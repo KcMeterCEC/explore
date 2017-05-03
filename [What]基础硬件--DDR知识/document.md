@@ -24,7 +24,7 @@
 > 芯片（内存颗粒）本身的 bit 位数，比如芯片位宽是 16bit，P-Bank 为64bit，那么一个内存条上需要 4 课芯片并联来满足 CPU 接口的需要。
 
 ### 逻辑 Bank
-![sdram theory](./SDRAM theory.jpg)
+![sdram theory](./SDRAM-theory.jpg) 
 > SDRAM 内部由很多表格组成，表格层层堆叠为整个内存。其中一个表格就是一个逻辑 Bank(L-Bank)。
 > 寻址时就要先确定是哪个 L-Bank ，然后在 L-Bank 中选定行 (Row) 和列 (Colum)。所以在同一时刻只能操作一个 L-Bank。
 > 也可以看出 **SDRAM表格每个单元的容量就是芯片的位宽，也是 L-Bank 的位宽** 。
@@ -51,7 +51,7 @@
 
 > 需要注意的是： **在发送行选择后，需要间隔一段时间才能发送列选择命令。定义为 tRCD，就是 RAS to CAS Delay** 。
 > tRCD 以时钟周期数 (tCK) 为单位，如下图所示。
-![sdram tRCD](./SDRAM tRCD.jpg)
+![sdram tRCD](./SDRAM-tRCD.jpg)
 
 #### SDRAM 数据读出
 > 在 CAS 发出后，需要经过一段时间后才能有数据输出。从CAS与读取命令发出到第一笔数据输出的时间定义为 **CL (CAS Latency， CAS 潜伏期)** 。
@@ -62,24 +62,24 @@
 > S-AMP 需要有一个准备时间才能保证信号的发送强度，也就是说数据需要经过一定时间才能出现在数据总线上。
 > 这个时间被称为 **tAC(Access Time from CLK, 时钟触发后的访问时间)** ， 单位为 nS 。
 > 需要注意的是：每个数据在读取时都有 tAC ，包括在连续读中，只是在进行一个数据传输的同时就开始了第二个数据的 tAC 。
-![sdram cl & tAC](./SDRAM cl.jpg)
+![sdram cl & tAC](./SDRAM-cl.jpg)
 
 ### SDRAM 数据写入
 > 数据写入操作是在 tRCD 后进行，但此时没有了 CL ，如下图所示。
-![sdram write](./SDRAM write.jpg)
+![sdram write](./SDRAM-write.jpg)
 
 > 数据写入虽然没有延时，但是在内部电容充电过程中依然需要一定的时间，称为 ** 写入 / 校正时间 (tWR, Write Recovery Time)** ，也叫写回 (Write Back)。
 
 ### 突发长度
 > 连续传输所涉及到的存储单元的数量就是突发长度 (Burst Lengths, BL) ，如下图所示 。
-![sdram bl](./SDRAM BL.jpg)
+![sdram bl](./SDRAM-BL.jpg)
 
 ### 预充电
 > L-Bank 关闭现有工作行，准备打开新行的操作就是预充电 (Precharge) 。
 > 实际上是对工作行中所有存储体进行数据重写，并对行地址进行复位，同时释放 S-AMP 以准备新行的工作。
 > 在发出预充电命令后，要经过一段时间后才能允许发送 RAS 命令打开新工作行，这个间隔称为 **tRP(Precharge command Period，预充电有效周期)** 。
 > tRP 以时钟周期为单位。
-![sdram rp](./SDRAM RP.jpg)
+![sdram rp](./SDRAM-RP.jpg)
 
 ### 刷新
 > 预充电是对一个或所有 L-Bank 中的工作行操作，并且是不定期的。而刷新是有固定周期，依次对所有的行进行操作，为了保留久久没有经历重写的存储体中的数据。
@@ -88,7 +88,7 @@
 
 ### 数据掩码 (Data I/O Mask, DQM)
 > 内存可以控制  I/O 端口取消哪些输出或输入的数据。一个 DQM 信号占用一字节。
-![sdram dqm](./SDRAM DQM.jpg)
+![sdram dqm](./SDRAM-DQM.jpg)
 
 
 ## DDR 基本结构及时序
