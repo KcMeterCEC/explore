@@ -18,9 +18,32 @@ DDR 是跑 ssbl 和系统的基础，但 DDR 由于布线参数等等原因不�
 比较好的解决步骤是：
 
 1.  在 vivado 下将 DDR 时钟降低，这样会降低由于布线造成的误差。
-2.  通过 JATG 下载 fsbl 配置 DDR ，然后再通过 JATG 下载例程 "DRAM test" 代码完成对整个 DDR 的读写测试。
-3.  参考 "DRAM test" 测试结果修改 DDR 配置参数，直到配置正常。
+2.  通过 JATG 下载 fsbl 配置 DDR ，然后再通过 JATG 下载例程 "DRAM test" 代码完成对整个 DDR 的读写测试（需要关闭 cache，命令“Z”）。
+3.  参考 "DRAM test" 测试结果（眼图测试命令“R/I/D/A”）修改 DDR 配置参数，直到配置正常。
 4.  提升 DDR 时钟到理论时钟，对参数再次进行微调。
 5.  在修改参数的过程中，要**注意截图保存**，因为参数会反复调。
 
 相关参考 : [ddr基础知识](https://github.com/KcMeterCEC/explore/blob/master/%5BWhat%5D%E5%9F%BA%E7%A1%80%E7%A1%AC%E4%BB%B6--DDR%E7%9F%A5%E8%AF%86/document.md)
+
+#### 对于 LPDDR
+
+vivado 对 lpddr 的配置参数支持并不友好，如果在前面的步骤无法搞定，那么需要**手动修改文件 "ps7\_init.c ps7\_init.tcl"**。
+
+**得到内核版本：**
+
+1. 使用 JATG 连接目标板
+2. 在 SDK 下调用控制台 "Xilinx Tools --> XSDB Console"
+3. 在控制台下连接目标板 "connect"
+4. 选中目标 "targets 1"
+5. 读取寄存器的值 "mrd 0xf8007080"
+6. 根据返回数据的第 31:28 位得出版本号，比如：30800100 代表版本3.0
+
+**修改寄存器并验证：**
+
+1. 修改 **对应版本** "ps7\_init.c ps7\_init.tcl" （查看 DDR MRX 配置，对应搜寻 zynq MRX 寄存器配置）
+
+**注意：** SDK 最坑爹的是它会在下载完一次代码后，自动还原上面两个文件的值！！！！！所以每次下载前需要重新修改
+
+2. 重新编译 "Project --> Clean"
+3. 通过“得到内核版本”中一样的步骤，读取寄存器
+
