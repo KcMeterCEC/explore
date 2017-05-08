@@ -47,3 +47,21 @@ vivado 对 lpddr 的配置参数支持并不友好，如果在前面的步骤无
 2. 重新编译 "Project --> Clean"
 3. 通过“得到内核版本”中一样的步骤，读取寄存器
 
+## 裸机测试
+
+打开 c99 标准： project-> properties -> c/c++Build -> settings -> ARM v7 gcc compiler -> Miscekkaneous 
+在 Other flags 中添加 -std=c99
+
+优化代码大小： 在添加c99标准处，继续添加 "-ffunction-sections -fdata-sections" ，在 xxxx ->settings -> ARM v7 gcc linker -> inferred options -> software platform -> software platform inferred flags 处，添加 "--gc-sections"
+
+**说明：**
+> 编译选项 -ffunction-sections -fdata-sections 使得编译器为每个 functions 和 data item 分配独立的 section。
+> 链接选项 --gc-sections 会使链接器删除没有被使用的section
+
+
+逻辑测试如果硬件稍多需要使用 FreeRTOS，需要注意的是：
+
+1. 包含头文件 "FreeRTOS.h" 的位置要在其他组件**之前**，并且在 debug 和 release 下都要添加此选项
+2. zynq 默认上电 IO 口有0.8v电压！！！
+3. 如果裸机代码大于 192KB，那么需要**修改链接脚本的映射**，并且调用 OCM重映射函数。
+4. 如果要修改 bsp 的部分配置，则**修改 libsrc 下的文件，不能修改 include文件夹下的文件，因为它会被覆盖！**
