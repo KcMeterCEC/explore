@@ -62,6 +62,7 @@ vivado 对 lpddr 的配置参数支持并不友好，如果在前面的步骤无
 逻辑测试如果硬件稍多需要使用 FreeRTOS，需要注意的是：
 
 1. 包含头文件 "FreeRTOS.h" 的位置要在其他组件**之前**，并且在 debug 和 release 下都要添加此选项
-2. zynq 默认上电 IO 口有0.8v电压！！！
-3. 如果裸机代码大于 192KB，那么需要**修改链接脚本的映射**，并且调用 OCM重映射函数。
+2. zynq 默认上电 IO 口是**高电平**！
+3. 如果裸机代码大于 192KB，那么需要**修改链接脚本的映射**，并且在**执行代码前**调用 [OCM重映射函数](https://github.com/KcMeterCEC/explore/tree/master/%5BWhat%5DZynq--%E6%9E%84%E6%9E%B6%E8%AF%B4%E6%98%8E)。
 4. 如果要修改 bsp 的部分配置，则**修改 libsrc 下的文件，不能修改 include文件夹下的文件，因为它会被覆盖！**
+5. 一般硬件 IIC 只需要提供 **7位地址即可**，不用包含最终的读写位，How foolish i am!
