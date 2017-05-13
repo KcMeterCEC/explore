@@ -10,7 +10,7 @@
 首先考虑的必是优秀的国产 RTOS --> RT Thread, 如果单片机是 emwin 授权的那就使用 emwin，否则使用 rt thread配套的 RTGUI。
 
 如果单片机资源不够，或者是RT Thread没有移植好的，那么可以考虑 FreeRTOS 或者是自己写个合作式调度器， 那么对应的GUI 就是**免费
-且开源的GUI** --> [littlev](little.hu)
+且开源的GUI** --> [littlev](littlev.hu)
 
 2. 基于 linux 的嵌入式平台
 
@@ -65,6 +65,12 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 
 3. 下载 pc 仿真代码
 
-> git clone https://github.com/littlevgl/proj\_pc
+> git clone https://github.com/littlevgl/proj_pc
+
+> cd proj_pc
+
+> git submodule init
+
+> git submodule update
 
 4. 启动 eclipse 并导入 littlev 工程， 编译， 运行。
