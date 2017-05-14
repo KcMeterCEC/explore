@@ -46,6 +46,8 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 
 > sudo apt install default-jdk
 
+> 设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-openjdk-amd64/jre/bin'"
+
 #### 安装正式版本
 
 > sudo add-apt-repository ppa:webupd8team/java
@@ -60,7 +62,7 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 
 > 配置在各个 java 版本间切换， sudo update-alternatives --config java  , 星号代表正在使用的版本，输入编号即可选择
 
-> 设置环境变量,  编辑文件 "/etc/profile" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-oracle/jre/bin'"
+> 设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-oracle/jre/bin'"
 
 
 3. 下载 pc 仿真代码
