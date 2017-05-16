@@ -49,7 +49,7 @@ vivado 对 lpddr 的配置参数支持并不友好，如果在前面的步骤无
 
 ## 裸机测试
 
-打开 c99 标准： project-> properties -> c/c++Build -> settings -> ARM v7 gcc compiler -> Miscekkaneous 
+打开 c99 标准： project-> properties -> c/c++Build -> settings -> ARM v7 gcc compiler -> Miscellaneous 
 在 Other flags 中添加 -std=c99
 
 优化代码大小： 在添加c99标准处，继续添加 "-ffunction-sections -fdata-sections" ，在 xxxx ->settings -> ARM v7 gcc linker -> inferred options -> software platform -> software platform inferred flags 处，添加 "--gc-sections"
