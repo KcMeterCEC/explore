@@ -104,7 +104,7 @@ ARM 处理器响应中断的时候，总是从固定的地址（一般是指中�
 由上图可知中断体系具有如下特点：
 
 1. 每个 CPU 具有自己的私有外设中断 Private Peripheral Interrupt(PPI), 具有5个中断源，包括全局定时器、私有看门狗、私有定时器、PL端的 FIQ/IRQ
-2. CPU 共用软件中断生成器 Software Generated Interrupt(SGI),具有16个中断源
+2. CPU 共用软件中断生成器 Software Generated Interrupt(SGI), **每个都** 具有16个中断源
 3. CPU 共用共享中断 Shared Peripheral Interrupt(SPI),一共具有60个中断源
 
 这些中断都由通用中断控制器（Generic Interrupt Controller,GIC）来实现管理。
@@ -128,7 +128,7 @@ ARM 处理器响应中断的时候，总是从固定的地址（一般是指中�
 | :----:      | :-----:   | :------: | :------: | :------: |
 | 软件 0 | 0 | 0 | 上升沿 |
 | 软件 1 | 1 | 1 | 上升沿 |
-|  .| . | . | . |
+|  . |  . | . | . |
 | 软件 15 | 15 | 15 | 上升沿 |
 
 ### 共享外设中断
