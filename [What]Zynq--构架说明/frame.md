@@ -32,7 +32,7 @@ BootROM 为了保证自己的运行空间，将其中的 64KB 设置到高位内
 
 通过修改 XSLCR_OCM_CFG_RESETVAL ，然后**在执行应用代码前**调用此函数即可，对于通过 JATG 下载的代码，需要[修改配置脚本](https://github.com/KcMeterCEC/explore/blob/master/%5BWhat%5D%E5%9F%BA%E7%A1%80%E7%A1%AC%E4%BB%B6--DDR%E7%9F%A5%E8%AF%86/document.md)。
 
-## 中断
+## 中断、异常、模式
 
 ### 概览
 
