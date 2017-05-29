@@ -89,7 +89,7 @@
 | C - z           | 后台 emacs （与 shell 一样）|
 | fg %[num]       | 回复后台进程 （与 shell一样）|
 | C - h c [command] | 查看 [command] 简单介绍 |
-| C - h k [command] | 查看 [command] 详细介绍 |
+| C - h k [key] | 查看 快捷键 详细介绍 |
 | C - h f [function] | 查看 [function] 介绍 |
 | C - h v [variables] | 查看变量介绍 |
 | C - h a [command] | 查找命令 |
@@ -101,6 +101,43 @@
 | C - s [string] | 搜索字符串，进入搜索模式后，输入 C - s ,切换到下一个字符串，C - r 切换到上一个字符串，按下 <Return> 退出搜索模式 |
 
 
-## 内置的配置
+## 配置
 
-- 显示行号 `M - x linum-mode`
+### 内置配置
+
+emacs 的配置默认是放在 `~/.emacs.d/init.el` 文件中的，文件使用 `elisp` 语言编写配置，每写完一行代码，都可以使用 `C - x C - e` 查看实际效果
+
+- 关闭工具栏 `(tool-bar-mode -1)`
+- 关闭滚动条 `(scroll-bar-mode -1)`
+- 显示行号 `(global-linum-mode t)`
+- 关闭启动画面 `(setq inhibit-splash-screen t)`
+- 默认启动第三方插件 `(global-xxxx t)` , `xxx` 为第三方包的名称
+- 禁止备份文件 `(setq make-backup-files nil)`
+- 文档中代码高亮 `(require 'org)` `(setq org-src-fontify-natively t)`
+- 保存最近打开的文件 `(require 'recentf)` `(recentf-mode t)` `(setq recentf-max-menu-items 25)`
+- 选中的内容输入后，直接替换而不是连接 `(delete-selection-mode t)`
+- 括号匹配 `(add-hook 'emacs-lisp-mode-hook 'show-paren-mode)`
+- 高亮当前行 `(global-hl-line-mode t)`
+
+### 第三方插件配置
+
+emacs 具有内置的包管理器，里面包含了很多可以安装的包。安装完成的包存放于 `~/.emacs.d/elpa/` 文件夹中，对应的会在 `~/.emacs.d/init.el` 文件中生成一定的函数
+在使用第三方包之前，需要先配置 [emacs 的源](http://melpa-stable.milkbox.net/#/)
+j
+#### 与 packages 相关的命令
+
+- package-list-packages  列出所有可用的packages
+- customize-group 图形化定制packages 设置，最终也会在 init.el 文件中添加变量
+
+#### 牛逼的packages
+
+- 主题 monokai-theme
+- 快速删除 hungry-delete
+- 命令快速补全 smex
+- 实时显示搜索结果 swiper
+- 括号引号等补全  smartparens
+- js编程环境 js2-mode nodejs-repl
+
+## 懒人配置
+
+- clone [陈斌大师的配置并做了一些修改](https://github.com/KcMeterCEC/emacs.d)

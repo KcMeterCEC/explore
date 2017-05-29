@@ -7,6 +7,8 @@ elisp 实际上是函数式的调用方式，和 c/c++ 一样都具有函数名�
 
 在进入 emacs 后，按下 `q` 便可进入。在函数后的括号输入 `C - j` 或者 `C - x C - e` 便可执行当前函数，
 
+**注意：** 新写一行代码，都需要执行一次以生效，否则会报错！
+
 ### 注释：
 
 使用两个分号 `;;`
@@ -43,6 +45,25 @@ elisp 实际上是函数式的调用方式，和 c/c++ 一样都具有函数名�
 
 > (format "Hello %s!\n" "visitor")
 
+- let 帮定字符串
+
+> (let ((name "hello")) (message "%s\n" name))
+
+- read-from-minibuffer 从 minibuffer 与用户交互
+
+> (read-from-minibuffer "Enter your name:")
+
+- 定义字符串列表
+
+> (setq list-of-names '("Sarah" "Chloe" "Mathilde"))
+
+> (car list-of-names) ;;输出列表的第一个字符串
+
+> (cdr list-of-names) ;;输出列表的剩余字符串
+
+> (push "Stephanie" list-of-names) ;;将字符串添加到列表头
+
+> (mapcar 'hello list-of-names) ;;依次取出字符串然后作用于 hello 函数
 
 ### 定义函数
 
