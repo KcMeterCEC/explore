@@ -1,0 +1,524 @@
+* [What] Zynq --> petalinux & u-boot 2016.1
+
+** 配置
+默认 u-boot 的配置方式是使用 =make menuconfig= , 但在 petalinux 下使用 =petalinux-config -c u-boot=.
+petalinux 会先生成一个默认的配置文件位于 : project/subsystem/linux/configs/u-boot/config ,然后会有一个配置界面.
+与此配置界面相关联的文件有:
+1. =./scripts= 下的文件存放与配置界面相关的代码,从使用者的角度来看,不用关心
+2. =./arch/${ARCH}/Kconfig= 以及各个层次目录下的 Kconfig
+3. 根目录以及各个目录下的 Makefile
+4. 根目录以及各个目录下的 config.mk
+
+*** 配置流程
+1. 当使用 =petalinux-config -c u-boot= 时,petalinux 底层会传入 ARCH 值,然后系统会读取对应ARCH 以及相关目录下的 Kconfig .
+这些 Kconfig 中就含有一些配置的默认值.并且也会去读取 =project/subsystem/linux/configs/u-boot/config= 文件中的设置,最终确定
+menuconfig 中的选项状态.
+2. 当确定配置并退出界面后,petalinux 会根据配置更新 =project/subsystem/linux/configs/u-boot/config= 以及 =project/subsystem/linux/configs/u-boot/platform-auto.h=
+3. 编译生成 u-boot.bin 使用 =petalinux-build -c u-boot=
+    - 首先会拷贝 components 下的 u-boot ,到 =build/linux/u-boot/src/= 下.
+    - 然后会将步骤2文件夹中的 =platform-auto.h= 以及 =platform-top.h= 拷贝到 =build/linux/u-boot/src/<U_BOOT_SRC>/include/configs/= 目录下,同时 =platform-top.h= 会更名为 =zynq_zc70x.h=
+    - 然后拷贝步骤2文件夹中的 =config= 文件转换到 =build/linux/u-boot/<U_BOOT>/include/generated= 文件夹下,并且还会生成一些其他附加信息头文件.
+
+*结论* : 通过分析上述的配置步骤,可以得出以下结论
+1. =components/u-boot/= 下的源码是一个参考,到最终编译的时候,会被拷贝至 =/build/linux/u-boot/src= 
+2. 配置 u-boot 时,尽量使用图形界面配置,如果图形界面没有引申出来的配置,便在 =project/subsystem/linux/configs/u-boot/platform-top.h= 文件中增加配置
+3. 退出图形界面后,可以查看 =project/subsystem/linux/configs/u-boot/= 目录来了解全部的配置情况
+4. 对于更加深入的配置,比如要增加文件,除了文件本身,还需要修改相应的 Kconfig 和 Makefile 文件
+
+*** 在 u-boot 中增加多余的外设控制代码
+
+*** 在 u-boot 中增加命令
+
+u-boot 中的命令文件位于 `common` 文件夹中。
+
+1. 为了与 u-boot 统一，新建的命令文件名为 `cmd_xxx.c`
+2. 参考其他的命令文件格式，新建命令处理函数以及 `U_BOOT_CMD`
+3. 在  `common/Makefile` 中增加宏定义开关，比如 `obj-$(CONFIG_CMD_ECHO) += cmd_echo.o`
+4. 在 `common/Kconfig` 中增加命令开关
+
+
+** 编译过程
+
+*** spl 编译过程
+
+spl(Secondary program loader)是u-boot中的一个分支,是一个精简的启动代码,用于支持运行在内部的 RAM 中.
+这和 zynq 的 fsbl 功能类似,spl的使命就是初始化必要的硬件环境好支持 u-boot 的正常运行.使能 SPL 的编译,需要打开选项
+`CONFIG_SPL` .
+
+SPL 编译流程也是和 u-boot 编译命令一致,在 Makefile 中走了两条分路,最终会生成 uboot.bin 和 uboot-spl.bin.
+总体流程如下:
+
+1. 在各个子目录源码下生成对应的 `.o` 文件,然后根据 `u-boot-spl.lds` 中的链接关系进行链接生成 `u-boot-spl`.
+2. `u-boot-spl` 中包含了符号表,使用 `objcopy` 命令去掉符号表信息,生成 `u-boot-spl.bin`
+
+**** 从顶层的 Makefile 分析:
+
+1.  根据配置,来判断是否将 `u-boot-spl.bin` 加入编译目标
+
+#+NAME: .Malefile
+#+BEGIN_SRC shellv
+## line 752
+## 只有配置了 CONFIG_SPL 才会加入编译
+ALL-$(CONFIG_SPL) += spl/u-boot-spl.bin
+
+## line 1327
+spl/u-boot-spl.bin: spl/u-boot-spl
+	@:
+## 判断是分离设备树,然后执行命令 make -f scripts/Makefile.spl all
+spl/u-boot-spl: tools prepare $(if $(CONFIG_OF_SEPARATE),dts/dt.dtb)
+	$(Q)$(MAKE) obj=spl -f $(srctree)/scripts/Makefile.spl all
+#+END_SRC
+
+2. 编译 `u-boot-spl.bin`
+
+
+```
+## line 35
+SPL_BIN := u-boot-spl
+## line 139
+ALL-y	+= $(obj)/$(SPL_BIN).bin $(obj)/$(SPL_BIN).cfg
+## line 217
+## u-boot-spl.bin 是由 u-boot-spl 使用 objcopy 命令得到的
+$(obj)/$(SPL_BIN).bin: $(obj)/$(SPL_BIN) FORCE
+	$(call if_changed,objcopy)
+
+## line 244
+## 层层调用依赖的文件并链接
+## u-boot-spl.lds : arch/arm/cpu/
+$(obj)/$(SPL_BIN): $(u-boot-spl-init) $(u-boot-spl-main) $(obj)/u-boot-spl.lds FORCE
+	$(call if_changed,u-boot-spl)
+```
+
+*** U-BOOT 编译过程
+
+普通 u-boot 编译过程大体如下：
+1. 先在相应的子文件夹中编译相应的文件
+2. 根据 `u-boot.lds` 将目标文件链接为 `u-boot` 文件
+3. 将 `u-boot` 使用 `objcopy` 去掉符号表，生成 `u-boot-nodtb.bin`
+4. 将 dts 文件编译为 `u-boot.dtb` 与 `u-boot-nodtbl.bin` 打包为 `u-boot.bin`
+
+但在 petalinux 中并不是这样,整个流程需要反复分析 log 文件 以及 build/linux/u-boot/Makefile 文件来厘清
+1. petalinux 会将 u-boot 源码拷贝一份到 =build/linux/u-boot= 目录,然后调用当前文件下的 Makefile
+
+
+
+**** 分析 =build/linux/u-boot/Makefile= 
+首先就是在此目录下执行 =make all= 
+
+#+BEGIN_SRC shell
+#+END_SRC
+
+**** 从顶层 Makefile 分析
+
+1. 生成 `u-boot.bin` 的依赖
+
+```
+## line 872
+u-boot.bin: u-boot FORCE
+	$(call if_changed,objcopy)
+	$(call DO_STATIC_RELA,$<,$@,$(CONFIG_SYS_TEXT_BASE))
+	$(BOARD_SIZE_CHECK)
+## line 1192
+u-boot:	$(u-boot-init) $(u-boot-main) u-boot.lds
+	$(call if_changed,u-boot__)
+ifeq ($(CONFIG_KALLSYMS),y)
+	$(call cmd,smap)
+	$(call cmd,u-boot__) common/system_map.o
+endif
+
+## line 1180
+cmd_u-boot__ ?= $(LD) $(LDFLAGS) $(LDFLAGS_u-boot) -o $@ \
+-T u-boot.lds $(u-boot-init)                             \
+--start-group $(u-boot-main) --end-group                 \
+$(PLATFORM_LIBS) -Map u-boot.map
+```
+2. 生成设备树
+
+编译文件位置：arch/arm/dts
+
+```
+
+## line 63
+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+	zynq-zc706.dtb \
+	zynq-zed.dtb \
+	zynq-zybo.dtb \
+	zynq-microzed.dtb \
+	zynq-cc108.dtb \
+	zynq-afx-nand.dtb \
+	zynq-afx-nor.dtb \
+	zynq-afx-qspi.dtb \
+	zynq-cse-nand.dtb \
+	zynq-cse-nor.dtb \
+	zynq-cse-qspi.dtb \
+	zynq-picozed.dtb \
+	zynq-zc770-xm010.dtb \
+	zynq-zc770-xm011.dtb \
+	zynq-zc770-xm012.dtb \
+	zynq-zc770-xm013.dtb
+
+## line 211
+targets += $(dtb-y)
+
+# Add any required device tree compiler flags here
+DTC_FLAGS +=
+
+PHONY += dtbs
+dtbs: $(addprefix $(obj)/, $(dtb-y))
+	@:
+
+clean-files := *.dtb
+
+## ./Makefile line 833
+## make -f /scripts/Makefile.build obj=dts dtbs
+dtbs dts/dt.dtb: checkdtc u-boot
+	$(Q)$(MAKE) $(build)=dts dtbs
+
+## /scripts/Malefile.build
+## line 53
+# The filename Kbuild has precedence over Makefile
+kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
+kbuild-file := $(if $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Kbuild,$(kbuild-dir)/Makefile)
+include $(kbuild-file)
+## line 70
+include scripts/Makefile.lib
+
+## scripts/Malefile.lib
+## line 295
+$(obj)/%.dtb: $(src)/%.dts FORCE
+	$(call if_changed_dep,dtc)
+
+
+```
+
+
+
+make menuconfig
+
+** 启动过程
+
+*** SPL
+
+从链接脚本中可以知道代码入口是 `_start`,位于 `arch/arm/lib/vector.S`
+`vector.S` 定义了异常向量表，在SPL中的异常都会导致死循环，在进入 `_start`后便进入复位处理函数（start.S）
+
+大致流程为：
+1. 关闭中断，进入管理模式（SVC），关闭 MMU 、TLB、cache,
+2. 进入 lowlevel_init,设置芯片内部参数，比如关闭看门狗、时钟、DDR、串口等初始化
+3. 进入 `_main` ，设置堆栈和 SP 参数，为运行代码 `board_init_f` 准备运行环境
+4. 跳转到 u-boot
+
+
+*** u-boot
+u-boot 中与实际硬件平台相关的结构层次如下图所示（参考于 [蜗窝科技](http://www.wowotech.net/u-boot/boot_flow_1.html) ）：
+
+![arch](./uboot_arch.jpg)
+
+- board : 代表整个硬件平台，在对应目录下主要为 **控制器之外的外设代码**
+- machine : 代表 SOC，在对应目录下主要为 **控制器内部的 CPU的外设控制器代码**
+- arch : 代表 CPU，在对应目录下主要为 **除开 CPU 内核架构外的内部代码**
+- CPU : 代表 CPU 架构，比如 "armv7",在对应目录主要为 **CPU 内核架构处理代码**
+
+由下从上看，流程大致如下图：
+
+![stream](./uboot_stream.jpg)
+
+在各个层级的调用关系为：
+
+- u-boot 启动后，会最先执行 CPU 层代码初始化基本的内核
+- CPU 相关代码会调用 ARCH 层代码初始化内部架构
+- ARCH 相关代码会调用 BOARD 层来初始化控制器外设
+- BOARD 层会根据使用的外设来调用 MACHINE 层代码，来初始化 SOC 对应的内部控制器
+
+了解 u-boot 的启动过程，最好的方式是首先打开uboot的一些调试选项，比如 `CONFIG_DISPLAY_BOARDINFO` ,选项会输出当前平台的启动流程。
+
+在 petalinux 的支持下：
+1. 需要在 `./subsystems/linux/configs/u-boot/platform-top.h` 文件中增加此项宏定义
+2. 编译 u-boot `petalinux-build -c u-boot `
+3. 生成 BOOT.bin `petalinux-package --boot --fsbl <fsbl> --fpga <fpga> --u-boot`
+
+*** 1. start.S
+
+> arch/arm/cpu/armv7/start.S
+
+
+*** 2. lowlevel_init()
+
+*** 3. board_init_f()
+
+*** 4. board_init_r()
+
+*** 5. main_loop()
+
+> common/main.c
+
+** 配置
+
+从启动过程分析可以知道，当使用一个已经移植好的底层代码架构时，仅仅需要修改与板载外设相关的代码，然后增加相应的命令即可。基本的配置方式，除了 `make menuconfig` 和定义 `CFG_XX` 宏以外，进一步的改进为：
+
+> 在petalinux 中，配置 u-boot 使用命令 `petalinux-config -c u-boot`
+
+*** 在 u-boot 中增加多余的外设控制代码
+
+*** 在 u-boot 中增加命令
+
+u-boot 中的命令文件位于 `common` 文件夹中。
+
+1. 为了与 u-boot 统一，新建的命令文件名为 `cmd_xxx.c`
+2. 参考其他的命令文件格式，新建命令处理函数以及 `U_BOOT_CMD`
+3. 在  `common/Makefile` 中增加宏定义开关，比如 `obj-$(CONFIG_CMD_ECHO) += cmd_echo.o`
+4. 在 `common/Kconfig` 中增加命令开关
+
+** 驱动
+
+uboot 驱动 也使用了设备树来载入具体设备的方式.
+
+** 启动过程
+
+*** SPL
+
+从链接脚本中可以知道代码入口是 `_start`,位于 `arch/arm/lib/vector.S`
+`vector.S` 定义了异常向量表，在SPL中的异常都会导致死循环，在进入 `_start`后便进入复位处理函数（start.S）
+
+大致流程为：
+1. 关闭中断，进入管理模式（SVC），关闭 MMU 、TLB、cache,
+2. 进入 lowlevel_init,设置芯片内部参数，比如关闭看门狗、时钟、DDR、串口等初始化
+3. 进入 `_main` ，设置堆栈和 SP 参数，为运行代码 `board_init_f` 准备运行环境
+4. 跳转到 u-boot
+
+
+*** u-boot
+u-boot 中与实际硬件平台相关的结构层次如下图所示（参考于 [蜗窝科技](http://www.wowotech.net/u-boot/boot_flow_1.html) ）：
+
+![arch](./uboot_arch.jpg)
+
+- board : 代表整个硬件平台，在对应目录下主要为 **控制器之外的外设代码**
+- machine : 代表 SOC，在对应目录下主要为 **控制器内部的 CPU的外设控制器代码**
+- arch : 代表 CPU，在对应目录下主要为 **除开 CPU 内核架构外的内部代码**
+- CPU : 代表 CPU 架构，比如 "armv7",在对应目录主要为 **CPU 内核架构处理代码**
+
+由下从上看，流程大致如下图：
+
+![stream](./uboot_stream.jpg)
+
+在各个层级的调用关系为：
+
+- u-boot 启动后，会最先执行 CPU 层代码初始化基本的内核
+- CPU 相关代码会调用 ARCH 层代码初始化内部架构
+- ARCH 相关代码会调用 BOARD 层来初始化控制器外设
+- BOARD 层会根据使用的外设来调用 MACHINE 层代码，来初始化 SOC 对应的内部控制器
+
+了解 u-boot 的启动过程，最好的方式是首先打开uboot的一些调试选项，比如 `CONFIG_DISPLAY_BOARDINFO` ,选项会输出当前平台的启动流程。
+
+在 petalinux 的支持下：
+1. 需要在 `./subsystems/linux/configs/u-boot/platform-top.h` 文件中增加此项宏定义
+2. 编译 u-boot `petalinux-build -c u-boot `
+3. 生成 BOOT.bin `petalinux-package --boot --fsbl <fsbl> --fpga <fpga> --u-boot`
+
+*** 1. start.S
+
+> arch/arm/cpu/armv7/start.S
+
+
+*** 2. lowlevel_init()
+
+*** 3. board_init_f()
+
+*** 4. board_init_r()
+
+*** 5. main_loop()
+
+> common/main.c
+
+** 驱动
+
+uboot 驱动 也使用了设备树来载入具体设备的方式.
+
+*** 术语
+
+- udevice 指设备对象, 实际上就是一个结构体,在使用设备树的情况下,此对象通过解析设备树而自动生成
+- driver 指的是 udevice 的驱动,并且操作函数格式满足 uclass 接口,最终的操作函数会做为uclass的元素
+- uclass 是指代表一个设备类, 将同一类的设备操作方法抽象出来.实际上可以理解为包含函数指针的结构体
+- uclass_driver 是对 uclass 的操作函数
+
+*** 使用沙盒仿真驱动
+
+1. make sandbox_defconfig
+2. make
+3. ./u-boot -d u-boot.dtb
+
+*** 使用自动测试工具
+
+1. ./test/dm/test-dm.sh
+
+*** 由上至下看驱动的调用步骤
+
+通过最简单的命令 `cmd_demo.c` 来展示调用步骤
+
+```c
+struct udevice *demo_dev;
+
+/*!
+@brief
+
+UCLASS_DEMO 代表的就是一个类的名称
+devnum 代表一个设备的编号
+demo_dev 代表就是一个设备的通用结构体
+
+通过此函数找到对应的设备
+*/
+ret = uclass_get_device(UCLASS_DEMO, devnum, &demo_dev);
+
+// 接下来便可以调用使用函数
+return demo_hello(demo_dev, ch);
+```
+```c
+int demo_hello(struct udevice *dev, int ch)
+{
+    const struct demo_ops *ops = device_get_ops(dev);
+    if(!ops->hello)
+        return -ENOSYS;
+
+    return ops->hello(dev, ch);
+}
+
+// 最终映射到底层驱动
+
+static int simple_hello(struct udevice *dev, int ch)
+{
+    const struct dm_demo_pdata *pdata = dev_get_platdata(dev);
+
+    printf("Hello from %08x:  %s %d \n", map_to_sysmem(dev), pdata->colour, pdata->sides);
+
+    return 0;
+}
+
+```
+
+*** 驱动编写
+
+参考 `demo-shape.c`
+
+定义驱动需要先为对应的方法提供函数,然后提供宏定义.
+
+```c
+
+static const struct demo_ops shape_ops =
+{
+    .hello = shape_hello,
+    .status = shape_status,
+};
+
+
+U_BOOT_DRIVER(demo_shape_drv) =
+{
+    .name = "demo_shape_drv",
+    .id = UCLASS_DEMO,
+    .ops = &shape_ops,
+    .priv_data_size = sizeof(struct shape_data),// 使用 `dev_get_priv(dev)` 访问私有数据
+};
+
+```
+
+除此之外 `U_BOOT_DRIVER`(device.h) 一般还具有以下元素:
+
+- bind 将设备与驱动绑定
+- unbind
+- probe 设备准备被使用
+- remove
+- ofdata_to_platdata 将设备树转换为数据结构
+
+工作顺序是 bind --> ofdata_to_platdata -> probe
+
+*** platform data
+
+目前官方推荐不直接使用 platform data ,而是通过设备树的方式.
+以 `demo-pdata.c` 为例
+
+```c
+static const struct dm_demo_cdata red_square =
+{
+    .colour = "red",
+    .sides = 4,
+};
+
+ststic const struct driver_info info[] =
+{
+    {
+        .name = "demo_shape_drv",
+        .platdata = &red_square,
+    },
+};
+
+demo1 = driver_bind(root, &info[0]);
+```
+
+*** 设备树(/arch/arm/dts)
+
+设备树是更为灵活的方式,相比较 `platform_data` 中表示的数据,设备树表示如下:
+
+```c
+red-square
+{
+    compatible = "demo-shape";
+    colour = "red";
+    sides = <4>;
+};
+```
+让设备树工作的最简单的方式是:
+```c
+/*!
+@brief
+auto_alloc 是为申请足够的内存,用于存放将设备树转换为数据结构的空间
+ofdata_to_platdata 是为了将设备树转换为数据的方法
+
+也可以主动申请设备树数据内存,但是也需要手动释放.
+*/
+
+.platdata_auto_alloc_size = sizeof(struct dm_tast_pdata),
+.ofdata_to_platdata = testfdt_ofdata_to_platdata,
+```
+*** 新建类
+
+参考代码 `include/dm/ucalss.h` 来添加新类
+
+*** 设备号
+
+设备号默认是从0开始编号,也可以主动载设备树中申请(*需要确保  `DM_UC_FLAG_SEQ_ALIAS` 标志被设置*):
+
+```c
+//申请的设备号为2
+aliases
+{
+    serial2 = "/serial@22230000";
+};
+
+/./下面这种方式更为直观
+aliases
+{
+    serial2 = &serial_2;
+};
+.....
+serial_2:serial@22230000
+{
+....
+};
+```
+*** 总线驱动
+
+设备可以使用函数 `dev->parent_platdata` 来获得总线的设置参数,
+
+*** 驱动的生命周期
+
+1. 绑定阶段
+
+绑定阶段有两种方法,一种是在 `U_BOOT_DEVICE()` 中直接提供设备数据结构,然后 u-boot 会调用 `device_bind()` 来绑定设备与驱动,
+还有一种是在设备树中定义设备接点,u-boot 会扫瞄设备树然后创建数据结构.
+
+2. 激活阶段
+
+当 `priv_auto_alloc_size` 为非0, 然后会申请一段私有空间,使用`dev->priv`来访问这段数据
+
+当 `platdata_auto_alloc_size` 为非0,然后会申请一段私有空间,使用`dev->platdata`来访问这段数据
+
+当`per_device_auto_alloc_size`为非0,然后会申请一段私有空间
