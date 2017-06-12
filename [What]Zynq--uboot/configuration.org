@@ -5,7 +5,7 @@
 petalinux 会先生成一个默认的配置文件位于 : project/subsystem/linux/configs/u-boot/config ,然后会有一个配置界面.
 与此配置界面相关联的文件有:
 1. =./scripts= 下的文件存放与配置界面相关的代码,从使用者的角度来看,不用关心
-2. =./arch/${ARCH}/Kconfig= 以及各个层次目录下的 Kconfig
+2. =./Kconfig= 以及各个层次目录下的 Kconfig
 3. 根目录以及各个目录下的 Makefile
 4. 根目录以及各个目录下的 config.mk
 
@@ -147,7 +147,7 @@ u-boot具有一些默认的环境变量,只需要增加其对应的宏定义即�
 - =fdt rm <node>= 来删除节点
 - =fdt move <address>= 来移动设备树
 ** 调试技巧
-
+   
 ** 驱动
 uboot 驱动 也使用了设备树来载入具体设备的方式.
 
