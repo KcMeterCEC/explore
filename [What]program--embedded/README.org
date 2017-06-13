@@ -1,0 +1,34 @@
+[What]embedded --> communication
+=================================
+
+## 与芯片通信
+
+当通过与存储芯片进行通信时，可以不用**在意大小端的问题。**
+
+比如与 eeprom 进行通信：
+
+```
+uint32_t u32_data = 0x1234;
+
+// 写数据
+eeprom_write((uint8_t *)&u32_data, sizeof(u32_data), SAVE_ADDR);
+
+// 读数据
+eeprom_read((uint8_t *)&u32_data, sizeof(u32_data), SAVE_ADDR);
+```
+
+但如果与其他芯片通信，则应该**一字节一字节的读取，然后再映射到整体数据上。**
+
+比如与 iic 接口的气压计通信：
+
+```
+uint16_t u16_readData = 0;
+uint8_t  pu8_buf[2];
+
+press_read(pu8_buf, 2, READ_ADDR);
+
+u16_readData = (uint16_t)pu8_buf[0] << 8 | pu8_buf[1];
+
+```
+
+**今天就是想当然，所以困惑了半天！！！**

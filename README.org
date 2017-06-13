@@ -1,0 +1,14 @@
+* explore
+相信积累的力量
+
+** 学习书籍列表
+*** STARTED <<程序员的自我修养>>
+*** STARTED <<构建之法>>
+*** TODO <<正则表达式>>
+
+** 学习软件列表
+*** STARTED gnuradio
+*** STARTED emacs
+
+** 学习语言列表
+*** STARTED python
