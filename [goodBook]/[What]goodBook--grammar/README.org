@@ -305,7 +305,6 @@ Use only the present simple with these verbs .
 - Do you know that girl ? Yes but I don't remember her name.
 - I don't understand .What do you mean ?
 
-
 *** I have ... and I've got ...
 You can say I have or I've got , he has or he's got:
 *I have* or *I have got* (I've got).
@@ -354,3 +353,205 @@ No, it hasn't.
 - Tracey and Jeff haven't got any children.
 - It's a nice house, but it hasn't got a garden.
 - Have you got a camera ? No, I haven't.
+- What have you got in your bag? Nothing.It's empty.
+- Has Helen got a car? Yes, she has.
+- What kind of car has she got?
+
+=I don't have / do you have?=
+In negatives and questions you can also use do / does ...
+- They don't have any children.  = They haven't got any children.
+- It's a nice house, but it doesn't have a garden. = it hasn't got a garden.
+- Does Helen have a car ? = Has Helen got a car ?
+- What do you have in your bag? = What have you got in your bag ?
+ 
+*** was / were
+Now Robert is at work. At midnight last night, he wasn't at work. He was in bed. He was asleep.
+
+*am / is* (present) -> *was* (past):
+- I am tired.                I was tired last night.
+- Where is Kate ?        Where was Kate yesterday?
+- The weather is good today.           The weather was good last week.
+
+*are* (present) --> *were* (past):
+- You are late.      You were late yesterday.
+- They aren't here.     They weren't here last Sunday.
+
+positive:
+I was.
+he was.
+she was.
+it was.
+we were.
+you were.
+they were.
+
+negative:
+I was not.
+he was not.
+she was not.
+it was not.
+we were not.
+you were not.
+they were not.
+
+question:
+was I?
+was he?
+was she?
+was it?
+were we?
+were you?
+were they?
+
+- Last year Rachel was 22, so she is 23 now.
+- When I was a child, I was afraid of dogs.
+- We were hungry after the journey, but we weren't tired.
+- The hotel was comfortable, but it wasn't on holiday ?
+- Your shoes are nice, Were they expensive ?
+- Why were you late this morning ?
+
+short answers:
+Yes, I / he / she / it was.
+Yes, we / you /they were.
+No, I / he / she / it wasn't.
+No, we / you / they weren't.
+
+- Were you late ? No, I wasn't.
+- Was Ted at work yesterday ? Yes, he was.
+- Were Sue and Steve at the party? No, they weren't.
+
+*** worked / got / went etc. (past simple)
+They watch television every evening. (present simple)
+They *watched* television every evening. (past simple)
+*watched* is the past simple.
+
+I / we / you / they / she /he / it watched.
+
+The past simple is  often *-ed* (regular verbs). For example:
+work -> worked    dance -> danced   clean -> cleaned stay -> stayed
+start -> started    need -> needed
+
+- I clean my teeth every morning. This morning I cleaned my teeth.
+- Terry worked in a bank from 1996 to 2003.
+- Yesterday it rained all morning. It stopped at lunchtime.
+- We enjoyed the party last night. We danced a lot and talked to a lot of people . The party finished at midnight.
+
+Spelling:
+try -> tried    study -> studied   copy -> copied  stop -> stopped  plan -> planned
+
+Some verbs are irregular . The past simple is not -ed. Here are some important irregular verbs:
+| begin  -> began  | fall -> fell     | leave -> left    | sell -> sold     |
+| break -> broke   | find -> found    | lose -> lost     | sit -> sat       |
+| bring -> brought | fly -> flew      | make -> made     | sleep -> slept   |
+| build -> built   | forget -> forgot | meet -> met      | spek -> spoke    |
+| buy -> bought    | get -> got       | pay -> paid      | stand -> stood   |
+| catch -> caught  | give -> gave     | put -> put       | take -> took     |
+| come -> came     | go -> went       | read ->read(red) | tell -> told     |
+| do -> did        | have -> had      | ring -> rang     | think -> thought |
+| drink -> drank   | hear -> heard    | say -> said      | win -> won       |
+| eat -> ate       | know -> knew     | see -> saw       | write -> wrote   |
+
+- I usually get up early, but this morning I got up at 9 o'clock.
+- We did a lot of work yeaterday.
+- Caroline went to the cinema three times last week.
+- James came into the room, took off his coat and sat down.
+*** I didn't ....   Did you .... ? (past simple negative and questions)
+We use *did* in past simple negatives and questions:
+| infinitive | positive    | negative         | question        |
+|------------+-------------+------------------+-----------------|
+| play       | I played    | I didn't play    | did I play ?    |
+| start      | we started  | we didn't strart | did we start ?  |
+| watch      | you watched | you didn't watch | did you watch ? |
+| have       | they had    | they didn't have | did they have ? |
+| see        | he saw      | he didn't saw    | did he see ?    |
+| do         | she did     | she didn't do    | did she do ?    |
+| go         | it went     | it didn't go     | did it go ?     |
+
+do / does (present) -> did (past)
+- I don't watch television very often.
+- I didn't watch television yesterday.
+- Does she often go away ?
+- Did she go away last week ?
+
+We use did / didn't + infinitive (watch / play / go etc)
+I watched   -->  I didn't watchi
+they went --> did they go ?
+he had -> he didn't have
+you did -> did you do ?
+
+- I played tennis yesterday, but I didn't win.
+- Did you do the shopping ? No , I didn't have time.
+- We went to the cinema, but we didn't enjoy the film.
+
+Study the word order in questions :
+=did + subject + infinitive=
+- Did your sister phone you ?
+- What did you do last night ?
+- How did the accident happen ?
+- Where did your parents go for their holiday ?
+
+short ansers:
+Yes, I / we / you /they / he /she / it did.
+No, I / we / you /they /he / she /didn't.
+- Did you see joe yesterday ? No, I didn't.
+- Did it rain on Sunday ? Yes, it did.
+- Did Helen come to the party ? No, she didn't.
+- Did your parents have a good holiday ? Yes, they did.
+*** I was doing (past continuous)
+It is 6 o'clock now.
+Paul is at home.
+He is watching television.
+At 4 o'clock he wasn't at home.
+He was at the sports club.
+He was swimming in the pool.
+He wasn't watching television.
+
+=was / were + -ing is the past continuous=
+positive:
+I was doing.
+he was watching.
+she was playing.
+it was living.
+we were doing.
+you were playing.
+they were swimming.
+
+negative:
+I wasn't doing.
+he wasn't watching.
+she wasn't playing.
+it wasn't living.
+we weren't doing.
+you weren't playing.
+they weren't living.
+
+question:
+was I doing ?
+was he watching ?
+was she playing ?
+was it living ?
+were we doing?
+were you watching ?
+were you playing ?
+were you living ?
+
+- What were you doing at 11.30 yesterday ? Were you working ?
+- What did he say ? I don't know . I wasn't listening.
+- It was rainning, so we didn't go out.
+- In 2001 we were living in Canada.
+- Today she's wearing a skirt, but yesterday she was wearing trousers.
+- I work up early yeaterday. It was a beautiful morning.The sun was shining and the birds were singing.
+
+Spelling(live -> living / run -> running / lie -> lying)
+
+am / is / are + -ing (present)
+was / were + -ing (past)
+present:
+- I'm working.
+- It isn't rainning.
+- What are you doing?
+
+past:
+- I was working at 10.30 last night.
+- It wasn 't rainning when we went out.
+- What were you doing at three o'clock.
