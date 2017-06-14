@@ -59,8 +59,6 @@ u-boot 包含了最基本的 LCD 驱动框架,用户仅仅需要提供基本的�
 需要注意的是,在 =lcd_ctrl_init= 函数中需要为 LCD 控制器指明 framebuffer 的地址,因为刷液晶的实质就是在更新缓存.
 4. 提供以上函数后,便可以使用函数 =lcd_printf= 显示字符,其底层是调用函数 =lcd_putc_xy0= 来刷新缓存.
 
-***** 
-
 ** 使用u-boot命令
 *** 获取硬件信息
 **** bdinfo
@@ -147,6 +145,8 @@ u-boot具有一些默认的环境变量,只需要增加其对应的宏定义即�
 - =fdt rm <node>= 来删除节点
 - =fdt move <address>= 来移动设备树
 ** 调试技巧
+*** 显示调试信息
+在配置文件中打开调试输出 *#define DEBUG*
    
 ** 驱动
 uboot 驱动 也使用了设备树来载入具体设备的方式.
@@ -344,17 +344,18 @@ serial_2:serial@22230000
 当`per_device_auto_alloc_size`为非0,然后会申请一段私有空间
 
 ** 编译过程
-
+现在许多CPU的启动方式和 zynq 的启动方式几乎一样, 内部ROM --> fsbl --> u-boot -> system.
+前3个阶段都是为最后的系统做准备的, 每个阶段初始化的硬件越来越广, 到最后满足系统的运行, 这3个阶段也分别称为 BL0 / BL1 / BL2.
 *** spl 编译过程
 
 spl(Secondary program loader)是u-boot中的一个分支,是一个精简的启动代码,用于支持运行在内部的 RAM 中.
 这和 zynq 的 fsbl 功能类似,spl的使命就是初始化必要的硬件环境好支持 u-boot 的正常运行.使能 SPL 的编译,需要打开选项
-`CONFIG_SPL` .
+ =CONFIG_SPL=.
 
-SPL 编译流程也是和 u-boot 编译命令一致,在 Makefile 中走了两条分路,最终会生成 uboot.bin 和 uboot-spl.bin.
+spl 编译流程也是和 u-boot 编译命令一致,在 Makefile 中走了两条分路,最终会生成 uboot.bin 和 uboot-spl.bin.
 总体流程如下:
 
-1. 在各个子目录源码下生成对应的 `.o` 文件,然后根据 `u-boot-spl.lds` 中的链接关系进行链接生成 `u-boot-spl`.
+1. 在各个子目录源码下生成对应的 目标文件 =.o= 文件,然后根据 =u-boot-spl.lds= 中的链接关系进行链接生成 =u-boot-spl=.
 2. `u-boot-spl` 中包含了符号表,使用 `objcopy` 命令去掉符号表信息,生成 `u-boot-spl.bin`
 
 **** 从顶层的 Makefile 分析:
