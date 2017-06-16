@@ -151,9 +151,124 @@ u-boot具有一些默认的环境变量,只需要增加其对应的宏定义即�
 ** 驱动
 uboot 驱动 也使用了设备树来载入具体设备的方式.
 
+*** 设备树(/arch/arm/dts)
+
+设备树是更为灵活的方式,相比较 `platform_data` 中表示的数据,设备树表示如下:
+
+#+begin_example
+red-square
+{
+    compatible = "demo-shape";
+    colour = "red";
+    sides = <4>;
+};
+#+end_example
+让设备树工作的最简单的方式是:
+#+begin_example
+/*!
+@brief
+auto_alloc 是为申请足够的内存,用于存放将设备树转换为数据结构的空间
+ofdata_to_platdata 是为了将设备树转换为数据的方法
+
+也可以主动申请设备树数据内存,但是也需要手动释放.
+*/
+
+.platdata_auto_alloc_size = sizeof(struct dm_tast_pdata),
+.ofdata_to_platdata = testfdt_ofdata_to_platdata,
+#+end_example
+**** dtb 结构
+dtb 文件结构如下:
+| DTB header            |
+| alignment gap         |
+| memory reserve map    |
+| alignment gap         |
+| device-tree structure |
+| alignment gap         |
+| device-tree string    |
+dtb 文件头结构如下:
+| magic          |
+| totalsize      |
+| off_dt_struct  |
+| off_dt_string  |
+| off_mem_rsvmap |
+| version        |
+| ..........     |
+其中, magic 是一个固定的值, 0xd0dfeed (大端) 或者 0xedfe0dd0(小端), 可以使用命令 =hexdump -C ***.dtb= 来查看
+**** dtb 在 u-boot 中的位置
+- dtb 在 u-boot 尾部
+使用宏 =CONFIG_OF_SEPARATE= , u-boot 的编译和 dtb 的编译是分开的, 先生成 uboot.bin 文件,然后再另外生成 .dtb 文件.
+最终会追加到 uboot.bin 文件尾部, 可以通过符号 =_end=来获取 dtb 地址.
+- dtb 在 u-boot 内部
+使用宏 =CONFIG_OF_EMBED=, 在编译 u-boot 的同时编译 dtb, 最终 dtb 位于 =.dtb.init.rodata=段中, 在代码中可以通过 =_dtb_dt_begin=获取符号.
+- 使用环境变量 =fdtcontroladdr=
+通过把 dtb 加载到内存的某个位置,并在环境变量中设置 =fdtcontroladdr= 为这个地址,达到动态指定 dtb的目的
+**** 使能 fdt
+1. 打开相关的宏
+- CONFIG_OF_CONTROL    表明使用FDT
+- CONFIG_OF_SEPARATE or CONFIG_OF_EMBED 表明dtb的位置
+2. 添加 fdt
+在 =arch/arm/dts/= 下参考其他 dts 文件,增加自己的 dts 文件,并且在 Makfile 中增加选项:
+#+begin_example
+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+zynq-zc706.dtb \
+zynq-zed.dtb \
+......
+#+end_example
+所以也要使用对应的宏,比如 =CONFIG_ARCH_ZYNQ=
+由于一般一个配置会对应多个宏, 所以需要指定 dtb 文件名, 使用宏 =CONFIG_DEFAULT_DEVICE_TREE=
+#+begin_example
+#define CONFIG_DEFAULT_DEVICE_TREE  "zynq-zc702.dtb"
+#+end_example
+**** dtb 被使用的过程
+u-boot 在初始化的过程中, 需要对 dtb 做两个操作:
+1. 获取 dtb 的地址,并验证 dtb 的合法性
+2. 对 dtb 进行重定位, 并获取定位后的 dtb 地址
+在 =common/board_f.c= 的 =init_sequence_f= 中进行了以上两个步骤.
+***** fdtdec_setup (获取 dtb 的地址,并验证合法性)
+***** reserve_fdt (为 dtb 分配新的内存地址空间)
+***** relocate_dtb (重定位 dtb)
+
+**** 常用接口
+fdt 的接口地址使用 =gd->fdt_blob= 获取, 对应的 fdt 处理函数位于 =lib/fdtdec.c and lib/fdtdec_common.c=.
+***** fdt_path_offset
+=int fdt_path_offset(const void *fdt, const char *path)=
+获取一个路径相对于根节点的偏移, 就代表了获取了节点.
+比如: =node = fdt_path_offset(gd->fdt_blob, "aliases");=
+***** fdt_getprop
+=const void *fdt_getprop(const void *fdt, int nodeoffset, const char *name, int *lenp)=
+获取某个节点的 *字符串属性值*.
+比如: =mac = fdt_getprop(gd->fdt_blob, node, "mac-address",  &len);=
+***** fdtdec_get_int_array, fdtdec_get_byte_array
+=int fdtdec_get_int_array(const void *blob, int node, const char *prop_name, u32 *array, int count)=
+获取某个节点的 *整形数组属性值*.
+比如: =ret = fdtdec_get_int_array(gd->fdt_blob, node, "interrupts", cell, ARRAY_SIZE(cell));=
+***** fdtdec_get_addr 
+获取某个节点 *地址属性值*
+比如: =fdtdec_get_addr(gd->fdt_blob, node, "reg");=
+***** fdtdec_get_config_int, fdtdec_get_config_bool, fdtdec_get_config_string
+获取config节点下的整形属性, bool属性, 字符串属性 
+***** fdtdec_get_chosen_node
+=int fdtdec_get_chosen_node(const void *blob, const char *name)=
+获取 chosen 下的 name 节点偏移
+***** fdtdec_get_chosen_prop 
+=const char *fdtdec_get_chosen_prop(const void *blob, const char *name)=
+获取 chosen 下的 names属性值
+***** fdtdec_get_int
+=int fdtdec_get_int(const void *blob, int node, const char *prop_name, int default_val)=
+获得节点的某个整形属性值
+比如: =bus->udelay = fdtdec_get_int(blob, node, "i2c-gpio,delay-us", DEFAULT_UDELAY);=
+***** fdtdec_get_unit
+获得节点某个无符号整形属性值
+*** 使能设备驱动
+1. 打开设备驱动模型
+使用宏: =CONFIG_DM=
+2. 打开对应的类驱动
+使用宏: =CONFIG_DM_<driver_name>=
+比如: =CONFIG_DM_SERIAL=y=
+3. 打开对应的设备驱动
 *** 术语
-- udevice 指设备对象, 实际上就是一个结构体,在使用设备树的情况下,此对象通过解析设备树而自动生成,用户需要来填充设备树.
-- driver 指的是 udevice 的驱动,并且操作函数格式满足 uclass 接口,最终的操作函数会做为uclass的元素,这部分也是由用户来完成.
+- udevice 指设备对象, 实际上就是一个结构体,在使用设备树的情况下,此对象通过解析设备树而自动生成, *用户需要来填充设备树*.
+- driver 指的是 udevice 的驱动,并且操作函数格式满足 uclass 接口,最终的操作函数会做为uclass的元素,这部分也是由 *用户来完成*.
 udevice找到对应的uclass的方式主要是通过 udevice 对应的 driver 的 id 和 uclass 对应的 uclass_driver 的 id  是否匹配.
 - uclass 是指代表一个设备类, 将同一类的设备操作方法抽象出来.实际上可以理解为包含函数指针的结构体
 - uclass_driver 是对 uclass 的操作函数,最终用户通过操作这一层的函数,来访问底层设备.
@@ -161,6 +276,35 @@ udevice找到对应的uclass的方式主要是通过 udevice 对应的 driver �
 uclass 和 udevice 都是动态生成的,在解析设备树的时候,会动态生成 udevice,然后找到对应的 driver,通过driver中的uclass id 得到 uclass_driver id.
 从uclass链表中查找对应的uclass是否已经生成,没有生成的话则动态生成uclass.
 
+由上可以看出,用户在完成了设备树和设备驱动的情况下,仅仅需要使用 =uclass_driver= 来找到相应设备后, 再使用上层提供的接口来操作即可.
+
+*** 驱动构架
+**** 环境变量
+与驱动相关的环境变量有:
+- gd->dm_root  : DM中的根设备,也是u-boot中第一个创建的 udevice, 对应了 dts 中的根节点
+- gd->dm_root_f : 在重定向之前的的根设备
+- gd->uclass_root: uclass 链表, 所有被 udevice 匹配的uclass 都会被挂载到这个链表上
+
+**** DM 中的主要组成部分
+***** uclass id
+每个类都有自己的ID号,定义于对应的 uclass_driver中, ID 的定义位于文件: =include/dm/uclass-id.h=
+***** uclass
+uclass定义位于文件: =include/dm/uclass.h=
+udevice 被挂载于 uclass, 而uclass又被挂载于 gd->uclass_root,所以可以使用遍历的方式找到对应的 uclass 以及对应的 udevice.
+使用函数 =int uclass_get(enum uclass_id key, struct uclass **ucp)= 可以得到对应的 uclass地址
+***** uclass_driver 
+uclass_driver 定义位于文件: =include/dm/uclass.h=
+定义一个 uclass_driver :
+#+BEGIN_SRC   c
+UCLASS_DRIVER(serial) = {
+  .id = UCLASS_SERIAL,
+  .name = "serial",
+  .flags = DM_UC_FLAG_SEQ_ALIAS,
+  .post_probe = serial_post_probe,
+  .pre_remove = serial_pre_remove,
+  .pre_auto_alloc_size = sizeof(struct serial_dev_priv),
+};
+#+END_SRC
 *** 使用沙盒仿真驱动
 
 1. make sandbox_defconfig
@@ -273,31 +417,6 @@ ststic const struct driver_info info[] =
 demo1 = driver_bind(root, &info[0]);
 ```
 
-*** 设备树(/arch/arm/dts)
-
-设备树是更为灵活的方式,相比较 `platform_data` 中表示的数据,设备树表示如下:
-
-```c
-red-square
-{
-    compatible = "demo-shape";
-    colour = "red";
-    sides = <4>;
-};
-```
-让设备树工作的最简单的方式是:
-```c
-/*!
-@brief
-auto_alloc 是为申请足够的内存,用于存放将设备树转换为数据结构的空间
-ofdata_to_platdata 是为了将设备树转换为数据的方法
-
-也可以主动申请设备树数据内存,但是也需要手动释放.
-*/
-
-.platdata_auto_alloc_size = sizeof(struct dm_tast_pdata),
-.ofdata_to_platdata = testfdt_ofdata_to_platdata,
-```
 *** 新建类
 
 参考代码 `include/dm/ucalss.h` 来添加新类
@@ -347,23 +466,26 @@ serial_2:serial@22230000
 现在许多CPU的启动方式和 zynq 的启动方式几乎一样, 内部ROM --> fsbl --> u-boot -> system.
 前3个阶段都是为最后的系统做准备的, 每个阶段初始化的硬件越来越广, 到最后满足系统的运行, 这3个阶段也分别称为 BL0 / BL1 / BL2.
 *** spl 编译过程
-
 spl(Secondary program loader)是u-boot中的一个分支,是一个精简的启动代码,用于支持运行在内部的 RAM 中.
 这和 zynq 的 fsbl 功能类似,spl的使命就是初始化必要的硬件环境好支持 u-boot 的正常运行.使能 SPL 的编译,需要打开选项
  =CONFIG_SPL=.
-
 spl 编译流程也是和 u-boot 编译命令一致,在 Makefile 中走了两条分路,最终会生成 uboot.bin 和 uboot-spl.bin.
 总体流程如下:
-
 1. 在各个子目录源码下生成对应的 目标文件 =.o= 文件,然后根据 =u-boot-spl.lds= 中的链接关系进行链接生成 =u-boot-spl=.
-2. `u-boot-spl` 中包含了符号表,使用 `objcopy` 命令去掉符号表信息,生成 `u-boot-spl.bin`
+2. =u-boot-spl= 中包含了符号表,使用 =objcopy= 命令去掉符号表信息,生成 =u-boot-spl.bin=
 
 **** 从顶层的 Makefile 分析:
+在 petalinux 中, 最先运行的 Makfile 位于 : =./build/linux/u-boot/Makefile=
+此文件首先定义了一些变量,然后对一些变量进行检查.然后也规定了在此目录下建立一个 u-boot 副本,用于编译.
+然后会执行 u-boot 下的Makefile. 
+*最终的编译结果会存在于当前文件夹中, 可以查看这个编译结果来查看哪些文件 被加入了工程*
+- 通过 =u-boot.cfg= 查看总体配置
+- 通过 =u-boot.lds= 查看链接脚本
+- 通过 =u-boot.map= 查看代码分布结构以及符号表
 
 1.  根据配置,来判断是否将 `u-boot-spl.bin` 加入编译目标
 
-#+NAME: .Malefile
-#+BEGIN_SRC shellv
+#+begin_example
 ## line 752
 ## 只有配置了 CONFIG_SPL 才会加入编译
 ALL-$(CONFIG_SPL) += spl/u-boot-spl.bin
@@ -374,12 +496,9 @@ spl/u-boot-spl.bin: spl/u-boot-spl
 ## 判断是分离设备树,然后执行命令 make -f scripts/Makefile.spl all
 spl/u-boot-spl: tools prepare $(if $(CONFIG_OF_SEPARATE),dts/dt.dtb)
 	$(Q)$(MAKE) obj=spl -f $(srctree)/scripts/Makefile.spl all
-#+END_SRC
-
-2. 编译 `u-boot-spl.bin`
-
-
-```
+#+end_example
+2. 编译 =u-boot-spl.bin=
+#+begin_example
 ## line 35
 SPL_BIN := u-boot-spl
 ## line 139
@@ -394,7 +513,7 @@ $(obj)/$(SPL_BIN).bin: $(obj)/$(SPL_BIN) FORCE
 ## u-boot-spl.lds : arch/arm/cpu/
 $(obj)/$(SPL_BIN): $(u-boot-spl-init) $(u-boot-spl-main) $(obj)/u-boot-spl.lds FORCE
 	$(call if_changed,u-boot-spl)
-```
+#+end_example
 
 *** U-BOOT 编译过程
 
