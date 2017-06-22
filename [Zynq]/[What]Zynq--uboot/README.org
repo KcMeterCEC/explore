@@ -1,5 +1,4 @@
-* [What] Zynq --> petalinux & u-boot 2016.1
-
+* [What] Zynq --> petalinux & u-boot 2016.1 
 ** 配置
 默认 u-boot 的配置方式是使用 =make menuconfig= , 但在 petalinux 下使用 =petalinux-config -c u-boot=.
 petalinux 会先生成一个默认的配置文件位于 : project/subsystem/linux/configs/u-boot/config ,然后会有一个配置界面.
@@ -305,12 +304,64 @@ UCLASS_DRIVER(serial) = {
   .pre_auto_alloc_size = sizeof(struct serial_dev_priv),
 };
 #+END_SRC
-*** 使用沙盒仿真驱动
+最终所有的 =uclass_driver= 结构体以列表的形式被放在 =.u_boot_list_2_uclass_1 和 .u_boot_list_2_uclass_3= 区间中, 这个列表简称 uclass_driver_table.
+****** 获取uclass_driver 
+#+BEGIN_SRC  c
+// 得到 uclass_driver_table 的地址
+struct uclass_driver *uclass = ll_entry_start(struct uclass_driver, uclass);
+// 得到 uclass_driver_table 长度
+const int n_ents = ll_entry_conut(struct uclass_driver, uclass);
+//从 uclass_driver_table 中获取 uclass   id 为 uclass_driver 的 ID
+struct uclass_driver *lists_uclass_lookup(enum uclass_id id);
+#+END_SRC
+***** udevice
+数据结构的定义位于 =include/dm/device.h=
+udevice 在 u-boot 解析 dtb 的过程中动态的生成.
+udevice 会连接到对应的 uclass 中, 位于 =uclass->dev_head= 链表中
+udevice 有可能会连接到父设备中,位于 =udevice->child_head= 中,并且最终的根设备是 =gd->dm_root=.
+***** driver
+driver 和 uclass_driver 的方式是相似的.
+定义一个驱动使用如下方式:
+#+BEGIN_SRC  C
+U_BOOT_DRIVER(serial_s5p) =
+{
+    .name = "serial_s5p",
+    .id  = UCLASS_SERIAL,
+    .of_match = s5p_serial_ids,
+    .ofdata_to_platdata = s5p_serial_ofdata_to_platdata,
+    .platdata_auto_alloc_size = sizeof(struct s5p_serial_platdata),
+    .probe = s5p_serial_probe,
+    .ops   = &s5p_serial_ops,
+    .flags = DM_FLAG_PRE_RELOC,
+};
+#+END_SRC
+通过以下方式来获取一个 driver
+#+BEGIN_SRC    C
+// 得到 uclass_driver table 的地址
+stuct driver *drv = ll_entry_start(stuct driver, driver);
+// 获得 driver table 的长度
+const int n_ents = ll_entry_count(struct driver, driver);
+// 根据驱动的名字搜寻到一个 driver
+struct driver *lists_driver_lookup_name(const char * name);
+#+END_SRC
+**** DM 的初始化
+1. 创建根设备 root 的 udevice, 存放在 gd->dm_root 中.根设备其实是一个虚拟设备,主要为 u-boot 的其他设备提供一个挂载点
+2. 初始化 uclass 链表 gd->uclass_root
+***** dm_init_and_scan (初始化DM)
+在 =common/board_f.c= 中,函数 =initf_dm 和 initr_dm= 都使用了这个函数.
+当 =dm_init_and_scan= 的参数为 true 时, 只会对带有 =u-boot, dm-pre-reloc=属性的节点进行解析,代表这个设备在 relocate 之前就需要使用.
+当为 false 时,则会对所有的节点都进行解析.
+**** DM 工作流程
+设备需要被 probe 之后才能被使用.通过 =device_probe= 来完成设备的激活.
+此函数的主要工作如下:
+- 分配设备私有数据
+- 对父设备进行probe
+- 执行 probe device 之前 uclass 需要调用的一些函数
+- 调用 driver 的 =ofdata_to_platdata=, 将 dts 信息转化为设备的平台数据
+- 调用driver 的 probe 函数
+- 执行 probe device 之后 uclass 需要调用的函数
 
-1. make sandbox_defconfig
-2. make
-3. ./u-boot -d u-boot.dtb
-
+通过参考以上过程,用户可以根据需要编写对应的驱动函数.
 *** 使用自动测试工具
 
 1. ./test/dm/test-dm.sh
@@ -462,6 +513,39 @@ serial_2:serial@22230000
 
 当`per_device_auto_alloc_size`为非0,然后会申请一段私有空间
 
+** 驱动的使用
+*** GPIO驱动
+**** 工作原理
+- 一个bank对应一个 udevice, udevice 中私有数据中存放着该bank的信息,比如相应的寄存器地址等等.
+- 上层通过调用 gpio_desc 描述符来描述一个GPIO,其中包括该GPIO所属的 udevice,在bank内的偏移,以及标志位.
+- 上层通过调用gpio core的接口从dtsi获取到GPIO属性对应的gpio_desc描述符
+- 上层使用gpio_desc描述符来作为调用gpio core的操作接口的参数
+- gpio core从gpio_desc描述符提取udevice,并调用其driver中对应的操作集,以bank内的偏移作为其参数
+- driver中提取udevice的私有数据中的bank信息,并进行相应的操作
+*** I2C驱动
+xilinx 官方所提供的驱动并没有使用宏 =U_BOOT_DRIVER=,所以可以知道它并没有使用驱动模型.
+**** 普通驱动分析
+***** 使能
+通过读取根目录下的文件 =README= 可以知道通过如下步骤可以配置使用:
+1. 使用宏 =CONFIG_SYS_I2C= 来使能I2C 子系统
+2. 使用对应的宏定义来使能对应的驱动, 比如 =#define CONFIG_ZYNQ_I2C0=
+3. 设置时钟速度以及从机地址, 比如 =CONFIG_SYS_I2C_ZYNQ_SPEED, CONFIG_SYS_I2C_ZYNQ_SLAVE=
+3. 如果使用了多路复用器,则需要使用宏 =CONFIG_SYS_NUM_I2C_BUSES, CONFIG_SYS_I2C_MAX_HOPS, CONFIG_SYS_I2C_BUSES=
+4. 如果需要使用命令则需要在 =menuconfig= 使能命令 =cmd_i2c=.
+
+*注意*: 
+- 在 zynq 中,虽然官方提供了驱动和修改了 Makfile, *却没有相应的修改 Kconfig*,所以需要增加选项.
+***** 编程使用
+参考 =common/cmd_i2c.c以及 drivers/i2c/i2c_core.c= 文件可以得出有如下操作函数
+- 选择当前操作的总线,使用函数 =int i2c_set_bus_num(unsigned int bus)=
+- 设置总线速度以及操作从机地址使用函数 =unsigned int i2c_set_bus_speed(unsigned int speed)= 以及 =int i2c_probe(uint8_t chip)=
+- 读取数据使用函数 =int i2c_read(uint8_t chip, unsigned int addr, int alen, uint8_t *buffer, int len);=
+- 写入数据使用函数 =int i2c_write(uint8_t chip, unsigned int addr, int alen, uint8_t *buffer, int len);=
+
+*注意:*
+- zynq 中对驱动的支持有些不太完整,需要用户自己修改.
+
+** 中断的使用
 ** 编译过程
 现在许多CPU的启动方式和 zynq 的启动方式几乎一样, 内部ROM --> fsbl --> u-boot -> system.
 前3个阶段都是为最后的系统做准备的, 每个阶段初始化的硬件越来越广, 到最后满足系统的运行, 这3个阶段也分别称为 BL0 / BL1 / BL2.
@@ -675,7 +759,29 @@ u-boot 中与实际硬件平台相关的结构层次如下图所示（参考于 
 *** 4. board_init_r()
 
 *** 5. main_loop()
-
+    
 > common/main.c
+
+** 启动 kernel 过程
+   在 =platform-auto.h= 中,可以看到默认的启动命令是 "default_bootcmd= run cp kernel2ram && bootm ${netstart}"
+一共进行了两个步骤:
+1. 将内核代码从存储介质拷贝到内存的特定地址, 命令展开为 =mmcinfo && fatload mmc 0 0x10000000 image.ub=
+2. 从该地址启动内核, 命令展开为 =bootm 0x10000000=
+*** 将内核拷贝到内存中
+**** mmcinfo
+此命令不仅仅是显示 mmc 信息, 还初始化了 mmc ,所以需要在 mmc 拷贝代码的情况下, 这个命令是必不可少的.
+**** fatload mmc 0 0x10000000 image.ub
+将文件 image.ub 从 mmc 0 拷贝到内存 0x10000000 的地址处.
+*** 启动内内核
+=bootm 0x10000000= 从内存 0x10000000 处启动内核.
+**** bootm 解析
+***** linux 映像文件
+由 petalinux 生成的映像文件为 =image.ub=,此镜像文件包含了 kernel,ramdisk,dtb.然后通过 bootm 命令启动.
+image.ub 的格式其实上是一个 FIT-uImage,目前基本上映像文件都以这个格式存储.
+在uboot 中,使能宏 =CONFIG_CMD_IMI=, 使用命令 =iminfo= 可以查看映像文件的格式
+***** bootm 说明
+bootm 这个命令用于启动一个操作系统映像, 它会从映像文件的头部取得一些信息,这些信息包括: 映像文件的基于的CPU架构,
+操作系统类型,映像类型,压缩方式,映像文件在内存中的加载地址,映像文件运行的入口地址,映像文件名等.紧接着 bootm 将映像加载到指定的地址,
+如果需要的话,还会解压映像并传递必要的参数给内核,最后跳转到入口地址进入内核.
 
 

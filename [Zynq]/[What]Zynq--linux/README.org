@@ -1,0 +1,3 @@
+* [What] zynq --> linux
+
+** ÅäÖÃ
