@@ -1,3 +1,124 @@
 * [What] zynq --> linux
 
 ** 配置
+zynq linux 的配置流程与 u-boot 极为相似, 传统的方式也是使用命令 =make menuconfig=, 在 petalinux 下则使用 =petalinux-config -c kernel ,  petalinux-config -c rootfs=.
+由界面生成的配置文件位于 =project/subsystem/linux/configs/kernel/config,project/subsystem/linux/configs/genericl/config,project/subsystem/linux/configs/rootfs/config=.
+有关设备树的配置文件位于 =project/subsystem/linux/configs/device-tree/=
+顶层的 Makfile 有两个主要任务是产生 vmlinux 文件和内核模块.为了实现此功能,顶层 Makfile 递归的进入到内核的各个子目录中,分别调用位于这些子目录中的 Makfile.
+*** petalinux 自动配置
+运行命令 =petalinux-config= 在界面中选择 =Auto Config Settings=, 可以选择哪些组件需要自动更新,如果没有选中则需要用户主动更新.
+- 设备树自动配置文件
+  - skeleton.dtsi , zynq-7000.dtsi, pcw.dtsi, pl.dtsi. system-conf.dtsi
+- kernel 自动配置文件
+  - config 
+- rootfs 自动配置文件
+  - config
+- u-boot 自动配置文件
+- config, platform-auto.h
+一般来说都需要打开自动配置,如果觉得不合理的地方, 可以在 top 文件中使用 =undef= 来屏蔽
+*** 文件结构
+通过 petalinux 生成的 image.ub 文件包含了如下内容:
+- 设备树
+- 内核
+- 根文件系统, 包括必备的文件结构, 用户代码, 用户库以及用户模块.
+** 分析
+*** 启动分析
+**** 内存分布分析
+内存分析需要分析基本的链接脚本,与 arm 相关的脚本有 =arch/arm/boot/compressed/vmlinux.lds.S= 以及 =arch/arm/kernel/vmlinux.lds.S=.
+在linux启动输出的过程中,可以看到如下信息:
+[[linux_ld.jpg]]
+此信息在 =mm/page_alloc.c中的 mem_init_print_info= 中打印.
+关于 vmlinux.lds.S 中的段会按照 =include/asm-generic/vmlinux.lds.h= 进行组织.
+- __init_begin - __init_end:
+只有初始化才会使用到的段放在这个区间,一旦初始化完成,那么这个区间里的数据或代码在后面就不会被使用,内核会把这部分内存释放出来.
+要完整的查看函数的地址,变量的地址,链接段的地址信息,位于文件 =build/linux/kernel/<linux>/System.map=.
+通过查看 =arch/arm/kernel/vmlinux.lds.S= 可以知道 =ENTRY(stext)= 说明运行的第一条指令从 stext 符号处启动, 此符号位于 =arch/arm/kernel/head.S=
+***** 起始地址
+通过查看 System.map 可以知道, stext 的地址为 0xc008000.
+通过查看 =arch/arm/kernel/vmlinux.lds.S= 知道链接的虚拟起始地址为 *. =PAGE_OFFSET + TEXT_OFFSET*.
+- PAGE_OFFSET
+定义位于文件 =arch/arm/include/asm/memory.h= ,定义为 *#define PAGE_OFFSET  UL(CONFIG_PAGE_OFFSET)*,
+而在 =subsystem/linx/configs/kernel/config= 中可以知道, CONFIG_PAGE_OFFSET 的值为 *0XC0000000*.
+- TEXT_OFFSET
+代表内核在RAM中的起始位置相对于RAM起始地址的偏移.此值的定义位于 =arch/arm/Makefile=.
+*textofs-y := 0x00008000*
+*TEXT_OFFSET := $(textofs-y)*
+
+*值为 0x8000* 的原因:
+kernel 镜像的前16K需要预留出来给初始化页表使用.
+
+**** 启动之前的准备
+在kernel启动之前的环境,都是由 bootloader来准备实现的,一般会有如下几个步骤:
+***** 1. 将kernel镜像加载到RAM的对应位置
+*需要注意的是*: 加载位置是有要求的, 一般是加载到物理 RAM 偏移 0X8000(32K)的位置,这32K中16K作为启动参数,16K作为临时页表.而kernel会从加载的位置上开始解压.
+***** 2. 硬件环境初始化
+****** 关闭MMU
+MMU关闭的情况下,CPU寻址的地址都是物理地址. *映射表需要由kernel来创建* .所以在kernel主动创建映射表之前,必须保证MMU处于关闭状态.
+****** 关闭数据缓存
+数据缓存一定要关闭,否则可能kernel刚启动的过程中,读数据的时候,从Cache 中读取, *而Cache中的数据由可能是在kernel加载之前的数据*, 从而会导致异常发生.
+****** 寄存器 r0 = 0
+****** 寄存器 r1 = machine ID
+****** 寄存器 r2 = atags or dtb pointer
+***** 3. PC指针跳转到 kernel 的入口代码处运行
+**** 启动
+从 *内存分布分析* 中可以知道:
+- kernel 的入口虚拟地址为 *0xc008000*
+- kernel 的入口代码为 =arch/arm/kernel/head.S= 的 *ENTRY(stext)* 处
+***** 1. 准备工作
+在打开MMU之前,运行地址与链接脚本的虚拟地址不一致,所以使用的是 *位置无关汇编代码*.
+主要流程为:
+- 进入 SVC 模式, 关闭所有中断
+- 获取 CPU ID, 提取 proc info
+- 验证 tags或 dtb
+- 创建临时内核页表和页表项
+- 配置寄存器 r13
+- 使能MMU
+- 跳转到 start_kernel
+***** 2. start_kernel
+此阶段主要由 C 代码来完成,并且此阶段的代码 *都是在虚拟内存上运行的* ,start_kernel 文件位于 =init/main.c=.
+它主要完成第一阶段没有初始化的与硬件平台相关的初始化工作. 在完成一系列与内核相关的初始化后,调用第一个用户进程(init进程)并等待用户进程的执行,这样整个linux内核便启动完毕.
+该函数所做的工作包括:
+1. 进行体系结构相关的第一个初始化工作
+2. 初始化系统核心进程调度器和时钟中断处理机制
+3. 初始化串口控制台
+4. 创建和初始化系统 cache ,为各种内存调用机制提供缓存.
+5. 初始化内存管理.
+6. 初始化系统的进程间通信机制
+7. 调用函数 =rest_init()= , 启动第一个进程. init 进程首先进行一系列的硬件初始化, 然后通过命令行传递过来的参数挂载根文件系统.
+
+当所有的初始化工作结束后, cpu_idle()函数会被调用来使系统处于闲置状态(idle),并等待用户进程的执行.
+
+**** 文件启动
+***** 文件系统挂载
+默认情况下, petalinux 将文件系统集成在 image.ub文件中, 这样在启动内核后, 内核直接将其拷贝到 RAM中运行, *但这期间所做的修改是不会写回到image.ub中了*, 说白了就是一个虚拟文件系统了.
+为了能够存储, 需要做如下步骤:
+1. 将存储文件系统的设备或分区格式化为 ext4 文件格式
+2. 使用 =petalinux-config -> Image Packaging Configuration -> Root filesystem type= , 选择对应设备类型, 此时 =system-conf.dtsi=设备树的 =bootargs= 会更新.
+3. 编译系统,并导出根文件压缩包 =petalinux-package --image -c rootfs --format initramfs=
+4. 解压根文件包 =sudo pax -rvf rootfs.cpio=
+5. 将解压后的结果拷贝进对应设备分区
+***** 流程概述
+1. 当载入文件系统以后,首先读入 =/boot= 目录下的内核文件.
+2. 运行第一个程序 =/sbin/init=,用户初始化系统环境, 进程PID是1,其他的进程都是它的子进程.
+3. 根据运行级别来确定启动哪些守护进程.设置运行级别的文件位于 =/etc/inittab=,而相对于运行级别而对应的运行程序文件位于 =/etc/rc5.d/= ("rc" 是 "run command" 的缩写, "d" 是 "directory" 的缩写, zynq 默认运行级别是5)
+此目录下的文件格式都是 "S + XX + 程序名", "S" 代表 "Start", 数字代表运行的先后顺序, 数字越小越早处理, 数字相同时,按照字符顺序启动.
+4. 加载开机启动程序
+开机启动程序脚本统一的放在 =/etc/init.d/= 下
+***** 用户登录
+****** 命令行登录:
+init 进程调用 gettty 程序,让用户输入用户名和密码. 输入完成后,再调用 login 程序,然后核对密码. 如果密码正确,就从文件 =/etc/passwd= 读取用户指定的 shell, 然后启动shell
+****** ssh登录
+系统调用 sshd 程序, 取代 getty 和 login 然后启动 shell
+****** 图形界面登录
+init 进程调用显示管理器, 如果用户密码正确就读取 =/etc/gdm3/Xsession= 启动用户会话.
+***** 配置shell环境
+先读取 =/etc/profile= 中的用户配置, 然后依次寻找 =~/.bash_profile, ~/.bash_login, ~/.profile= 配置文件(只要找到其中一个, 后面的就不会寻找了)
+*** 实现linux的快速启动
+zynq的启动流程为: ROMBOOT -->  fsbl --> uboot -> kernel
+后面3个阶段都是可定制的, 那么要想快速启动, 需要把握原则:
+1. 仅仅初始化启动所必要的硬件, 关于硬件的深度检测, 放在 bootloader 的用户选项来执行
+2. 软件过程中尽量不要有死等, 尽量运用非阻塞方式编程
+3. 为了让用户 *感觉启动很快*, 需要 *尽量早的显示开机画面,在开机画面停留的几秒时间再来配置硬件及软件环境*.
+
+**** bootloader 的快速启动
+
