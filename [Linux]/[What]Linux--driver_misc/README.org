@@ -1,0 +1,68 @@
+* [What]Linux --> misc 设备驱动
+参考于: *<<Linux设备驱动开发详解>> , drivers/char/misc.c*
+
+** 使用
+有一部分杂散设备,可以使用 =miscdevice= 框架结构,此结构本质上也是字符设备,只是在 miscdevice 核心层的 =misc_init()= 函数中,
+通过 =register_chrdev(MISC_MAJOR, "misc", &misc_fops)= 注册了字符设备.在具体的 miscdevice 实例调用 =misc_register()= 中,
+通过函数 =device_create_with_groups(misc_class, misc->parent, dev, misc, misc->groups, "%s", misc->name)= 完成了设备的创建.
+miscdevice 的主设备号固定为 MISC_MAJOR 值为10.
+- midcdevice 结构的定义为:
+#+BEGIN_SRC C
+struct miscdevice{
+        int minor; //次设备号,当为 =MISC_DYNAMIC_MINOR= 时,代表自动获取
+        const char *name; //设备名称
+        const struct file_operatons *fops;//由misc_fops间接调用
+        struct list_head list;
+        struct device *parent;
+        struct device *this_device;
+        const struct attribute_group **groups;
+        const char *nodename;
+        umode_t mode;
+};
+#+END_SRC
+- 驱动的注册与注销
+#+BEGIN_SRC C
+int misc_register(struct miscdevice *misc);
+int midc_deregister(struct miscdevice *misc);
+#+END_SRC
+- 用户驱动的一般结构
+#+BEGIN_SRC C
+//定义硬件操作
+static const struct file_operations xxx_fops =
+{
+        .unlocked_ioctl = xxx_ioctl,
+        .mmap           = xxx_mmap,
+        ...
+};
+//定义驱动
+static struct miscdevice xxx_dev =
+{
+        .minor = MISC_DYNAMIC_MINOR,
+        .name  = "xxx",
+        .fops  = &xxx_fops,
+};
+//注册驱动
+static int __init xxx_init(void)
+{
+        pr_info("ARC Hostlink driver mmap at 0x%p\n", __HOSTLINK__);
+        return misc_register(&xxx_dev);
+}
+#+END_SRC
+在注册驱动的过程中,框架会以 xxx_dev 作为 drvdata参数.其次,在 miscdevice 核心层 =misc_open()= 函数的帮助下,
+在 file_operations 的成员函数中, xxx_dev 会自动成为 file 的 private_data.所以可以将 miscdevice 和其他元素封装在一起,
+通过 container_of() 和 file->private_data 反推出 xxx_dev 实例.
+#+BEGIN_SRC C
+strcu xxx_dev
+{
+        unsigned int version;
+        unsigned int size;
+        spinlock_t lock;
+        struct miscdevice miscdev;
+};
+
+static long xxx_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+        struct xxx_dev *xxx = container_of(file->private_data, struct xxx_dev, miscdev);
+}
+#+END_SRC
+

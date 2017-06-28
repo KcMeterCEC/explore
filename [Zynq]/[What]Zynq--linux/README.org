@@ -1,4 +1,4 @@
-* [What] zynq --> linux
+* [What] zynq --> petalinux2016.2 -> linux4.4
 
 ** 配置
 zynq linux 的配置流程与 u-boot 极为相似, 传统的方式也是使用命令 =make menuconfig=, 在 petalinux 下则使用 =petalinux-config -c kernel ,  petalinux-config -c rootfs=.
@@ -121,4 +121,161 @@ zynq的启动流程为: ROMBOOT -->  fsbl --> uboot -> kernel
 3. 为了让用户 *感觉启动很快*, 需要 *尽量早的显示开机画面,在开机画面停留的几秒时间再来配置硬件及软件环境*.
 
 **** bootloader 的快速启动
+** 驱动
+*** DMA engine
+参考于: [[www.wowotech.net][蜗窝科技]]
+**** 基本概念
+***** DMA channels
+一个 DMA controller 可以同时进行的DMA传输的个数是有限的,这称为 DMA channels.
+*注意*: 这里的 "channel"仅仅是一个逻辑概念.
+因为鉴于总线访问的冲突,以及内存一致性的考量,从物理的角度看,不大可能会同时进行两个及以上的DMA传输.因而DMA channel 不太可能是物理上独立的通道.
+很多时候,DMA channels 是 DMA controller 为了方便而抽象出来的概念, 让 consumer 以为独占了一个 channel, 实际上所有的channel的DMA传输请求都会在DMA controller
+中进行仲裁,进而串行传输.
+因此,软件也可以基于 controller 提供的channel(物理),自行抽象更多的逻辑channel, 软件会管理这些逻辑channel 上的传输请求.实际上很多平台都这样做了, 在DMA engine framework 中,
+不会区分这两种channel(本质上没有区别).
+***** DMA request lines
+DMA传输的设备和DMA控制器之间,会有几条物理的连接线,称为 DMA request(DRQ), 用于通知DMA 控制器可以开始传输了.每个数据收发的节点,称作 endpoint 和 DMA controller 之间,就有一条 DMA request line.
 
+DMA channel 是 provider , DMA request line 是 Consumer, 在一个系统中 DMA request line 的数量通常比 DMA channel 的数量多, 因为并不是每个 request line 在每一个时刻都需要数据传输.
+***** 传输参数
+****** transfer size
+传输的数据大小
+****** transfer width
+传输数据宽度
+****** burst size
+DMA 控制器内部可缓存的数据量大小
+***** scatter-gather
+将不连续地址的数据传输到一个连续的缓存中.
+
+ 
+
+**** 使用介绍
+***** 概念
+站在DMA 的视角来看, 无论传输的是什么方向,都是slave 于 slave之间的数据传输.
+*但是在 memory 到 memory 这种情况下*, Linux 为了方便基于DMA的 memcpy,memset等操作,在dma engine 上又封装了一层
+更为简洁的 API,这种 API 就是 Async TX API(以async_开头, 比如 async_memcpy, async_memset, async_xor等).
+[[.dma_engineAPI,jpg]]
+除此之外的3种情况(MEM2DEV,DEV2MEM,DEV2DEV)被称为Slave-DMA传输.
+*注意*: 在Slave-DMA中的 "slave",值的是参与DMA传输的设备, 而对应的 "master"指的是 DMA controller 自身.
+***** consumer使用步骤
+****** 申请channel
+DMA channel 在kernel 中由 "struct dma_chan" 数据结构表示, 由 provider 提供操作
+使用函数: =struct dma_chan *dma_request_chan(struct device *dev, const char *name)=
+该接口会返回绑定在设备上名称为name的dma channel .
+当不使用 channel 时,使用函数释放: =void dma_release_channel(struct dma_chan *chan);=
+*注意*:
+在petalinux2016.2中申请channel对应的函数为 =dma_request_slave_channel= 
+****** 配置 channel参数
+使用配置函数 =int dmaengine_slave_config(struct dma_chan *chan, struct dma_slave_config *config)= 进行配置
+****** 获取描述符
+DMA传输属于异步传输,在启动传输之前,slave driver 需要将此次传输的一些信息提交给dma engine, dma engine 确定后,返回描述符 dma_async_tx_decriptor.
+此后, slave driver 就可以以该描述符为单位,控制并跟踪此次传输.
+有3个 API 可以获取传输描述符:
+1. struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl, unsigned int sg_len, enum dma_data_direction direction, unsigned long flags);
+用于在sg列表和总线设备之间进行DMA传输.
+2. struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len, size_t period_len, enum dma_data_direction direction);
+用于音频等场景中,进行一定长度的DMA 传输.
+3. struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(struct dma_chan *chan, struct dma_interleaved_template *xt, unsigned long flags);
+****** 提交并启动
+1. 提交描述符 =dma_cookie_t dmaengine_submit(struct dma_async_tx_descriptor *desc)=
+返回一个唯一识别该描述符的 cookie,用于后续的跟踪和监控
+2. 启动传输 =void dma_async_issue_pending(struct dma_chan *chan)=
+****** 等待传输结束
+传输请求被提交之后,client driver 可以通过回调函数获取传输完成的消息,当然也可以通过 =dma_async_is_tx_complete= 等API,测试传输是否完成.\
+****** 停止传输
+1. dmaengine_pause
+2. dmaengine_resume
+3. dmaengine_terminate_all
+
+
+
+***** provider 编写
+****** 整体描述
+DMA 控制器驱动需要做的事有:
+1. 抽象并控制DMA控制器
+2. 管理 DMA channel (可以是物理channel,也可以是虚拟channel),并向client driver 提供友好,易用的接口.
+3. 以 DMA channel 为操作对象,响应 client driver的传输请求,并控制DMA controller执行传输.
+主要思路如下:
+[[./dma_engine.jpg]]
+1. 使用 =struct dma_device= 抽象 DMA controller, controller driver 只要填充该结构中必要的字段,就可以完成驱动开发.
+2. 使用 =struct dma_chan= 抽象物理的 DMA channel, 物理的channel 和 controller 所能提供的通道数一一对应.
+3. 基于物理的 DMA channel ,使用 =struct virt_dma_cha= 抽象出虚拟的 dma channel.多个虚拟channel 可以共享一个物理channel,并且在这个物理channel上进行分时传输.
+4. 基于这些数据结构,提供一些便于controller driver 开发的API.
+****** 数据结构
+1. struct dma_device 主要元素
+- channels 
+链表头, 用于保存该 controller 支持的所有 dma_channel(struct dma_chan). 在初始化的时候, dma controller driver 首先要调用INIT_LIST_HEAD初始化它,
+然后调用 =list_add_tail= 将所有的channel 添加到该链表头中.
+- cap_mask
+一个bitmap, 用于指示该dma controller 所具备的能力(可以进行什么样的DMA传输)(具体参考 =enum dma_transaction_type= 定义).
+该bitmap的定义,需要和后面device_prep_dma_xxx形式的回调函数对应.
+- src_addr_widths
+一个bitmap,表示该 controller 支持哪些宽度的src类型.
+- dst_addr_widths
+一个bitmap,表示该 controller 支持哪些宽度的dst类型.
+- directions
+一个bitmap,表示该controller支持哪些传输方向.
+- max_burst
+支持的突发传输大小
+- descriptor_reuse
+表示该 controller 的传输描述符是否可以重复使用
+- device_alloc_chan_resources / device_free_chan_resources
+client driver 申请/释放 dma channel的时候, dmaengine会调用对应函数,以准备相应的资源.
+- device_prep_dma_xxx 
+与client driver 的 dmaengine_perp_xxx API对应.
+- device_config
+与client driver 的 dmaengine_slave_config 相对应.
+- device_pause/device_resume/ device_terminate_all.
+与 client driver 的暂停,停止函数相对应.
+- device_issue_pending
+与 client driver 的 dma_async_issus_pending 相对应
+2. struct dma_chan 主要元素
+用于抽象 dma channel .
+- device 
+指向 dma controller
+- cookie
+client driver 以该 channel 为操作对象获取传输描述符时, dma controller driver 返回给 client 的最后一个 cookie
+- completed_cookie
+在这个channel 上最后一次完成的传输的 cookie,dma controller driver 可以在传输完成时调用辅助函数 =dma_cookie_complete= 设置它的值
+- device_node
+链表的node, 用于将该channel 添加到 dma_device的 channel 列表中.
+3. struct virt_dma_cha 
+用于抽象一个虚拟的 dma channel ,多个虚拟channel可以共用一个物理channel,并由软件调度多个传输请求, 将多个虚拟channel 的传输串行地在物理channel上完成.
+- chan
+一个 struct dma_chan 类型, 用于和client driver 打交道.(屏蔽物理channel 和 虚拟channel的差异).
+- task
+一个 tasklet, 用于等待该虚拟 channel 上传输的完成.
+- desc_allocated, desc_submitted, desc_issued, desc_completed,
+用于保存不同状态的虚拟 channel 描述符.
+
+
+
+
+
+****** 使用函数
+1. 注册和注销
+=int dma_async_device_register(struct dma_device *device);=
+=void dma_async_device_unregister(struct dma_device *device);=
+2. cookie有关的辅助接口
+=static inline void dma_cookie_init(struct dma_chan *chan)=
+=static inline dma_cookie_assign(struct dma_async_tx_descriptor *tx)=
+=static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)=
+=static inline enum dma_status dma_cookie_status(struct dma_chan *chan, dma_cookie_t cookie, struct dma_tx_state *state)=
+3, 依赖处理接口
+=void dma_run_dependencies(struct dma_async_tx_descriptor *tx);=
+client可以同时提交多个具有依赖关系的dma传输,因此当某个传输结束的时候, dma controller driver 需要检查是否由依赖该传输的传输,
+4. 设备树接口
+=struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec, struct of_dma *ofdma);=
+=struct dma_chan *of_dma_xlate_by_chan_id(struct of_phandle_args *dma_spec, struct of_dma *ofdma)=
+用于将client device node 中有关的dma的字段解析出来, 并获取对应的 dma channel.
+
+****** 编写 dma controller driver 的步骤
+1. 定义 struct dma_device 变量,并初始化
+2. 根据 controller 支持的 channel 个数,为每个channel 定义一个 struct dma_chan 变量,进行必要的初始化后,将每个channel都添加道 struct dma_device变量的channels链表中.
+3, 根据硬件特性,实现 struct dma_device 变量中必要的回调函数
+4. 调用 dma_async_device_register 将 struct dma_device 变量注册到 kernel 中
+5. 当 client driver 申请 dma channel 时,dmaengine core 会调用 dma controller driver 的 device_alloc_chan_resources函数,controller driver 需要在这个接口中将该channel 资源准备号.
+6. 当client driver配置某个 dma channel 时, dmaengine core会调用 dma controller driver 的device_config函数,controller driver 需要在这个函数将对应配置应用好
+7. client driver 开始一个传输之前,会把传输的信息通过 dmaengine_prep_slave_xxx接口交给controller driver,controller driver 需要在对应的device_prep_dma_xx回调中准备好, 并返回给client driver 一个描述符
+8. 然后client driver 会调用 dmaengine_submit 将该传输提交给 controller driver,此时 dmaengine 会调用controller driver 为每个传输描述符所提供的 tx_submit回调函数,controller driver 需要在这个函数中将描述符挂到该channel对应的传输队列中
+9. client driver 开始传输时, 会调用 dma_async_issue_pending, controller driver 需要在对应的回调函数(device_issue_pending)中,依次将队列上所有的传输请求提交给硬件.
