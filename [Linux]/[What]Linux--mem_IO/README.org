@@ -10,7 +10,7 @@ MMU提供虚拟地址和物理地址的映射,内存访问权限保护和Cache�
 转换旁路缓存,TLB是MMU的核心部件,它缓存少量的虚拟地址与物理地址的转换关系,是转换表的Cache,因此也经常被称为"快表".
 2. TTW(Translation Table wale)
 转换表漫游,当TLB中没有缓冲对应的地址转换对应关系时,需要通过对内存中转换表的访问来获得虚拟地址和物理地址的对应关系.TTW成功后,结果应写入TLB中.
-*** Linux内存管理
+** Linux内存管理
 在Linux系统中,进程的 *虚拟4GB内存空间* 被分为两个部分---用户空间和内核空间.
 用户空间的地址一般分布为0~3GB(即PAGE_OFFSET),剩下的3~4GB为内核空间. *用户进程只有通过系统调用(代表用户进程在内核态执行)等方式才可以访问到内核空间*.
 每个进程的用户空间都是完全独立,互不相干的, *用户进程各自由不同的页表*.而内核空间是由内核负责映射,它并不会跟着进程改变,是固定的.
@@ -26,30 +26,206 @@ Linux 中1GB的内核地址空间又被划分为物理内存映射区,虚拟内�
 | PKMAP_BASE ~ PAGE_OFFSET -1     | 高端内存映射区                 |
 
 *对于内核物理内存映射区的虚拟内存(即从DMA和常规区域映射过来的),使用 =virt_to_phys()= 实现内核虚拟地址转化为物理地址.与之相对的函数为 =phys_to_virt()=*
-*** 内存存取
-**** 用户空间内存动态申请
+** 内存存取
+*** 用户空间内存动态申请
 - 申请 malloc()
 - 释放 free()
 
 *Linux内核总是采用按需调页(Demand Paging),因此当 malloc()返回的时候,虽然是成功返回,但是内核并没有真正给这个进程内存.这个时候如果去读申请的内存,内容全部是0,这个页面的映射是只读的.只有当写到某个页面的时候,内核才在页错误后,真正把这个页面给这个进程.*
 
-**** 内核空间内存动态申请
+*** 内核空间内存动态申请
 kmalloc() 和 __get_free_pages() 及其类似函数,申请的内存位于"DMA和常规区域的映射区",而且 *在物理上也是连续的*,
 它们与真实的物理地址只有一个固定的偏移,因此存在较简单的转换关系.而vmalloc()在虚拟内存空间给出一块连续的内存区,实际上,
 *这片连续的虚拟内存在物理内存中并不一定连续*,而vmalloc()申请的虚拟内存和物理内存之间页没有简单的换算关系.
-1. void *kmalloc(size_t size, int flags)  <->  kfree()
+- void *kmalloc(size_t size, int flags)  <->  kfree()
 size 代表分配块的大小
 flags : 
         GFP_KERNEL -> 在内核空间的进程中申请内存. *若不能满足,则进程会睡眠等待*, *不能在中断上下文和持有自旋锁的时候使用*!
         GFP_ATOMIC -> 若不存在空闲页则不等待,直接返回.
         GFP_USER   -> 为用户空间页分配内存
         GFP_DMA    -> 从DMA区域分配内存
-2. __get_free_pages() / __get_zeroed_page() <-> free_pages()
+- void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
+设备移除后自动释放内存
+- __get_free_pages() / __get_zeroed_page() <-> free_pages()
 本质上是Linux内核最底层用于获取空闲内存的方法.
-3. vmalloc() <-> vfree()
+- vmalloc() <-> vfree()
 一般只为存在于软件中(没有对应的硬件意义)的较大的顺序缓冲区分配内存, *vmalloc()远大于__get_free_pages()的开销*
 因此,*使用此函数来分配少量内存是不妥的.
-4. slab 与内存池
+- slab 与内存池
 
-        
-        
+*** 设备 I/O 端口和 I/O 内存的访问
+设备通常会提供一组寄存器来控制设备,读写设备和获取设备状态,这些寄存器可能位于 I/O 空间中,也可能位于内存空间中.
+当位于I/O 空间时,通常被称为 *I/O端口*;当位于内存空间时,对应的内存空间被称为 *I/O内存*.在使用I/O区域时,需要申请该区域,
+以表明驱动要访问这片区域.
+**** I/O 端口
+***** 申请与释放
+1. struct resource *request_region(unsigned long first, unsigned long n, const char *name);
+向内核申请 n 个端口,这些端口从 first开始,name 参数位设备的名称
+2. void release_region(unsigned long start, unsigned long n);
+将使用权归还给系统
+3. devm_request_region(); 使用此函数省事
+***** 读写操作
+1. 读写一字节端口
+- unsigned inb(unsigned port);
+- void outb(unsigned char byte, unsigned port);
+2. 读写16位端口
+- unsigned inw(unsigned port);
+- void outw(unsigned short word, unsigned port);
+3. 读写32位端口
+- unsigned inl(unsigned port);
+- void outl(unsigned longword, unsigned port);
+4. 读写一串字节
+- void insb(unsigned port, void *addr, unsigned long count);
+- void outsb(unsigned port, void *addr, unsigned long count);
+5. 读写一串16位
+- void insw(unsigned port, void *addr, unsigned long count);
+- void outsw(unsigned port, void *addr, unsigned long count);
+6. 读写一串32位
+- void insl(unsigned port, void *addr, unsigned long count);
+- void outsl(unsigned port, void *addr, unsigned long count);
+**** I/O 内存
+***** 申请与释放
+1. struct resource *request_mem_region(unsigned long start, unsigned long len, char *name);
+2. void release_mem_region(unsigned long start, unsigned long len);
+3. devm_request_mem_region(); 使用此函数省事
+***** 映射
+在访问I/O 内存之前,需要先将物理地址映射到虚拟地址使用 =void *ioremap(unsigned long offset, unsigned long size);=
+这个地址位于 vmalloc 映射区域,使用完成后需要释放 =void *iounmap(void *addr);=
+也可以使用函数 =void __iomem *devm_ioremap(struct device *dev, resource_size_t offset, unsigned long size);= *使用此函数映射通常不需要在驱动退出和出错处理的时候进行 iounmap()*.
+***** 读写操作函数
+- 读取
+  - readb_relaxed() / readw_relaxed() / readl_relaxed() ;不包含内存屏障
+  - readb() / readw() / readl() ; 包含一个内存屏障
+  - ioread8() / ioread16() / ioread32() ;明确
+- 写入
+  - writeb_realxed() / writew_relaxed() / writel_relaxed()
+  - writeb() / writew() / writel()
+  - iowrite8() / iowrite16() / iowrite32() ;明确
+
+**** 将设备地址映射到用户空间
+***** 内存映射与VMA
+****** mmap()
+mmap()实现了用户空间能直接访问设备的物理地址: 它将用户空间的一段内存与设备内存关联,当用户访问用户空间的这段地址范围时,实际上会转化为对设备的访问.
+*这种能力对于显示适配器一类的设备非常有意义,如果用户空间可以直接通过内存映射访问显存的话,屏幕帧的各点像素将不再需要一个从用户空间到内核空间的复制过程*
+函数原型: =int (*mmap) (struct file*, struct vm_area_strct *)=
+*驱动中的mmap()函数将在用户进行mmap()系统调用时最终被调用*
+******* 用户空间
+系统调用原型: =caddr_t mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)=
+- len : 映射到用户空间的字节数
+- offset : 一般为0
+- prot :指定访问权限,可以取如下几个值的"或":PROT_READ(可读),PORT_WRITE(可写),PROT_EXEC(可执行),PROT_NONE(不可访问)
+- addr :一般为NULL,这样选择起始地址的任务将由内核完成
+函数的返回值就是映射到用户空间的地址.
+当用户调用 mmap()的时候,内核会进行如下处理.
+1. 在进程的虚拟空间查找一块 VMA
+2. 将这块VMA进行映射
+3. 如果设备驱动程序或者文件系统的file_operations定义了mmap()操作,则调用它
+4. 将这个VMA插入进程的VMA链表中
+
+由mmap()系统调用映射的内存可以由munmap()解除映射 : =int munmap(caddr_t addr, size_t len);=
+******* 内核空间
+mmap()的参数 =struct vm_area_struct *vma= 就代表内核在进程的虚拟空间中找到的VMA.
+驱动中的mmap()的实现机制时建立页表,并填充VMA结构体中 =vm_operations_struct= 指针.
+#+BEGIN_SRC C
+struct vm_area_struct
+{
+        /*The first cache line has the info for VMA tree walking.*/
+        unsigned long vm_start;/*Our start address within vm_mm.*/
+        unsigned long vm_end;/*The first byte after our end address within vm_mm*/
+        /* lnked list of VM areas per task, sorted by address*/
+        struct vm_area_struct *vm_next,*vm_prev;
+        struct rb_node vm_rb;
+        ...
+};
+#+END_SRC
+VMA结构体描述的虚拟地址介于 vm_start 和 vm_end之间,其 vm_ops 成员指向这个VMA的操作集, 针对VMA的操作都被包含在 vm_operations_struct 结构体中.
+操作范例:
+#+BEGIN_SRC C
+static int xxx_mmap(stuct file *filp, struct vm_area_struct *vma)
+{
+// 创建页表项
+        if(remap_pfn_range(vma, vma->vm_start, vm->vm_pgoff, vma->vm_end -
+                           vma->vm_start, vma->vm_page_prot))
+                return -EAGAIN;
+        vma->vm_ops = &xxx_remap_vm_ops;
+        xxx_vma_open(vma);
+        return 0;
+}
+
+// 在用户空间使用 mmap()的时候被用到
+static void xxx_vma_open(struct vm_area_struct *vma)
+{
+        ...
+        printk(KERN_NOTICE "xxx VMA open, virt %lx, phys %lx\n", vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+}
+// 在用户空间使用 munmap()的时候被用到
+static void xxx_vma_close(struct vm_area_struct *vma)
+{
+        ...
+        printk(KERN_NOTICE "xxx VMA close.\n");
+}
+static struct vm_operations_struct xxx_remap_vm_ops =
+{
+        .open = xxx_vma_open,
+        .close = xxx_vma_close,
+        ...
+};
+#+END_SRC
+****** fault()
+**** I/O内存静态映射
+在将linux移植到目标电路板的过程中,有的会建立外设I/O内存物理地址到虚拟地址的静态映射,这个映射通过在与电路板对应的 map_desc 结构体数组中添加新的成员完成.
+#+BEGIN_SRC C
+struct map_desc{
+        unsigned long virtual;
+        unsigned long pfn;
+        unsigned long length;
+        unsigned int type;
+};
+#+END_SRC
+**** DMA内存
+***** DMA与Cache一致性
+在DMA不工作的情况下或者DMA与Cache相对应的主存没有重叠区, 那么Cache 与主存中的数据具有一致性特点.二者并不会起冲突.
+*当DMA与Cache相对应的主存有重叠区时,当DMA更新了重叠区的内容,而Cache并没有对应的更新.此时CPU仍然使用的是陈旧的cache的数据,就会发生Cache与内存之间数据"不一致性"的错误!*
+在发生Cache与内存不一致性错误后,驱动将无法正常运行.
+Cache的不一致问题并不是只发生在DMA的情况下,实际上,它还存在于Cache使能和关闭的时刻.例如,对于带MMU功能的ARM处理器,在开启 *MMU之前需要先置Cache无效,
+否则在开启MMU之后,Cache里面有可能保存的还是之前的物理地址,这也会造成不一致性的错误!*.
+***** Linux 下的DMA编程(*DMA只是一种外设与内存的交互方式*)
+内存中用于外设交互数据的一块区域称为 DMA 缓冲区, *在设备不支持scatter/gather操作的情况下,DMA缓冲区在物理上必须上连续的.*
+****** DMA区域
+对于大多数现代嵌入式处理器而言,DMA操作可以在整个常规内存区域进行,因此DMA区域就直接覆盖了常规内存.
+****** 虚拟地址,物理地址,总线地址
+****** DMA地址掩码
+设备不一定能在所有的内存地址上执行DMA操作,在这种情况下需要设置DMA能够操作的地址总线宽度.
+如果DMA只能操作24位地址,那么就应该调用 =dma_set_mask(dev,0xffffff)=,其原型为: =int dma_set_mask(struct device *dev, u64 mask)=
+****** 一致性DMA缓冲区
+为了能够避免 "DMA与Cache一致性问题",使用如下函数分配一个DMA一致性的内存区域:
+#+BEGIN_SRC C
+/*
+  申请一致性DMA缓冲区
+ ,*/
+//返回申请到的DMA缓冲区的虚拟地址
+//handle 代表总线地址
+void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
+
+//释放申请的内存
+void dma_free_coherent(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
+
+/*
+  分配一个写合并(writecombining)的DMA缓冲区
+ ,*/
+void *dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
+
+//释放
+void dma_free_writecombine(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
+
+/*
+  PCI设备申请缓冲区
+,*/
+void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_addrp);
+
+//释放
+void pci_free_consisten(struct pci_dev *pdev, size_t size, void *cpu_addr, dma_addr_t dma_addr);
+
+#+END_SRC
+*注意*:
+=dma_alloc_xxx()= 函数虽然是以 dma_alloc_开头, *但是其申请的区域不一定在DMA区域里面*.以32位ARM处理器为例,当conherent_dma_mask小于0xffffffff时,才会设置GFP_DMA标记,并从DMA区域去申请内存.
