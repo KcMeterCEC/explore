@@ -1,0 +1,58 @@
+* [What]Linux --> Debugging with GDB
+*You can use this manual at your leisure to read all about GDB.However,a handful of commands are enough to get started using the debugger.*
+** 1 A Sample GDB Session
+** 2 Getting In and Out of GDB
+在使用 GDB前,需要让编译器 *将代码的调试信息包含在可执行文件中*.以C为例,gcc编译器需要加上 =-g= 选项:
+#+begin_example
+gcc -g hello.c -o hello
+#+end_example
+- 进入gdb,输入 =gdb=
+- 退出gdb,输入 =quit= 或者按下 =Ctrl-d=
+*** 2.1 调用GDB
+- =gdb program=,最普通的启动gdb的命令 
+- =gdb program core=,在参数2增加一个核心转储文件 
+- =gdb program 1234=,如果想要同时监视一个正在运行的进程,可以在参数2使用进程ID,当使用远程调试裸机时,参数2的核心转储不会起作用.
+- =gdb --args gcc -O2 -c foo.c=,使用gdb来调试一些命令,此时 gdb 会调试 gcc 的编译过程
+- =gdb --silent=,禁止gdb的启动信息输出
+- =gdb -help=,显示帮助信息
+
+**** 2.1.1 选择文件
+**** 2.1.2 选择模式
+**** 2.1.3 GDB启动过程
+*** 2.2 退出GDB
+- =quit [expression]= / =q= / =Ctrl-d=,[expression]可以为空
+- =Ctrl-c=,只会打断当前gdb正在执行的命令, *但并不会退出*.
+
+
+
+** 3 GDB Commands
+** 4 Running Programs Under GDB
+** 5 Stopping and Continuing
+** 6 Running programs backward
+** 7 Recording Inferior's Execution and Replaying It
+** 8 Examining the Stack
+** 9 Examining Source Files
+** 10 Examining Data
+** 11 Debugging Optimized Code
+** 12 C Preprocessor Macros
+** 13 Tracepoints
+** 14 Debugging Programs That Use Overlays
+** 15 Using GDB with Different Languages
+** 16 Examining the Symbol Table
+** 17 Altering Execution
+** 18 GDB Files
+** 19 Specifying a Debugging Target
+** 20 Debugging Remote Programs
+** 21 Configuration-Specific Information
+** 22 Controlling GDB
+** 23 Extending GDB
+** 24 Command Interpreters
+** 25 GDB Text User Interface
+** 26 Using GDB under GNU Emacs
+** 27 The GDB/MI Interface
+** 28 GDB Annotations
+** 29 JIT Compilation Interface
+** 30 In-Process Agent
+** 31 Reporting Bugs in GDB
+** 32 Command Line Editing
+** 33 Using History Interactively

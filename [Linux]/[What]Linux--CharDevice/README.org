@@ -1,0 +1,58 @@
+* [What]Linux --> Char device
+
+** 驱动组成框架
+*** ioctl() 命令
+Linux 建议ioctl() 命令的组成方式为:
+| 设备类型 | 序列号 | 方向 | 数据尺寸 |
+|----------+--------+------+----------|
+| 8位      | 8位    | 2位  | 13/14位  |
+命令码的设备类型字段为一个"幻数",取值范围为 0~0xff,文档中的 =ioctl-number.txt= 给出了一些推荐的和已经被使用的幻数,幻数的目的是为了避免 *命令码污染*.
+
+- 命令码方向的值: _IOC_NONE(无数据传输),_IOC_READ(读),IOC_WRITE(写),_IOC_READ|IOC_WRITE(双向), *数据方向是从应用程序角度来看的*.
+
+在实际使用中,一般使用宏: =_IO(type,nr)=, =_IOR(type,nr,size)=, =IOW(type,nr,size)=, =_IOWR(type, nr, size)= 来直接生成命令码.
+
+#+BEGIN_SRC C
+//! command class
+#define FPGA_CMD_MAGIC   'm'
+
+#define FPGA_MISC_SER    0X00
+#define FPAG_CMD_MISC    _IOWR(FPGA_CMD_MAGIC, FPGA_MISC_SER, unsigned long)
+
+#define FPGA_FFT_SER    0X00
+#define FPAG_CMD_FFT    _IOWR(FPGA_CMD_MAGIC, FPGA_FFT_SER, unsigned long)
+
+typedef enum
+{
+        CMD_CLASS_MISC = FPGA_CMD_MISC,
+        CMD_CLASS_FFT = FPGA_CMD_FFT,
+}cmdClassEnum;
+#+END_SRC
+** 数据交换
+由于用户空间不能直接访问内核空间的内存,因此需要使用函数 =copy_from_user(), copy_to_user()=来完成数据 *复制*.
+#+BEGIN_SRC C
+//返回不能被复制的字节数,如果完全复制成功则返回0
+unsigned long copy_from_user(void *to, const void __user *from, unsigned long count);
+unsigned long copy_to_user(void __user *to, const void *from, unsigned long count);
+//复制简单类型,比如 char,int,long等使用 put_user 和 get_user
+int val;
+...
+get_user(val, (int *)arg);
+..
+put_user(val, (int *)arg);
+#+END_SRC
+以上函数都在内部进行了缓冲区合法性检查.
+
+*注意:*
+
+在内核空间与用户空间的界面处,内核检查用户空间的合法性显得尤为重要, *Linux 内核的许多安全漏洞都是因为遗漏了这一检查造成的*.
+侵入者可以伪造一片内核空间的缓冲区地址传入系统调用接口,让内核对这个evil指针指向的内核空间填充数据.参考:[[http://www.cvedetails.com/][CVE列表]]
+** 从元素得到父结构体
+Linux 内核中经常会通过结构体成员找到父结构体的指针.比如 =container_of(inde->i_cdev, struct globalmem_dev, dev)= 代表通过 dev 找到 globalmem_dev 的地址.
+#+BEGIN_SRC C
+#define offsetof(TYPE, MEMBER) ((size_t)&((TYPE *)0)->MEMBER)
+
+#define container_of(ptr, type, member) ({   \
+                        const typeof(((type *)0)->member) *__mptr = (ptr);  \
+                        (type *)((char *)mptr - offsetof(type, member));}
+#+END_SRC
