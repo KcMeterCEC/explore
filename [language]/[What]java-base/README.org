@@ -1,0 +1,19 @@
+* [What] java --> base
+
+** 数据类型
+
+| c/c++       | java          |
+|-------------+---------------|
+|             | byte          |
+| char(ascII) | char(unicode) |
+| unsigned    |               |
+| short       | short         |
+| int         | int           |
+| long        | long          |
+| bool        | boolean       |
+| float       | float         |
+| double      | double        |
+| 指针/引用   | 引用          |
+
+** 运算符,表达式,语句
+与c/c++ 一模一样

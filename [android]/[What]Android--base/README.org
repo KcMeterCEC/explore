@@ -1,0 +1,32 @@
+* [What] Android --> base
+
+** 编译
+*** 编译过程中的问题
+**** no such file: /home/xxx/.lunchrc
+在使用 lunch 时,出现上面这个警告,解决步骤如下:
+#+begin_example
+source build/envsetup.sh
+lunch
+#+end_example
+**** jdk版本太高
+在ubuntu16.04中,jdk的最低版本都是1.8.0,而编译 android5.0.2需要1.7.x版本的,所以需要重新安装.
+#+begin_example
+sudo add-apt-repository ppa:openjdk-r/ppa
+sudo apt update
+sudo apt install openjdk-7-jdk
+#+end_example
+**** libstdc++.so.6: cannot open shared object file 
+这是由于没有安装这个库而导致编译没有通过.
+#+begin_example
+sudo apt install lib32stdc++6
+#+end_example
+** 基础认知
+*** 基本概念
+Android驱动 = Linux驱动 + 封装
+
+| java语言开发的APP |
+| framework         |
+| java与C接口层     |
+| Linux驱动         |
+| 底层              |
+|                   |
