@@ -1,0 +1,8 @@
+* [What]Android --> Android Studio
+
+** 基本使用
+*** 安装问题
+**** Unable to access Android SDK add-on list
+在启动过程中出现这个错误是由于没有安装SDK而造成的.
+
+解决方法是在安装目录下的 =bin/idea.properties= 文件中最后加入一行 =disable.android.first.run=true=.
