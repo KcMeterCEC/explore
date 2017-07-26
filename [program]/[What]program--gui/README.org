@@ -86,7 +86,7 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 QWT 是一个绘图工具集, 具有很多已经写好的UI插件,大大提高开发效率.
 ***** 安装以及使用(windows)
 ****** 下载
-在 [[https://sourceforge.net/project/qwt/files/qwt/][QWT下载链接]] 中进入最新版的文件夹,然后下载 =.zip= 文件(源代码)以及 =.qch= 文件(帮助文档)即可.
+在 [[https://sourceforge.net/projects/qwt/files/qwt/][QWT下载链接]] 中进入最新版的文件夹,然后下载 =.zip= 文件(源代码)以及 =.qch= 文件(帮助文档)即可.
 
 解压 =.zip= 文件, *解压路径不能有中文*.
 ****** 设置Qt环境变量
