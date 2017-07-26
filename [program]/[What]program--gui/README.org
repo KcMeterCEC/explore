@@ -1,7 +1,10 @@
-[What] program --> GUI
-=======================
+#+TITLE: GUI方面使用总结
+#+AUTHOR: kcmetercec
+#+OPTIONS: ^:nil
+* [What] program --> GUI
 
-## GUI 的选择
+
+** GUI 的选择
 
 目前将编程平台分为三类：
 
@@ -24,11 +27,11 @@ app 使用 Qt
 
 需求**开发效率**的使用 Python
 
-## littlev
+** littlev
 
 littlev 是免费且开源的基于 C 代码的 GUI，移植性相当强，并且其具有 PC 端仿真代码，大大提高了调试效率。
 
-### 安装仿真环境
+*** 安装仿真环境
 
 1. 安装 SDL2
 
@@ -42,13 +45,13 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 
 在安装 eclipse 之前需要先安装 java 环境：
 
-#### 懒人安装
+**** 懒人安装
 
 > sudo apt install default-jdk
 
 > 设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-openjdk-amd64/jre/bin'"
 
-#### 安装正式版本
+**** 安装正式版本
 
 > sudo add-apt-repository ppa:webupd8team/java
 
@@ -76,3 +79,41 @@ SDL2 是一个库，提供一个可以直接控制硬件的接口。
 > git submodule update
 
 4. 启动 eclipse 并导入 littlev 工程， 编译， 运行。
+
+** Qt
+*** Qt插件
+**** QWT
+QWT 是一个绘图工具集, 具有很多已经写好的UI插件,大大提高开发效率.
+***** 安装以及使用(windows)
+****** 下载
+在 [[https://sourceforge.net/project/qwt/files/qwt/][QWT下载链接]] 中进入最新版的文件夹,然后下载 =.zip= 文件(源代码)以及 =.qch= 文件(帮助文档)即可.
+
+解压 =.zip= 文件, *解压路径不能有中文*.
+****** 设置Qt环境变量
+检查windows环境变量中是否包含了Qt的bin路径 =set PATH=,如果没有则添加该路径
+****** 编译和安装
+在解压文件夹路径中依次运行命令: =qmake qwt.pro=, =mingw32-make=, =mingw32-make install=,最后默认文件的安装路径为: =C:\Qwt-xxx=.
+****** 将库移入Qt路径中
+| QWT路径                                  | QT路径                          |
+|------------------------------------------+---------------------------------|
+| lib/libqwt.a, lib/qwtd.a                 | mingwxx_xx/lib                  |
+| lib/qwt.dll, lib/qwtd.dll                | mingwxx_xx/bin                  |
+| plugins/designer/qwt_designer_plugin.dll | mingwxx_xx/plugins/designer     |
+| include/**                               | mingwxx_xx/include/Qwt(new dir) |
+****** 载入帮助文件
+工具 -> 选项 -> 帮助 -> 添加 -> =.qch= 文件
+****** 使用
+- 新建一个widget项目
+- 添加库文件路径
+#+begin_example
+#在 .pro 文件中加入库路径
+
+DEFINES += QT_DLL QWT_DLL
+LIBS += -L"C:\Qt\Qt5.8.0\5.8\mingw53_32\lib" -lqwtd
+LIBS += -L"C:\Qt\Qt5.8.0\5.8\mingw53_32\lib" -lqwt
+INCLUDEPATH += C:\Qt\Qt5.8.0\5.8\mingw53_32\include\Qwt
+#+end_example
+- *显示* 的用 =Qt Designer= 来打开 =.ui= 文件,拖入控件,编译即可
+
+
+
