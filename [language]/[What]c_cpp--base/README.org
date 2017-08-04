@@ -468,3 +468,26 @@ enum class egg{Small, Medium, Large, Jumbo};
 enum class t_shirt{Small, Medium, Large, Xlarge};
 #+END_SRC
 *** 抽象数据类型
+** 运算符重载
+运算符重载将重载的概念扩展到运算符上,允许赋予C++运算符多种含义. *C++根据操作数的数目和类型来决定采用哪种操作*.
+
+要重载运算符,需要使用被称为运算符的函数的特殊函数形式.运算符函数的格式为: =operatorop(argument-list)=
+例如, operator + ()重载 + 运算符, operator * ()重载 * 运算符. *op必须是有效的C++运算符,不能虚构一个新的符号*.
+
+示例:
+#+BEGIN_SRC C++
+//mytime.h
+#ifndef MYTIME0_H__
+#define MYTIME0_H__
+class Time
+{
+private:
+        int hours;
+        int minutes;
+public:
+        Time();
+        Time(int h, int m = 0);
+        void AddMin(int m);
+};
+#endif
+#+END_SRC
