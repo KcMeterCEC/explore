@@ -17,3 +17,108 @@
 
 ** 运算符,表达式,语句
 与c/c++ 一模一样
+** 快速整理
+*** instanceof : 判断一个对象是不是某个类的实例
+#+BEGIN_SRC java
+class Father{
+        public void printInfo()
+                {
+                        System.out.println("This is father");
+                }
+        
+}
+class Son extends Father{
+        public void printInfo()
+                {
+                        System.out.println("This is son");
+                }
+        
+}
+public class Test{
+        public static void main(String args[])
+                {
+                        Father f = new Father();
+                        Son    s = new Son();
+
+                        print(f);
+                        print(s);
+                }
+        public static void print(Father f)
+                {
+                        if( f instanceof Son)
+                        {
+                                Son son = (Son)f;
+                                son.printInfo();
+                        }
+                        else if(f instanceof Father)
+                        {
+                                f.printInfo();
+                        }
+                }
+}
+#+END_SRC
+    
+*** static : 外部可以直接使用 static 定义的方法,而不用创建实例化的对象
+** 异常
+当程序发生异常时,可以处理或者默认不处理,处理又分为自己主动处理和让别人处理.
+
+java中的 =RunTimeException= (发生以后程序退出) 以及 =Error= 都不处理,用户主要处理的是 =IOException=.
+*** try...catch...finally --> 自己处理
+*** throws --> 让别人处理
+** 包和权限
+*** 包
+**** package --> 将编译的结果打包
+package 用于避免类命名污染.
+#+BEGIN_SRC java
+//将编译的结果打包到 a.b.c.d 文件夹下
+//编译时使用命令 javac -d . Pack.java
+//执行时使用命令 java a.c.c.d.Pack
+//在其他文件中导入类使用 import a.b.c.d.Pack
+//其他文件使用类就使用 a.b.c.d.Pack.main(), 若没有重名的类, 也可以直接使用 Pack.main();
+package a.b.c.d;
+
+public class Pack{
+        public static void main(String args[])
+                {
+                        System.out.println("Hello World!");
+                }
+}
+#+END_SRC
+*** 权限
+| 种类      | 同一个类 | 同一个包 | 不同包的子类的 *内部* | 不同包的非子类 |
+|-----------+----------+----------+-----------------------+----------------|
+| private   | V        |          |                       |                |
+| default   | V        | V        |                       |                |
+| protected | V        | V        | V                     |                |
+| public    | V        | V        | V                     | V              |
+**** public 
+- 当类名前具有 =public= 时,代表它可以被全局访问
+- 当类名没有 =public= 时,代表它只能被 *同一包内访问* (同文件夹).
+
+
+** 内部类
+内部类就是在类内部再定义一个类,内部类可以访问外部类的私有变量及属性.
+#+BEGIN_SRC java
+class Outer{
+        private int a = 10;
+        class Inner{
+                public void printInfo()
+                        {
+                                System.out.println("a = " +a);
+                        }
+        }
+}
+
+public class InnerDemo{
+        public static void main(String args[])
+                {
+                        Outer o  = new Outer();
+                        Outer.Inner i = o.new Inner();
+                        i.printInfo();
+                }
+}
+#+END_SRC
+** JNI(Java Native Interface)
+java通过统一的接口来访问 c/c++ 库函数
+*** System.loadLibrary --> 加载C库
+*** 
