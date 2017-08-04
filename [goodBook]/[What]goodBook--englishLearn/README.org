@@ -33,3 +33,39 @@
 - 过去式  singled 过去分词 singled 现在分词 singling
 1. single person. 单身
 2. single parent. 单亲家庭
+** <2017-08-02 Wed>
+*** temperature
+- n. 温度;体温;气温;发烧
+1. temperature difference . 温差
+*** formal
+- adj. 正式的;拘谨的;有条理的
+- n. 正式的社交活动;夜礼服
+- n. (Formal)人名;(法)福马尔
+- 比较级 more formal 最高级 most formal
+1. formal parameter . 形式参数
+*** obviously
+- adv. 明显的
+1. most obviously . 最明显的
+*** vertical
+- adj. 垂直的;头顶的,顶点的;
+- n. 垂直线,垂直面
+1. Flip Vertical 垂直翻转.
+*** parse
+- vt. 解析;从语法上分析
+- vi. 理解;从语法上分析
+- n. 从语法上分析;分列
+- 过去式 parsed 过去分词 parsed 现在分词 parsing
+1. Parse Error. 解析错误
+*** restrict
+- vt. 限制;约束;限定
+1. social restrict . 社会制约
+
+** <2017-08-04 Fri>
+*** guest
+- n. 客人,宾客;顾客
+- vt. 款待,招待
+- vi. 作客,寄宿
+- adj. 客人的;特邀的
+- n. (Guest)人名;
+1. guest student . 旁听生
+   
