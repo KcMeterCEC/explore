@@ -69,3 +69,170 @@
 - n. (Guest)人名;
 1. guest student . 旁听生
    
+** <2017-08-05 Sat>
+*** formerly
+- adv. 以前;原来
+1. Byby formerly. 拜拜从前
+*** scenario
+- n. 方案;情节;剧本;设想
+1. usage scenario . 使用方案
+*** superheterodyne
+- adj. 超外差的
+- n. 超外差式收音机
+1. superheterodyne mixer. 超外差混频器
+*** intermediate
+- vi. 起媒介作用
+- adj. 中间的
+- n. 中间物;媒介
+- 过去式 intermediated 过去分词 intermediated 现在分词 intermediating
+1. intermediate region. 中间区域;中间地带
+
+*** category 
+- n. 种类,分类;范畴
+- 复数 categories
+1. job category . 工作类型
+*** interaction
+- n. 相互作用;交互作用
+- n. 互动
+1. interaction point. 交互点
+** <2017-08-06 Sun>
+*** companion
+- n. 同伴;朋友;指南;手册
+- vt. 陪伴
+- n. 康帕宁
+1. wine companion. 葡萄酒指南
+*** objective
+- adj. 客观的;目标的;宾格的
+- n. 目的;目标;
+- 比较及 more objective 最高级 most objective
+1. objective lens. 物镜
+*** throttle
+- n. 节流阀;风门;喉咙
+- vt. 压制;使...窒息;使...节流
+- vi. 节流,减速;窒息
+- 过去式 throttled 过去分词 throttled 现在分词 throttling
+1. throttle plate . 节流阀
+*** intuition
+- n. 直觉;直觉力;直觉的知识
+1. intuition thinking. 直觉思维;直觉思维能力
+*** exact
+- adj. 准确的,精密的;精确的
+- vt. 要求;强求;急需
+- vi. 勒索
+- 比较及 more exact 最高级 exactest / most exact
+1. exact quantity. 准确数量
+*** quantity
+- n. 量;大量
+- 复数 quantities
+1. maximum quantity . 最大数量
+*** hover
+- vi. 盘旋;徘徊
+- n. 犹豫
+- vt. 徘徊在...旁
+- n. (Hover)人名
+1. hover corte. 盘旋侧步
+*** oppose
+- vt. 反对;对抗
+- vi. 反对
+- 过去式 opposed 过去分词 opposed 现在分词 opposing
+1. oppose side. 反对方
+*** experiment
+- vi. 尝试;进行实验
+- n. 实验
+1. Electrical experiment. 电子实验
+*** reiterate
+- vi. 重申;反复的做
+- 过去式 reiterated 过去分词 reiterated 现在分词 reiterating
+1. reiterate call. 再次呼吁
+*** daunting
+- adj. 使人气馁的
+1. daunting work. 艰巨的任务
+*** category
+- n. 种类;范畴
+- 复数 categories
+1. job category. 工作性质
+*** sink
+- vi. 下沉;消沉
+- vt. 使下沉
+- n. 水槽
+- 过去式 sank 或 sunk 过去分词 sunk 或 sunken 现在分词 sinking
+1. sink in . 被了解
+*** magnify
+- vt. 放大;赞美;夸大
+- vi. 放大;有放大能力的
+- 过去式 magnified 过去分词 magnified 现在分词 magnifying
+1. image magnify. 非线性放大
+*** accomplish
+- vt. 完成;实现达到
+1. Accomplish much. 大有作为
+*** canvas
+- n. 帆布
+- vt. 用帆布覆盖
+- adj. 帆布制的
+- 过去式 canvased 或 vassed 过去分词 canvansed 或 vassed 现在分词 canvasing 或 vassing
+1. linen canvas. 亚麻帆布
+*** dimensions
+- n. 规模,大小
+1. Outline dimensions. 外形尺寸
+*** exgibit
+- vt. 展览;显示
+- n. 展览品;证据
+- vi. 展出
+1. Art exhibit 美术展览
+*** respectively
+- adv. 分别的;各自的;
+*** representation
+- n. 代表;表现;表示法;陈述
+1. digital representation . 数字表示法
+*** hinton
+- n. 暗示;线索
+- vt. 暗示;示意
+- vi. 示意
+1. psychological hint. 心理暗示
+*** extra
+- adv. 特别的,非常;另外
+- n. 临时演员;号外;额外的事物
+- adj. 额外的;特大的
+1. extra work. 加班
+*** affinity
+- n. 密切关系;吸引力;类同
+- 复数 affinities
+1. arcane affinity. 奥术亲和
+*** periodically
+- adv. 定期的;周期性的;偶尔;间歇
+1. periodically fluctuating. 周期性波动
+*** appropriately
+- adv. 适当的;合适的;相称的
+1. appropriately handing. 妥善处理
+*** quote
+- vt. 报价;引述;举证
+- vi. 报价;引用;引证
+- n. 引用
+- 过去式 quoted 过去分词 quoted 现在分词 quoting
+1. close quote. 右引号
+*** literally
+- adv. 照字面的;逐字地;不夸张的;正确的;
+*** delve
+- vi. 钻研;探究
+- n. 穴;洞
+1. silt delve. 淤泥坑
+*** enumerate
+- vt. 列举;枚举;计算
+- 过去式 enumerated 过去分词 enumerated 现在分词 enumerating
+1. to enumerate 列举;枚举
+*** conclusion
+- n. 结论;结局;推论
+1. in conclusion. 总之;在结束时
+*** gray
+- adj. 灰色的;苍白的;
+- n. 灰色.
+- vi. 成为灰色
+1. gray whale. 灰鲸
+*** collapse
+- vi. 倒塌;瓦解;暴跌
+- vt. 使倒塌,使崩溃;
+- n. 倒塌;失败
+1. collapse all. 全部折叠
+*** dissect
+- vt. 切细;仔细分析
+- vi. 进行解剖;进行详细分析

@@ -1,0 +1,90 @@
+* [What]Python --> base
+** 语法
+*** 基本格式
+#+BEGIN_SRC python
+#! /usr/bin/env python3   #指明python的运行路径
+# -*- coding: utf-8 -*-   #指定使用utf8编码
+
+a = 100
+if a >= 0: #当语句以冒号结尾时,缩进的语句视为代码块
+    print(a)
+else:
+    print(-a)
+#+END_SRC
+*** 输入和输出
+**** 输出 -> print()
+1. 括号内可以使用单引号或双引号包含的字符串,也可以使用逗号隔开多段字符串,逗号会被解释为空格.
+2. 可以使用公式,从而直接输出公式结果.字符串与公式或变量也是使用逗号分隔
+3. 使用百分号来索引格式化输出. =print("the number is %d" %5)=, 如果需要显示百分号,则在前面增加一个百分号转义.
+**** 输入 -> input()
+1. parameter = intput("please input your name:"), 可以输入任何字符串,内容存储在 parameter 中.
+
+*** 条件判断
+#+BEGIN_SRC python
+if <条件判断1>:
+    <执行1>
+elif <条件判断2>:
+    <执行2>
+elif <条件判断3>:
+    <执行3>
+else:
+    <执行4>
+
+#+END_SRC
+*** 模块
+在python 中,一个 .py 文件就称为一个模块(Module).同时为了避免模块名冲突,还引入了按目录来组织模块的方法,
+称为包(Package).外部引用的方式就是 <包名>.<模块名>.
+
+同样的,也可以有多级目录,来层层包含模块.
+
+*注意*:
+1. 每一个包目录下面都会有一个 =__init__.py= 的文件,这个文件是必须存在的,否则Python就把这个目录当成普通目录,
+而表示一个包. =__init__.py= 可以是空文件,也可以有Python代码,因为 =__init__.py= 本身就是一个模块, 而它的模块名就是包名.
+
+2. 自己创建的模块不能与python自带的模块名称冲突
+**** 使用模块
+#+BEGIN_SRC python
+#! /usr/bin/env python3
+# -*- coding:utf-8 -*-
+
+#模块的文档注释,任何模块代码的第一个字符串都被视为模块的文档注释
+"a test module"
+#指明模块的作者
+__author__ = "kcmetercec"
+
+#导入 "sys"模块
+#在导入包下的模块时,通常使用 from <包名> import 模块名, 这样就可以直接使用
+import sys
+
+def test():
+    args = sys.argv
+    if len(args) == 1:
+        print("Hello, world!")
+    elif len(args) == 2:
+        print("Hello, %s!" % args[1])
+    else:
+        print("Too many arguments!")
+
+# 当直接运行模块时,会执行此函数,用于测试模块,而其他地方导入则不会执行
+if __name__=="__main__":
+    test()
+            
+#+END_SRC
+
+***** 作用域
+- 模块内正常的函数和变量名都是公开的,可以被外部直接引用
+- 类似 =__xxx__= 这样的特殊变量,也可以被引用,但是有特殊用途
+- 类似 =_xxx 或 __xxx= 这样的函数就是非公开的, *不应该* 被直接引用
+
+**** 安装第三方模块
+安装第三方模块,时通过包管理工具 pip 完成的.
+
+默认情况下,python 解释器会搜索当前目录,所有已经安装的内置模块和第三方模块. 搜索路径在 =sys.path= 变量中.
+要修改此变量,可以:
+- 添加要搜索的目录. *这种方法是在运行时修改,运行结束后失效*.
+#+BEGIN_SRC python
+import sys
+sys.path.append('/Users/michael/my_py_scripts')
+- 设置环境变量 =PYTHONPATH=, 只需要添加自己的搜索路径即可
+#+END_SRC
+** 技巧
