@@ -1,4 +1,5 @@
 * [What]Python --> base
+*参考廖雪峰大神的网站*
 ** 语法
 *** 基本格式
 #+BEGIN_SRC python
@@ -175,11 +176,75 @@ def fact(n):
 #类名一般是大写开头的单词
 #object 代表该类是从哪个类继承下来的, 如果没有合适的类,则使用 object 类
 class Student(object):
-    pass
+    #self 代表实例本身, 在创建实例的时候,需要传入除 self 以外的参数
+    def __init__(self, name, score):
+        #以 __开头,代表是一个私有变量, python解释器将其翻译为了: self._Student_name
+        self.__name = name
+        self.__score = score
+    #和普通函数相比,在类定义的函数只有一点不同,就是第一个参数永远是 self,并且调用时,
+    #不用传递该参数.除此之外并没有声明不同,依然可以使用默认参数,可变参数,关键字参数和命名关键字参数
+    def print_score(self):
+        print("%s: %s" %(self.__name, self.__score))
 
 #使用
-bart = Student()
+bart = Student("Bart simpson", 59)
+#可以自由地给一个实例变量绑定属性
+bart.home = "sichuan"
+
 #+END_SRC
+**** 获取对象信息
+#+BEGIN_SRC python
+#使用 type() 函数来判断对象的类型
+>> type(123)
+<class 'int'>
+>> type("str")
+<class 'str'>
+>> type(Node)
+<type(Node) 'NoneType'>
+
+#比较两个变量是否为同类型
+>>> type(123) == type(456)
+True
+>>> type('abc') == type(123)
+False
+#比较一个对象是否是函数
+>>> type(fn) == types.FunctionType
+
+# 使用 isinstance() 来判断class的类型
+# 假设继承关系: object -> Animal -> Dog -> Husky
+>>> a = Animal()
+>>> d = Dog()
+>>> h = Husky()
+>>> isinstance(h, Husky)
+True
+>>> isinstance(h, Dog)
+True
+>>> isinstance(h, Animal)
+True
+>>> isinstance(d, Husky)
+False
+
+#使用 dir() 获得一个对象的所有属性和方法
+#+END_SRC
+**** 实例属性和类属性
+由于Python是动态语言, 根据类创建的实例可以 *任意绑定属性*.
+给实例绑定属性的方法是通过实例变量, 或者通过 self 变量:
+#+BEGIN_SRC python
+class Student(object):
+    def __init__(self, name):
+        self.name = name
+
+s = Student('Bob')
+s.score = 90
+
+#Student 类本身需要绑定一个属性,可以直接在class中定义属性,这种属性是类属性,归Student类所有
+#但是类的所有实例都可以访问到
+class Student(object):
+    name = 'Student'
+
+    
+#+END_SRC
+
 *** 模块
 在python 中,一个 .py 文件就称为一个模块(Module).同时为了避免模块名冲突,还引入了按目录来组织模块的方法,
 称为包(Package).外部引用的方式就是 <包名>.<模块名>.
