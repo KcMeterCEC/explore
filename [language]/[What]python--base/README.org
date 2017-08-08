@@ -31,6 +31,143 @@ else:
     <执行4>
 
 #+END_SRC
+*** 函数
+**** 函数的调用
+函数的调用和 c/c++ 没什么不同,使用 =函数名(<参数列表>)= 的方式使用.
+
+可以将函数名赋值给一个变量,相当于给函数起了一个别名:
+#+BEGIN_SRC python
+a = abs
+a(-1)
+#+END_SRC
+**** 函数的定义
+#+BEGIN_SRC python
+#########
+#普通函数
+#########
+def functionName(argc):
+
+    #参数检查
+    if not isinstance(argc, (int, float)):
+        raise TypeError("bad operand type")
+    
+    if argc >= 0:
+        return argc
+    else:
+        #当函数中没有 return 语句时,执行完毕返回的结果为 None
+        return -argc
+
+#########
+#空函数
+#########
+def nop():
+    pass
+
+#########
+#返回多个值,实际上返回的类型时 tuple
+#########
+import math
+def move(x, y, step, angle = 0):#angle 是默认参数, 注意: 默认参数必须指向不变对象
+    nx = x + step * math.cos(angle)
+    ny = y - step * math.sin(angle)
+    return nx, ny
+#使用
+x, y = move(100, 100, 60, math.pi / 6)
+
+#########
+# 可变参数函数
+#########
+#定义可变参数和定义一个list或tuple参数相比,仅仅在参数前面加了一个 *号.
+#在函数内部,参数 numbers 接收到的是一个 tuple.调用该函数时,可以传入任意个参数,
+#包括0个参数
+def calc(*numbers):
+    sum = 0
+    for n in numbers:
+        sum = sum + n * n
+    return sum
+#使用
+calc(1, 2)
+calc()
+#将list或tuple传入
+nums = [1, 2, 3]
+calc(*nums)
+
+#########
+# 关键字参数,允许传入0个或任意个含参数名的参数,这些关键字参数在函数内部自动组装位一个dict
+#########
+def person(name, age, **kw):
+    print("name:", name, "age", age, "other", kw)
+#使用
+person("Michael", 30)
+person("Bob", 35, city = "Beijing")
+
+extra = {"city":"Beijing", "job": "Engineer"}
+person("jack", 24, **extra)
+
+#########
+# 命名关键字参数,限定关键字参数的名字. 命令关键字参数必须传入参数名
+#########
+#限定只接收 city 和 job作为关键字参数
+def person(name, age, *, city, job):
+    print(name, age, city, job)
+
+#如果函数定义中已经有了一个可变参数,后面跟着的命名关键字参数就不再需要一个特殊的分隔符了 *
+def person(name, age, *args, city, job):
+    print(name, age, args, city, job)
+
+#关键字参数也可以具有默认值
+def person(name, age, *, city = "Beijing", job):
+    print(name, age, city, job)
+    
+
+#使用
+person("Jack", 24, city = "Beijing", job = "Engineer")
+
+####################
+#参数组合
+###################
+#注意: 参数定义的顺序必须是:必选参数, 默认参数, 可变参数, 命名关键字参数, 关键字参数
+def f1(a, b, c = 0, *args, **kw):
+    print("a = ", a, "b = ", b, "c = ", c, "args = ", args, "kw = ", kw)
+
+def f2(a, b, c = 0, *, d, **kw):
+    print("a = ", a, "b = ", b, "c = ", c, "d = ", d, "kw = ", kw)
+
+#使用
+f1(1, 2)
+f1(1, 2, c = 3)
+f1(1, 2, 3, "a", "b")
+f1(1, 2, 3, "a", "b", x = 99)
+f2(1, 2, d = 99, ext = None)
+
+args = (1, 2, 3, 4)
+kw = {"d": 99, "x": "#"}
+f1(*args, **kw)
+
+args = (1, 2, 3)
+kw = {"d":88, "x", "#"}
+f2(*args, **kw)
+
+
+#+END_SRC
+**** 函数的递归
+#+BEGIN_SRC python
+#使用递归要注意避免栈溢出
+def fact(n):
+    if n == 1:
+        return 1
+    return n * fact(n - 1)
+
+#使用尾递归优化的方式,避免栈溢出(在函数返回的时候,调用自身本身,并且 return 语句不能包含表达式
+def fact_iter(num, product):
+    if num == 1:
+        return product
+    return fact_iter(num - 1, num * product)
+
+def fact(n):
+    return fact_iter(n, 1)
+
+#+END_SRC
 *** 模块
 在python 中,一个 .py 文件就称为一个模块(Module).同时为了避免模块名冲突,还引入了按目录来组织模块的方法,
 称为包(Package).外部引用的方式就是 <包名>.<模块名>.

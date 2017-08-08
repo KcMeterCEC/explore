@@ -20,4 +20,36 @@ gunradio 使用命令 =gnuradio-companion=  *在命令行启动*!.
 关于模块的正常使用方式,依然是看它的说明文档!
 ** 使用Python开发
 当在图形界面使用 =generate= 功能时,便会生成和options中定义的ID名称一样的python文件.
+**** 第一个简单的调用(如此的优雅)
+#+BEGIN_SRC python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+from gnuradio import gr
+from gnuradio import audio
+from gnuradio import analog
+
+#gr.top_block 是gnuradio提供的基类
+class my_top_block(gr.top_block):
+    def __init__(self):
+        gr.top_block.__init__(self)
+
+        sample_rate = 32000
+        ampl = 0.1
+
+#信号源
+        src0 = analog.sig_source_f(sample_rate, analog.GR_SIN_WAVE, 350, ampl)
+        src1 = analog.sig_source_f(sample_rate, analog.GR_SIN_WAVE, 440, ampl)
+
+#接收机
+        dst = audio.sink(sample_rate, "")
+#连接信号源和接收机
+        self.connect(src0, (dst, 0))
+        self.connect(src1, (dst, 1))
+
+if __name__ == "__main":
+    try:
+        my_top_block().run()
+    except [[KeyboardInterrupt]]:
+        pass
+#+END_SRC
 

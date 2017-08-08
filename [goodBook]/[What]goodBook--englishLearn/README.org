@@ -236,3 +236,17 @@
 *** dissect
 - vt. 切细;仔细分析
 - vi. 进行解剖;进行详细分析
+** <2017-08-07 Mon>
+*** operand
+- n. 操作数;运算对象
+1. positional operand . 位操作数
+** <2017-08-08 Tue>
+*** portion
+- n. 部分;一份;命运
+- vt. 分配;给...嫁妆
+1. relevant portion. 相关部分
+*** forge
+- n. 融炉;
+- vi. 伪造;前进
+- vt. 伪造;前进
+1. forge iron. 打铁
