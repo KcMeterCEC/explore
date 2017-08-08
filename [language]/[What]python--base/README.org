@@ -168,6 +168,18 @@ def fact(n):
     return fact_iter(n, 1)
 
 #+END_SRC
+*** 类
+面向对象最重要的概念就是类和实例, 类是抽象的模板, 实例是根据类创建出来的一个具体的对象, 每个对象都拥有相同的方法, 但各自的数据可能不同.
+**** 类的定义
+#+BEGIN_SRC python
+#类名一般是大写开头的单词
+#object 代表该类是从哪个类继承下来的, 如果没有合适的类,则使用 object 类
+class Student(object):
+    pass
+
+#使用
+bart = Student()
+#+END_SRC
 *** 模块
 在python 中,一个 .py 文件就称为一个模块(Module).同时为了避免模块名冲突,还引入了按目录来组织模块的方法,
 称为包(Package).外部引用的方式就是 <包名>.<模块名>.
