@@ -250,3 +250,71 @@
 - vi. 伪造;前进
 - vt. 伪造;前进
 1. forge iron. 打铁
+** <2017-08-09 Wed>
+*** delve
+- vi. 钻研;探究;挖
+- vt. 钻研;探究;挖
+- n. 穴;洞
+- 过去式 delved 过去分词 delved 现在分词 delving
+1. delve into . 深入探究
+*** massive
+- adj. 大量的;巨大的;魁伟的
+- 比较级 more massive 最高级 most massive
+1. massive retaliation. 大规模报复
+*** terawatt
+- n. 太瓦;兆兆瓦
+1. terawatt level. 太瓦量级
+*** dish
+- n. 碟,盘;一道菜
+- vt. 把...装盘;使成碟状
+- vi. 成碟状
+- 复数 dishes 过去式 dished 过去分词 dished 现在分词 dishing
+1. fruit dish. 水果盘
+*** concern
+- vt. 涉及;使担心
+- n. 关系;关心
+1. humanistic concern. 人文关怀
+*** estimation
+- n. 估算
+1. state estimation. 状态估计
+*** obtain
+- vi. 获得;流行
+- vt. 获得
+1. obtain knowledge. 获取知识
+*** merely
+- adv. 仅仅;只是
+1. Merely act. 原来只是一场戏
+*** thorough
+- adj. 彻底的;十分的;周密的
+1. thorough understanding. 彻底理解;深入了解
+*** neighbor
+- n. 邻居
+- adj. 邻近的
+- vi. 友好的
+- vt. 邻接
+1. Neighbor relations. 左邻右舍
+*** interactively
+- adv. 交互式的;互勤地
+*** decimator
+- n. 杀害多人者; 抽取器
+*** interpolator
+- n. 窜改者;内插程序
+*** prompt
+- adj. 敏捷的;立刻的
+- vt. 提示;促进;激起
+- n. 提示;
+- adv. 准时的
+1. pmt prompt. 即时的
+*** strict
+- adj. 严格的;绝对的;精确的;详细的
+- 比较及 stricter 最高级 strictest
+1. strict control. 严格控制;严格治理
+*** perserve
+- vt. 保存;保护;维持;腌;禁猎
+- n. 保护区;禁猎地
+- 过去式 preserved 过去分词 preserved 现在分词 perserving
+1. special preserve. 特殊权利
+*** precision
+- n. 精度,精密度;精确
+- adj. 精密的,精确的
+1. precision instrument. 精密仪器

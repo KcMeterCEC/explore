@@ -53,3 +53,18 @@ if __name__ == "__main":
         pass
 #+END_SRC
 
+**** 先使用界面构建,然后再修改代码
+可以先在UI下构建基本工程,然后在去修改源码.需要注意的是, 如果再次修改了UI,那么源码会被再次更新.
+对应的办法是将此 *文件复制一份再修改*, 然后使用命令行启动代码.
+**** 块操作
+gnuradio 使用 gr_modtool 来开发和管理模块(module).而块(block)则是存放在module中的.
+***** gr_modtool 操作
+- =gr_modtool help= 调用帮助说明
+- =gr_modtool newmod <modname>= 创建一个新的模块, 模块中的 python,grc 文件夹需要关注
+- =gr_modtool add -t <type> -l python= 创建一个 python 模块,根据向导即可.然后会在 python,grc 文件夹下生成以测试为目的的 qa 文件, 块文件, 与GRC连接的xml文件,以及更新CMakeLists.txt文件.
+
+在选择块文件时, 需要规范文件后缀,后缀以输入输出数据类型而定.比如 multiply_py_ff , ff 代表输入为浮点,输出也为浮点.
+***** 编码操作
+- 进入块稳健,修改源码以指定输入输出类型(in_sig, out_sig),以及数据运算过程(work方法).
+- 单元测试
+
