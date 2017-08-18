@@ -1,0 +1,22 @@
+* [What]Linux --> command
+** 网络命令
+*** 文件下载
+**** 快速文件下载器 --> axel
+[[https://github.com/eribertomota/axel][axel]] 是命令行下使用的快速下载器,支持 HTTP,HTTPS,FTP,FTPS协议下载.
+
+*注意*:对于需要输入帐号密码才能进入的下载网址,可能会返回错误 =HTTP/1.0 403 Forbideen=
+#+begin_example
+#install
+sudo apt install axel
+#useage, x is maximum speed(bytes per second), y is maximum number of connections
+axel -s x -n y url1 [url2] [url...]
+#+end_example
+*** 网络监控
+**** 网速查看
+nethogs 用于查看哪些进程消耗了多少网络带宽
+#+begin_example
+#install
+sudo apt install nethogs
+#run
+sudo nethogs
+#+end_example

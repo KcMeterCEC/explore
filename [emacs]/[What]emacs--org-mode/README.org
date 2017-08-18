@@ -1,20 +1,32 @@
 * [What]emacs --> org-mode
-
 ** 基本操作
-
 *** 标题
 在要显示的标题前加上星号即可，有几个星号对应第几级标题。
-
 **** 折叠和打开标题
-
 *** 移动
-
 *** 列表
+*** 导出文档
+**** 导出前的准备
+***** 指定导出文档的标题
+在文档头,加入如下行即可.
+#+begin_example
+#+TITLE: This is the title of the document
+#+end_example
+***** 指定标题有几级
+默认情况下,只有前3个级别用作标题,更深的级别会被看作项目列表.可以显示的使用如下行来指定几个级别用作标题.
+#+begin_example
+#+OPTIONS: H:4
+#+end_example
+***** 指定目录显示规则
+#+begin_example
+#+OPTIONS: toc:2 (目录中只显示二级标题)
+#+OPTIONS: toc:nil (无目录)
+#+end_example
+**** 导出文件
+使用快捷键 =C-c C-e= ,进入选项界面.
 
-
-
+- 导出为PDF文件时,建议先导出HTML文件,然后再打印为PDF
 ** 编辑技巧
-
 *** 跳转到专用的代码编辑模式
 1. 在要写的代码块前后加上 `#BEGIN_SRC` `#END_SRC`，快捷输入方式 `<s - TAB`
 2. 在代码块中使用使用快捷键 `C - c - '`，就会跳转到一个新 buffer 来编辑代码

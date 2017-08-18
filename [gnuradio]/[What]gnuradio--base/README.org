@@ -58,6 +58,12 @@ if __name__ == "__main":
 对应的办法是将此 *文件复制一份再修改*, 然后使用命令行启动代码.
 **** 块操作
 gnuradio 使用 gr_modtool 来开发和管理模块(module).而块(block)则是存放在module中的.
+
+块分为如下几类:
+1. synchronous(1:1), 同步操作,也就是输入的数据数量与输出的数据数量一样多
+2. decimation(N:1), 抽取操作,输入的数据量是输出的数据量的整倍数
+3. interpolation(1:M),插值操作,输出的数据量是输入数据量的整数倍
+4. general/basic(N:M),输入和输出之间没有固定的联系
 ***** gr_modtool 操作
 - =gr_modtool help= 调用帮助说明
 - =gr_modtool newmod <modname>= 创建一个新的模块, 模块中的 python,grc 文件夹需要关注
@@ -65,6 +71,24 @@ gnuradio 使用 gr_modtool 来开发和管理模块(module).而块(block)则是�
 
 在选择块文件时, 需要规范文件后缀,后缀以输入输出数据类型而定.比如 multiply_py_ff , ff 代表输入为浮点,输出也为浮点.
 ***** 编码操作
-- 进入块稳健,修改源码以指定输入输出类型(in_sig, out_sig),以及数据运算过程(work方法).
+- 进入块文件,修改源码以指定输入输出类型(in_sig, out_sig),以及数据运算过程(work方法).
+ 数据类型使用 =numpy.int8= 这种对象,具体说明位于: [[https:docs.scipy.org/doc/numpy/user/basics.type.html?][numpy]]
 - 单元测试
+单元测试的核心思想: 强测试代码视为一个黑盒, 为黑盒提供 *遍历* 输入, 然后对比输出与理论值是否符合.
 
+在gnuradio中,进入qa_xx文件,然后修改 =test_001_t= 这类文件.
+
+***** XML文件
+XML文件位于 grc 文件夹中,编辑此文件最终会显示在UI选项上.
+
+通过提供标记(tag)来达到UI与python交互的目的.
+***** 安装block
+首先进入到module的根目录,然后运行如下脚本:
+#+begin_example
+mkdir build
+cd build
+cmake ../
+make
+sudo make install
+sudo ldconfig
+#+end_example

@@ -31,6 +31,25 @@ else:
     <执行4>
 
 #+END_SRC
+*** 循环
+**** for
+for x in y 循环依次把 y( list 或 tuple )中的每个元素取出来赋值给x,参与运算.
+#+BEGIN_SRC python
+#依次打印出 names 中的元素
+names = ['Michael', 'Bob', "Tracy']
+for name in names:
+    print(name)
+#+END_SRC
+**** while 
+while x 循环判断,只要x 为真则一直循环下去.
+#+BEGIN_SRC python
+sum = 0
+n = 99
+while n > 0:
+    sum = sum + n
+    n = n - 2
+print(sum)
+#+END_SRC
 *** 函数
 **** 函数的调用
 函数的调用和 c/c++ 没什么不同,使用 =函数名(<参数列表>)= 的方式使用.

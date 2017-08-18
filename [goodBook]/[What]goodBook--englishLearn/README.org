@@ -318,3 +318,205 @@
 - n. 精度,精密度;精确
 - adj. 精密的,精确的
 1. precision instrument. 精密仪器
+** <2017-08-14 Mon>
+*** excellent
+- adj. 卓越的;极好的;杰出的
+1. excellent example. 典范;榜样
+*** linearity
+- n. 线性;线性度;直线性
+- 复数 linearities
+1. non linearity. 非线性
+*** conversion
+- n. 转换;兑换
+1. internal conversion. 内部转换
+*** obtain
+- vi. 获得;流行
+- vt. 获得
+*** spur
+- n. 鼓舞,刺激;马刺;山坡
+- vi. 骑马疾驰;给予刺激
+- vt. 激励,鞭策;
+- 过去式 spurred 过去分词 spurred 现在分词 spurring
+1. Bone spur. 骨刺
+** <2017-08-15 Tue>
+*** approximate
+- vt. 近似;使...接近;粗略估计
+- vi. 接近于;近似于
+- adj. 近似的;大概的
+1. approximate number. 近似值
+*** equality
+- n. 平等;相等;等式
+- 复数 equalities
+1. equality act. 平等法
+*** cube
+- n. 立方;立方体;
+- vt. 使成立方形
+- 过去式 cubed 过去分词 cubed 现在分词 cubing
+1. magic cube. 幻立方
+*** original
+- n. 原件;原作;原型
+- adj. 原始的;最初的;独创的
+1. original edition. 原版
+*** initiative
+- n. 主动权
+- adj. 主动的
+1. avengers initiative. 复仇者联盟
+*** ease
+- vt. 减轻;使安心
+- n. 轻松;安逸
+- vi. 缓和;放松
+- 过去式 eased 过去分词 eased 现在分词 easing
+1. ease up. 放松
+*** effort
+- n. 努力,成就
+1. best effort. 尽力而为
+*** portfolio
+- n. 公文包;文件夹;证券投资组合
+- 复数 portfolios
+1. lecture portfolio. 讲义夹
+*** comprise
+- vt. 包含;由...组成
+- 过去式 comprised 过去分词 comprised 现在分词 comprising
+1. mainly comprised . 主要包括
+*** compose
+- vt. 构成;写作;使平静;排...的版
+- vi. 组成;作曲;排字
+- 过去式 composed 过去分词 composed 现在分词 composing
+1. compose buffer. 写缓冲区
+*** consistent
+- adj. 始终如一的;坚持的
+- 比较级 more consistent 最高级 most consistent
+1. consistent with. 符合
+*** middleware 
+- n. 中间件;中间设备
+1. middleware software. 中间软件
+*** utility
+- n. 实用;效用;公共设施
+- adj. 实用;通用的;有多种用途的
+- 复数 utilities
+1. time utility. 时间效用
+*** expert
+- adj. 熟练的;老练的
+- n. 专家
+- vt. 当专家
+1. expert team. 专家团队
+*** orient
+- vt. 使适应;确定方向;
+- n. 东方
+- adj. 东方的
+- vi. 向东
+1. orient group. 东方集团
+*** simultaneously
+- adv. 同时的
+1. sample simultaneously. 同步采样
+*** restriction
+- n. 限制;约束;束缚
+1. restriction gene. 限制基因
+*** production
+- n. 成果;产品;生产;作品
+1. production capacity. 生产力
+*** compliance
+- n. 顺从,服从;承诺
+1. compliance test. 验证试验.
+*** validation
+- n. 确认;批准;生效
+1. cross validation. 交叉验证
+*** qualification
+- n. 资格;条件;限制
+1. qualification test. 资格考试
+*** gather
+- vt. 收集;使...聚集
+- vi. 集聚
+- n. 聚集
+1. final gather. 最终聚集
+*** series
+- n. 系列;串联;丛书
+- 复数 series
+1. power series. 功率串联
+*** convenience
+- n. 便利;厕所;便利的事物
+1. convenience store. 便利店
+*** dependency
+- n. 属国;从属;
+- 复数 dependencies
+1. dependency theory. 依附理论
+*** migration
+- n. 迁移;移民;移动
+1. human migration. 人口迁移
+*** catgory
+- n. 种类,分类;范畴
+- 复数 categories
+1. job categories. 工作类E 
+** <2017-08-16 Wed>
+*** uncommon
+- adj. 不寻常的;罕有的
+- adv. 非常的
+1. uncommon freedom. 非凡的自由
+*** dismiss
+- vt. 解散;开除;让...离开;不予理会
+- vi. 解散
+1. dismiss from. 解雇;被解雇
+*** ultimate
+- adj. 最终的;极限的;根本的
+- n. 终极;根本;基本原则
+1. vista ultimate. 旗舰版
+*** peer
+- n. 贵族;同等的;同邻人
+- vi. 凝视;
+- vt. 封为贵族;与...同等
+1. life peer. 生命同行
+*** volume
+- n. 量;体积;卷;音量
+- adj. 大量的
+- vi. 成团卷起的
+- vt. 把...收集成卷
+1. air volume. 风量
+
+** <2017-08-17 Thu>
+*** forbidden
+- adj. 被禁止的;严禁的;
+1. forbidden city . 故宫
+*** accelerator
+- n. 油门;催化剂;加速装置
+1. linear accelerator. 直线加速器
+*** famous
+- adj. 著名的;极好的
+1. famous for . 驰名;成名作
+*** approximately
+- adj. 大约
+1. approximately equal. 近似等于
+*** critical
+- adj. 鉴定的;临界的;批评的
+1. critical thinking. 批判性思维
+*** flawlessly
+-  adv. 完美无瑕的
+1. flawlessly beautiful. 无瑕美好
+*** consult
+- vt. 查阅;向...请教
+- vi. 请教;商议
+1. consult with. 商量
+** <2017-08-18 Fri>
+*** constellation
+- n. 星座;星群;荟萃;
+1. project constellation . 星座计划
+*** plot
+- n. 情节;图;阴谋
+- vt. 密谋;绘图;划分;标绘
+- vi. 密谋;策划;绘制
+- 过去式 plotted 过去分词 plotted 现在分词 plotting
+1. Nyquist plot. nyquist 图
+*** quadrant
+- n. 象限;四分之一圆
+1. quadrant scale. 扇形称
+*** adjacent
+- adj. 邻近的
+1. adjacent station. 相邻车站
+*** placeholder
+- n. 占位符
+1. symbolic placeholder. 占位符号
+*** snip
+- n. 剪;便宜货
+- vt. 剪断
+- vi. 剪
+- 过去式 snipped 过去分词 snipped 现在分词 snipping
+1. snip off. 剪掉
