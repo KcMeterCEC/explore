@@ -1,0 +1,72 @@
+* [What]Linux --> usage experiences
+** linux启动失败(grub rescue)
+在先安装了 windows 然后安装 linux 时,如果没有选择启动硬盘装载启动代码的话,便无法正常启动系统.
+并会出现提示 =grub rescue >=.
+
+应对的方法是: 重新指定启动硬盘.
+#+begin_example
+#首先列出当前的磁盘
+grub rescue > ls
+(hd0) (hd0,msdos5) (hd0,msdos3)
+#然后依次查找可以被识别出文件系统的磁盘(ext)
+grub rescue > ls (hd0,msdos5)
+grub rescue > ls (hd0,msdos3)
+#在识别出磁盘后,首先指定其为启动代码起始盘
+grub rescue > set root=(hd0,msdos5)
+grub rescue > set prefix=(hd0,msdos5)/boot/grub
+#启动引导代码
+grub rescue > insmod normal
+grub rescue > normal
+
+#进入Linux后,重新设置
+sudo update-grub
+sudo grub-install /dev/sdx #比如/dev/sda 为启动盘
+#+end_example
+** 为局域网服务器搭建一个git服务器
+此git服务器可以为每个项目指定哪些人具有读写权限,哪些人具有只读权限.
+
+*** 服务器端
+- 设定服务器为固定IP地址
+- 为git服务器新建一个用户,比如 git
+#+begin_example
+sudo adduser git
+#+end_example 
+- 切换到git用户,在 *HOME* 目录下下载代码,并安装
+#+begin_example
+su git
+git clone https://github.com/sitaramc/gitolite
+mkdir bin
+cd gitolite
+./install -to ~/bin
+#+end_example
+- 创建公钥并指定,此时gitolite 会自动新建一个库
+#+begin_example
+ssh-keygen
+cd ~/bin
+gitolite setup -pk ~/.ssh/id_rsa.pub
+#+end_example
+- 克隆库,此时在 gitolite-admin 文件夹下有 =conf/gitolite.conf= 用于配置权限, =keydir= 用于保存用户公钥
+#+begin_example
+cd ~
+git clone git@localhost:gitolite-admin
+#+end_example
+- 为项目设置 conf文件,比如项目名称为 foo, 参与者有 alice,bob,carol,其中carol仅有只读权限
+#+begin_example
+repo foo
+    RW+     = alice bob 
+    R       = carol 
+#+end_example
+- 将参与者的公钥拷贝进 keydir 文件夹,名字要相对应. =alice.pub, bob.pub, carol.pub=
+- 提交更改,在提交更改后,gitolite会自动在 =~/repositories=文件夹中新建库文件,并修改 =~/.ssh/authorized_keys=
+#+begin_example
+git add .
+git commit -m "added foo, gave access to alice,bob,carol"
+git push
+#+end_example
+*** 客户端
+- 克隆项目,<host_ip> 为主机地址, <reponame> 为库文件名 
+#+begin_example
+git clone git@<host_ip>:<reponame>
+#+end_example
+
+如果此命令运行失败,则有可能是 ssh还没有更新生成的公钥, 使用 =ssh-add= 命令即可.

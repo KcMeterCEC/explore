@@ -520,3 +520,46 @@
 - vi. 剪
 - 过去式 snipped 过去分词 snipped 现在分词 snipping
 1. snip off. 剪掉
+** <2017-08-19 Sat>
+*** nuance
+- n. 细微差别
+*** illustrate
+- vt. 阐明;图解
+- vi. 举例
+- 过去式 illustrated 过去分词 illustrated 现在分词 illustrating 
+1. further illustrate. 进一步说明
+*** demand
+- vt. 要求;需要;查询
+- vi. 需要;请求;查问
+- n. 需求;要求;需要
+1. derived demand. 衍生需求
+*** quality
+- n. 质量;特性;才能
+- adj. 优质的;高品质的
+1. High quality. 高品质
+*** assurance 
+- n. 保证;保险
+1. life assurance. 人寿保险
+*** establish 
+- vt. 建立;创办;安置
+- vi. 植物定植
+1. establish create. 设立
+*** semantics
+- n. 语义学;语义论
+1. operational semantics. 操作语义
+*** couple
+- n. 对;夫妇;数个
+- vi. 结合;成婚
+- vt. 结合;连接;连合
+- 过去式 coupled 过去分词 coupled 现在分词 coupling
+1. the couple. 两口子
+*** flesh
+- n. 肉;肉体
+- vt. 喂肉给...;使发胖
+- vi. 长胖
+1. flesh search. 人肉搜索.
+*** skeleton
+- n. 骨架;纲要;骨瘦如柴的人
+- adj. 骨骼的;概略的
+1. skeleton diagram. 轮廓图.
+  
