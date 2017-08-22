@@ -72,7 +72,7 @@ gnuradio 使用 gr_modtool 来开发和管理模块(module).而块(block)则是�
 在选择块文件时, 需要规范文件后缀,后缀以输入输出数据类型而定.比如 multiply_py_ff , ff 代表输入为浮点,输出也为浮点.
 ***** 编码操作
 - 进入块文件,修改源码以指定输入输出类型(in_sig, out_sig),以及数据运算过程(work方法).
- 数据类型使用 =numpy.int8= 这种对象,具体说明位于: [[https:docs.scipy.org/doc/numpy/user/basics.type.html?][numpy]]
+  数据类型使用 =numpy.int8= 这种对象,具体说明位于: [[https:docs.scipy.org/doc/numpy/user/basics.type.html?][numpy]]
 - 单元测试
 单元测试的核心思想: 强测试代码视为一个黑盒, 为黑盒提供 *遍历* 输入, 然后对比输出与理论值是否符合.
 

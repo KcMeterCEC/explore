@@ -563,3 +563,106 @@
 - adj. 骨骼的;概略的
 1. skeleton diagram. 轮廓图.
   
+** <2017-08-21 Mon>
+*** hierarchically
+- adv. 分层次,分等级的
+1. hierarchically management. 分层次管理
+*** reflect
+- vt. 反映;表达;显示;反省
+- vi. 反射;深思
+1. reflect sheet. 反射膜
+*** percentage
+- n. 百分比;百分率
+1. percentage point. 一个百分点
+*** respectively
+- adv. 分别的;各自的
+1. respectively ad. 各自的
+*** presence
+- n. 存在;出席;参加;风度;仪态
+1. social presence. 社会临场感
+*** intermediate
+- vi. 起媒介作用
+- adj. 中间的,中级的
+- n. 中间物;媒介
+- 过去式 intermediated 过去分词 intermediated 现在分词 intermediating
+1. intermediate system. 中间系统
+*** fatal
+- adj. 致命的;重大的;毁灭性的;命中注定的
+- 比较级 more fatal 最高级 most fatal
+1. fatal love. 危情
+*** complementary
+- adj. 补足的;补充的
+- 复数 complementaries
+1. complementary angles. 余角
+*** encompass
+- vt. 包含;包围;完成
+1. encompass partner. 紧密合作伙伴
+*** innovative
+- adj. 革新的;新颖的;有创新精神的
+1. innovative thinking. 创新思维
+*** comprehensive
+- adj. 综合的;广泛的;有理解力的
+- n. 综合学校;专业综合测验
+1. comprehensive school. 综合学校
+*** interact
+- vt. 互相影响
+- vi. 互相影响
+- n. 幕间剧;幕间休息
+1. interact with. 互相作用的东西
+*** permit
+- vi/vt. 许可;允许
+- n. 许可证,执照
+- 过去式 permitted 过去分词 permitted 现在分词 permitting
+1. work permit. 工作许可
+*** horizontal
+- adj. 水平的;地平线的
+- n. 水平线;水平面
+1. horizontal plane. 水平投影面
+*** quadrature
+- n. 正交;求积;
+1. quadrature filter. 正交滤波器
+*** comparative
+- adj. 比较的;相当的
+- n. 比较级;对手
+1. comparative advantage. 比较优势
+*** aspect 
+- n. 方面;方向;形式;外貌
+1. aspect card. 标记卡
+*** consult
+- vt. 查阅;商量;向...请教
+- vi. 请教;商议;当顾问
+1. consult with. 商议
+*** explicitly
+- adv.  明确的;明白的
+1. explicitly linking. 显式链接
+*** propagate
+- vt. 传播;繁殖;宣传
+- vi. 繁殖;增殖
+- 过去式/过去分词 propagated 现在分词 propagating
+1. propagate extension. 宣传推广
+** <2017-08-22 Tue>
+*** margin
+- n. 边缘;利润;页边的空白
+- vt. 加边于;加旁注
+1. left margin. 左边距
+*** onus
+- n. 责任;负担
+- 复数 onuses
+1. onous proringi. 举证责任
+*** reply
+- vi. 回答;回击
+- n. 答辨;回答
+- vt. 回答
+- 复数 replies 过去式/过去分词 replied 现在分词 replying
+1. quick reply. 快速回复
+*** sanity
+- n. 明智;通情大理
+1. sanity personalties. 健全人格
+*** stuck
+- v. 刺
+- adj. 被卡住;
+1. stuck with. 被迫接受
+*** rational
+- adj. 合理的;理性的
+- n. 有理数
+- 比较级 more rational 最高级 most rational
