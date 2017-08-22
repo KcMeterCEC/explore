@@ -666,3 +666,17 @@
 - adj. 合理的;理性的
 - n. 有理数
 - 比较级 more rational 最高级 most rational
+** <2017-08-22 Tue>
+*** concept
+- n. 观念,概念
+1. design concept. 设计概念
+*** aggregation
+- n. 聚合;聚合体
+1. aggregation pipeline. 聚合管道
+*** fixture
+- n. 设备;固定装置;
+1. fixture design. 夹具设计
+*** involve
+- vt. 包含;牵涉;
+- 过去式 involved 过去分词 involved 现在分词 involving
+

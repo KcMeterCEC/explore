@@ -322,4 +322,39 @@ import sys
 sys.path.append('/Users/michael/my_py_scripts')
 - 设置环境变量 =PYTHONPATH=, 只需要添加自己的搜索路径即可
 #+END_SRC
+*** 单元测试
+**** 基本概念
+- 测试夹具(test fixture): 代表进行一个单元测试之前或之后进行的准备或清理工作.类似于c++中的构造和析构函数.
+- 测试用例(test case): 代表对一个实际的单元进行测试的代码.
+- 测试套件(test suite): 代表几个测试用例的集合, 也可以层层包含,用于连续执行多个用例.
+- 测试运行器(test runner): 代表运行测试用例的组件.
+**** 基本格式
+#+BEGIN_SRC python
+#! /usr/bin/env python3
+
+#test.py
+#载入 单元测试模块
+import unittest
+
+#继承自 unittest.TestCase
+class TestStringMethods(unittest.TestCase):
+
+    #各个测试用例都要以 test_ 开头, 以便可以自动执行它们
+    def test_upper(self):
+        self.assertEqual('foo'.upper(), 'FOO')
+    def test_isupper(self):
+        self.assertTrue('FOO'.isupper())
+        self.assertFalse('Foo'.isupper())
+    def test_split(self):
+        s = 'hello world'
+        self.assertEqual(s.split(), ['hello', 'world'])
+        with self.assertRaises(TypeError):
+            s.split(2)
+
+if __name__ == '__main__':
+    unittest.main()
+#+END_SRC
+
+- 运行时,使用 =python3 test.py -v= 可以看到各个测试用例的结果
+
 ** 技巧
