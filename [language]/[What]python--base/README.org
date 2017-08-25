@@ -323,6 +323,7 @@ sys.path.append('/Users/michael/my_py_scripts')
 - 设置环境变量 =PYTHONPATH=, 只需要添加自己的搜索路径即可
 #+END_SRC
 *** 单元测试
+[[https://docs.python.org/3/library/unittest.html][官方网站]]
 **** 基本概念
 - 测试夹具(test fixture): 代表进行一个单元测试之前或之后进行的准备或清理工作.类似于c++中的构造和析构函数.
 - 测试用例(test case): 代表对一个实际的单元进行测试的代码.
@@ -339,22 +340,56 @@ import unittest
 #继承自 unittest.TestCase
 class TestStringMethods(unittest.TestCase):
 
-    #各个测试用例都要以 test_ 开头, 以便可以自动执行它们
+    #各个测试用例都要以 test_ 开头, 以便可以自动执行它们(执行的顺序为字母排序)
     def test_upper(self):
+        #通过 assert* 来判断各种场强
         self.assertEqual('foo'.upper(), 'FOO')
     def test_isupper(self):
         self.assertTrue('FOO'.isupper())
         self.assertFalse('Foo'.isupper())
+    #可以使用修饰器通过某个测试用例
+    @unittest.skip('demonstrating skipping')
     def test_split(self):
         s = 'hello world'
         self.assertEqual(s.split(), ['hello', 'world'])
         with self.assertRaises(TypeError):
             s.split(2)
+    #每个测试方法调用前会执行此方法
+    def setUp(self):
+        print('setUp...')
+    #每个测试方法调用后会执行此方法
+    def tearDown(self):
+        print('tearDown...')
+    #设置这个类中有哪些实例被运行, 等于说是留给了上层一个接口
+    def suite():
+        suite = unittest.TestSuite()
+        suite.addTest(TestStringMethods('test_upper'))
+        return suite
 
 if __name__ == '__main__':
     unittest.main()
+
+    #也可以在测试代码中实现
+    suite = unittest.TestSuite()
+    suite.addTest(TestStringMethods('test_upper'))
+    runner = unittest.TestTestRunner()
+    runner.run(suite)
 #+END_SRC
 
-- 运行时,使用 =python3 test.py -v= 可以看到各个测试用例的结果
+**** 运行
+- 运行时,使用 =python3 test.py -v= 可以自动依次执行各个用例,也可以看到各个测试用例的结果
+- 使用 =-f= 参数时, 只要出现错误便停止测试. =python3 -f test.py -v=
+- 将 =-v= 放在前面, 会有更多的信息输出. =python3 -v test.py=
+- 查看帮助 =python3 -m unittest -h=, 运行体验 =python3 -m unittest=
+- 也可以单独只运行某个模块,某个用例
+#+begin_example
+python -m unittest test_module1 test_module2
+python -m unittest test_module.TestClass
+python -m unittest test_module.TestClass.test_method
+#+end_example
+- 可以指定路径
+#+begin_example
+pythom -m unittest tests/test_somthing.py
+#+end_example
 
 ** 技巧

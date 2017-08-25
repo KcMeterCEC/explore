@@ -680,3 +680,106 @@
 - vt. 包含;牵涉;
 - 过去式 involved 过去分词 involved 现在分词 involving
 
+** <2017-08-23 Wed>
+*** combination
+- n. 结合;组合;联合
+1. combination reaction. 化合反应
+*** qualify
+- vt. 限制;使具有资格;证明...合格
+- vi. 取得资格
+- 过去式/过去分词 qualified 现在分词 qualifying
+1. monday qualify. 资格赛
+*** explicitly
+- adv. 明确地;明白的
+1. defined explicitly. 明确定义
+*** pattern
+- n. 模式;图案;样品
+- vt. 模仿
+- vi. 形成图案
+1. observer pattern. 观察者模式
+*** caution
+- n. 小心;警告
+- vt. 警告
+1. caution money. 保证金
+*** scenario
+- n. 方案;情节;剧本;设想
+1. scenario testing. 测试场景
+*** correctness
+- n. 正确性
+1. timing correctness. 时间正确性
+*** isolation
+- n. 隔离;孤立
+1. social isolation. 社交孤立
+*** arbitrary
+- adj. 任意的;武断的;专制的
+1. aribitrary average. 任意平均数
+*** repetitive
+- adj. 重复
+1. repetitive process. 反复过程
+*** exception
+- n. 例外;异议
+1. exception declaraton. 异常声明
+*** suffer
+- vt. 遭受;忍受;经历
+- vi. 受痛苦;经验
+1. suffer from. 遭受
+*** ship
+- vt. 运送,乘船;以船运送
+- vi. 上船;乘船旅行;当船员
+- n. 船;舰
+- 过去式/过去分词 shipped 现在分词 shipping
+1. passenger ship. 客轮
+*** consistent
+- adj. 始终如一的;坚持的
+- 比较级 more consistent 最高级 most consistent
+1. consistent return. 稳定回报
+*** strategy
+- n. 战略
+- 复数 strategies
+1. military strategy. 军事战略
+*** decorator
+- n. 装饰者;室内装潢师
+1. resource decorator. 模式
+*** variant 
+- adj. 不同的;多样的
+- n. 变体;转化
+1. variant pump. 变速泵
+*** distinguish
+- vt. 区别;辨别;使杰出
+- vi. 区分;辨别
+1. danger distinguish. 危害辨识
+*** iteration
+- n. 迭代;反复
+1. iteration method. 迭代方法
+*** comprehensive
+- adj. 综合的;广泛的;有理解力的
+- n. 综合学校
+1. comprehensive income. 综合收入
+*** principle
+- n. 原理;主义;本质;根源
+1. equivalence principle. 等效原理
+*** migrate
+- vi. 移动;迁移
+- vt. 使移居;使移植
+- 过去式/过去分词 migrated 现在分词 migrating
+1. migrate workers. 流动工人
+*** quad
+- n. 四方院子;嵌条;成套的四件东西
+1. quad patch. 方形面片
+*** latency
+- n. 潜伏;潜在因素
+- 复数 latencies
+1. additive latency. 附加延迟
+** <2017-08-24 Thu>
+*** previously
+- adv. 以前;预先;仓促
+1. previously when. 以前的时候做的
+*** regard
+- n. 注意;尊重;问候;凝视
+- vt. 注重;看待;尊敬
+- vi. 注意;注视
+1. regard as. 当作.
+*** invalidate
+- vt. 使无效;使无价值
+- 过去式/过去分词 invalidated 现在分词 invalidting
+1. to invalidate. 废弃

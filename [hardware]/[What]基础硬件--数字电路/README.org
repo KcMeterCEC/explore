@@ -1,0 +1,5 @@
+* [what] 基础硬件 --> 数字电路
+** 符号
+*** 数字电路中的符号
+**** 逻辑门符号
+[[./logicGatesSymbols.jpg][Logic Gates Symbols]]
