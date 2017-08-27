@@ -20,6 +20,24 @@ sudo apt install openjdk-7-jdk
 #+begin_example
 sudo apt install lib32stdc++6
 #+end_example
+**** 编译到 libwebviewchromium.so 停止很长时间后发生错误
+当编译过程卡在 =libwebviewchromium.so= 时, 有可能是正常现象, 也有可能会出错(需要等待大约1个多小时).
+所以, *一定要在错误结果出现后再具体操作, 千万不要提前打断!*
+
+当出现错误后, 一般是交换分区设置不足的问题造成的, 所以需要重新设定(建议10G).步骤如下:
+#+begin_example
+#新建分区
+dd if=/dev/zero of=/opt/swap bs=1024 count=10240000
+#将文件变成swap文件
+mkswap /opt/swap
+#启用swap文件
+swapon /opt/swap
+#每次开机时都启用
+vim /etc/fstab
+/opt/swap swap swap defaults 0 0
+#+end_example
+**** No command 'mmm' found....
+在生成IDE文件时, 需要使用 =mmm= 命令, 此命令是编译包下的命令, 所以需要先执行 =source build/envsetup.sh= 
 ** 基础认知
 *** 基本概念
 Android驱动 = Linux驱动 + 封装
