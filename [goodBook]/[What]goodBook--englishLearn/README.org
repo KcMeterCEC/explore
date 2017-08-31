@@ -783,3 +783,349 @@
 - vt. 使无效;使无价值
 - 过去式/过去分词 invalidated 现在分词 invalidting
 1. to invalidate. 废弃
+** <2017-08-28 Mon>
+*** conflict
+- n. 冲突,茅盾;斗争;争执
+- vi. 冲突, 牴触;争执; 战斗
+1. conflict theory. 冲突理论
+*** theory
+- n. 理论;原理;学说;推测
+- 复数 theories
+1. information theory. 信息理论
+*** facto
+- adj. 事实上
+1. impact facto. 影响因子
+*** annotated
+- adj. 有注释的
+1. annotated corpora. 语料库
+*** extract 
+- vt. 提取;取出;摘录;榨取
+- n. 汁;榨出物
+1. beef extract. 牛肉膏
+*** inheritance
+- n. 继承;遗传;遗产
+1. inheritance law. 继承法
+*** collaboration
+- n. 合作;勾结;通敌
+1. mass collaboration. 大规模协作.
+*** flavor
+- n. 情味;香料
+- vt. 加味于
+1. cinnamon flavor. 桂香味
+*** gratuitously
+- adv. 无偿的
+1. permit gratuitously. 无偿许可
+*** privacy
+- n. 隐私;秘密;隐居
+- 复数 privacies
+1. privacy policy. 保密规则
+*** occasionally
+- adv. 偶尔
+1. occasionally needed. 有时需要
+*** subscribe
+- vi. 订阅;捐款;认购
+- vt. 签署;赞成;捐助
+- 过去式/过去分词 subscribed 现在分词 subscribing
+1. email subscribe. 电子邮件订阅
+*** involve
+- vt. 包含;牵涉;使陷于
+- 过去式/过去分词 involved 现在分词 involving
+1. involve deeply. 深深卷入
+*** formula
+- n. 公式;配方;婴儿食品
+- 复数 formulas
+*** parse
+- vt. 解析;
+- vi. 理解
+- n. 从语法上分析
+- 过去式/过去分词 parsed 现在分词 parsing
+1. parse Error. 解析错误
+*** assure
+- vt. 保证;担保;使确信;弄清楚
+- 过去式/过去分词 assured 现在分词 assuring
+1. assure system . 担保制度
+*** reasonable
+- adj. 合理的;通情达理的
+- 比较级 more reasonable 最高级 most reasonable
+1. reasonable distribution. 合理分配.
+*** recognize
+- vt. 认出;承认
+- vi. 确认;
+- 过去式/过去分词 recognized 现在分词 recognizing
+1. recognize game. 认识的游戏
+*** omit
+- vt. 省略;遗漏;删除;忽略
+- 过去式/过去分词 ommitted 现在分词 omitting
+1. omit work. 省略工作
+*** pretend
+- vi. 假装
+- adj. 假装的
+- vt. 假装,伪装,模拟
+1. playing pretend. 自行玩耍
+*** entity
+- n. 实体;存在;本质
+- 复数 entities
+1. business entity.企业实体
+*** deem 
+- vt. 认为,视作;相信
+- vi. 认为;作某种评价
+1. deem city. 城市.
+*** collaboration
+- n. 合作;勾结;通敌
+1. mass collaboration. 大规模协作
+*** regardless
+- adj. 不管的;不顾的;不注意的
+- adv. 不顾后果的;无论如何
+1. but regardless. 但不管怎么样
+*** sort
+- n. 种类;方式;品质
+- vi. 分类;协调;交往
+- vt. 将...分类;将...排序
+1. bubble sort. 冒泡排序
+** <2017-08-29 Tue>
+*** grant
+- vt. 授予;允许;承认
+- vi. 同意
+- n. 拨款
+*** permission
+- n. 允许,许可
+1. asking permission. 请求许可
+*** term
+- n. 术语;学期;期限;条款
+- vt. 把...叫做
+1. term logic. 传统逻辑
+*** publish
+- vt. 出版;发表;公布
+- vi. 出版;发行;刊印
+1. publish entry. 发布项.
+*** concatenation
+- n. 串联,连接
+1. concatenation character. 连接字符
+*** collaboration 
+- n. 合作;勾结;通敌
+1. mass collaboration. 大规模协作
+*** appliance 
+- n. 器具;器械;装置
+- 过去式/过去分词 applianced 现在分词 appliancing
+1. virtual appliance. 虚拟设备
+*** arch
+- n. 弓形;拱门
+- adj. 主要的
+- vt. 使...成弓形
+- vi. 拱起
+*** commercial
+- adj. 商业;盈利
+- n. 商业广告
+1. commercial revolution. 商业革命
+*** community
+- n. 社区;团体
+- 复数 communities
+1. scientific community. 科学界
+*** enterprise
+- n. 企业;事业;进取心;事业心
+1. private enterprise. 民营企业
+*** maintenance
+- n. 维护;保持;生活费用
+1. system maintenance. 系统维护
+*** scalability
+- n. 可扩展性;可伸缩性
+1. scalability testing. 
+*** premium
+- n. 保险费;奖金
+- 复数 premiums
+1. gross premium. 总保费
+*** gross
+- adj. 总共;粗野的;恶劣的
+- vt. 总共收入
+- 总数
+- 复数 grosses 比较级 grosser 最高级 grossest
+1. gross loss.总亏损
+*** evaluation
+- n. 评价;评估;
+1. job evaluation. 工作评价
+*** grow
+- vi. 发展;生长;
+- vt. 使生长
+- 过去式 grew 过去分词 grown 现在分词 growing
+1. grow home. 成长家园
+*** fledged
+- adj. 成熟的;
+1. fully fledged. 全面发展
+*** resilient
+- adj. 弹回的,有弹力的;有复员能力的
+1. resilient dynamism. 弹性活力
+*** cluster
+- n. 群;簇;丛;串
+- vi. 群聚;丛生
+- vt. 使聚集
+1. cluster bomb
+*** sort
+- n. 种类;方式;品质
+- vi. 分类;协调;交往
+- vt. 将...分类;将...排序;
+1. quick sort. 快速排序
+*** bubble
+- n. 气泡;泡状物
+- vi. 沸腾
+- vt. 使冒泡
+- 过去式/过去分词 bubbled 现在分词 bubbling
+1. economic bubble. 经济泡沫
+*** economic
+- adj. 经济的;经济上的;经济学的
+- 比较级 more economic 最高级 most economic
+1. economic depression. 经济萧条
+*** decline
+- n. 下降;衰退;斜面
+- vi. 下降;衰落;谢绝;
+- vt. 谢绝;婉拒
+- 过去式/过去分词 declined 现在分词 declining
+1. moral decline. 道德水准下降
+*** moral
+- adj. 道德的;精神上的;品行端正的
+- n. 道德;寓意
+1. moral hazard. 道德风险
+** <2017-08-30 Wed>
+*** benefit
+- n. 利益;好处;救济金
+- vt. 有益于,对...有益
+- vi. 受益
+1. external benefit. 外部利益
+*** diagram
+- n. 图表;图解
+- vt. 用图解法表示
+- 过去式/过去分词 diagramed 或 diagrammed 现在分词 diagraming 或 diagramming
+1. ladder diagram. 梯形图
+*** intend
+- vt. 打算;想要;意指
+- vi. 有打算
+1. intend to. 打算去
+*** forge
+- n. 融炉;锻铁炉;铁工厂
+- vi. 伪造;前进
+1. forge welding .锻焊
+** <2017-08-31 Thu>
+*** incident
+- n. 事件;插曲
+- adj. 入射的;附带的;易发生的;伴随而来的
+
+*** anonymous
+- adj. 匿名的;无个性特征的
+1. anonymous methods. 匿名方法
+*** restrict
+- vt. 限制;约束;限定
+*** explicit
+- adj. 明确的;清楚的;直率的;详述的
+1. explicit function. 外显函数
+*** deploy
+- vt. 配置;展开;使疏开
+- vi. 部属;展开
+- n. 部属
+1. deploy server. 部署服务器
+*** suite
+- n. 家具;套房;随从
+1. presidential suite. 总统套房
+*** interaction
+- n. 相互作用;交互作用
+- n. 互动
+1. interaction point. 交互点
+*** technical
+- adj. 工艺的;技术上的;专门的
+- 比较级 more technical  最高级 most technical
+1. technical information. 技术信息
+*** compilation
+- n. 编译;编辑;汇编
+1. cross compilation. 交叉编译
+*** record
+- vt. 记录;标明;将...录音
+- vi. 记录;录音
+- n. 档案;唱片;最高记录
+- adj. 创记录的
+1. record label. 唱片公司
+*** appropriate
+- adj. 恰当的;合适的
+- vt. 占用
+1. appropriate time. 适当的时间
+*** correction
+- n. 改正,修正
+1. correction coefficient. 修正系数
+*** entry
+- n. 进入;入口;条目;登记;报关手续;对土地的侵占
+- 复数 entries
+1. entry point. 入口点
+*** convention
+- n. 大会;惯例;约定
+1. calling convention. 调用规范
+*** minor
+- adj. 未成年的;次要的;较小的
+- n. 未成年人;
+- vi. 副修
+1. ursa minor. 小熊座
+*** major
+- adj. 主要的;重要的;主修的;较多的
+- n. 成年人;主修科目;陆军少校
+- vi. 主修
+1. major in. 专攻
+*** snapshot
+- n. 快照;急射;简单印象
+- vt. 给...拍快照
+- vi. 拍快照
+- 过去式/过去分词 snapshot 或 snapshotted 现在分词 snapshotting
+1. dynamic snapshot. 动态快照
+*** dynamic
+- adj. 动态的;动力的;有活力的
+- n. 动态;动力
+1. dynamic DNS. 动态DNS
+*** seek
+- vt. 寻找;探索;搜索
+- vi. 寻找;探索;搜索
+- 过去式/过去分词 sought 现在分词 seeking
+1. seek through. 搜遍
+*** query
+- n. 疑问;疑问号;查询
+- vt. 询问;对...表示疑问
+- vi. 询问;表示怀疑
+1. spatial query. 空间索引
+*** geometry
+- n. 几何学
+- 复数 geometries
+1. analytic geometry. 解析几何
+*** transparency
+- n. 透明;幻灯片;有图案的玻璃
+- 复数 transparentcies
+1. transparency management. 透明管理
+*** maintenance
+- n. 维护;保持;生活费用
+1. capital maintenance. 资本保值
+*** horizontal
+- adj. 水平的;地平线的;同一阶层
+- n. 水平线;水平位置
+1. horizontal plane. 水平投影面
+*** vertical
+- adj. 垂直的;直立的
+- n. 垂直线
+1. vertical angles. 垂直角
+*** flicker
+- vi. 闪烁;摇曳;
+- vt. 使闪烁;使摇曳
+- n. 闪烁;闪光;电影
+1. flicker frequency. 闪烁频率
+*** influence
+- n. 影响;势力;感化;有影响的人或事
+- vt. 影响;改变
+- 过去式/过去分词 influenced 现在分词 influencing
+1. influence factors. 影响因素
+*** interact
+- vt. 互相影响;互相作用
+- vi. 互相影响;互相作用
+- n. 幕间剧
+1.interact communication. 沟通.
+*** subtle
+- adj. 微妙的;精细的;敏感的;狡猾的;稀薄的
+- 比较级 subtler 最高级 subtlest
+1. subtle humor. 微妙的
+*** chroma
+- n. 色彩的浓度
+1. chroma tank. 染色槽.
+*** fraction
+- n. 分数;部分;小部分;稍微
+1. unit fraction. 单位分数.

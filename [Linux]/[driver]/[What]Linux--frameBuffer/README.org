@@ -1,0 +1,46 @@
+* [What] linux --> framebuffer
+*参考资料*: <<linux设备驱动开发详解>>
+** 概览
+Framebuffer(帧缓冲)是 Linux 系统为显示设备提供的一个接口, 它将显示缓冲区抽象, 屏蔽图像硬件底层差异, 
+*允许上层应用程序在图形模式下直接对显示缓冲区进行读写操作*.对于帧缓冲设备而言, 只要在显示缓冲区中与
+显示点对应的区域写入颜色值, 对应的颜色会自动在屏幕上显示.
+
+*** 用户空间
+一般来说, 在用户空间中, 设备节点为 =/dev/fb*=, 比如 /dev/fb0 就代表第一个帧缓存.事实上, 它们
+属于 *字符设备*.
+
+由于此节点代表的就是一个显示所映射的内存, 所以用户可以进行如下操作.
+- 保存显示内存 : cp /dev/fb0 filename
+
+用户可以正常的读写,也可以通过 ioctl() 函数来配置显示, 具体的可用操作参考代码 =<linux/fb.h>=.
+
+在实际使用中,一般将内核内存映射至用户空间, 以直接进行读写操作.
+#+BEGIN_SRC c
+int fb;
+uint8_t * pu8_disBuf;
+
+fb = open("/dev/fb0", O_RDWR);
+pu8_disBuf = mmap(NULL, 800 * 480 , PORT_READ | POER_WRITE, MAP_SHARED, fb, 0);
+
+/// 清屏
+memset(pu8_disBuf, 0, 800 * 480);
+#+END_SRC
+*** 内核空间
+与 framebuffer 相关的代码位于 =drivers/video= 文件夹下.提供给用户空间的 file_operations 结构体由 
+=fbdev/core/fbmem.c= 中的file_operations 提供, 而特定的帧缓冲设备驱动由 =xxxfb.c= 实现, 此文件的主要
+目的就是填充 =fb_ops= 结构体与底层硬件打交道, 填充 =file_operatons= 结构体, 提供给上层应用.
+
+设备驱动需要使用的主要文件是:
+- include/linux/fb.h
+- drivers/video/fbdev/core/fbmem.c
+
+其中 fbmem.c 其实已经完成了驱动的大部份工作, xxxfb.c 仅仅提供一些必要的操作函数即可.
+**** fbmem.c
+此文件为 xxxfb.c 提供了如下功能函数:
+#+BEGIN_SRC c
+
+void fb_set_suspend(struct fb_info *info, int state);
+#+END_SRC
+
+
+

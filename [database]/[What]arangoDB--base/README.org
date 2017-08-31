@@ -1,0 +1,19 @@
+* [What]ArangoDB --> base
+[[https://www.arangodb.com][ArangoDB]] 是一个开源的数据库, 具有商业版和社区版. 其中社区版是 *免费* 的.
+** 安装与配置
+*** 安装
+参考官方网站, 然后选择自己的应用平台安装即可.
+*** 配置
+为了能够在局域网的其他电脑上通过网页访问此数据库, 需要将服务器IP写入配置文件.
+#+begin_example
+#编辑配置文件
+sudo vim /etc/arangodb3/arangod.conf 
+#将 endpoint 中的地址修改为服务器IP地址即可
+endpoint = tcp://192.168.1.227:8529
+#编辑另一个配置
+sudo vim /etc/arangodb3/arangosh.conf
+#依然修改IP
+endpoint = tcp://192.168.11.227:8529
+#重启服务即可
+sudo systemctl restart arangodb3
+#+end_example

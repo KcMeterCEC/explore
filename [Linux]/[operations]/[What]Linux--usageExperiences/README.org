@@ -1,0 +1,157 @@
+* [What]Linux --> usage experiences
+** 启动过程
+*** linux启动失败(grub rescue)
+在先安装了 windows 然后安装 linux 时,如果没有选择启动硬盘装载启动代码的话,便无法正常启动系统.
+并会出现提示 =grub rescue >=.
+
+应对的方法是: 重新指定启动硬盘.
+#+begin_example
+#首先列出当前的磁盘
+grub rescue > ls
+(hd0) (hd0,msdos5) (hd0,msdos3)
+#然后依次查找可以被识别出文件系统的磁盘(ext)
+grub rescue > ls (hd0,msdos5)
+grub rescue > ls (hd0,msdos3)
+#在识别出磁盘后,首先指定其为启动代码起始盘
+grub rescue > set root=(hd0,msdos5)
+grub rescue > set prefix=(hd0,msdos5)/boot/grub
+#启动引导代码
+grub rescue > insmod normal
+grub rescue > normal
+
+#进入Linux后,重新设置
+sudo update-grub
+sudo grub-install /dev/sdx #比如/dev/sda 为启动盘
+#+end_example
+** 服务器
+*** 为局域网服务器搭建一个git服务器
+**** gitolite (轻量及的服务器)
+    此git服务器可以为每个项目指定哪些人具有读写权限,哪些人具有只读权限.
+***** 服务器端
+- 设定服务器为固定IP地址
+- 为git服务器新建一个用户,比如 git
+#+begin_example
+sudo adduser git
+#+end_example 
+- 切换到git用户,在 *HOME* 目录下下载代码,并安装
+#+begin_example
+su git
+git clone https://github.com/sitaramc/gitolite
+mkdir bin
+cd gitolite
+./install -to ~/bin
+#+end_example
+- 创建公钥并指定,此时gitolite 会自动新建一个库
+#+begin_example
+ssh-keygen
+cd ~/bin
+gitolite setup -pk ~/.ssh/id_rsa.pub
+#+end_example
+- 克隆库,此时在 gitolite-admin 文件夹下有 =conf/gitolite.conf= 用于配置权限, =keydir= 用于保存用户公钥
+#+begin_example
+cd ~
+git clone git@localhost:gitolite-admin
+#+end_example
+- 为项目设置 conf文件,比如项目名称为 foo, 参与者有 alice,bob,carol,其中carol仅有只读权限
+#+begin_example
+repo foo
+    RW+     = alice bob 
+    R       = carol 
+#+end_example
+- 将参与者的公钥拷贝进 keydir 文件夹,名字要相对应. =alice.pub, bob.pub, carol.pub=
+- 提交更改,在提交更改后,gitolite会自动在 =~/repositories=文件夹中新建库文件,并修改 =~/.ssh/authorized_keys=
+#+begin_example
+git add .
+git commit -m "added foo, gave access to alice,bob,carol"
+git push
+#+end_example
+***** 客户端
+- 克隆项目,<host_ip> 为主机地址, <reponame> 为库文件名 
+#+begin_example
+git clone git@<host_ip>:<reponame>
+#+end_example
+
+如果此命令运行失败,则有可能是 ssh还没有更新生成的公钥, 使用 =ssh-add= 命令即可.
+***** 与github同步
+使用本地服务器做中转, 然后每隔一段时间提交到github.
+1. 使用正常步骤建立库和加入开发人员
+2. 在服务器本地 clone 一次本地库, 然后 *将github库加入remote,再clone一次github库*.最后提交至本地库
+3. 其他用户通过正常操作 clone,push,pull
+4. 需要向github提交时, *需要再服务器本地库pull一次以更新, 然后再push至github上去*.
+
+**** gitlab (网页通信的服务器, 类似于github)
+***** 安装及配置
+1. 基本安装
+#+begin_example
+#安装必要的库
+sudo apt install -y curl openssh-server ca-certificates
+#增加安装包并安装
+curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+sudo apt install gitlab-ce
+#启动
+sudo gitlab-ctl reconfigure 
+#+end_example
+2. 配置
+需要编辑文件 =/etc/gitlab/gitlab.rb=
+- 修改服务器的IP地址,比如 external_url 'http://192.168.1.2'
+- 确认服务器用户名及组, 默认为 =git=.
+#+begin_example
+user['username'] = "git"
+user['group'] = "git"
+#+end_example
+- 指定库的存放 *文件夹*, 默认为 =/var/opt/gitlab/git-data/= 中的 =repositories= 文件夹中
+在不需要运行版本库的情况下, 其实使用默认的位置即可
+#+begin_example
+git_data_dirs({
+  "default" => {
+   "path" => "/home/git/gitlab-data",
+   "failure_count_threshold" => 10,
+   "failure_wait_time" => 30,
+   "failure_reset_time" => 1800,
+   "storage_timeout" => 5
+  }
+})
+#+end_example
+
+***** 使用
+****** 登录
+使用浏览器登录 : root@local.host , 默认用户名是 =root= , 密码是 =5iveL!fe=.
+
+gitlab 可以新建一个组, 然后将用户添加进这个组, 并且还可以为每个用户添加不能的权限.
+
+对于权限不够的用户, 可以 fork 一个库, 然后向主库提交一个合并请求.
+****** 库的存放位置
+
+***** 停止
+#+begin_example
+sudo gitlab-ctl stop
+#关闭开机启动
+sudo systemctl disable gitlab-runsvdir.service
+#+end_example
+** 用户管理
+*** 为普通用户增加 sudo 权限
+**** 命令行法
+#+begin_example
+sudo usermod -aG sudo <username>
+#+end_example
+**** 修改文件法
+#+begin_example
+#切换到 root 用户下
+sudo -i
+#编辑 /etc/sudoers 文件
+visudo
+#在 root ALL=(ALL:ALL) ALL 下添加同样的一行, 将"root" 修改为用户名即可
+
+#+end_example
+*** 忘记密码
+**** 普通用户忘记密码
+如果仅仅是普通用户忘记密码, 则可以告知管理员, 管理员通过进入 root 模式, 然后使用命令 =passwd <username>= 即可修改密码.
+**** 忘记root密码
+ubuntu 默认没有使用 root 密码, 可以使用 =sudo passwd root= 来设置密码.
+
+如果是忘记了root密码, 则需要进入单用户模式:
+1. 重启ubuntu, 在bootloader中进入 =recovery mode=.
+2. 按下 =e= 进入编辑模式, 然后将 =ro recovery nomodeset= 修改为 =rw single init=/bin/bash=.
+3. 按下 =ctrl + x= 进入单用户模式
+4. 使用命令 =passwd= 修改root密码, 然后输入 =exit= 退出此模式
+5. 重启后再修改其他普通用户密码

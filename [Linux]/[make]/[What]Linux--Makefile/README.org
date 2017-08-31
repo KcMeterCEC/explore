@@ -1,0 +1,394 @@
+* [What] Linux --> Makefile
+** 基本书写规则
+一般来说，Makefile只应该有一个最终目标，这个目标被放在第一条规则中。
+#+begin_example
+targets:prerequisites
+     command #注意command必须以[TAB]开头
+#+end_example
+Makefile就是通过command作用于prerequisites，然后生成最新的targets。
+其中：
+1. targets一般是一个文件，多个文件用空格隔开
+2. command如果太长可以用'\'续行，可以使用 *Shell所支持的任何命令* ，整个规则中，若想使用特殊符号作普通符号，使用'\'转义
+3. 在默认情况下，make会把要执行的命令显示到屏幕上，可以使用"@"字符屏蔽显示某行命令（一般在echo类命令前加@，避免重复输出）。
+也可以通过 =make -n= 只显示命令而不执行，来达到调试的目的。若全部不显示，则使用 =make -s=
+4. 若需要上一条命令作用于下一条命令，需要把两个命令放在同一行并用分号分隔。
+#+begin_example
+cd /home/kcmetercec ; ls
+#这样ls才会在上条命令基础上执行
+#+end_example
+5. 若命令出错则make会停止，可以使用以下方式继续运行
+#+begin_example
+clean:
+    -rm -f *.o #忽略此条命令出错
+
+.IGNORE       #忽略此目标的命令错误
+clean :
+    rm -f *.o
+    rm -f *.bin
+
+#也可以使用make -i 忽略整个make的命令错误
+#或者使用make -k ，当遇到错误时，不执行此规则而去继续执行其他规则
+#+end_example
+
+** 文件搜寻
+当有多个文件分别位于不同文件夹时，可以用过特殊变量"VPATH"指定搜寻路径。以告知Makefile在当前目录找不到依赖文件时，去指定路径寻找。
+#+begin_example
+VPATH = ../test : ../Make #路径由':'分隔
+为了能够使搜索更加灵活，需要使用关键字"vpath"
+
+vpath pattern directories
+#满足pattern模式的文件指定directories目录，目录同样可以用冒号分隔
+vpath pattern
+#清除满足pattern模式的文件搜索目录
+vpath
+#清除所有已经设置好了的文件搜索目录
+
+#例如
+vpath %.c ../src
+#指定在当前目录没有找到.c文件，在../src目录中寻找
+#+end_example
+** 伪目标
+一般在Makefile最后会有一个clean目标来清除make过程的文件，为了避免clean目标与项目重名使用伪目标来显示说明。
+#+begin_example
+.PHONY clean
+clean:
+    rm *.c
+#+end_example
+** 引用/嵌套其他的Makefile
+通过使用include关键字可以包含其他Makefile，在实际运行过程中，被包含的文件会在include位置展开
+#+begin_example
+include a.mk b.mk 
+#可以包含路径，通配符，变量等
+#可以在include前加减号"-"，表明没有找到文件也继续运行
+#+end_example
+和shell一样，Makefile可以嵌套执行其他的Makefile，将其他的Makefile作为一个子程序。
+同理，父Makefile的变量可以使用 =export= 传递到下级，或使用 =unexport= 不传递，默认参数 =SHELL= 和 =MAKEFLAGS= 总是会传递的。
+一般来说，使用 =make -w= 可以使make输出当时执行的Makefile所在目录。也可以使用 =MAKELEVEL= 得到嵌套深度。
+#+begin_example
+subsystem:
+    cd subdir && ${MAKE}
+#代表先进入subdir目录然后执行make命令，其中MAKE变量是为了make加入参数比较好维护
+
+#等价于
+subsystem:
+    ${MAKE} -C subdir
+#+end_example
+** 变量
+*** 默认变量：
+#+begin_example
+AR 
+#函数库打包程序，默认"ar"
+ARFLAGS
+#AR参数，默认"rv"
+
+AS
+#汇编编译程序，默认"as"
+ASFLAG
+#AS参数，默认空
+
+CC
+#c编译程序，默认"cc"
+CFLAGS
+#CC参数，默认空
+
+CXX
+#c++编译程序，默认"g++"
+CXXFLAGS
+#CXX参数，默认空
+
+CPP
+#c程序预处理器，默认"${CC} -E"
+CPPFLASG
+#CPP参数，默认空
+
+RM
+#删除文件命令，默认"rm -f"
+
+LDFLAGS
+#连接器参数，默认空
+#+end_example
+*** 自动化变量：
+自动化变量出现在规则命令中，用以代替目标或依赖。
+#+begin_example
+${@}
+#表示所有目标
+${%}
+#当目标为函数库文件，代表库文件中的成员
+${<}
+#表示第一个依赖
+${?}
+#表示所有比目标新的依赖
+${^}
+#表示所有依赖，当依赖有重复，自动去掉重复
+${+}
+#表示所有依赖，不去除重复
+#+end_example
+** 库文件
+库文件就是对源代码编译所生成的中间文件的打包文件。
+生成库文件格式如下：
+#+begin_example
+LibName(a.o):a.o
+    ar cr LibName a.o
+#上面代表使用ar命令打包生成文件名为LibName的库文件，其成员为a.o
+#+end_example
+** 定义变量：
+变量定义与shell中变量定义略有不同，不能使用引号。但使用变量依然用${val}的方式。
+与c/c++宏类似， *变量在运行中是完全替换的方式* 。
+变量定义有4中方式:
+#+begin_example
+=   :最后决定的赋值。 在Makefile中会展开扫描其他定义，在其他定义完成后才会决定左侧真正的值。因此它可以使用后面定义的值。
+
+foo = ${bar}
+bar = ${ugh}
+ugh = Huh?
+#foo的值为"Huh?"
+:=  :立即赋值。在Makefile中会立即给予其值，所以它不能使用后面定义的值。
+
+bar = abc.c
+foo := ${bar}
+bar = def.c
+
+#foo 的值为"abc.c"
+?=  :选择赋值。Makefile会判断左侧是否被定义过，若没有被定义则使用右值。
+
+bar = abc.c
+foo ?= def.c
+
+#此时foo依然为 "abc.c"
++=  :追加赋值。Makefile会将右侧字符串追加到左侧
+
+注意：定义变量后面不要加注释！因为这样会将空格也算入字符串中！
+
+dir := /foo/bar    #在bar后的空格也会存入dir变量中!
+#+end_example
+** 目标中的变量：
+目标变量的作用范围仅仅在当前目标规则中，类似于c/c++中的局部变量一样。
+规则是在定义一般变量的基础上加上目标头即可。
+#+begin_example
+prog : CFLAGS := -g
+prog : prog.o foo.o bar.o
+    ${CC} ${CFLAGS} prog.o foo.o bar.o
+
+#无论外部CFLAGS值为什么，在目标prog中一直是"-g"
+同理，我们可以一次定义很多模式相同的目标变量。
+
+%.o : CFLAGS := -g
+#所有以".o"结尾的目标其局部变量CFLAGS的值都为"-g"
+#+end_example
+** 多行变量：
+当有些命令序列多次出现时，可以将他们打包便于以后管理
+#+begin_example
+define make_a #以define 变量名做开头，命令依然要以[TAB]开头!
+　　gcc -c *.c
+　　mv *.o ../
+endef #以endef做结尾
+
+#调用方式和变量一样${make_a}
+#+end_example
+** 替换变量：
+替换变量一部分字符使用格式：${var:a=b}(代表将var变量中"a"结尾替换为"b")
+#+begin_example
+foo := a.o b.o c.o
+bar :=${foo:.o=.c}
+#此时bar就为"a.c b.c c.c"
+
+foo := a.o b.o c.o
+bar :=${foo:%.o=%.c}
+#仅将foo中满足格式%.o替换为.c结尾
+#此时bar就为"a.c b.c c.c"
+#+end_example
+
+** 条件判断
+条件判断可以比较变量之间以及变量和常量之间的逻辑关系
+需要注意的是： *条件判断参数不要用自动化变量* ，因为make在读取Makefile时就会得出判断真假，而自动化变量是运行时才有的。如同c/c++宏条件判断一样
+#+begin_example
+ ifeq(arg1,arg2)#比较arg1和arg2是否相同
+ ......
+ else
+ .......
+ endif
+ 
+ ifneq(arg1,arg2)#比较arg1和arg2是否不同
+ ......
+ else
+ .......
+ endif
+ 
+ ifdef arg #判断变量arg是否非空，也就是是否有值
+ ......
+ else
+ .....
+ endif
+ 
+ ifndef arg #判断变量arg是否为空，也就是是否无值
+ ......
+ else
+ .....
+ endif
+#+end_example
+** 函数
+
+关于Makefile自带函数参考文档:http://blog.csdn.net/haoel/article/details/2894
+#+begin_example
+$(function arg1,arg2,...)
+#函数名与参数用空格分离，参数间用逗号分隔
+#+end_example
+*** 常用函数
+**** 条件判断
+***** $(if condition, then-part[, else-part])
+当 contidion 非空, 则执行 =then-part=, 否则执行 =[else-part]=
+***** $(or condition1[,condition2[,condition3]])
+当 =contidion1= 为 =空= , 则继续执行后面的 =contidionx=,直到遇到非空的内容, 否则返回最后一个空字符串.
+***** $(and condition1[,condition2[,condition3]])
+当 =contidion1= 为 =非空= , 则继续执行后面的 =contidionx=,直到遇到空的内容,否则返回最后一个非空字符串.
+**** 文件操作
+***** $(wildcard pattern)
+在文件夹下寻找满足 =pattern= 格式的文件
+例子:
+#+begin_example
+$(wildcard *.c)
+#返回当前目录下以 .c 结尾的文件
+#+end_example
+
+**** 字符串操作
+***** $(firstword <text>)   
+取字符串 <text> 中的第一个单词并返回.
+比如: $(firstword foo bar) 的返回值是 "foo"
+等价函数: $(word 1,<text>)
+***** $(filter <pattern>,<text>)
+以 <pattern>模式过滤 <text> 字符串中的单词, 保留符合模式 <pattern> 的单词, 可以有多个模式. 最后返回字符串
+示例:
+#+begin_example
+sources := foo.c bar.c baz.s ugh.h
+foo: $(sources)
+    cc $(filter %.c %.s,$(sources)) -o -foo 
+
+#函数的返回值是 : foo.c bar.c baz.s
+#+end_example
+***** $(filter-out <pattern>,<text>)
+以 <pattern> 模式过滤 <text> 字符串中的单词, 去除符合模式 <pattern> 的单词, 可以有多个模式.
+示例:
+#+begin_example
+objects=main1.o foo.o main2.o bar.o
+mains=main1.o main2.o
+$(filter-out $(mains), $(objects))
+#返回值是 "foo.o bar.o"
+#+end_example
+***** $(patsubst pattern, replacement, text)
+寻找 "text" 中符合 "pattern" 的字符串, 使用 "replacement"替换它们
+例子:
+#+begin_example
+$(patsubst %.c,%.o,x.c.c bar.c)
+#返回的字符串为: x.c.o bar.o
+#+end_example
+**** 特殊函数
+***** $(origin variable)
+得到变量 variable 的类型, variable 代表变量的名字, 所以不能使用 '$'
+返回的字符串有以下几种值:
+- undefined : 此变量未定义
+- default: 此变量是默认变量
+- environment : 此变量是继承自环境变量
+- environment overried : 此变量是继承自环境变量,并且使用了 '-e' 选项
+- file : 此变量在 makfile 中被定义
+- command line : 此变量在命令行中被定义
+- override : 
+- automatic : 
+
+** make命令
+*** 默认目标名：
+在make中有一些默认大家都遵守的目标命名方式：
+#+begin_example
+all:这是所有目标的目标，其他目标都是它的依赖，这样可以编译所有目标。
+
+clean:清理被make创建的文件
+
+install:安装已经编译好的程序，就是把可执行文件拷贝到指定目录下。对于Linux而言，站在用户角度，拷贝到:/usr/local/bin
+
+print:列出改变过的源文件
+
+tar:打包源代码
+
+dist:创建一个源代码的压缩文件
+
+TAGS:更新所有目标，以备完全编译
+
+check/test:测试Makefile
+#+end_example
+*** 检查规则：
+#+begin_example
+#只打印命令不执行
+-n
+--just-print
+--dry-run
+--recon
+
+#更新目标文件时间但不更改目标文件内容
+-t
+--touch
+
+#寻找目标
+-q
+--question
+
+#指定编译依赖于文件File的目标，配合-n来查看相关目标
+-W File
+--what-if=File
+--assume-new=File
+--new-file=File
+#+end_example
+*** 常用命令：
+#+begin_example
+#完全编译
+-B
+--always-make
+
+#输出调试信息
+--debug
+-d#输出所有调试信息
+
+#输出环境变量值覆盖Makefile中变量值
+-e
+--environment-overrides
+
+#执行时忽略所有错误
+-i
+--ignore-errors
+
+#制定运行Makefile目录Dir
+-I Dir
+--include-dir=Dir
+
+#如果某个规则出错，则跳出此规则继续运行其他规则
+-k
+--keep-going
+
+#运行时不输出命令
+-s
+--silent
+--quiet
+#+end_example
+*** 隐含规则
+对汇编和汇编预处理的隐含规则:
+
+对于"*.o"的目标，若没有明确说明其依赖和命令，自动推导其依赖文件为"*.s"，默认编译器为"as"，命令为"${AS} -c ${ASFLAGS}"
+
+对于"*.s"的目标，若没有明确说明其依赖和命令，自动推导其依赖文件为"*.S"，默认编译器为"cpp"，命令为"${AS} -c ${ASFLAGS}"
+
+对C程序的隐含规则：
+
+对于"*.o"的目标，若没有明确说明其依赖和命令，自动推导其依赖文件为"*.c"，命令为"${CC} -c ${CPPFLAGS} ${CFLAGS}"
+
+对C++程序的隐含规则:
+
+对于"*.o"的目标，若没有明确说明其依赖和命令，自动推导其依赖文件为"*.cc"或"*.C"，命令为"${CXX} -c ${CPPFLAGS} ${CFLAGS}"
+
+*** 模式规则
+
+模式规则中使用"%"来达到规范模式的目的，"%"代表至少有一个字符。
+
+通过与目标一同使用，便可得出整个规则列表，例如：
+
+%.o:%.c
+#说明了将.c结尾的依赖文件编译为.o结尾的目标文件
+#当依赖文件为a.c 时，目标文件就必然为a.o
+ 
