@@ -38,9 +38,90 @@ memset(pu8_disBuf, 0, 800 * 480);
 **** fbmem.c
 此文件为 xxxfb.c 提供了如下功能函数:
 #+BEGIN_SRC c
-
+/**
+ ,* @brief 用于挂起或重新运行frmebuffer 内核和客户端
+ ,* @para info -> 设备的信息结构体
+ ,* @para state -> 0 : 运行 , 非零则挂起
+ ,*/
 void fb_set_suspend(struct fb_info *info, int state);
+/**
+ ,* @brief 注册 framebuffer 设备
+ ,* @para info -> 设备的信息结构体
+ ,* @para 0则成功, 非0则有错误
+ ,*/
+int register_framebuffer(struct fb_info *info);
+/**
+ ,* @brief 注销 framebuffer 设备
+ ,* @para info -> 设备的信息结构体
+ ,* @para 0则成功, 非0则有错误
+ ,*/
+int unregister_framebuffer(struct fb_info *info);
+/**
+ ,* @brief 移除有冲突的设备
+ ,* @para 0则成功, 非0则有错误
+ ,*/
+int remove_conflicting_framebuffers(struct apertures_struct *a, const char *name, bool primary);
+/**
+ ,* @brief 移除设备
+ ,* @para info -> 设备的信息结构体
+ ,* @para 0则成功, 非0则有错误
+ ,*/
+int unlink_framebuffer(struct fb_info *info);
+
+/**
+ ,* @brief 为设备上锁
+ ,* @para info -> 设备的信息结构体
+ ,* @para 0则失败, 1则成功
+ ,*/
+int lock_fb_info(struct fb_info *info);
+/**
+ ,* @brief 得到设备颜色深度
+ ,*/
+int fb_get_color_depth(struct fb_var_screeninfo *var, struct fb_fix_screeninfo *fix);
+
+void fb_pad_aligned_buffer(u8 *dts, u32 d_pitch, u8 *src, u32 s_pitch, u32 height);
+void fb_pad_unaligned_buffer(u8 *dts, u32 d_pitch, u8 *src, u32 idx, u32 height
+                             ,u32 shift_high, u32 shift_low, u32 mod);
+char *fb_get_buffer_offset(struct fb_info *info, struct fb_pixmap *buf, u32 size);
+
 #+END_SRC
+并且也完成了 =file_operations= 结构体:
+#+BEGIN_SRC c
+static const struct file_operations fb_fops = {
+        .owner =  THIS_MODULE,
+        .read  =  fb_read,
+        .write =  fb_write,
+        .unlocked_ioctl = fb_ioctl,
+        #ifdef CONFIG_COMPAT
+        .compat_ioctl = fb_compat_ioctl,
+        #endif
+        .mmap  =  fb_mmap,
+        .open  =  fb_open,
+        .release = fb_release,
+        #ifdef HAVE_ARCH_FB_UNMAPPED_AREA
+        .get_unmapped_area = get_fb_unmapped_area,
+        #endif
+        #ifdef CONFIG_FB_DEFERRED_IO
+        .fsync  = fb_deferred_io_fsync,
+        #endif
+        .llseek = default_llseek,
+};
+#+END_SRC
+
+通过查看 =fb_ioctl= 可以发现, 底层设备 *必须提供info* 结构体,若不提供便会返回错误.
+#+BEGIN_SRC c
+static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+        struct fb_info *info = file_fb_info(file);
+        if(!info)
+                return -ENODEV;
+        return do_fb_ioctl(info, cmd, arg);
+}
+#+END_SRC
+同样的, 通过查看函数 =fb_blank=, =fb_set_var=, =fb_write=, =fb_read=, 可以发现:
+如果用户提供了相应的函数, 那么就使用用户提供的函数, 否则使用默认提供的函数.
+
+
 
 
 
