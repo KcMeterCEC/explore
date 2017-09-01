@@ -128,6 +128,112 @@ sudo gitlab-ctl stop
 #关闭开机启动
 sudo systemctl disable gitlab-runsvdir.service
 #+end_example
+*** 搭建局域网代码查看服务器(OpenGrok)
+**** 准备工作
+***** 安装JDK1.8或更新版本
+****** 安装openjdk
+#+begin_example
+sudo apt install openjdk-8-jdk
+#+end_example
+****** 安装官方版本
+- 到[[www.oracle.com][Oracle]]安装 =jdk-8u144-linux-64.tar.gz=.
+#+begin_example
+#解压文件
+tar -zxf jdk-8u144-linux-64.tar.gz
+#修改名称
+mv jdk1.8.0_144 jdk
+#将文件放在 /usr/local/ 便于管理
+sudo cp -R jdk /usr/local/java/
+#设置环境变量
+#编辑文件
+sudo vim /etc/environment
+#输入内容
+# JAVA_HOME=/usr/local/java/jdk
+# CLASSPATH=.:${JAVA_HOME}/lib:${JAVA_HOME}/jre/lib
+# JRE_HOME=${JAVA_HOME}/jre
+# 在{PATH}中加入 :${JAVA_HOME}/bin:${JRE_HOME}/bin
+
+#设置
+sudo update-alternatives --install "/usr/bin/java" "java" "/usr/local/java/jdk/bin/java" 300
+sudo update-alternatives --install "/usr/bin/javac" "javac" "/usr/local/java/jdk/bin/javac" 300
+sudo update-alternatives --install "/usr/bin/javaws" "javaws" "/usr/local/java/jdk/bin/javaws" 300
+
+#重启linux
+#+end_example
+
+***** 下载 opengrok
+在[[https://github.com/OpenGrok/OpenGrok/releases][OpenGrok下载]], 下载 =.tar.gz= 文件.
+***** 安装 universal-ctags
+#+begin_example
+git clone http://github.com/universal-ctags/ctags
+sudo apt install autoconf
+sudo apt install pkg-config
+cd ctags
+./autogen.sh
+./configure --prefix=/usr/local
+make
+sudo make install
+#+end_example
+***** 安装 Tomcat
+- 下载二进制版本的 [[tomcat.apache.org/download-90.cgi][Tomcat]]
+- 配置
+#+begin_example
+#解压文件
+tar -zxf apache-tomcat-9.0.0.M26.tar.gz
+#修改名称
+mv apache-tomcat-9.0.0.M26.tar.gz tomcat
+#将文件放在 /usr/local/ 便于管理
+sudo cp -R tomcat /usr/local/
+#设置环境变量
+sudo vim /etc/environment
+#输入内容
+# CATALINA_HOME=/usr/local/tomcat
+# 在 PATH 中加入 :${CATALINA_HOME}/bin
+#设置变量
+sudo /usr/local/tomcat/bin/setclasspath.sh
+#+end_example
+- 运行
+#+begin_example
+#启动, 然后可以通过 http://localhost:8080 访问
+sudo /usr/local/tomcat/bin/startup.sh
+#停止
+sudo /usr/local/tomcat/bin/shutdown.sh
+
+#如果当前已经有其他服务器启用了, 那么需要修改端口
+cd /usr/local/tomcat/conf
+sudo vim server.xml
+#找到 "Connector port",修改,重启
+#+end_example
+***** 安装 opengrok
+#+begin_example
+#解压
+tar -zxf opengrok-1.1-rc13.tar.gz
+#重命名
+mv opengrok-1.1-rc13 opengrok
+#移动到 /usr/local
+sudo cp -R opengrok /usr/local/
+#指定 tomcat 和 opengrok位置
+sudo vim /etc/environment
+OPENGROK_TOMCAT_BASE=/usr/local/tomcat/
+OPENGROK_PATH=/usr/local/opengrok
+#加入PATH
+:${OPENGROK_PATH}/bin
+#+end_example
+**** 开始部署
+opengrok 通过配置XML文件来达到索引源代码的目的, *每个源代码工程都有一个 SRC_ROOT 变量来指定自己代码根目录*.
+详细参考: [[https://github.com/OpenGrok/OpenGrok/wiki/How-to-install-OpenGrok][How-to-install-OpenGrok]]
+***** 启动服务
+#+begin_example
+sudo OpenGrok deploy
+#+end_example
+***** 创建索引
+#+begin_example
+sudo OpenGrok index <代码根目录>
+#+end_example
+***** 登录服务
+登录地址为: =http://YOUR_WEBAPP_SERVER:WEBAPPSRV_PORT/source=
+
+
 ** 用户管理
 *** 为普通用户增加 sudo 权限
 **** 命令行法

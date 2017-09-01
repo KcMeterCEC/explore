@@ -1129,3 +1129,19 @@
 *** fraction
 - n. 分数;部分;小部分;稍微
 1. unit fraction. 单位分数.
+** <2017-09-01 Fri>
+*** destroy
+- vt. 破坏;消灭;毁坏
+*** align
+- vt. 使结盟;使成一行;匹配
+- vi. 排列;排成一行
+1. align surfaces. 曲面对齐
+*** pitch
+- vi. 倾斜;投掷;搭帐篷;坠落
+- vt. 投;掷;定位于;用沥青涂;扎营
+- n. 沥青;音高;程度
+1. pitch perfect. 完美音调
+*** grok
+- vt. 凭直觉;欣赏;神交
+- vi. 新意相通;与...神交
+- 过去式/过去分词 grokked 现在分词 grokking

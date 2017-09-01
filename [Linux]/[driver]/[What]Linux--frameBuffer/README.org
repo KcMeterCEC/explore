@@ -35,50 +35,60 @@ memset(pu8_disBuf, 0, 800 * 480);
 - drivers/video/fbdev/core/fbmem.c
 
 其中 fbmem.c 其实已经完成了驱动的大部份工作, xxxfb.c 仅仅提供一些必要的操作函数即可.
-**** fbmem.c
+** 文件分析
+*** fbmem.c
 此文件为 xxxfb.c 提供了如下功能函数:
 #+BEGIN_SRC c
 /**
  ,* @brief 用于挂起或重新运行frmebuffer 内核和客户端
  ,* @para info -> 设备的信息结构体
- ,* @para state -> 0 : 运行 , 非零则挂起
+ ,* @retval state -> 0 : 运行 , 非零则挂起
  ,*/
 void fb_set_suspend(struct fb_info *info, int state);
 /**
  ,* @brief 注册 framebuffer 设备
  ,* @para info -> 设备的信息结构体
- ,* @para 0则成功, 非0则有错误
+ ,* @retval 0则成功, 非0则有错误
  ,*/
 int register_framebuffer(struct fb_info *info);
 /**
  ,* @brief 注销 framebuffer 设备
  ,* @para info -> 设备的信息结构体
- ,* @para 0则成功, 非0则有错误
+ ,* @retval 0则成功, 非0则有错误
  ,*/
 int unregister_framebuffer(struct fb_info *info);
 /**
  ,* @brief 移除有冲突的设备
- ,* @para 0则成功, 非0则有错误
+ ,* @retval 0则成功, 非0则有错误
  ,*/
 int remove_conflicting_framebuffers(struct apertures_struct *a, const char *name, bool primary);
 /**
  ,* @brief 移除设备
  ,* @para info -> 设备的信息结构体
- ,* @para 0则成功, 非0则有错误
+ ,* @retval 0则成功, 非0则有错误
  ,*/
 int unlink_framebuffer(struct fb_info *info);
 
 /**
  ,* @brief 为设备上锁
  ,* @para info -> 设备的信息结构体
- ,* @para 0则失败, 1则成功
+ ,* @retval 0则失败, 1则成功
  ,*/
 int lock_fb_info(struct fb_info *info);
 /**
  ,* @brief 得到设备颜色深度
+ ,* @retval 当RGB颜色位数一样时, 则返回其中一个通道的位数. 否则返回位数之和
  ,*/
 int fb_get_color_depth(struct fb_var_screeninfo *var, struct fb_fix_screeninfo *fix);
 
+/**
+ ,* @brief 对齐操作, 将SRC中的内容按照要求进行对齐到DTS
+ ,* @para  *dts -> 目的地址
+ ,* @para  *d_pitch -> 目的地址需要对齐的位数
+ ,* @para  *src -> 源地址
+ ,* @para  *s_pitch -> 源地址的对齐位数
+ ,* @para  *height -> 需要进行对齐的个数
+*/
 void fb_pad_aligned_buffer(u8 *dts, u32 d_pitch, u8 *src, u32 s_pitch, u32 height);
 void fb_pad_unaligned_buffer(u8 *dts, u32 d_pitch, u8 *src, u32 idx, u32 height
                              ,u32 shift_high, u32 shift_low, u32 mod);
@@ -121,7 +131,23 @@ static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 同样的, 通过查看函数 =fb_blank=, =fb_set_var=, =fb_write=, =fb_read=, 可以发现:
 如果用户提供了相应的函数, 那么就使用用户提供的函数, 否则使用默认提供的函数.
 
+综上所述, 底层驱动需要保证 *最少提供* 的元素有:
+- 结构体 =struct fb_info, struct fb_var_screeninfo= , 提供显示设备的详细信息
+- 函数 =static int fb_pan_display(struct fb_var_screeninfo *, struct fb_info *)=
 
+可以选择提供的元素有(未全部列出):
+- 函数 =static int fb_release(struct fb_info *, int user)=
+- 函数 =static int fb_open(struct fb_info *, int user)=
+- 函数 =static int fb_ioctl(struct fb_info *, unsigned int cmd, unsigned long arg)=
+- 函数 =static ssize_t fb_write(struct fb_info *, const char __user *, size_t , lofft_t *)=
+- 函数 =static ssize_t fb_read(struct fb_info *, const char __user *, size_t , lofft_t *)=
+- 函数 =static int fb_open(struct fb_info *info, int user)=
+- 函数 =static int fb_blank(int blank_mode, struct fb_info *fbi)=
+- 函数 =static int fb_get_caps(struct fb_info *, struct fb_blit_caps * , struct fb_var_screeninfo *)=
+- 函数 =static int fb_check_var(struct fb_var_screeninfo *, struct fb_info)=
 
-
+以上的函数, 其实都是通过填充结构体 =struct fb_ops= 来达到此目的的.
+** 编写
+通过以上的分析, 可以得出此驱动调用的结构如下图所示:
+[[./fb_struct.jpg][程序结构]]
 
