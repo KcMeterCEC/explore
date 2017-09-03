@@ -1,0 +1,57 @@
+* [What]yocto --> base
+参考链接:[[www.yoctoproject.org/docs/2.3.1/mega-manual/mega-manual.html][yocto参考手册]]
+
+** 1. Yocto 开发环境介绍
+yocto 提供了可以开发以及仿真ARM,MIPS,PowerPC,X86平台的开发环境, 并且可以完成Linux的
+全栈仿真应用.
+
+yocto具有如下特征:
+- 提供最新的linux kernel 代码, 以及相应的嵌入式开发所需要的库环境
+- 提供UI组件,包括X11,GTK+,Qt,Clutter,SDL.
+- 提供稳定的开源嵌入式开发环境
+- 提供QEMU来仿真全栈
+- 基于分层式设计, 可以很好的开发和扩展
+
+最终yocto可以生成镜像文件以在实际硬件平台上设置.
+** 2. 准备工作
+为了能够保证yocto正常运行, 需要准备如下的运行环境:
+*** 2.1 linux主机
+目前支持的主机有 Ubuntu,Fedora,openSUSE,CentOS,Debian.
+
+需要安装的依赖包有:
+- git1.8.3.1 或更高等级
+- tar1.2.4 或更高
+- Python3.4.0 或更高 
+*** 2.2 主机依赖包安装
+**** Ubuntu 和 Debian 
+- 安装QEMU所需要的基本依赖
+#+begin_example
+sudo apt install gawk wget git-core diffstat unzip texinfo gcc-multilib \
+build-essential chrpath socat cpio python python3 python3-pip python3-pexpect \
+xz-utils debianutils iputils-ping libsdl1.2-dev xterm
+#+end_example
+*** 2.3 yocto 获取
+#+begin_example
+git clone git://git.yoctoproject.org/poky
+git checkout pyro
+#+end_example
+** 3.编译镜像文件
+*** 3.1 编译仿真环境
+**** 基本配置
+#+begin_example
+cd poky
+#切换到最新的release
+git checkout -b pyro origin/pyro
+#初始化编译环境
+source oe-init-build-env
+#+end_example
+
+执行以上步骤后,会在 =build/conf= 文件夹下生成 =local.conf, bblayers.conf= 文件, 可以通过配置这些文件来更改设置.
+
+- 为了能够节约硬盘空间, 可以在 =local.conf= 文件中加入一行:
+#+begin_example
+INHERIT += "rm_work"
+#+end_example
+- 默认配置是用于QEMU仿真的32位X86平台, 可以通过修改 =MACHINE= 变量来修改.
+- 默认生成的镜像文件是 RPM 格式, 可以通过修改 =PACKAGE_CLASSES= 变量改变包格式
+
