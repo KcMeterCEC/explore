@@ -42,9 +42,11 @@ git checkout pyro
 cd poky
 #切换到最新的release
 git checkout -b pyro origin/pyro
-#初始化编译环境
+#初始化编译环境,设置环境变量
 source oe-init-build-env
 #+end_example
+
+注意: =source oe-init-build-env= 命令需要在重启后都执行一次, 否则会提示 =bitbake= 命令找不到!
 
 执行以上步骤后,会在 =build/conf= 文件夹下生成 =local.conf, bblayers.conf= 文件, 可以通过配置这些文件来更改设置.
 
@@ -55,3 +57,39 @@ INHERIT += "rm_work"
 - 默认配置是用于QEMU仿真的32位X86平台, 可以通过修改 =MACHINE= 变量来修改.
 - 默认生成的镜像文件是 RPM 格式, 可以通过修改 =PACKAGE_CLASSES= 变量改变包格式
 
+**** 开始编译
+首次编译需要一定的时间, 因为需要首次下载文件.
+#+begin_example
+bitbake core-image-sato
+#+end_example
+**** 开始仿真
+使用 =Ctrl -C= 退出仿真环境.
+#+begin_example
+runqemu qemux86
+#+end_example
+*** 3.2 为硬件环境生成镜像文件
+此示例演示如何编译支持 =MinnowBoard MAX-64bit= 硬件.
+**** 3.2.1 拷贝代码
+#+begin_example
+cd poky
+git clone git://git.yoctoproject.org/meta-intel
+#+end_example
+**** 3.2.2 配置
+配置编译结果, 需要配置文件 =bblayers.conf, local.conf= , 这两个文件都位于 =build/conf= 文件夹中.
+#+begin_example
+cd build
+bitbake-layers "add-layer ../meta-intel"
+echo 'MACHINE = "intel-corei7-64"' >> conf/local.conf
+#+end_example
+**** 3.2.3 编译
+#+begin_example
+#编译生成基础命令行版的 linux
+bitbake core-image-base
+#+end_example
+当编译完成后, 生成的文件位于 =tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic=.
+**** 3.2.4 载入镜像文件
+使用以下命令就可以生成一个可以启动的文件了:
+#+begin_example
+#TARGET_DEVICE 代表在硬件板上启动文件存放的位置, 比如 /dec/mmcblk0
+sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic of=TARGET_DEVICE
+#+end_example
