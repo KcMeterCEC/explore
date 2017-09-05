@@ -1145,3 +1145,56 @@
 - vt. 凭直觉;欣赏;神交
 - vi. 新意相通;与...神交
 - 过去式/过去分词 grokked 现在分词 grokking
+** <2017-09-04 Mon>
+*** annotate
+- vi. 注释;给...作注释或评注
+- vt. 注释;作注解
+- 过去式/过去分词 annotated 现在分词 annotating
+1. category annotate. 类别标注
+*** rotate
+- vi. 旋转;循环
+- vt. 使旋转;使转动;使轮流
+- adj. 辐状的
+- 过去式/过去分词 rotated 现在分词 rotating
+1. rotate canvas. 旋转画布
+*** dimensions
+- n. 规模
+1. array dimensions. 阵列尺寸
+*** fake
+- n. 假货;骗子;假动作
+- vt. 捏造;假装...的样子
+- vi. 假装;做假动作
+- adj. 伪造的
+1. fake fans. 伪球迷
+*** palette
+- n. 调色板;颜料
+1. tool palette. 工具面板
+*** phrase
+- n. 短语
+- vt. 措词
+1. noun phrase. 名词短语
+*** intelligence
+- n. 智力;情报工作;理解力
+1. intelligence agency. 情报机构
+*** skeleton 
+- n. 骨架;纲要;骨瘦如柴
+- adj. 骨骼的;骨瘦如柴的;概略的
+1. skeleton key. 全能钥匙
+** <2017-09-05 Tue>
+*** coin
+- vt. 铸造;杜撰;创造
+- n. 硬币
+1. token coin. 代币
+*** warranty
+- n. 保证;担保;授权
+- 复数 warranties
+1. warranty period. 保修期
+*** represent
+- vt. 代表;表现;描绘;回忆;再赠送
+- vi. 代表;提出异议
+1. represent general. 表示一般
+*** bunch
+- n. 群;串;突出物
+- vi. 形成一串
+- vt. 使...成一串
+- 第三人称单数 bunches 过去式/过去分词 bunched 现在分词 bunching

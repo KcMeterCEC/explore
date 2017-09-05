@@ -220,7 +220,7 @@ OPENGROK_PATH=/usr/local/opengrok
 :${OPENGROK_PATH}/bin
 #+end_example
 **** 开始部署
-opengrok 通过配置XML文件来达到索引源代码的目的, *每个源代码工程都有一个 SRC_ROOT 变量来指定自己代码根目录*.
+opengrok 通过配置XML文件来达到索引源代码的目的, *将需要阅读的代码放入同一个文件夹, 此文件夹下的每个子文件夹就是一个子项目*.
 详细参考: [[https://github.com/OpenGrok/OpenGrok/wiki/How-to-install-OpenGrok][How-to-install-OpenGrok]]
 ***** 启动服务
 #+begin_example
@@ -228,11 +228,10 @@ sudo OpenGrok deploy
 #+end_example
 ***** 创建索引
 #+begin_example
-sudo OpenGrok index <代码根目录>
+sudo OpenGrok index <所有项目代码根目录>
 #+end_example
 ***** 登录服务
 登录地址为: =http://YOUR_WEBAPP_SERVER:WEBAPPSRV_PORT/source=
-
 
 ** 用户管理
 *** 为普通用户增加 sudo 权限

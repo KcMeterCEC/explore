@@ -132,7 +132,7 @@ static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 如果用户提供了相应的函数, 那么就使用用户提供的函数, 否则使用默认提供的函数.
 
 综上所述, 底层驱动需要保证 *最少提供* 的元素有:
-- 结构体 =struct fb_info, struct fb_var_screeninfo= , 提供显示设备的详细信息
+- 结构体 =struct fb_info= 提供显示设备的详细信息
 - 函数 =static int fb_pan_display(struct fb_var_screeninfo *, struct fb_info *)=
 
 可以选择提供的元素有(未全部列出):
@@ -148,6 +148,107 @@ static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 以上的函数, 其实都是通过填充结构体 =struct fb_ops= 来达到此目的的.
 ** 编写
-通过以上的分析, 可以得出此驱动调用的结构如下图所示:
-[[./fb_struct.jpg][程序结构]]
+*** 逻辑结构
+通过以上的分析, 可以得出此驱动调用的结构如下图所示: [[./fb_struct.jpg][程序结构]]
+*** 数据结构
+framebuffer 有几个重要的数据结构需要填充:
+**** struct fb_fix_screeninfo & struct fb_var_screeninfo
+=fb_fix_screeninfo= 存储了显示器的固定信息, =struct fb_var_screeninfo= 存储了显示器可变信息.
 
+显示时序参数入下图:
+[[./fb_timing.jpg][fb_timing]]
+#+BEGIN_SRC c
+struct fb_fix_screeninfo{
+        char id[16];              /// 显示器名称
+        unsigned long smem_start; /// 显示缓存的地址
+        __u32 smem_len;           /// 显示缓存的大小
+        __u32 type;
+        __u32 type_aux;
+        __u32 visual;
+        __u16 xpanstep;
+        __u16 ypanstep;
+        __u16 ywrapstep;
+        __u32 line_length;        /// 长度所占用的字节数
+        unsigned long mmio_start; /// IO物理地址
+        __u32 mmio_len;
+        __u32 accel;
+        __u16 capabilities;
+        __u16 reserved[2];
+};
+
+struct fb_var_screeninfo{
+        __u32 xres;               /// 显示尺寸
+        __u32 yres;
+        __u32 xres_virtual;       /// 缓存尺寸
+        __u32 yres_virtual;
+        __u32 xoffset;            /// 实际显示在缓存的偏移
+        __u32 ypffset;
+
+        __u32 bits_per_pixel;     /// 每个像素占用的位数
+        __u32 grayscale;          /// 0 = color, 1 = grayscale >1 = FOURCC
+
+        struct fb_bitfield red;  /// 指定RGB偏移及注释
+        struct fb_bitfield green;
+        struct fb_bitfield blue;
+        struct fb_bitfield transp;
+
+        __u32 nonstd;
+
+        __u32 activate;
+
+        __u32 height;            /// 显示器尺寸,单位是毫米
+        __u32 width;
+
+        __u32 accel_flags;
+
+/**
+ ,* @brief 此部分用于设置显示时序, 包括了行同步,场同步,行延迟,场延迟等
+ ,*/
+        __u32 pixclock;         /// pixclock = 1000000 / DCF; (DCF即刷新频率)
+        __u32 left_margin;      /// time from sync to picture = HFL - SH2
+        __u32 right_margin;     /// time from picture to sync = SH1 - HR
+        __u32 upper_margin;     /// time from sync to picture = VFL - SV2
+        __u32 lower_margin;     /// time from picture to sync = SV1 - VR
+        __u32 hsync_len;        /// length of horizontal sync = SH2 - SH1
+        __u32 vsync_len;        /// length of vertical sync = SV2 - SV1
+        __u32 sync;
+        __u32 vmode;
+        __u32 rotate;
+        __u32 colorspace;
+        __u32 reserved[4];
+};
+#+END_SRC
+**** struct fb_info
+=struct fb_fix_screeninfo= 和 =struct fb_var_screeninfo= 集成在 =fb_info= 中, 最终填充的都是此结构体
+#+BEGIN_SRC c
+struct fb_info{
+        atomic_t count;
+        int node;
+        int flags;
+        struct mutex lock;      ///lock for open/release/ioctl functions
+        struct mutex mm_lock;   ///lock for fb_mmap and smem_* fields
+        struct fb_var_screeninfo var; /// current var
+        struct fb_fix_screeninfo fix; /// current fix
+        struct fb_mpnspecs monspecs;  /// current monitor specs
+        struct work_struct queue;  /// framebuffer event queue
+        struct fb_pixmap pixmap;   /// image hardware mapper
+        struct fb_pixmap sprite    /// cursor hardware mapper
+        struct fb_cmap cmap;       /// current cmap
+        struct list_head modelist; /// mode list
+        struct fb_videomode *mode; /// current mode
+        ........
+        struct fb_ops *fops;
+        
+};
+#+END_SRC
+*** 用户编写流程
+通过参考其他 xxxfb.c 文件, 以及模板 =skeleton.c= ,可以得出流程如下:
+- 编写显示器对应的设备树描述符, 用于设置必要显示参数
+- 编写对于当前显示所必须的一些 ops 函数, 并初始化 =fb_ops= 结构体
+- 在 =probe= 中解析设备树得出参数,并初始化结构体 =fb_info=, 申请对应的显示缓存并注册设备
+- 在 =release= 中释放相应的显示缓存并注销设备.
+
+*注意*:此部分仅仅是对显示缓存的操作, 而对于具体缓存应该如何作用于LCD,
+ 则需要编写LCD驱动.
+
+[[https://github.com/KcMeterCEC/linux_exercise/tree/master/device_framebuffer][参考代码]]
