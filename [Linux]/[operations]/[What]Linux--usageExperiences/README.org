@@ -260,3 +260,14 @@ ubuntu 默认没有使用 root 密码, 可以使用 =sudo passwd root= 来设置
 3. 按下 =ctrl + x= 进入单用户模式
 4. 使用命令 =passwd= 修改root密码, 然后输入 =exit= 退出此模式
 5. 重启后再修改其他普通用户密码
+*** 设置 sudo 的保持时间
+在ubuntu中默认 sudo 的保持时间是 5分钟, 可以选择调整这个时间, 或者一直保持 sudo 有效
+#+begin_example
+sudo visudo
+#修改行 Defaults env_reset 
+#<time>的值即为分钟, 当值为 -1 时,在注销或退出 terminal 之前都会记住密码
+Defaults env_reset, timestamp_timeout=<time>
+
+#也可以强制退出 sudo 状态
+sudo -K
+#+end_example

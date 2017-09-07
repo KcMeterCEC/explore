@@ -10,9 +10,58 @@ linux 中使用 =history= 命令来存储历史命令.使用 =!= 执行指定序
 - -a:将历史命令缓冲区中的命令写入历史命令文件中
 - -r:将历史命令文件中的命令读入当前历史命令缓冲区中
 - -w:将 *当前* 历史命令缓冲区命令写入历史命令文件中
+*** 打包/压缩命令
+- 打包 : 将一大堆文件或目录组合为一个总的文件
+- 压缩 : 将一个大文件通过压缩算法变成一个小文件
+如果要压缩一大堆文件, 则需要先打包再压缩.
+**** tar [opt] [par]
+- 打包及压缩
+#+begin_example
+#打包文件但不压缩
+tar -cvf file.tar file1 file2 ...
+#打包后以 gzip 压缩
+tar -zcvf file.tar.gz file1 file2 ...
+#打包后以 bzip2 压缩
+tar -jcvf file.tar.bz2 file1 file2 ...
+#在文件夹中,打包比某个日期新的文件
+tar -N "2017/7/7" -zcvf file.tar.gz filedir
+#打包时,排除 exclude 指定的文件夹, 当有多个文件夹时,使用多个 exclude 即可
+tar -zcvf file.tar.gz file --exclude file/name ##忽略文件夹不能有 '/'
+#+end_example
+- 查看
+#+begin_example
+#查看 gzip 包中的文件
+tar -ztvf file.tar.gz
+#+end_example
+- 解压
+#+begin_example
+#解压 gzip 压缩的文件
+tar -zxvf file.tar.gz
+#解压 bzip 压缩的文件
+tar -jxvf file.tar.bz2
+#解压部分文件
+tar -zxvf file.tar.gz  file1
+#+end_example
+
+*** 查看文件大小
+**** du <opt> <file>
+- 显示当前目录下的文件及文件夹占用
+#+begin_example
+du -h
+#+end_example
+- 显示指定文件或目录占用大小
+#+begin_example
+du -h file
+#+end_example
+- 显示文件占用总和
+#+begin_example
+du -sh
+#+end_example
+
+
 ** 网络命令
 *** 文件下载
-**** 快速文件下载器 --> axel
+**** 快速文件下载器 --> axel [url]
 [[https://github.com/eribertomota/axel][axel]] 是命令行下使用的快速下载器,支持 HTTP,HTTPS,FTP,FTPS协议下载.
 
 *注意*:对于需要输入帐号密码才能进入的下载网址,可能会返回错误 =HTTP/1.0 403 Forbideen=
@@ -23,7 +72,7 @@ sudo apt install axel
 axel -s x -n y url1 [url2] [url...]
 #+end_example
 *** 网络监控
-**** 网速查看
+**** 网速查看 nethogs
 nethogs 用于查看哪些进程消耗了多少网络带宽
 #+begin_example
 #install
