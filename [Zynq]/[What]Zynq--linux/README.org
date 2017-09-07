@@ -1,281 +1,317 @@
 * [What] zynq --> petalinux2016.2 -> linux4.4
 
-** ÅäÖÃ
-zynq linux µÄÅäÖÃÁ÷³ÌÓë u-boot ¼«ÎªÏàËÆ, ´«Í³µÄ·½Ê½Ò²ÊÇÊ¹ÓÃÃüÁî =make menuconfig=, ÔÚ petalinux ÏÂÔòÊ¹ÓÃ =petalinux-config -c kernel ,  petalinux-config -c rootfs=.
-ÓÉ½çÃæÉú³ÉµÄÅäÖÃÎÄ¼şÎ»ÓÚ =project/subsystem/linux/configs/kernel/config,project/subsystem/linux/configs/genericl/config,project/subsystem/linux/configs/rootfs/config=.
-ÓĞ¹ØÉè±¸Ê÷µÄÅäÖÃÎÄ¼şÎ»ÓÚ =project/subsystem/linux/configs/device-tree/=
-¶¥²ãµÄ Makfile ÓĞÁ½¸öÖ÷ÒªÈÎÎñÊÇ²úÉú vmlinux ÎÄ¼şºÍÄÚºËÄ£¿é.ÎªÁËÊµÏÖ´Ë¹¦ÄÜ,¶¥²ã Makfile µİ¹éµÄ½øÈëµ½ÄÚºËµÄ¸÷¸ö×ÓÄ¿Â¼ÖĞ,·Ö±ğµ÷ÓÃÎ»ÓÚÕâĞ©×ÓÄ¿Â¼ÖĞµÄ Makfile.
-*** petalinux ×Ô¶¯ÅäÖÃ
-ÔËĞĞÃüÁî =petalinux-config= ÔÚ½çÃæÖĞÑ¡Ôñ =Auto Config Settings=, ¿ÉÒÔÑ¡ÔñÄÄĞ©×é¼şĞèÒª×Ô¶¯¸üĞÂ,Èç¹ûÃ»ÓĞÑ¡ÖĞÔòĞèÒªÓÃ»§Ö÷¶¯¸üĞÂ.
-- Éè±¸Ê÷×Ô¶¯ÅäÖÃÎÄ¼ş
+** é…ç½®
+zynq linux çš„é…ç½®æµç¨‹ä¸ u-boot æä¸ºç›¸ä¼¼, ä¼ ç»Ÿçš„æ–¹å¼ä¹Ÿæ˜¯ä½¿ç”¨å‘½ä»¤ =make menuconfig=, åœ¨ petalinux ä¸‹åˆ™ä½¿ç”¨ =petalinux-config -c kernel ,  petalinux-config -c rootfs=.
+ç”±ç•Œé¢ç”Ÿæˆçš„é…ç½®æ–‡ä»¶ä½äº =project/subsystem/linux/configs/kernel/config,project/subsystem/linux/configs/genericl/config,project/subsystem/linux/configs/rootfs/config=.
+æœ‰å…³è®¾å¤‡æ ‘çš„é…ç½®æ–‡ä»¶ä½äº =project/subsystem/linux/configs/device-tree/=
+é¡¶å±‚çš„ Makfile æœ‰ä¸¤ä¸ªä¸»è¦ä»»åŠ¡æ˜¯äº§ç”Ÿ vmlinux æ–‡ä»¶å’Œå†…æ ¸æ¨¡å—.ä¸ºäº†å®ç°æ­¤åŠŸèƒ½,é¡¶å±‚ Makfile é€’å½’çš„è¿›å…¥åˆ°å†…æ ¸çš„å„ä¸ªå­ç›®å½•ä¸­,åˆ†åˆ«è°ƒç”¨ä½äºè¿™äº›å­ç›®å½•ä¸­çš„ Makfile.
+
+*æ³¨æ„:*: petalinux ä½¿ç”¨çš„æ—¶å¢é‡ç¼–è¯‘, å¦‚æœ hdf æ–‡ä»¶ä¿®æ”¹äº†ä¸€äº›é…ç½®, éœ€è¦åˆ é™¤ =build= ç›®å½•ä¸‹çš„æ–‡ä»¶, ä»¥é˜²é”™è¯¯.
+*** petalinux è‡ªåŠ¨é…ç½®
+è¿è¡Œå‘½ä»¤ =petalinux-config= åœ¨ç•Œé¢ä¸­é€‰æ‹© =Auto Config Settings=, å¯ä»¥é€‰æ‹©å“ªäº›ç»„ä»¶éœ€è¦è‡ªåŠ¨æ›´æ–°,å¦‚æœæ²¡æœ‰é€‰ä¸­åˆ™éœ€è¦ç”¨æˆ·ä¸»åŠ¨æ›´æ–°.
+- è®¾å¤‡æ ‘è‡ªåŠ¨é…ç½®æ–‡ä»¶
   - skeleton.dtsi , zynq-7000.dtsi, pcw.dtsi, pl.dtsi. system-conf.dtsi
-- kernel ×Ô¶¯ÅäÖÃÎÄ¼ş
+- kernel è‡ªåŠ¨é…ç½®æ–‡ä»¶
   - config 
-- rootfs ×Ô¶¯ÅäÖÃÎÄ¼ş
+- rootfs è‡ªåŠ¨é…ç½®æ–‡ä»¶
   - config
-- u-boot ×Ô¶¯ÅäÖÃÎÄ¼ş
+- u-boot è‡ªåŠ¨é…ç½®æ–‡ä»¶
 - config, platform-auto.h
-Ò»°ãÀ´Ëµ¶¼ĞèÒª´ò¿ª×Ô¶¯ÅäÖÃ,Èç¹û¾õµÃ²»ºÏÀíµÄµØ·½, ¿ÉÒÔÔÚ top ÎÄ¼şÖĞÊ¹ÓÃ =undef= À´ÆÁ±Î
-*** ÎÄ¼ş½á¹¹
-Í¨¹ı petalinux Éú³ÉµÄ image.ub ÎÄ¼ş°üº¬ÁËÈçÏÂÄÚÈİ:
-- Éè±¸Ê÷
-- ÄÚºË
-- ¸ùÎÄ¼şÏµÍ³, °üÀ¨±Ø±¸µÄÎÄ¼ş½á¹¹, ÓÃ»§´úÂë, ÓÃ»§¿âÒÔ¼°ÓÃ»§Ä£¿é.
-** ·ÖÎö
-*** Æô¶¯·ÖÎö
-**** ÄÚ´æ·Ö²¼·ÖÎö
-ÄÚ´æ·ÖÎöĞèÒª·ÖÎö»ù±¾µÄÁ´½Ó½Å±¾,Óë arm Ïà¹ØµÄ½Å±¾ÓĞ =arch/arm/boot/compressed/vmlinux.lds.S= ÒÔ¼° =arch/arm/kernel/vmlinux.lds.S=.
-ÔÚlinuxÆô¶¯Êä³öµÄ¹ı³ÌÖĞ,¿ÉÒÔ¿´µ½ÈçÏÂĞÅÏ¢:
+ä¸€èˆ¬æ¥è¯´éƒ½éœ€è¦æ‰“å¼€è‡ªåŠ¨é…ç½®,å¦‚æœè§‰å¾—ä¸åˆç†çš„åœ°æ–¹, å¯ä»¥åœ¨ top æ–‡ä»¶ä¸­ä½¿ç”¨ =undef= æ¥å±è”½
+*** æ–‡ä»¶ç»“æ„
+é€šè¿‡ petalinux ç”Ÿæˆçš„ image.ub æ–‡ä»¶åŒ…å«äº†å¦‚ä¸‹å†…å®¹:
+- è®¾å¤‡æ ‘
+- å†…æ ¸
+- æ ¹æ–‡ä»¶ç³»ç»Ÿ, åŒ…æ‹¬å¿…å¤‡çš„æ–‡ä»¶ç»“æ„, ç”¨æˆ·ä»£ç , ç”¨æˆ·åº“ä»¥åŠç”¨æˆ·æ¨¡å—.
+** åˆ†æ
+*** å¯åŠ¨åˆ†æ
+**** å†…å­˜åˆ†å¸ƒåˆ†æ
+å†…å­˜åˆ†æéœ€è¦åˆ†æåŸºæœ¬çš„é“¾æ¥è„šæœ¬,ä¸ arm ç›¸å…³çš„è„šæœ¬æœ‰ =arch/arm/boot/compressed/vmlinux.lds.S= ä»¥åŠ =arch/arm/kernel/vmlinux.lds.S=.
+åœ¨linuxå¯åŠ¨è¾“å‡ºçš„è¿‡ç¨‹ä¸­,å¯ä»¥çœ‹åˆ°å¦‚ä¸‹ä¿¡æ¯:
 [[linux_ld.jpg]]
-´ËĞÅÏ¢ÔÚ =mm/page_alloc.cÖĞµÄ mem_init_print_info= ÖĞ´òÓ¡.
-¹ØÓÚ vmlinux.lds.S ÖĞµÄ¶Î»á°´ÕÕ =include/asm-generic/vmlinux.lds.h= ½øĞĞ×éÖ¯.
+æ­¤ä¿¡æ¯åœ¨ =mm/page_alloc.cä¸­çš„ mem_init_print_info= ä¸­æ‰“å°.
+å…³äº vmlinux.lds.S ä¸­çš„æ®µä¼šæŒ‰ç…§ =include/asm-generic/vmlinux.lds.h= è¿›è¡Œç»„ç»‡.
 - __init_begin - __init_end:
-Ö»ÓĞ³õÊ¼»¯²Å»áÊ¹ÓÃµ½µÄ¶Î·ÅÔÚÕâ¸öÇø¼ä,Ò»µ©³õÊ¼»¯Íê³É,ÄÇÃ´Õâ¸öÇø¼äÀïµÄÊı¾İ»ò´úÂëÔÚºóÃæ¾Í²»»á±»Ê¹ÓÃ,ÄÚºË»á°ÑÕâ²¿·ÖÄÚ´æÊÍ·Å³öÀ´.
-ÒªÍêÕûµÄ²é¿´º¯ÊıµÄµØÖ·,±äÁ¿µÄµØÖ·,Á´½Ó¶ÎµÄµØÖ·ĞÅÏ¢,Î»ÓÚÎÄ¼ş =build/linux/kernel/<linux>/System.map=.
-Í¨¹ı²é¿´ =arch/arm/kernel/vmlinux.lds.S= ¿ÉÒÔÖªµÀ =ENTRY(stext)= ËµÃ÷ÔËĞĞµÄµÚÒ»ÌõÖ¸Áî´Ó stext ·ûºÅ´¦Æô¶¯, ´Ë·ûºÅÎ»ÓÚ =arch/arm/kernel/head.S=
-***** ÆğÊ¼µØÖ·
-Í¨¹ı²é¿´ System.map ¿ÉÒÔÖªµÀ, stext µÄµØÖ·Îª 0xc008000.
-Í¨¹ı²é¿´ =arch/arm/kernel/vmlinux.lds.S= ÖªµÀÁ´½ÓµÄĞéÄâÆğÊ¼µØÖ·Îª *. =PAGE_OFFSET + TEXT_OFFSET*.
+åªæœ‰åˆå§‹åŒ–æ‰ä¼šä½¿ç”¨åˆ°çš„æ®µæ”¾åœ¨è¿™ä¸ªåŒºé—´,ä¸€æ—¦åˆå§‹åŒ–å®Œæˆ,é‚£ä¹ˆè¿™ä¸ªåŒºé—´é‡Œçš„æ•°æ®æˆ–ä»£ç åœ¨åé¢å°±ä¸ä¼šè¢«ä½¿ç”¨,å†…æ ¸ä¼šæŠŠè¿™éƒ¨åˆ†å†…å­˜é‡Šæ”¾å‡ºæ¥.
+è¦å®Œæ•´çš„æŸ¥çœ‹å‡½æ•°çš„åœ°å€,å˜é‡çš„åœ°å€,é“¾æ¥æ®µçš„åœ°å€ä¿¡æ¯,ä½äºæ–‡ä»¶ =build/linux/kernel/<linux>/System.map=.
+é€šè¿‡æŸ¥çœ‹ =arch/arm/kernel/vmlinux.lds.S= å¯ä»¥çŸ¥é“ =ENTRY(stext)= è¯´æ˜è¿è¡Œçš„ç¬¬ä¸€æ¡æŒ‡ä»¤ä» stext ç¬¦å·å¤„å¯åŠ¨, æ­¤ç¬¦å·ä½äº =arch/arm/kernel/head.S=
+***** èµ·å§‹åœ°å€
+é€šè¿‡æŸ¥çœ‹ System.map å¯ä»¥çŸ¥é“, stext çš„åœ°å€ä¸º 0xc008000.
+é€šè¿‡æŸ¥çœ‹ =arch/arm/kernel/vmlinux.lds.S= çŸ¥é“é“¾æ¥çš„è™šæ‹Ÿèµ·å§‹åœ°å€ä¸º *. =PAGE_OFFSET + TEXT_OFFSET*.
 - PAGE_OFFSET
-¶¨ÒåÎ»ÓÚÎÄ¼ş =arch/arm/include/asm/memory.h= ,¶¨ÒåÎª *#define PAGE_OFFSET  UL(CONFIG_PAGE_OFFSET)*,
-¶øÔÚ =subsystem/linx/configs/kernel/config= ÖĞ¿ÉÒÔÖªµÀ, CONFIG_PAGE_OFFSET µÄÖµÎª *0XC0000000*.
+å®šä¹‰ä½äºæ–‡ä»¶ =arch/arm/include/asm/memory.h= ,å®šä¹‰ä¸º *#define PAGE_OFFSET  UL(CONFIG_PAGE_OFFSET)*,
+è€Œåœ¨ =subsystem/linx/configs/kernel/config= ä¸­å¯ä»¥çŸ¥é“, CONFIG_PAGE_OFFSET çš„å€¼ä¸º *0XC0000000*.
 - TEXT_OFFSET
-´ú±íÄÚºËÔÚRAMÖĞµÄÆğÊ¼Î»ÖÃÏà¶ÔÓÚRAMÆğÊ¼µØÖ·µÄÆ«ÒÆ.´ËÖµµÄ¶¨ÒåÎ»ÓÚ =arch/arm/Makefile=.
+ä»£è¡¨å†…æ ¸åœ¨RAMä¸­çš„èµ·å§‹ä½ç½®ç›¸å¯¹äºRAMèµ·å§‹åœ°å€çš„åç§».æ­¤å€¼çš„å®šä¹‰ä½äº =arch/arm/Makefile=.
 *textofs-y := 0x00008000*
 *TEXT_OFFSET := $(textofs-y)*
 
-*ÖµÎª 0x8000* µÄÔ­Òò:
-kernel ¾µÏñµÄÇ°16KĞèÒªÔ¤Áô³öÀ´¸ø³õÊ¼»¯Ò³±íÊ¹ÓÃ.
+*å€¼ä¸º 0x8000* çš„åŸå› :
+kernel é•œåƒçš„å‰16Kéœ€è¦é¢„ç•™å‡ºæ¥ç»™åˆå§‹åŒ–é¡µè¡¨ä½¿ç”¨.
 
-**** Æô¶¯Ö®Ç°µÄ×¼±¸
-ÔÚkernelÆô¶¯Ö®Ç°µÄ»·¾³,¶¼ÊÇÓÉ bootloaderÀ´×¼±¸ÊµÏÖµÄ,Ò»°ã»áÓĞÈçÏÂ¼¸¸ö²½Öè:
-***** 1. ½«kernel¾µÏñ¼ÓÔØµ½RAMµÄ¶ÔÓ¦Î»ÖÃ
-*ĞèÒª×¢ÒâµÄÊÇ*: ¼ÓÔØÎ»ÖÃÊÇÓĞÒªÇóµÄ, Ò»°ãÊÇ¼ÓÔØµ½ÎïÀí RAM Æ«ÒÆ 0X8000(32K)µÄÎ»ÖÃ,Õâ32KÖĞ16K×÷ÎªÆô¶¯²ÎÊı,16K×÷ÎªÁÙÊ±Ò³±í.¶økernel»á´Ó¼ÓÔØµÄÎ»ÖÃÉÏ¿ªÊ¼½âÑ¹.
-***** 2. Ó²¼ş»·¾³³õÊ¼»¯
-****** ¹Ø±ÕMMU
-MMU¹Ø±ÕµÄÇé¿öÏÂ,CPUÑ°Ö·µÄµØÖ·¶¼ÊÇÎïÀíµØÖ·. *Ó³Éä±íĞèÒªÓÉkernelÀ´´´½¨* .ËùÒÔÔÚkernelÖ÷¶¯´´½¨Ó³Éä±íÖ®Ç°,±ØĞë±£Ö¤MMU´¦ÓÚ¹Ø±Õ×´Ì¬.
-****** ¹Ø±ÕÊı¾İ»º´æ
-Êı¾İ»º´æÒ»¶¨Òª¹Ø±Õ,·ñÔò¿ÉÄÜkernel¸ÕÆô¶¯µÄ¹ı³ÌÖĞ,¶ÁÊı¾İµÄÊ±ºò,´ÓCache ÖĞ¶ÁÈ¡, *¶øCacheÖĞµÄÊı¾İÓÉ¿ÉÄÜÊÇÔÚkernel¼ÓÔØÖ®Ç°µÄÊı¾İ*, ´Ó¶ø»áµ¼ÖÂÒì³£·¢Éú.
-****** ¼Ä´æÆ÷ r0 = 0
-****** ¼Ä´æÆ÷ r1 = machine ID
-****** ¼Ä´æÆ÷ r2 = atags or dtb pointer
-***** 3. PCÖ¸ÕëÌø×ªµ½ kernel µÄÈë¿Ú´úÂë´¦ÔËĞĞ
-**** Æô¶¯
-´Ó *ÄÚ´æ·Ö²¼·ÖÎö* ÖĞ¿ÉÒÔÖªµÀ:
-- kernel µÄÈë¿ÚĞéÄâµØÖ·Îª *0xc008000*
-- kernel µÄÈë¿Ú´úÂëÎª =arch/arm/kernel/head.S= µÄ *ENTRY(stext)* ´¦
-***** 1. ×¼±¸¹¤×÷
-ÔÚ´ò¿ªMMUÖ®Ç°,ÔËĞĞµØÖ·ÓëÁ´½Ó½Å±¾µÄĞéÄâµØÖ·²»Ò»ÖÂ,ËùÒÔÊ¹ÓÃµÄÊÇ *Î»ÖÃÎŞ¹Ø»ã±à´úÂë*.
-Ö÷ÒªÁ÷³ÌÎª:
-- ½øÈë SVC Ä£Ê½, ¹Ø±ÕËùÓĞÖĞ¶Ï
-- »ñÈ¡ CPU ID, ÌáÈ¡ proc info
-- ÑéÖ¤ tags»ò dtb
-- ´´½¨ÁÙÊ±ÄÚºËÒ³±íºÍÒ³±íÏî
-- ÅäÖÃ¼Ä´æÆ÷ r13
-- Ê¹ÄÜMMU
-- Ìø×ªµ½ start_kernel
+**** å¯åŠ¨ä¹‹å‰çš„å‡†å¤‡
+åœ¨kernelå¯åŠ¨ä¹‹å‰çš„ç¯å¢ƒ,éƒ½æ˜¯ç”± bootloaderæ¥å‡†å¤‡å®ç°çš„,ä¸€èˆ¬ä¼šæœ‰å¦‚ä¸‹å‡ ä¸ªæ­¥éª¤:
+***** 1. å°†kernelé•œåƒåŠ è½½åˆ°RAMçš„å¯¹åº”ä½ç½®
+*éœ€è¦æ³¨æ„çš„æ˜¯*: åŠ è½½ä½ç½®æ˜¯æœ‰è¦æ±‚çš„, ä¸€èˆ¬æ˜¯åŠ è½½åˆ°ç‰©ç† RAM åç§» 0X8000(32K)çš„ä½ç½®,è¿™32Kä¸­16Kä½œä¸ºå¯åŠ¨å‚æ•°,16Kä½œä¸ºä¸´æ—¶é¡µè¡¨.è€Œkernelä¼šä»åŠ è½½çš„ä½ç½®ä¸Šå¼€å§‹è§£å‹.
+***** 2. ç¡¬ä»¶ç¯å¢ƒåˆå§‹åŒ–
+****** å…³é—­MMU
+MMUå…³é—­çš„æƒ…å†µä¸‹,CPUå¯»å€çš„åœ°å€éƒ½æ˜¯ç‰©ç†åœ°å€. *æ˜ å°„è¡¨éœ€è¦ç”±kernelæ¥åˆ›å»º* .æ‰€ä»¥åœ¨kernelä¸»åŠ¨åˆ›å»ºæ˜ å°„è¡¨ä¹‹å‰,å¿…é¡»ä¿è¯MMUå¤„äºå…³é—­çŠ¶æ€.
+****** å…³é—­æ•°æ®ç¼“å­˜
+æ•°æ®ç¼“å­˜ä¸€å®šè¦å…³é—­,å¦åˆ™å¯èƒ½kernelåˆšå¯åŠ¨çš„è¿‡ç¨‹ä¸­,è¯»æ•°æ®çš„æ—¶å€™,ä»Cache ä¸­è¯»å–, *è€ŒCacheä¸­çš„æ•°æ®ç”±å¯èƒ½æ˜¯åœ¨kernelåŠ è½½ä¹‹å‰çš„æ•°æ®*, ä»è€Œä¼šå¯¼è‡´å¼‚å¸¸å‘ç”Ÿ.
+****** å¯„å­˜å™¨ r0 = 0
+****** å¯„å­˜å™¨ r1 = machine ID
+****** å¯„å­˜å™¨ r2 = atags or dtb pointer
+***** 3. PCæŒ‡é’ˆè·³è½¬åˆ° kernel çš„å…¥å£ä»£ç å¤„è¿è¡Œ
+**** å¯åŠ¨
+ä» *å†…å­˜åˆ†å¸ƒåˆ†æ* ä¸­å¯ä»¥çŸ¥é“:
+- kernel çš„å…¥å£è™šæ‹Ÿåœ°å€ä¸º *0xc008000*
+- kernel çš„å…¥å£ä»£ç ä¸º =arch/arm/kernel/head.S= çš„ *ENTRY(stext)* å¤„
+***** 1. å‡†å¤‡å·¥ä½œ
+åœ¨æ‰“å¼€MMUä¹‹å‰,è¿è¡Œåœ°å€ä¸é“¾æ¥è„šæœ¬çš„è™šæ‹Ÿåœ°å€ä¸ä¸€è‡´,æ‰€ä»¥ä½¿ç”¨çš„æ˜¯ *ä½ç½®æ— å…³æ±‡ç¼–ä»£ç *.
+ä¸»è¦æµç¨‹ä¸º:
+- è¿›å…¥ SVC æ¨¡å¼, å…³é—­æ‰€æœ‰ä¸­æ–­
+- è·å– CPU ID, æå– proc info
+- éªŒè¯ tagsæˆ– dtb
+- åˆ›å»ºä¸´æ—¶å†…æ ¸é¡µè¡¨å’Œé¡µè¡¨é¡¹
+- é…ç½®å¯„å­˜å™¨ r13
+- ä½¿èƒ½MMU
+- è·³è½¬åˆ° start_kernel
 ***** 2. start_kernel
-´Ë½×¶ÎÖ÷ÒªÓÉ C ´úÂëÀ´Íê³É,²¢ÇÒ´Ë½×¶ÎµÄ´úÂë *¶¼ÊÇÔÚĞéÄâÄÚ´æÉÏÔËĞĞµÄ* ,start_kernel ÎÄ¼şÎ»ÓÚ =init/main.c=.
-ËüÖ÷ÒªÍê³ÉµÚÒ»½×¶ÎÃ»ÓĞ³õÊ¼»¯µÄÓëÓ²¼şÆ½Ì¨Ïà¹ØµÄ³õÊ¼»¯¹¤×÷. ÔÚÍê³ÉÒ»ÏµÁĞÓëÄÚºËÏà¹ØµÄ³õÊ¼»¯ºó,µ÷ÓÃµÚÒ»¸öÓÃ»§½ø³Ì(init½ø³Ì)²¢µÈ´ıÓÃ»§½ø³ÌµÄÖ´ĞĞ,ÕâÑùÕû¸ölinuxÄÚºË±ãÆô¶¯Íê±Ï.
-¸Ãº¯ÊıËù×öµÄ¹¤×÷°üÀ¨:
-1. ½øĞĞÌåÏµ½á¹¹Ïà¹ØµÄµÚÒ»¸ö³õÊ¼»¯¹¤×÷
-2. ³õÊ¼»¯ÏµÍ³ºËĞÄ½ø³Ìµ÷¶ÈÆ÷ºÍÊ±ÖÓÖĞ¶Ï´¦Àí»úÖÆ
-3. ³õÊ¼»¯´®¿Ú¿ØÖÆÌ¨
-4. ´´½¨ºÍ³õÊ¼»¯ÏµÍ³ cache ,Îª¸÷ÖÖÄÚ´æµ÷ÓÃ»úÖÆÌá¹©»º´æ.
-5. ³õÊ¼»¯ÄÚ´æ¹ÜÀí.
-6. ³õÊ¼»¯ÏµÍ³µÄ½ø³Ì¼äÍ¨ĞÅ»úÖÆ
-7. µ÷ÓÃº¯Êı =rest_init()= , Æô¶¯µÚÒ»¸ö½ø³Ì. init ½ø³ÌÊ×ÏÈ½øĞĞÒ»ÏµÁĞµÄÓ²¼ş³õÊ¼»¯, È»ºóÍ¨¹ıÃüÁîĞĞ´«µİ¹ıÀ´µÄ²ÎÊı¹ÒÔØ¸ùÎÄ¼şÏµÍ³.
+æ­¤é˜¶æ®µä¸»è¦ç”± C ä»£ç æ¥å®Œæˆ,å¹¶ä¸”æ­¤é˜¶æ®µçš„ä»£ç  *éƒ½æ˜¯åœ¨è™šæ‹Ÿå†…å­˜ä¸Šè¿è¡Œçš„* ,start_kernel æ–‡ä»¶ä½äº =init/main.c=.
+å®ƒä¸»è¦å®Œæˆç¬¬ä¸€é˜¶æ®µæ²¡æœ‰åˆå§‹åŒ–çš„ä¸ç¡¬ä»¶å¹³å°ç›¸å…³çš„åˆå§‹åŒ–å·¥ä½œ. åœ¨å®Œæˆä¸€ç³»åˆ—ä¸å†…æ ¸ç›¸å…³çš„åˆå§‹åŒ–å,è°ƒç”¨ç¬¬ä¸€ä¸ªç”¨æˆ·è¿›ç¨‹(initè¿›ç¨‹)å¹¶ç­‰å¾…ç”¨æˆ·è¿›ç¨‹çš„æ‰§è¡Œ,è¿™æ ·æ•´ä¸ªlinuxå†…æ ¸ä¾¿å¯åŠ¨å®Œæ¯•.
+è¯¥å‡½æ•°æ‰€åšçš„å·¥ä½œåŒ…æ‹¬:
+1. è¿›è¡Œä½“ç³»ç»“æ„ç›¸å…³çš„ç¬¬ä¸€ä¸ªåˆå§‹åŒ–å·¥ä½œ
+2. åˆå§‹åŒ–ç³»ç»Ÿæ ¸å¿ƒè¿›ç¨‹è°ƒåº¦å™¨å’Œæ—¶é’Ÿä¸­æ–­å¤„ç†æœºåˆ¶
+3. åˆå§‹åŒ–ä¸²å£æ§åˆ¶å°
+4. åˆ›å»ºå’Œåˆå§‹åŒ–ç³»ç»Ÿ cache ,ä¸ºå„ç§å†…å­˜è°ƒç”¨æœºåˆ¶æä¾›ç¼“å­˜.
+5. åˆå§‹åŒ–å†…å­˜ç®¡ç†.
+6. åˆå§‹åŒ–ç³»ç»Ÿçš„è¿›ç¨‹é—´é€šä¿¡æœºåˆ¶
+7. è°ƒç”¨å‡½æ•° =rest_init()= , å¯åŠ¨ç¬¬ä¸€ä¸ªè¿›ç¨‹. init è¿›ç¨‹é¦–å…ˆè¿›è¡Œä¸€ç³»åˆ—çš„ç¡¬ä»¶åˆå§‹åŒ–, ç„¶åé€šè¿‡å‘½ä»¤è¡Œä¼ é€’è¿‡æ¥çš„å‚æ•°æŒ‚è½½æ ¹æ–‡ä»¶ç³»ç»Ÿ.
 
-µ±ËùÓĞµÄ³õÊ¼»¯¹¤×÷½áÊøºó, cpu_idle()º¯Êı»á±»µ÷ÓÃÀ´Ê¹ÏµÍ³´¦ÓÚÏĞÖÃ×´Ì¬(idle),²¢µÈ´ıÓÃ»§½ø³ÌµÄÖ´ĞĞ.
+å½“æ‰€æœ‰çš„åˆå§‹åŒ–å·¥ä½œç»“æŸå, cpu_idle()å‡½æ•°ä¼šè¢«è°ƒç”¨æ¥ä½¿ç³»ç»Ÿå¤„äºé—²ç½®çŠ¶æ€(idle),å¹¶ç­‰å¾…ç”¨æˆ·è¿›ç¨‹çš„æ‰§è¡Œ.
 
-**** ÎÄ¼şÆô¶¯
-***** ÎÄ¼şÏµÍ³¹ÒÔØ
-Ä¬ÈÏÇé¿öÏÂ, petalinux ½«ÎÄ¼şÏµÍ³¼¯³ÉÔÚ image.ubÎÄ¼şÖĞ, ÕâÑùÔÚÆô¶¯ÄÚºËºó, ÄÚºËÖ±½Ó½«Æä¿½±´µ½ RAMÖĞÔËĞĞ, *µ«ÕâÆÚ¼äËù×öµÄĞŞ¸ÄÊÇ²»»áĞ´»Øµ½image.ubÖĞÁË*, Ëµ°×ÁË¾ÍÊÇÒ»¸öĞéÄâÎÄ¼şÏµÍ³ÁË.
-ÎªÁËÄÜ¹»´æ´¢, ĞèÒª×öÈçÏÂ²½Öè:
-1. ½«´æ´¢ÎÄ¼şÏµÍ³µÄÉè±¸»ò·ÖÇø¸ñÊ½»¯Îª ext4 ÎÄ¼ş¸ñÊ½
-2. Ê¹ÓÃ =petalinux-config -> Image Packaging Configuration -> Root filesystem type= , Ñ¡Ôñ¶ÔÓ¦Éè±¸ÀàĞÍ, ´ËÊ± =system-conf.dtsi=Éè±¸Ê÷µÄ =bootargs= »á¸üĞÂ.
-3. ±àÒëÏµÍ³,²¢µ¼³ö¸ùÎÄ¼şÑ¹Ëõ°ü =petalinux-package --image -c rootfs --format initramfs=
-4. ½âÑ¹¸ùÎÄ¼ş°ü =sudo pax -rvf rootfs.cpio=
-5. ½«½âÑ¹ºóµÄ½á¹û¿½±´½ø¶ÔÓ¦Éè±¸·ÖÇø
-***** Á÷³Ì¸ÅÊö
-1. µ±ÔØÈëÎÄ¼şÏµÍ³ÒÔºó,Ê×ÏÈ¶ÁÈë =/boot= Ä¿Â¼ÏÂµÄÄÚºËÎÄ¼ş.
-2. ÔËĞĞµÚÒ»¸ö³ÌĞò =/sbin/init=,ÓÃ»§³õÊ¼»¯ÏµÍ³»·¾³, ½ø³ÌPIDÊÇ1,ÆäËûµÄ½ø³Ì¶¼ÊÇËüµÄ×Ó½ø³Ì.
-3. ¸ù¾İÔËĞĞ¼¶±ğÀ´È·¶¨Æô¶¯ÄÄĞ©ÊØ»¤½ø³Ì.ÉèÖÃÔËĞĞ¼¶±ğµÄÎÄ¼şÎ»ÓÚ =/etc/inittab=,¶øÏà¶ÔÓÚÔËĞĞ¼¶±ğ¶ø¶ÔÓ¦µÄÔËĞĞ³ÌĞòÎÄ¼şÎ»ÓÚ =/etc/rc5.d/= ("rc" ÊÇ "run command" µÄËõĞ´, "d" ÊÇ "directory" µÄËõĞ´, zynq Ä¬ÈÏÔËĞĞ¼¶±ğÊÇ5)
-´ËÄ¿Â¼ÏÂµÄÎÄ¼ş¸ñÊ½¶¼ÊÇ "S + XX + ³ÌĞòÃû", "S" ´ú±í "Start", Êı×Ö´ú±íÔËĞĞµÄÏÈºóË³Ğò, Êı×ÖÔ½Ğ¡Ô½Ôç´¦Àí, Êı×ÖÏàÍ¬Ê±,°´ÕÕ×Ö·ûË³ĞòÆô¶¯.
-4. ¼ÓÔØ¿ª»úÆô¶¯³ÌĞò
-¿ª»úÆô¶¯³ÌĞò½Å±¾Í³Ò»µÄ·ÅÔÚ =/etc/init.d/= ÏÂ
-***** ÓÃ»§µÇÂ¼
-****** ÃüÁîĞĞµÇÂ¼:
-init ½ø³Ìµ÷ÓÃ gettty ³ÌĞò,ÈÃÓÃ»§ÊäÈëÓÃ»§ÃûºÍÃÜÂë. ÊäÈëÍê³Éºó,ÔÙµ÷ÓÃ login ³ÌĞò,È»ºóºË¶ÔÃÜÂë. Èç¹ûÃÜÂëÕıÈ·,¾Í´ÓÎÄ¼ş =/etc/passwd= ¶ÁÈ¡ÓÃ»§Ö¸¶¨µÄ shell, È»ºóÆô¶¯shell
-****** sshµÇÂ¼
-ÏµÍ³µ÷ÓÃ sshd ³ÌĞò, È¡´ú getty ºÍ login È»ºóÆô¶¯ shell
-****** Í¼ĞÎ½çÃæµÇÂ¼
-init ½ø³Ìµ÷ÓÃÏÔÊ¾¹ÜÀíÆ÷, Èç¹ûÓÃ»§ÃÜÂëÕıÈ·¾Í¶ÁÈ¡ =/etc/gdm3/Xsession= Æô¶¯ÓÃ»§»á»°.
-***** ÅäÖÃshell»·¾³
-ÏÈ¶ÁÈ¡ =/etc/profile= ÖĞµÄÓÃ»§ÅäÖÃ, È»ºóÒÀ´ÎÑ°ÕÒ =~/.bash_profile, ~/.bash_login, ~/.profile= ÅäÖÃÎÄ¼ş(Ö»ÒªÕÒµ½ÆäÖĞÒ»¸ö, ºóÃæµÄ¾Í²»»áÑ°ÕÒÁË)
-*** ÊµÏÖlinuxµÄ¿ìËÙÆô¶¯
-zynqµÄÆô¶¯Á÷³ÌÎª: ROMBOOT -->  fsbl --> uboot -> kernel
-ºóÃæ3¸ö½×¶Î¶¼ÊÇ¿É¶¨ÖÆµÄ, ÄÇÃ´ÒªÏë¿ìËÙÆô¶¯, ĞèÒª°ÑÎÕÔ­Ôò:
-1. ½ö½ö³õÊ¼»¯Æô¶¯Ëù±ØÒªµÄÓ²¼ş, ¹ØÓÚÓ²¼şµÄÉî¶È¼ì²â, ·ÅÔÚ bootloader µÄÓÃ»§Ñ¡ÏîÀ´Ö´ĞĞ
-2. Èí¼ş¹ı³ÌÖĞ¾¡Á¿²»ÒªÓĞËÀµÈ, ¾¡Á¿ÔËÓÃ·Ç×èÈû·½Ê½±à³Ì
-3. ÎªÁËÈÃÓÃ»§ *¸Ğ¾õÆô¶¯ºÜ¿ì*, ĞèÒª *¾¡Á¿ÔçµÄÏÔÊ¾¿ª»ú»­Ãæ,ÔÚ¿ª»ú»­ÃæÍ£ÁôµÄ¼¸ÃëÊ±¼äÔÙÀ´ÅäÖÃÓ²¼ş¼°Èí¼ş»·¾³*.
+**** æ–‡ä»¶å¯åŠ¨
+***** æ–‡ä»¶ç³»ç»ŸæŒ‚è½½
+é»˜è®¤æƒ…å†µä¸‹, petalinux å°†æ–‡ä»¶ç³»ç»Ÿé›†æˆåœ¨ image.ubæ–‡ä»¶ä¸­, è¿™æ ·åœ¨å¯åŠ¨å†…æ ¸å, å†…æ ¸ç›´æ¥å°†å…¶æ‹·è´åˆ° RAMä¸­è¿è¡Œ, *ä½†è¿™æœŸé—´æ‰€åšçš„ä¿®æ”¹æ˜¯ä¸ä¼šå†™å›åˆ°image.ubä¸­äº†*, è¯´ç™½äº†å°±æ˜¯ä¸€ä¸ªè™šæ‹Ÿæ–‡ä»¶ç³»ç»Ÿäº†.
+ä¸ºäº†èƒ½å¤Ÿå­˜å‚¨, éœ€è¦åšå¦‚ä¸‹æ­¥éª¤:
+1. å°†å­˜å‚¨æ–‡ä»¶ç³»ç»Ÿçš„è®¾å¤‡æˆ–åˆ†åŒºæ ¼å¼åŒ–ä¸º ext4 æ–‡ä»¶æ ¼å¼
+2. ä½¿ç”¨ =petalinux-config -> Image Packaging Configuration -> Root filesystem type= , é€‰æ‹©å¯¹åº”è®¾å¤‡ç±»å‹, æ­¤æ—¶ =system-conf.dtsi=è®¾å¤‡æ ‘çš„ =bootargs= ä¼šæ›´æ–°.
+3. ç¼–è¯‘ç³»ç»Ÿ,å¹¶å¯¼å‡ºæ ¹æ–‡ä»¶å‹ç¼©åŒ… =petalinux-package --image -c rootfs --format initramfs=
+4. è§£å‹æ ¹æ–‡ä»¶åŒ… =sudo pax -rvf rootfs.cpio=
+5. å°†è§£å‹åçš„ç»“æœæ‹·è´è¿›å¯¹åº”è®¾å¤‡åˆ†åŒº
+***** æµç¨‹æ¦‚è¿°
+1. å½“è½½å…¥æ–‡ä»¶ç³»ç»Ÿä»¥å,é¦–å…ˆè¯»å…¥ =/boot= ç›®å½•ä¸‹çš„å†…æ ¸æ–‡ä»¶.
+2. è¿è¡Œç¬¬ä¸€ä¸ªç¨‹åº =/sbin/init=,ç”¨æˆ·åˆå§‹åŒ–ç³»ç»Ÿç¯å¢ƒ, è¿›ç¨‹PIDæ˜¯1,å…¶ä»–çš„è¿›ç¨‹éƒ½æ˜¯å®ƒçš„å­è¿›ç¨‹.
+3. æ ¹æ®è¿è¡Œçº§åˆ«æ¥ç¡®å®šå¯åŠ¨å“ªäº›å®ˆæŠ¤è¿›ç¨‹.è®¾ç½®è¿è¡Œçº§åˆ«çš„æ–‡ä»¶ä½äº =/etc/inittab=,è€Œç›¸å¯¹äºè¿è¡Œçº§åˆ«è€Œå¯¹åº”çš„è¿è¡Œç¨‹åºæ–‡ä»¶ä½äº =/etc/rc5.d/= ("rc" æ˜¯ "run command" çš„ç¼©å†™, "d" æ˜¯ "directory" çš„ç¼©å†™, zynq é»˜è®¤è¿è¡Œçº§åˆ«æ˜¯5)
+æ­¤ç›®å½•ä¸‹çš„æ–‡ä»¶æ ¼å¼éƒ½æ˜¯ "S + XX + ç¨‹åºå", "S" ä»£è¡¨ "Start", æ•°å­—ä»£è¡¨è¿è¡Œçš„å…ˆåé¡ºåº, æ•°å­—è¶Šå°è¶Šæ—©å¤„ç†, æ•°å­—ç›¸åŒæ—¶,æŒ‰ç…§å­—ç¬¦é¡ºåºå¯åŠ¨.
+4. åŠ è½½å¼€æœºå¯åŠ¨ç¨‹åº
+å¼€æœºå¯åŠ¨ç¨‹åºè„šæœ¬ç»Ÿä¸€çš„æ”¾åœ¨ =/etc/init.d/= ä¸‹
+***** ç”¨æˆ·ç™»å½•
+****** å‘½ä»¤è¡Œç™»å½•:
+init è¿›ç¨‹è°ƒç”¨ gettty ç¨‹åº,è®©ç”¨æˆ·è¾“å…¥ç”¨æˆ·åå’Œå¯†ç . è¾“å…¥å®Œæˆå,å†è°ƒç”¨ login ç¨‹åº,ç„¶åæ ¸å¯¹å¯†ç . å¦‚æœå¯†ç æ­£ç¡®,å°±ä»æ–‡ä»¶ =/etc/passwd= è¯»å–ç”¨æˆ·æŒ‡å®šçš„ shell, ç„¶åå¯åŠ¨shell
+****** sshç™»å½•
+ç³»ç»Ÿè°ƒç”¨ sshd ç¨‹åº, å–ä»£ getty å’Œ login ç„¶åå¯åŠ¨ shell
+****** å›¾å½¢ç•Œé¢ç™»å½•
+init è¿›ç¨‹è°ƒç”¨æ˜¾ç¤ºç®¡ç†å™¨, å¦‚æœç”¨æˆ·å¯†ç æ­£ç¡®å°±è¯»å– =/etc/gdm3/Xsession= å¯åŠ¨ç”¨æˆ·ä¼šè¯.
+***** é…ç½®shellç¯å¢ƒ
+å…ˆè¯»å– =/etc/profile= ä¸­çš„ç”¨æˆ·é…ç½®, ç„¶åä¾æ¬¡å¯»æ‰¾ =~/.bash_profile, ~/.bash_login, ~/.profile= é…ç½®æ–‡ä»¶(åªè¦æ‰¾åˆ°å…¶ä¸­ä¸€ä¸ª, åé¢çš„å°±ä¸ä¼šå¯»æ‰¾äº†)
+*** å®ç°linuxçš„å¿«é€Ÿå¯åŠ¨
+zynqçš„å¯åŠ¨æµç¨‹ä¸º: ROMBOOT -->  fsbl --> uboot -> kernel
+åé¢3ä¸ªé˜¶æ®µéƒ½æ˜¯å¯å®šåˆ¶çš„, é‚£ä¹ˆè¦æƒ³å¿«é€Ÿå¯åŠ¨, éœ€è¦æŠŠæ¡åŸåˆ™:
+1. ä»…ä»…åˆå§‹åŒ–å¯åŠ¨æ‰€å¿…è¦çš„ç¡¬ä»¶, å…³äºç¡¬ä»¶çš„æ·±åº¦æ£€æµ‹, æ”¾åœ¨ bootloader çš„ç”¨æˆ·é€‰é¡¹æ¥æ‰§è¡Œ
+2. è½¯ä»¶è¿‡ç¨‹ä¸­å°½é‡ä¸è¦æœ‰æ­»ç­‰, å°½é‡è¿ç”¨éé˜»å¡æ–¹å¼ç¼–ç¨‹
+3. ä¸ºäº†è®©ç”¨æˆ· *æ„Ÿè§‰å¯åŠ¨å¾ˆå¿«*, éœ€è¦ *å°½é‡æ—©çš„æ˜¾ç¤ºå¼€æœºç”»é¢,åœ¨å¼€æœºç”»é¢åœç•™çš„å‡ ç§’æ—¶é—´å†æ¥é…ç½®ç¡¬ä»¶åŠè½¯ä»¶ç¯å¢ƒ*.
 
-**** bootloader µÄ¿ìËÙÆô¶¯
-** Çı¶¯
+**** bootloader çš„å¿«é€Ÿå¯åŠ¨
+** é©±åŠ¨
 *** DMA engine
-²Î¿¼ÓÚ: [[www.wowotech.net][ÎÏÎÑ¿Æ¼¼]]
-**** »ù±¾¸ÅÄî
+å‚è€ƒäº: [[www.wowotech.net][èœ—çªç§‘æŠ€]]
+**** åŸºæœ¬æ¦‚å¿µ
 ***** DMA channels
-Ò»¸ö DMA controller ¿ÉÒÔÍ¬Ê±½øĞĞµÄDMA´«ÊäµÄ¸öÊıÊÇÓĞÏŞµÄ,Õâ³ÆÎª DMA channels.
-*×¢Òâ*: ÕâÀïµÄ "channel"½ö½öÊÇÒ»¸öÂß¼­¸ÅÄî.
-ÒòÎª¼øÓÚ×ÜÏß·ÃÎÊµÄ³åÍ»,ÒÔ¼°ÄÚ´æÒ»ÖÂĞÔµÄ¿¼Á¿,´ÓÎïÀíµÄ½Ç¶È¿´,²»´ó¿ÉÄÜ»áÍ¬Ê±½øĞĞÁ½¸ö¼°ÒÔÉÏµÄDMA´«Êä.Òò¶øDMA channel ²»Ì«¿ÉÄÜÊÇÎïÀíÉÏ¶ÀÁ¢µÄÍ¨µÀ.
-ºÜ¶àÊ±ºò,DMA channels ÊÇ DMA controller ÎªÁË·½±ã¶ø³éÏó³öÀ´µÄ¸ÅÄî, ÈÃ consumer ÒÔÎª¶ÀÕ¼ÁËÒ»¸ö channel, Êµ¼ÊÉÏËùÓĞµÄchannelµÄDMA´«ÊäÇëÇó¶¼»áÔÚDMA controller
-ÖĞ½øĞĞÖÙ²Ã,½ø¶ø´®ĞĞ´«Êä.
-Òò´Ë,Èí¼şÒ²¿ÉÒÔ»ùÓÚ controller Ìá¹©µÄchannel(ÎïÀí),×ÔĞĞ³éÏó¸ü¶àµÄÂß¼­channel, Èí¼ş»á¹ÜÀíÕâĞ©Âß¼­channel ÉÏµÄ´«ÊäÇëÇó.Êµ¼ÊÉÏºÜ¶àÆ½Ì¨¶¼ÕâÑù×öÁË, ÔÚDMA engine framework ÖĞ,
-²»»áÇø·ÖÕâÁ½ÖÖchannel(±¾ÖÊÉÏÃ»ÓĞÇø±ğ).
+ä¸€ä¸ª DMA controller å¯ä»¥åŒæ—¶è¿›è¡Œçš„DMAä¼ è¾“çš„ä¸ªæ•°æ˜¯æœ‰é™çš„,è¿™ç§°ä¸º DMA channels.
+*æ³¨æ„*: è¿™é‡Œçš„ "channel"ä»…ä»…æ˜¯ä¸€ä¸ªé€»è¾‘æ¦‚å¿µ.
+å› ä¸ºé‰´äºæ€»çº¿è®¿é—®çš„å†²çª,ä»¥åŠå†…å­˜ä¸€è‡´æ€§çš„è€ƒé‡,ä»ç‰©ç†çš„è§’åº¦çœ‹,ä¸å¤§å¯èƒ½ä¼šåŒæ—¶è¿›è¡Œä¸¤ä¸ªåŠä»¥ä¸Šçš„DMAä¼ è¾“.å› è€ŒDMA channel ä¸å¤ªå¯èƒ½æ˜¯ç‰©ç†ä¸Šç‹¬ç«‹çš„é€šé“.
+å¾ˆå¤šæ—¶å€™,DMA channels æ˜¯ DMA controller ä¸ºäº†æ–¹ä¾¿è€ŒæŠ½è±¡å‡ºæ¥çš„æ¦‚å¿µ, è®© consumer ä»¥ä¸ºç‹¬å äº†ä¸€ä¸ª channel, å®é™…ä¸Šæ‰€æœ‰çš„channelçš„DMAä¼ è¾“è¯·æ±‚éƒ½ä¼šåœ¨DMA controller
+ä¸­è¿›è¡Œä»²è£,è¿›è€Œä¸²è¡Œä¼ è¾“.
+å› æ­¤,è½¯ä»¶ä¹Ÿå¯ä»¥åŸºäº controller æä¾›çš„channel(ç‰©ç†),è‡ªè¡ŒæŠ½è±¡æ›´å¤šçš„é€»è¾‘channel, è½¯ä»¶ä¼šç®¡ç†è¿™äº›é€»è¾‘channel ä¸Šçš„ä¼ è¾“è¯·æ±‚.å®é™…ä¸Šå¾ˆå¤šå¹³å°éƒ½è¿™æ ·åšäº†, åœ¨DMA engine framework ä¸­,
+ä¸ä¼šåŒºåˆ†è¿™ä¸¤ç§channel(æœ¬è´¨ä¸Šæ²¡æœ‰åŒºåˆ«).
 ***** DMA request lines
-DMA´«ÊäµÄÉè±¸ºÍDMA¿ØÖÆÆ÷Ö®¼ä,»áÓĞ¼¸ÌõÎïÀíµÄÁ¬½ÓÏß,³ÆÎª DMA request(DRQ), ÓÃÓÚÍ¨ÖªDMA ¿ØÖÆÆ÷¿ÉÒÔ¿ªÊ¼´«ÊäÁË.Ã¿¸öÊı¾İÊÕ·¢µÄ½Úµã,³Æ×÷ endpoint ºÍ DMA controller Ö®¼ä,¾ÍÓĞÒ»Ìõ DMA request line.
+DMAä¼ è¾“çš„è®¾å¤‡å’ŒDMAæ§åˆ¶å™¨ä¹‹é—´,ä¼šæœ‰å‡ æ¡ç‰©ç†çš„è¿æ¥çº¿,ç§°ä¸º DMA request(DRQ), ç”¨äºé€šçŸ¥DMA æ§åˆ¶å™¨å¯ä»¥å¼€å§‹ä¼ è¾“äº†.æ¯ä¸ªæ•°æ®æ”¶å‘çš„èŠ‚ç‚¹,ç§°ä½œ endpoint å’Œ DMA controller ä¹‹é—´,å°±æœ‰ä¸€æ¡ DMA request line.
 
-DMA channel ÊÇ provider , DMA request line ÊÇ Consumer, ÔÚÒ»¸öÏµÍ³ÖĞ DMA request line µÄÊıÁ¿Í¨³£±È DMA channel µÄÊıÁ¿¶à, ÒòÎª²¢²»ÊÇÃ¿¸ö request line ÔÚÃ¿Ò»¸öÊ±¿Ì¶¼ĞèÒªÊı¾İ´«Êä.
-***** ´«Êä²ÎÊı
+DMA channel æ˜¯ provider , DMA request line æ˜¯ Consumer, åœ¨ä¸€ä¸ªç³»ç»Ÿä¸­ DMA request line çš„æ•°é‡é€šå¸¸æ¯” DMA channel çš„æ•°é‡å¤š, å› ä¸ºå¹¶ä¸æ˜¯æ¯ä¸ª request line åœ¨æ¯ä¸€ä¸ªæ—¶åˆ»éƒ½éœ€è¦æ•°æ®ä¼ è¾“.
+***** ä¼ è¾“å‚æ•°
 ****** transfer size
-´«ÊäµÄÊı¾İ´óĞ¡
+ä¼ è¾“çš„æ•°æ®å¤§å°
 ****** transfer width
-´«ÊäÊı¾İ¿í¶È
+ä¼ è¾“æ•°æ®å®½åº¦
 ****** burst size
-DMA ¿ØÖÆÆ÷ÄÚ²¿¿É»º´æµÄÊı¾İÁ¿´óĞ¡
+DMA æ§åˆ¶å™¨å†…éƒ¨å¯ç¼“å­˜çš„æ•°æ®é‡å¤§å°
 ***** scatter-gather
-½«²»Á¬ĞøµØÖ·µÄÊı¾İ´«Êäµ½Ò»¸öÁ¬ĞøµÄ»º´æÖĞ.
+å°†ä¸è¿ç»­åœ°å€çš„æ•°æ®ä¼ è¾“åˆ°ä¸€ä¸ªè¿ç»­çš„ç¼“å­˜ä¸­.
 
  
+**** ä½¿ç”¨ä»‹ç»
+***** æ¦‚å¿µ
+ç«™åœ¨DMA çš„è§†è§’æ¥çœ‹, æ— è®ºä¼ è¾“çš„æ˜¯ä»€ä¹ˆæ–¹å‘,éƒ½æ˜¯slave äº slaveä¹‹é—´çš„æ•°æ®ä¼ è¾“.
+*ä½†æ˜¯åœ¨ memory åˆ° memory è¿™ç§æƒ…å†µä¸‹*, Linux ä¸ºäº†æ–¹ä¾¿åŸºäºDMAçš„ memcpy,memsetç­‰æ“ä½œ,åœ¨dma engine ä¸Šåˆå°è£…äº†ä¸€å±‚
+æ›´ä¸ºç®€æ´çš„ API,è¿™ç§ API å°±æ˜¯ Async TX API(ä»¥async_å¼€å¤´, æ¯”å¦‚ async_memcpy, async_memset, async_xorç­‰).
+[[.dma_engineAPI.jpg][dma_engine]]
+é™¤æ­¤ä¹‹å¤–çš„3ç§æƒ…å†µ(MEM2DEV,DEV2MEM,DEV2DEV)è¢«ç§°ä¸ºSlave-DMAä¼ è¾“.
+*æ³¨æ„*: åœ¨Slave-DMAä¸­çš„ "slave",æŒ‡çš„æ˜¯å‚ä¸DMAä¼ è¾“çš„è®¾å¤‡, è€Œå¯¹åº”çš„ "master"æŒ‡çš„æ˜¯ DMA controller è‡ªèº«.
+***** consumerä½¿ç”¨æ­¥éª¤
+****** ç”³è¯·channel
+DMA channel åœ¨kernel ä¸­ç”± "struct dma_chan" æ•°æ®ç»“æ„è¡¨ç¤º, ç”± provider æä¾›æ“ä½œ
+ä½¿ç”¨å‡½æ•°: 
 
-**** Ê¹ÓÃ½éÉÜ
-***** ¸ÅÄî
-Õ¾ÔÚDMA µÄÊÓ½ÇÀ´¿´, ÎŞÂÛ´«ÊäµÄÊÇÊ²Ã´·½Ïò,¶¼ÊÇslave ÓÚ slaveÖ®¼äµÄÊı¾İ´«Êä.
-*µ«ÊÇÔÚ memory µ½ memory ÕâÖÖÇé¿öÏÂ*, Linux ÎªÁË·½±ã»ùÓÚDMAµÄ memcpy,memsetµÈ²Ù×÷,ÔÚdma engine ÉÏÓÖ·â×°ÁËÒ»²ã
-¸üÎª¼ò½àµÄ API,ÕâÖÖ API ¾ÍÊÇ Async TX API(ÒÔasync_¿ªÍ·, ±ÈÈç async_memcpy, async_memset, async_xorµÈ).
-[[.dma_engineAPI,jpg]]
-³ı´ËÖ®ÍâµÄ3ÖÖÇé¿ö(MEM2DEV,DEV2MEM,DEV2DEV)±»³ÆÎªSlave-DMA´«Êä.
-*×¢Òâ*: ÔÚSlave-DMAÖĞµÄ "slave",ÖµµÄÊÇ²ÎÓëDMA´«ÊäµÄÉè±¸, ¶ø¶ÔÓ¦µÄ "master"Ö¸µÄÊÇ DMA controller ×ÔÉí.
-***** consumerÊ¹ÓÃ²½Öè
-****** ÉêÇëchannel
-DMA channel ÔÚkernel ÖĞÓÉ "struct dma_chan" Êı¾İ½á¹¹±íÊ¾, ÓÉ provider Ìá¹©²Ù×÷
-Ê¹ÓÃº¯Êı: =struct dma_chan *dma_request_chan(struct device *dev, const char *name)=
-¸Ã½Ó¿Ú»á·µ»Ø°ó¶¨ÔÚÉè±¸ÉÏÃû³ÆÎªnameµÄdma channel .
-µ±²»Ê¹ÓÃ channel Ê±,Ê¹ÓÃº¯ÊıÊÍ·Å: =void dma_release_channel(struct dma_chan *chan);=
-*×¢Òâ*:
-ÔÚpetalinux2016.2ÖĞÉêÇëchannel¶ÔÓ¦µÄº¯ÊıÎª =dma_request_slave_channel= 
-****** ÅäÖÃ channel²ÎÊı
-Ê¹ÓÃÅäÖÃº¯Êı =int dmaengine_slave_config(struct dma_chan *chan, struct dma_slave_config *config)= ½øĞĞÅäÖÃ
-****** »ñÈ¡ÃèÊö·û
-DMA´«ÊäÊôÓÚÒì²½´«Êä,ÔÚÆô¶¯´«ÊäÖ®Ç°,slave driver ĞèÒª½«´Ë´Î´«ÊäµÄÒ»Ğ©ĞÅÏ¢Ìá½»¸ødma engine, dma engine È·¶¨ºó,·µ»ØÃèÊö·û dma_async_tx_decriptor.
-´Ëºó, slave driver ¾Í¿ÉÒÔÒÔ¸ÃÃèÊö·ûÎªµ¥Î»,¿ØÖÆ²¢¸ú×Ù´Ë´Î´«Êä.
-ÓĞ3¸ö API ¿ÉÒÔ»ñÈ¡´«ÊäÃèÊö·û:
+=struct dma_chan *dma_request_chan(struct device *dev, const char *name)=
+
+=struct dma_chan *dam_request_slave_channel(struct device *dev, const char *name)=
+
+è¯¥æ¥å£ä¼šè¿”å›ç»‘å®šåœ¨è®¾å¤‡ä¸Šåç§°ä¸ºnameçš„dma channel .
+
+å½“ä¸ä½¿ç”¨ channel æ—¶,ä½¿ç”¨å‡½æ•°é‡Šæ”¾: =void dma_release_channel(struct dma_chan *chan);=
+****** é…ç½® channelå‚æ•°
+ä½¿ç”¨é…ç½®å‡½æ•° =int dmaengine_slave_config(struct dma_chan *chan, struct dma_slave_config *config)= è¿›è¡Œé…ç½®
+
+- å¯¹äº zynq çš„ vdma ä½¿ç”¨, éœ€è¦ä½¿ç”¨å‡½æ•° =int xilinx_vdma_channel_set_config(struct dma_chan *dchan, struct xilinx_vdma_config *cfg)=
+å…¶ config ç»“æ„ä½“çš„æ³¨é‡Šå¤ªè¿‡æŠ½è±¡, é‡æ–°æ³¨é‡Šä¸€ä¸‹:
+#+BEGIN_SRC c
+/**
+ ,* @brief vdma é…ç½®ç»“æ„ä½“
+ ,* @para frm_dly: ç”¨äºGENLOCKä¸º SLAVEæ¨¡å¼æ—¶
+ ,* @para gen_lock: ä¸º1æ—¶, æ‰“å¼€GENLOCKåŠŸèƒ½, åŒç¼“å­˜è¯»å–
+ ,* @para master:
+ ,* @para frm_cnt_en: å½“ä¸º1æ—¶, vdmaè¿›è¡Œ coalescæ¬¡ä¼ è¾“åäº§ç”Ÿä¸­æ–­ä¾¿åœæ­¢.
+ ,* @para park: ä¸º1æ—¶ä¸ºPARKæ¨¡å¼, ä¸º0 æ—¶ä¸ºå¾ªç¯ä¼ è¾“æ¨¡å¼
+ ,* @para park_frm:
+ ,* @para coalesc: éœ€è¦ä¼ è¾“çš„ framebuffer ä¸ªæ•°, (1 ~ 255)
+ ,* @para delay: åœ¨æ•°æ®å¡«æ»¡å,å»¶è¿Ÿå¤šå°‘ä¸ªå‘¨æœŸæ‰äº§ç”Ÿä¸­æ–­
+ ,* @para reset: ä¸º1æ—¶, åœ¨é…ç½®å‡½æ•°ä¸­é¦–å…ˆå¤ä½ä¸€æ¬¡DMAé€šé“
+ ,* @para ext_fsync:
+ ,*/
+struct xilinx_vdma_config{
+        int frm_dly;
+        int gen_lock;
+        int master;
+        int frm_cnt_en;
+        int park;
+        int park_frm;
+        int coalesc;
+        int delay;
+        int reset;
+        int ext_fsync;
+};
+#+END_SRC
+****** è·å–æè¿°ç¬¦
+DMAä¼ è¾“å±äºå¼‚æ­¥ä¼ è¾“,åœ¨å¯åŠ¨ä¼ è¾“ä¹‹å‰,slave driver éœ€è¦å°†æ­¤æ¬¡ä¼ è¾“çš„ä¸€äº›ä¿¡æ¯æäº¤ç»™dma engine, dma engine ç¡®å®šå,è¿”å›æè¿°ç¬¦ dma_async_tx_decriptor.
+æ­¤å, slave driver å°±å¯ä»¥ä»¥è¯¥æè¿°ç¬¦ä¸ºå•ä½,æ§åˆ¶å¹¶è·Ÿè¸ªæ­¤æ¬¡ä¼ è¾“.
+æœ‰3ä¸ª API å¯ä»¥è·å–ä¼ è¾“æè¿°ç¬¦:
 1. struct dma_async_tx_descriptor *dmaengine_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl, unsigned int sg_len, enum dma_data_direction direction, unsigned long flags);
-ÓÃÓÚÔÚsgÁĞ±íºÍ×ÜÏßÉè±¸Ö®¼ä½øĞĞDMA´«Êä.
+ç”¨äºåœ¨sgåˆ—è¡¨å’Œæ€»çº¿è®¾å¤‡ä¹‹é—´è¿›è¡ŒDMAä¼ è¾“.
 2. struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len, size_t period_len, enum dma_data_direction direction);
-ÓÃÓÚÒôÆµµÈ³¡¾°ÖĞ,½øĞĞÒ»¶¨³¤¶ÈµÄDMA ´«Êä.
+ç”¨äºéŸ³é¢‘ç­‰åœºæ™¯ä¸­,è¿›è¡Œä¸€å®šé•¿åº¦çš„DMA ä¼ è¾“.
 3. struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(struct dma_chan *chan, struct dma_interleaved_template *xt, unsigned long flags);
-****** Ìá½»²¢Æô¶¯
-1. Ìá½»ÃèÊö·û =dma_cookie_t dmaengine_submit(struct dma_async_tx_descriptor *desc)=
-·µ»ØÒ»¸öÎ¨Ò»Ê¶±ğ¸ÃÃèÊö·ûµÄ cookie,ÓÃÓÚºóĞøµÄ¸ú×ÙºÍ¼à¿Ø
-2. Æô¶¯´«Êä =void dma_async_issue_pending(struct dma_chan *chan)=
-****** µÈ´ı´«Êä½áÊø
-´«ÊäÇëÇó±»Ìá½»Ö®ºó,client driver ¿ÉÒÔÍ¨¹ı»Øµ÷º¯Êı»ñÈ¡´«ÊäÍê³ÉµÄÏûÏ¢,µ±È»Ò²¿ÉÒÔÍ¨¹ı =dma_async_is_tx_complete= µÈAPI,²âÊÔ´«ÊäÊÇ·ñÍê³É.\
-****** Í£Ö¹´«Êä
+
+*æ³¨æ„*: åœ¨zynq vdma é©±åŠ¨ä¸­, ä»…ä»…æä¾›äº† =dmaengine_prep_interleaved()= å‡½æ•°!
+****** æäº¤å¹¶å¯åŠ¨
+1. æäº¤æè¿°ç¬¦ =dma_cookie_t dmaengine_submit(struct dma_async_tx_descriptor *desc)=
+è¿”å›ä¸€ä¸ªå”¯ä¸€è¯†åˆ«è¯¥æè¿°ç¬¦çš„ cookie,ç”¨äºåç»­çš„è·Ÿè¸ªå’Œç›‘æ§
+2. å¯åŠ¨ä¼ è¾“ =void dma_async_issue_pending(struct dma_chan *chan)=
+****** ç­‰å¾…ä¼ è¾“ç»“æŸ
+ä¼ è¾“è¯·æ±‚è¢«æäº¤ä¹‹å,client driver å¯ä»¥é€šè¿‡å›è°ƒå‡½æ•°è·å–ä¼ è¾“å®Œæˆçš„æ¶ˆæ¯,å½“ç„¶ä¹Ÿå¯ä»¥é€šè¿‡ =dma_async_is_tx_complete= ç­‰API,æµ‹è¯•ä¼ è¾“æ˜¯å¦å®Œæˆ.\
+****** åœæ­¢ä¼ è¾“
 1. dmaengine_pause
 2. dmaengine_resume
 3. dmaengine_terminate_all
 
 
-
-***** provider ±àĞ´
-****** ÕûÌåÃèÊö
-DMA ¿ØÖÆÆ÷Çı¶¯ĞèÒª×öµÄÊÂÓĞ:
-1. ³éÏó²¢¿ØÖÆDMA¿ØÖÆÆ÷
-2. ¹ÜÀí DMA channel (¿ÉÒÔÊÇÎïÀíchannel,Ò²¿ÉÒÔÊÇĞéÄâchannel),²¢Ïòclient driver Ìá¹©ÓÑºÃ,Ò×ÓÃµÄ½Ó¿Ú.
-3. ÒÔ DMA channel Îª²Ù×÷¶ÔÏó,ÏìÓ¦ client driverµÄ´«ÊäÇëÇó,²¢¿ØÖÆDMA controllerÖ´ĞĞ´«Êä.
-Ö÷ÒªË¼Â·ÈçÏÂ:
+***** provider ç¼–å†™
+****** æ•´ä½“æè¿°
+DMA æ§åˆ¶å™¨é©±åŠ¨éœ€è¦åšçš„äº‹æœ‰:
+1. æŠ½è±¡å¹¶æ§åˆ¶DMAæ§åˆ¶å™¨
+2. ç®¡ç† DMA channel (å¯ä»¥æ˜¯ç‰©ç†channel,ä¹Ÿå¯ä»¥æ˜¯è™šæ‹Ÿchannel),å¹¶å‘client driver æä¾›å‹å¥½,æ˜“ç”¨çš„æ¥å£.
+3. ä»¥ DMA channel ä¸ºæ“ä½œå¯¹è±¡,å“åº” client driverçš„ä¼ è¾“è¯·æ±‚,å¹¶æ§åˆ¶DMA controlleræ‰§è¡Œä¼ è¾“.
+ä¸»è¦æ€è·¯å¦‚ä¸‹:
 [[./dma_engine.jpg]]
-1. Ê¹ÓÃ =struct dma_device= ³éÏó DMA controller, controller driver Ö»ÒªÌî³ä¸Ã½á¹¹ÖĞ±ØÒªµÄ×Ö¶Î,¾Í¿ÉÒÔÍê³ÉÇı¶¯¿ª·¢.
-2. Ê¹ÓÃ =struct dma_chan= ³éÏóÎïÀíµÄ DMA channel, ÎïÀíµÄchannel ºÍ controller ËùÄÜÌá¹©µÄÍ¨µÀÊıÒ»Ò»¶ÔÓ¦.
-3. »ùÓÚÎïÀíµÄ DMA channel ,Ê¹ÓÃ =struct virt_dma_cha= ³éÏó³öĞéÄâµÄ dma channel.¶à¸öĞéÄâchannel ¿ÉÒÔ¹²ÏíÒ»¸öÎïÀíchannel,²¢ÇÒÔÚÕâ¸öÎïÀíchannelÉÏ½øĞĞ·ÖÊ±´«Êä.
-4. »ùÓÚÕâĞ©Êı¾İ½á¹¹,Ìá¹©Ò»Ğ©±ãÓÚcontroller driver ¿ª·¢µÄAPI.
-****** Êı¾İ½á¹¹
-1. struct dma_device Ö÷ÒªÔªËØ
+1. ä½¿ç”¨ =struct dma_device= æŠ½è±¡ DMA controller, controller driver åªè¦å¡«å……è¯¥ç»“æ„ä¸­å¿…è¦çš„å­—æ®µ,å°±å¯ä»¥å®Œæˆé©±åŠ¨å¼€å‘.
+2. ä½¿ç”¨ =struct dma_chan= æŠ½è±¡ç‰©ç†çš„ DMA channel, ç‰©ç†çš„channel å’Œ controller æ‰€èƒ½æä¾›çš„é€šé“æ•°ä¸€ä¸€å¯¹åº”.
+3. åŸºäºç‰©ç†çš„ DMA channel ,ä½¿ç”¨ =struct virt_dma_cha= æŠ½è±¡å‡ºè™šæ‹Ÿçš„ dma channel.å¤šä¸ªè™šæ‹Ÿchannel å¯ä»¥å…±äº«ä¸€ä¸ªç‰©ç†channel,å¹¶ä¸”åœ¨è¿™ä¸ªç‰©ç†channelä¸Šè¿›è¡Œåˆ†æ—¶ä¼ è¾“.
+4. åŸºäºè¿™äº›æ•°æ®ç»“æ„,æä¾›ä¸€äº›ä¾¿äºcontroller driver å¼€å‘çš„API.
+****** æ•°æ®ç»“æ„
+1. struct dma_device ä¸»è¦å…ƒç´ 
 - channels 
-Á´±íÍ·, ÓÃÓÚ±£´æ¸Ã controller Ö§³ÖµÄËùÓĞ dma_channel(struct dma_chan). ÔÚ³õÊ¼»¯µÄÊ±ºò, dma controller driver Ê×ÏÈÒªµ÷ÓÃINIT_LIST_HEAD³õÊ¼»¯Ëü,
-È»ºóµ÷ÓÃ =list_add_tail= ½«ËùÓĞµÄchannel Ìí¼Óµ½¸ÃÁ´±íÍ·ÖĞ.
+é“¾è¡¨å¤´, ç”¨äºä¿å­˜è¯¥ controller æ”¯æŒçš„æ‰€æœ‰ dma_channel(struct dma_chan). åœ¨åˆå§‹åŒ–çš„æ—¶å€™, dma controller driver é¦–å…ˆè¦è°ƒç”¨INIT_LIST_HEADåˆå§‹åŒ–å®ƒ,
+ç„¶åè°ƒç”¨ =list_add_tail= å°†æ‰€æœ‰çš„channel æ·»åŠ åˆ°è¯¥é“¾è¡¨å¤´ä¸­.
 - cap_mask
-Ò»¸öbitmap, ÓÃÓÚÖ¸Ê¾¸Ãdma controller Ëù¾ß±¸µÄÄÜÁ¦(¿ÉÒÔ½øĞĞÊ²Ã´ÑùµÄDMA´«Êä)(¾ßÌå²Î¿¼ =enum dma_transaction_type= ¶¨Òå).
-¸ÃbitmapµÄ¶¨Òå,ĞèÒªºÍºóÃædevice_prep_dma_xxxĞÎÊ½µÄ»Øµ÷º¯Êı¶ÔÓ¦.
+ä¸€ä¸ªbitmap, ç”¨äºæŒ‡ç¤ºè¯¥dma controller æ‰€å…·å¤‡çš„èƒ½åŠ›(å¯ä»¥è¿›è¡Œä»€ä¹ˆæ ·çš„DMAä¼ è¾“)(å…·ä½“å‚è€ƒ =enum dma_transaction_type= å®šä¹‰).
+è¯¥bitmapçš„å®šä¹‰,éœ€è¦å’Œåé¢device_prep_dma_xxxå½¢å¼çš„å›è°ƒå‡½æ•°å¯¹åº”.
 - src_addr_widths
-Ò»¸öbitmap,±íÊ¾¸Ã controller Ö§³ÖÄÄĞ©¿í¶ÈµÄsrcÀàĞÍ.
+ä¸€ä¸ªbitmap,è¡¨ç¤ºè¯¥ controller æ”¯æŒå“ªäº›å®½åº¦çš„srcç±»å‹.
 - dst_addr_widths
-Ò»¸öbitmap,±íÊ¾¸Ã controller Ö§³ÖÄÄĞ©¿í¶ÈµÄdstÀàĞÍ.
+ä¸€ä¸ªbitmap,è¡¨ç¤ºè¯¥ controller æ”¯æŒå“ªäº›å®½åº¦çš„dstç±»å‹.
 - directions
-Ò»¸öbitmap,±íÊ¾¸ÃcontrollerÖ§³ÖÄÄĞ©´«Êä·½Ïò.
+ä¸€ä¸ªbitmap,è¡¨ç¤ºè¯¥controlleræ”¯æŒå“ªäº›ä¼ è¾“æ–¹å‘.
 - max_burst
-Ö§³ÖµÄÍ»·¢´«Êä´óĞ¡
+æ”¯æŒçš„çªå‘ä¼ è¾“å¤§å°
 - descriptor_reuse
-±íÊ¾¸Ã controller µÄ´«ÊäÃèÊö·ûÊÇ·ñ¿ÉÒÔÖØ¸´Ê¹ÓÃ
+è¡¨ç¤ºè¯¥ controller çš„ä¼ è¾“æè¿°ç¬¦æ˜¯å¦å¯ä»¥é‡å¤ä½¿ç”¨
 - device_alloc_chan_resources / device_free_chan_resources
-client driver ÉêÇë/ÊÍ·Å dma channelµÄÊ±ºò, dmaengine»áµ÷ÓÃ¶ÔÓ¦º¯Êı,ÒÔ×¼±¸ÏàÓ¦µÄ×ÊÔ´.
+client driver ç”³è¯·/é‡Šæ”¾ dma channelçš„æ—¶å€™, dmaengineä¼šè°ƒç”¨å¯¹åº”å‡½æ•°,ä»¥å‡†å¤‡ç›¸åº”çš„èµ„æº.
 - device_prep_dma_xxx 
-Óëclient driver µÄ dmaengine_perp_xxx API¶ÔÓ¦.
+ä¸client driver çš„ dmaengine_perp_xxx APIå¯¹åº”.
 - device_config
-Óëclient driver µÄ dmaengine_slave_config Ïà¶ÔÓ¦.
+ä¸client driver çš„ dmaengine_slave_config ç›¸å¯¹åº”.
 - device_pause/device_resume/ device_terminate_all.
-Óë client driver µÄÔİÍ£,Í£Ö¹º¯ÊıÏà¶ÔÓ¦.
+ä¸ client driver çš„æš‚åœ,åœæ­¢å‡½æ•°ç›¸å¯¹åº”.
 - device_issue_pending
-Óë client driver µÄ dma_async_issus_pending Ïà¶ÔÓ¦
-2. struct dma_chan Ö÷ÒªÔªËØ
-ÓÃÓÚ³éÏó dma channel .
+ä¸ client driver çš„ dma_async_issus_pending ç›¸å¯¹åº”
+2. struct dma_chan ä¸»è¦å…ƒç´ 
+ç”¨äºæŠ½è±¡ dma channel .
 - device 
-Ö¸Ïò dma controller
+æŒ‡å‘ dma controller
 - cookie
-client driver ÒÔ¸Ã channel Îª²Ù×÷¶ÔÏó»ñÈ¡´«ÊäÃèÊö·ûÊ±, dma controller driver ·µ»Ø¸ø client µÄ×îºóÒ»¸ö cookie
+client driver ä»¥è¯¥ channel ä¸ºæ“ä½œå¯¹è±¡è·å–ä¼ è¾“æè¿°ç¬¦æ—¶, dma controller driver è¿”å›ç»™ client çš„æœ€åä¸€ä¸ª cookie
 - completed_cookie
-ÔÚÕâ¸öchannel ÉÏ×îºóÒ»´ÎÍê³ÉµÄ´«ÊäµÄ cookie,dma controller driver ¿ÉÒÔÔÚ´«ÊäÍê³ÉÊ±µ÷ÓÃ¸¨Öúº¯Êı =dma_cookie_complete= ÉèÖÃËüµÄÖµ
+åœ¨è¿™ä¸ªchannel ä¸Šæœ€åä¸€æ¬¡å®Œæˆçš„ä¼ è¾“çš„ cookie,dma controller driver å¯ä»¥åœ¨ä¼ è¾“å®Œæˆæ—¶è°ƒç”¨è¾…åŠ©å‡½æ•° =dma_cookie_complete= è®¾ç½®å®ƒçš„å€¼
 - device_node
-Á´±íµÄnode, ÓÃÓÚ½«¸Ãchannel Ìí¼Óµ½ dma_deviceµÄ channel ÁĞ±íÖĞ.
+é“¾è¡¨çš„node, ç”¨äºå°†è¯¥channel æ·»åŠ åˆ° dma_deviceçš„ channel åˆ—è¡¨ä¸­.
 3. struct virt_dma_cha 
-ÓÃÓÚ³éÏóÒ»¸öĞéÄâµÄ dma channel ,¶à¸öĞéÄâchannel¿ÉÒÔ¹²ÓÃÒ»¸öÎïÀíchannel,²¢ÓÉÈí¼şµ÷¶È¶à¸ö´«ÊäÇëÇó, ½«¶à¸öĞéÄâchannel µÄ´«Êä´®ĞĞµØÔÚÎïÀíchannelÉÏÍê³É.
+ç”¨äºæŠ½è±¡ä¸€ä¸ªè™šæ‹Ÿçš„ dma channel ,å¤šä¸ªè™šæ‹Ÿchannelå¯ä»¥å…±ç”¨ä¸€ä¸ªç‰©ç†channel,å¹¶ç”±è½¯ä»¶è°ƒåº¦å¤šä¸ªä¼ è¾“è¯·æ±‚, å°†å¤šä¸ªè™šæ‹Ÿchannel çš„ä¼ è¾“ä¸²è¡Œåœ°åœ¨ç‰©ç†channelä¸Šå®Œæˆ.
 - chan
-Ò»¸ö struct dma_chan ÀàĞÍ, ÓÃÓÚºÍclient driver ´ò½»µÀ.(ÆÁ±ÎÎïÀíchannel ºÍ ĞéÄâchannelµÄ²îÒì).
+ä¸€ä¸ª struct dma_chan ç±»å‹, ç”¨äºå’Œclient driver æ‰“äº¤é“.(å±è”½ç‰©ç†channel å’Œ è™šæ‹Ÿchannelçš„å·®å¼‚).
 - task
-Ò»¸ö tasklet, ÓÃÓÚµÈ´ı¸ÃĞéÄâ channel ÉÏ´«ÊäµÄÍê³É.
+ä¸€ä¸ª tasklet, ç”¨äºç­‰å¾…è¯¥è™šæ‹Ÿ channel ä¸Šä¼ è¾“çš„å®Œæˆ.
 - desc_allocated, desc_submitted, desc_issued, desc_completed,
-ÓÃÓÚ±£´æ²»Í¬×´Ì¬µÄĞéÄâ channel ÃèÊö·û.
+ç”¨äºä¿å­˜ä¸åŒçŠ¶æ€çš„è™šæ‹Ÿ channel æè¿°ç¬¦.
 
 
 
 
 
-****** Ê¹ÓÃº¯Êı
-1. ×¢²áºÍ×¢Ïú
+****** ä½¿ç”¨å‡½æ•°
+1. æ³¨å†Œå’Œæ³¨é”€
 =int dma_async_device_register(struct dma_device *device);=
 =void dma_async_device_unregister(struct dma_device *device);=
-2. cookieÓĞ¹ØµÄ¸¨Öú½Ó¿Ú
+2. cookieæœ‰å…³çš„è¾…åŠ©æ¥å£
 =static inline void dma_cookie_init(struct dma_chan *chan)=
 =static inline dma_cookie_assign(struct dma_async_tx_descriptor *tx)=
 =static inline void dma_cookie_complete(struct dma_async_tx_descriptor *tx)=
 =static inline enum dma_status dma_cookie_status(struct dma_chan *chan, dma_cookie_t cookie, struct dma_tx_state *state)=
-3, ÒÀÀµ´¦Àí½Ó¿Ú
+3, ä¾èµ–å¤„ç†æ¥å£
 =void dma_run_dependencies(struct dma_async_tx_descriptor *tx);=
-client¿ÉÒÔÍ¬Ê±Ìá½»¶à¸ö¾ßÓĞÒÀÀµ¹ØÏµµÄdma´«Êä,Òò´Ëµ±Ä³¸ö´«Êä½áÊøµÄÊ±ºò, dma controller driver ĞèÒª¼ì²éÊÇ·ñÓÉÒÀÀµ¸Ã´«ÊäµÄ´«Êä,
-4. Éè±¸Ê÷½Ó¿Ú
+clientå¯ä»¥åŒæ—¶æäº¤å¤šä¸ªå…·æœ‰ä¾èµ–å…³ç³»çš„dmaä¼ è¾“,å› æ­¤å½“æŸä¸ªä¼ è¾“ç»“æŸçš„æ—¶å€™, dma controller driver éœ€è¦æ£€æŸ¥æ˜¯å¦ç”±ä¾èµ–è¯¥ä¼ è¾“çš„ä¼ è¾“,
+4. è®¾å¤‡æ ‘æ¥å£
 =struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec, struct of_dma *ofdma);=
 =struct dma_chan *of_dma_xlate_by_chan_id(struct of_phandle_args *dma_spec, struct of_dma *ofdma)=
-ÓÃÓÚ½«client device node ÖĞÓĞ¹ØµÄdmaµÄ×Ö¶Î½âÎö³öÀ´, ²¢»ñÈ¡¶ÔÓ¦µÄ dma channel.
+ç”¨äºå°†client device node ä¸­æœ‰å…³çš„dmaçš„å­—æ®µè§£æå‡ºæ¥, å¹¶è·å–å¯¹åº”çš„ dma channel.
 
-****** ±àĞ´ dma controller driver µÄ²½Öè
-1. ¶¨Òå struct dma_device ±äÁ¿,²¢³õÊ¼»¯
-2. ¸ù¾İ controller Ö§³ÖµÄ channel ¸öÊı,ÎªÃ¿¸öchannel ¶¨ÒåÒ»¸ö struct dma_chan ±äÁ¿,½øĞĞ±ØÒªµÄ³õÊ¼»¯ºó,½«Ã¿¸öchannel¶¼Ìí¼ÓµÀ struct dma_device±äÁ¿µÄchannelsÁ´±íÖĞ.
-3, ¸ù¾İÓ²¼şÌØĞÔ,ÊµÏÖ struct dma_device ±äÁ¿ÖĞ±ØÒªµÄ»Øµ÷º¯Êı
-4. µ÷ÓÃ dma_async_device_register ½« struct dma_device ±äÁ¿×¢²áµ½ kernel ÖĞ
-5. µ± client driver ÉêÇë dma channel Ê±,dmaengine core »áµ÷ÓÃ dma controller driver µÄ device_alloc_chan_resourcesº¯Êı,controller driver ĞèÒªÔÚÕâ¸ö½Ó¿ÚÖĞ½«¸Ãchannel ×ÊÔ´×¼±¸ºÅ.
-6. µ±client driverÅäÖÃÄ³¸ö dma channel Ê±, dmaengine core»áµ÷ÓÃ dma controller driver µÄdevice_configº¯Êı,controller driver ĞèÒªÔÚÕâ¸öº¯Êı½«¶ÔÓ¦ÅäÖÃÓ¦ÓÃºÃ
-7. client driver ¿ªÊ¼Ò»¸ö´«ÊäÖ®Ç°,»á°Ñ´«ÊäµÄĞÅÏ¢Í¨¹ı dmaengine_prep_slave_xxx½Ó¿Ú½»¸øcontroller driver,controller driver ĞèÒªÔÚ¶ÔÓ¦µÄdevice_prep_dma_xx»Øµ÷ÖĞ×¼±¸ºÃ, ²¢·µ»Ø¸øclient driver Ò»¸öÃèÊö·û
-8. È»ºóclient driver »áµ÷ÓÃ dmaengine_submit ½«¸Ã´«ÊäÌá½»¸ø controller driver,´ËÊ± dmaengine »áµ÷ÓÃcontroller driver ÎªÃ¿¸ö´«ÊäÃèÊö·ûËùÌá¹©µÄ tx_submit»Øµ÷º¯Êı,controller driver ĞèÒªÔÚÕâ¸öº¯ÊıÖĞ½«ÃèÊö·û¹Òµ½¸Ãchannel¶ÔÓ¦µÄ´«Êä¶ÓÁĞÖĞ
-9. client driver ¿ªÊ¼´«ÊäÊ±, »áµ÷ÓÃ dma_async_issue_pending, controller driver ĞèÒªÔÚ¶ÔÓ¦µÄ»Øµ÷º¯Êı(device_issue_pending)ÖĞ,ÒÀ´Î½«¶ÓÁĞÉÏËùÓĞµÄ´«ÊäÇëÇóÌá½»¸øÓ²¼ş.
+****** ç¼–å†™ dma controller driver çš„æ­¥éª¤
+1. å®šä¹‰ struct dma_device å˜é‡,å¹¶åˆå§‹åŒ–
+2. æ ¹æ® controller æ”¯æŒçš„ channel ä¸ªæ•°,ä¸ºæ¯ä¸ªchannel å®šä¹‰ä¸€ä¸ª struct dma_chan å˜é‡,è¿›è¡Œå¿…è¦çš„åˆå§‹åŒ–å,å°†æ¯ä¸ªchanneléƒ½æ·»åŠ é“ struct dma_deviceå˜é‡çš„channelsé“¾è¡¨ä¸­.
+3, æ ¹æ®ç¡¬ä»¶ç‰¹æ€§,å®ç° struct dma_device å˜é‡ä¸­å¿…è¦çš„å›è°ƒå‡½æ•°
+4. è°ƒç”¨ dma_async_device_register å°† struct dma_device å˜é‡æ³¨å†Œåˆ° kernel ä¸­
+5. å½“ client driver ç”³è¯· dma channel æ—¶,dmaengine core ä¼šè°ƒç”¨ dma controller driver çš„ device_alloc_chan_resourceså‡½æ•°,controller driver éœ€è¦åœ¨è¿™ä¸ªæ¥å£ä¸­å°†è¯¥channel èµ„æºå‡†å¤‡å·.
+6. å½“client driveré…ç½®æŸä¸ª dma channel æ—¶, dmaengine coreä¼šè°ƒç”¨ dma controller driver çš„device_configå‡½æ•°,controller driver éœ€è¦åœ¨è¿™ä¸ªå‡½æ•°å°†å¯¹åº”é…ç½®åº”ç”¨å¥½
+7. client driver å¼€å§‹ä¸€ä¸ªä¼ è¾“ä¹‹å‰,ä¼šæŠŠä¼ è¾“çš„ä¿¡æ¯é€šè¿‡ dmaengine_prep_slave_xxxæ¥å£äº¤ç»™controller driver,controller driver éœ€è¦åœ¨å¯¹åº”çš„device_prep_dma_xxå›è°ƒä¸­å‡†å¤‡å¥½, å¹¶è¿”å›ç»™client driver ä¸€ä¸ªæè¿°ç¬¦
+8. ç„¶åclient driver ä¼šè°ƒç”¨ dmaengine_submit å°†è¯¥ä¼ è¾“æäº¤ç»™ controller driver,æ­¤æ—¶ dmaengine ä¼šè°ƒç”¨controller driver ä¸ºæ¯ä¸ªä¼ è¾“æè¿°ç¬¦æ‰€æä¾›çš„ tx_submitå›è°ƒå‡½æ•°,controller driver éœ€è¦åœ¨è¿™ä¸ªå‡½æ•°ä¸­å°†æè¿°ç¬¦æŒ‚åˆ°è¯¥channelå¯¹åº”çš„ä¼ è¾“é˜Ÿåˆ—ä¸­
+9. client driver å¼€å§‹ä¼ è¾“æ—¶, ä¼šè°ƒç”¨ dma_async_issue_pending, controller driver éœ€è¦åœ¨å¯¹åº”çš„å›è°ƒå‡½æ•°(device_issue_pending)ä¸­,ä¾æ¬¡å°†é˜Ÿåˆ—ä¸Šæ‰€æœ‰çš„ä¼ è¾“è¯·æ±‚æäº¤ç»™ç¡¬ä»¶.

@@ -1198,3 +1198,71 @@
 - vi. 形成一串
 - vt. 使...成一串
 - 第三人称单数 bunches 过去式/过去分词 bunched 现在分词 bunching
+** <2017-09-06 Wed>
+*** exclude
+- vt. 排除;排斥;拒绝接纳
+- 过去式/过去分词 excluded 现在分词 excluding
+1. receiver exclude. 排除接受
+*** triple
+- adj. 三倍的;
+- n. 三倍数;三个一组
+- vi. 增至三倍
+- vt. 使成三倍
+- 过去式/过去分词 tripled 现在分词 tripling
+1. triple jump. 三级跳
+*** poky
+- adj. 狭小的;衣服破旧的;无生气的
+- 比较级 pokier 最高级 pokiest
+*** inception
+- n. 起初;获得学位
+- n. <<盗梦空间>>
+1. inception beginning. 起初
+*** material
+- adj. 重要的;物质的;实质性的;肉体的
+- n. 材料;物资;布料
+1. reference material. 参考材料
+*** reside
+- vi. 居住;属于
+1. teleanchor reside. 实况转播
+*** exhaustive
+- adj. 详尽的;彻底的;消耗的
+1. exhaustive search. 穷举搜索.
+*** toaster
+- n. 烤面包机;
+1. scan toaster. 爱心早餐
+*** ancillary
+- adj. 辅助的;副的;从属的
+- n. 助手;附件
+- 复数 ancillaries
+1. ancillaries building. 辅助建筑.
+*** strict
+- adj. 严格的;绝对的;精确的;详细的
+- 比较级 stricter 最高级 strictest
+1. strict control. 严格控制
+*** artifacts
+- n. 史前古器物;人工产品
+** <2017-09-07 Thu>
+*** reasonably
+- adv. 合理地;相当的;适度的
+1. more reasonably. 更加合理
+*** certain
+- adj. 某一;必然的;确信;无疑的;有把握的
+- 比较级 more certain 最高级 most certain
+1. certain death. 无可避免的死亡
+*** exact
+- adj. 准确的;精密的;精确的
+- vt. 要求;强求;急需
+- vi. 勒索钱财
+- 比较级 more exact 最高级 exactest 或 most exact 
+*** involve
+- vt. 包含;牵涉;使陷于;潜心于
+- 过去式/分词 involved 现在分词 involving
+1. involve deeply. 深深卷入;使全神关注.
+*** scheme
+- n. 计划;组合;体制;诡计
+- vi. 搞阴谋;拟订计划
+- vt. 计划;策划
+- 过去式/分词 schemed 现在分词 scheming
+1. working scheme. 工作计划
+*** transcript
+- n. 成绩单;抄本;文字记录

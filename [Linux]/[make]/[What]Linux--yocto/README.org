@@ -1,7 +1,8 @@
 * [What]yocto --> base
 参考链接:[[www.yoctoproject.org/docs/2.3.1/mega-manual/mega-manual.html][yocto参考手册]]
 
-** 1. Yocto 开发环境介绍
+** 快速准备与体验操作
+*** 1. Yocto 开发环境介绍
 yocto 提供了可以开发以及仿真ARM,MIPS,PowerPC,X86平台的开发环境, 并且可以完成Linux的
 全栈仿真应用.
 
@@ -13,7 +14,7 @@ yocto具有如下特征:
 - 基于分层式设计, 可以很好的开发和扩展
 
 最终yocto可以生成镜像文件以在实际硬件平台上设置.
-** 2. 准备工作
+*** 2. 准备工作
 为了能够保证yocto正常运行, 需要准备如下的运行环境:
 *** 2.1 linux主机
 目前支持的主机有 Ubuntu,Fedora,openSUSE,CentOS,Debian.
@@ -35,7 +36,7 @@ xz-utils debianutils iputils-ping libsdl1.2-dev xterm
 git clone git://git.yoctoproject.org/poky
 git checkout pyro
 #+end_example
-** 3.编译镜像文件
+*** 3.编译镜像文件
 *** 3.1 编译仿真环境
 **** 基本配置
 #+begin_example
@@ -93,3 +94,18 @@ bitbake core-image-base
 #TARGET_DEVICE 代表在硬件板上启动文件存放的位置, 比如 /dec/mmcblk0
 sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic of=TARGET_DEVICE
 #+end_example
+** 详细说明
+*** 1. 准备工作
+**** 1.1 克隆代码库
+在完成了快速准备后, yocto 已经下载了 yocto-source 的 git 库在 =downloads= 文件夹中, 我们需要把它 clone 出来.
+#+begin_example
+#clone linux代码
+git clone ./build/downloads/git2/git.yoctoproject.org.linux-yocto-4.10.git linux-kernel
+#clone metadata extras
+git clone git://git.yoctoproject.org/meta-yocto-kernel-extras meta-yocto-kernel-extras 
+#clone bsp 
+git clone git://git.yoctoproject.org/meta-intel.git
+#+end_example
+*** 2. 概念
+
+
