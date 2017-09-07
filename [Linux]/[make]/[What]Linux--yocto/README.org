@@ -59,9 +59,14 @@ INHERIT += "rm_work"
 
 **** 开始编译
 首次编译需要一定的时间, 因为需要首次下载文件.
+
+*注意:* 首次编译及下载会消耗很多CPU和内存, 所以最好将UI界面退出, 进入命令行界面.否则容易导致 *ubuntu自动重启*.
+
+编译完成后, 下载的文件位于 =build/download= 文件夹下, 可以将其存储于网盘中.
 #+begin_example
 bitbake core-image-sato
 #+end_example
+
 **** 开始仿真
 使用 =Ctrl -C= 退出仿真环境.
 #+begin_example
