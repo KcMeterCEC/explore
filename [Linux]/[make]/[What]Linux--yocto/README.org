@@ -111,6 +111,37 @@ git clone git://git.yoctoproject.org/meta-yocto-kernel-extras meta-yocto-kernel-
 #clone bsp 
 git clone git://git.yoctoproject.org/meta-intel.git
 #+end_example
+**** 1.2 bmap-tools
+=bmap-tools= 工具用于将镜像文件烧写到引导介质(比如 sdcard).
+
+使用之前使用以下命令编译此工具:
+#+begin_example
+bitbake bmap-tools-native 
+#或者也可以简单粗暴
+sudo apt install bmap-tools
+#+end_example
+***** 示例:将 WIC 文件烧写至 flash
+- 增加配置信息到文件 =local.conf=
+#+begin_example
+IMAGE_FSTYPES += "wic wic.bmap"
+#+end_example
+- 编译对应的镜像文件
+#+begin_example
+bitbake image
+#+end_example
+- 烧写
+#+begin_example
+#如果对介质具有写权限, 则使用以下命令
+oe-run-native bmaptool copy ./tmp/deploy/images/qemux86-64/core-image-minimal-machine.wic /dev/sdx
+#如果没有写权限则使用如下命令
+sudo bash 
+PATH=tmp/sysroots/x86_64-linux/usr/bin bmaptool copy ./tmp/deploy/images/qemux86-64/core-image-minimal-machine.wic /dev/sdx
+#+end_example
+- 寻求帮助
+#+begin_example
+bmaptool --help
+oe-run-native bmaptool --help
+#+end_example
 *** 2. 概念
 
 
