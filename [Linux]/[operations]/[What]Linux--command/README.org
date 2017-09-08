@@ -58,7 +58,31 @@ du -h file
 du -sh
 #+end_example
 
+*** 搜寻文件
+**** find <opt> <par>
+#+begin_example
+#列出当前目录下的所有文件和文件夹
+find .
+#在某个目录下查找文件(将 name 换为 iname 为忽略大小写)
+find /home/cec -name "*.txt" #查找以 txt 结尾的文件
+#查找某几个文件
+find /home/cec -name "*.txt" -o -name "*.html"
+#排除文件
+find /home/cec ! -name "*.txt"
+#+end_example
 
+*** 搜寻字符串
+**** grep
+#+begin_example
+#搜寻文件包含的字符串
+grep "string" file_name
+#多个文件中搜寻字符串
+grep "string" file1 fiel2 ...
+#搜寻除 string 之外的字符串
+grep -v "string" file_name 
+#递归搜索字符串
+grep "text" . -r -n
+#+end_example
 ** 网络命令
 *** 文件下载
 **** 快速文件下载器 --> axel [url]

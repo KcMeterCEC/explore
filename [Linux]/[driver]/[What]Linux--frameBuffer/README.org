@@ -250,5 +250,47 @@ struct fb_info{
 
 *注意*:此部分仅仅是对显示缓存的操作, 而对于具体缓存应该如何作用于LCD,
  则需要编写LCD驱动.
+**** 对于zynq
+zynq 的显示需要动用 VDMA以及VTC来产生合适的时序.
+- vtc
+vtc 中需要对应增加相应的设备树节点. 然后使用函数 =struct vtc_device
+*xvtc_of_get(struct device_node *np)= 来获取对应已经申请好的设备.
+
+然后通过函数 =int xvtc_generator_start(struct xvtc_device *xvtc, const struct xvtc_config *config)= 来配置并启动.
+
+对于结构体 =xvtc_config= 需要说明一下:
+#+BEGIN_SRC c
+/**
+ ,* @brief vtc 时序配置结构体
+ ,*
+ ,* @para hblank_start: generated horizontal active frame size. the width of the frame without blanking in number of pixels/clocks(xres)
+ ,*
+ ,* @para hsync_start :generated horizontal sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(xres + 最右回扫)
+
+ ,*
+ ,* @para hsync_end: generated horizontal sync end end cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(xres + 最右回扫 + 最左回扫)
+
+ ,*
+ ,* @para hsize  : 物理一行的所有像素点(xres + 回扫 + 同步)
+ ,*
+ ,* @para vblank_start : generated vertical acrive frame size.the height of the frame without blanking in number of lines(yres)
+ ,*
+ ,* @para vsync_start : generated vertical sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(yres + 最下回扫)
+ ,*
+ ,* @para vsync_end :generated vertical sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(yres + 回扫)
+
+ ,* @para vsize : 物理一列的像素点(yres + 回扫 + 同步)
+ ,*/
+struct xvtc_config{
+        unsigned int hblank_start;
+        unsigned int hsync_start;
+        unsigned int hsync_end;
+        unsigned int hsize;
+        unsigned int vblank_start;
+        unsigned int vsync_start;
+        unsigned int vsync_end;
+        unsigned int vsize;
+};
+#+END_SRC
 
 [[https://github.com/KcMeterCEC/linux_exercise/tree/master/device_framebuffer][参考代码]]
