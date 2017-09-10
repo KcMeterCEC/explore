@@ -6,7 +6,7 @@ commom clock framework 是用来管理系统 clock 资源的子系统, 根据职
 2. 实现 clock 控制的通用逻辑, 这部分与硬件无关
 3. 将和硬件相关的 clock 控制逻辑封装成操作函数集, 交由底层的 platform 开发者实现, 由通用逻辑调用.
 
-很多芯片都具有时钟树,以满足不同设备的运行速度需求.参考熟悉 STM32 的系统时钟树可以发现,其组成部分有:
+很多芯片都具有时钟树,以满足不同设备的运行速度需求.参考熟悉的 STM32 的系统时钟树可以发现,其组成部分有:
 - 外部晶体振荡器
 - PLL
 - 多路选择器
@@ -18,4 +18,539 @@ common clock framework 的管理对象就是这些可以调节的各个部分, �
 - 设置时钟频率
 - 设置时钟树的连接关系
 
-*** 通用API
+*** driver 使用通用API(clock consumer)
+通用API位于 =include/linux/clk.h= 中.
+
+**** 使用顺序
+具体的时钟设备是通过设备树来表示的, 而clock框架通过读取当前设备接点的时钟描述, 而得到对应的具体时钟驱动.
+
+对于使用者来说, 仅仅需要通过在设备节点添加时钟, 然后调用clock API即可, 不用关心内部的实现.
+
+一般来说, 在设备树中会有先列出的整个系统时钟名称, 其他节点引用此名称即可:
+#+begin_example
+slcr: slcr@f8000000 {
+  #address-cells = <1>;
+  #size-cells = <1>;
+  compatible = "xlnx, zynq-slcr", "syscon";
+  reg = <0xf8000000 0x1000>;
+  ranges;
+  clkc: clkc:@100{
+    #clock-cells = <1>;
+    compatible = "xlnx, ps7-clkc";
+    ps-clk-frequency = <33333333>;
+    fclk-enable = <0>;
+                                         //  0            1            2           3
+    clocl-output-names = "armpll", "ddrpll", "iopll", "cpu_6or4x",
+                          //    4                 5           6             7            8
+                          "cpu_3or2x","cpu_2x","cpu_1x","ddr2x","ddr3x",
+                          //9       10       11     12           13       14
+                          "dci","lqspi","smc","pcap","gem0","gem1",
+                          //15      16         17      18        19       20
+                          "fclk0","fclk1","fclk2","fclk3","can0","can1",
+                          //21        22         23        24        25      26
+                          "sdio0","sdio1","uart0","uart1","spi0","spi1",
+                          //27            28               29               30
+                          "dma","usb0_aper","usb1_aper","gem0_aper",
+                          //31                        32                33
+                          "gem1_aper","sdio0_aper","sdio1_aper",
+                          //34                   35             36                37
+                          "spi0_aper","spi1_aper","can0_aper","can1_aper",
+                          //38                  39                 40               41
+                          "i2c0_aper","i2c1_aper","uart0_aper","uart1_aper",
+                          //  42                  43                  44           45
+                          "gpio_aper","lqspi_aper","smc_aper","swdt",
+                          //46               47
+                          "dbg_trc","dbg_apb";
+     reg = <0x100 0x100>;
+  };
+};
+
+sdhci0: sdhc@e0100000{
+  compatible = "arasan, sdhi-8.9a";
+  status = "disabled";
+  clock-names = "clk_xin", "clk_ahb";
+  clocks = <&clkc 21>, <&clkc 32>;
+  interrupt-parent = <&intc>;
+  interrupts = <0 24 4>;
+  reg = <0xe0100000 0x1000>;
+};
+#+end_example
+
+**** API
+***** 获取 strucl clk 
+每个时钟对象都由一个 =struct clk= 结构体来表示, 这些结构体通过链表挂接在一起, 所以在操作时钟前, 首先需要获取时钟.
+#+BEGIN_SRC c
+/**
+ ,* @brief 以 device 指针或 id 字符串(可以看作name)为参数, 查找clock
+ ,* @note dev 和 id 任意一个可以为空, 如果 id 为空,则必须要有 device tree 支持.
+ ,* id 可以是一个简单的名称, 也可以是一个预先定义的, 唯一标识(在平台提供的头文件中定义, 如 mach/clk.h);
+ ,* @warning 不能在中断上下文中调用
+ ,*/
+struct clk *clk_get(struct device *dev, const char *id);
+/**
+ ,* @note 与get的反操作, 和 get 成对使用
+ ,*/
+void clk_put(struct clk *clk);
+/**
+ ,* @note 相比 clk_get ,此函数可以自动释放
+ ,*/
+struct clk *devm_clk_get(struct device *dev, const char *id);
+void devm_put(struct device *dev, struct clk *clk);
+/**
+ ,* @note 相比 clk_get , 使用设备名称代替 device 结构
+ ,*/
+struct clk *clk_get_sys(const char *dev_id, const char *con_id);
+/**
+ ,* @note 直接从对应的设备树节点中获取 clk
+ ,*/
+struct clk *of_clk_get(struct device_node *np, int index);
+struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);
+
+#+END_SRC
+***** 控制 clock
+#+BEGIN_SRC c
+/**
+ ,*@note 启动和停止 clock 前的准备及善后工作, 可能会引起睡眠(等待PLL稳定的时间)
+ ,* @warning 不能在中断处理中调用
+ ,*/
+int clk_prepare(struct clk *clk);
+void clk_upprepare(struct clk *clk);
+
+/**
+ ,* @note 启动及停止clock,不会引起睡眠
+ ,*/
+static inline int clk_enable(struct clk *clk);
+static inline void clk_disable(struct clk *clk);
+
+/**
+ ,* @note 此函数失上面4个函数的组合顺序为 prepare -> enable -> disable -> unprepared
+ ,*/
+static inline int clk_prepare_enable(struct clk *lck);
+static inline void clk_disable_upprepare(struct clk *clk);
+/**
+ ,* @note clock 频率的的获取和设置.
+ ,* @warning 为了确保设置成功, 需要先调用 clk_round_rate 获取理想设置值的实际设置值
+ ,*/
+static inline unsigned long clk_get_rate(struct clk *clk);
+static inline int clk_set_rate(struct clk *clk, unsigned long rate);
+static inline long clk_round_rate(struct clk *clk, unsigned long rate);
+
+/**
+ ,* @note 获取和选择父时钟,形成时钟树
+ ,*/
+static inline int clk_set_parent(struct clk *clk, struct clk *parent);
+static inline struct clk *clk_get_parent(struct clk *clk);
+
+#+END_SRC
+***** 其他接口
+#+BEGIN_SRC c
+/**
+ ,* @note 用于注册和注销 clock rate 时, 通知其他驱动.
+ ,*/
+int clk_notifier_register(struct clk *clk, struct notifer_block *nb);
+int clk_notifier_unregister(struct clk *clk, struct notifer_block *nb);
+
+/**
+ ,* @brief 给 clk 起别名
+ ,*/
+int clk_add_alias(const char *alias, const char *alias_dev_name, char *id, struct device *dev);
+#+END_SRC
+**** 使用详解
+***** 在 device tree 中设置需要使用的 clock
+#+begin_example
+/**
+ ,* @note 此设备使用两个 clock, baud 取自 osc 的 1号通道, register 取自 ref 的 0号通道.
+ ,*/
+device{
+    clocks = <&osc 1>, <&ref 0>;
+    clock-names = "baud", "register";
+};
+#+end_example
+***** 系统解析
+系统启动后, device tree 代码会解析 clock 有关的关键字, 并将解析后的信息放在 platform_device 相关的字段中.
+***** driver 使用
+具体的driver可以在probe的时候, 以clock的名称为参数, 调用 clk_get 接口, 获取clock的对象, 然后使用此对象为参数使用上述函数.
+#+BEGIN_SRC c
+int xxx_probe(struct platform_device *pdev)
+{
+        struct clk *baud_clk;
+        int ret;
+
+        baud_clk = devm_clk_get(&pdev->dev, "baud");
+        if(IS_ERR(baud_clk))
+        {
+                ....
+        }
+        ret = clk_prepare_enable(baud_clk);
+        if(ret)
+        {
+                ...
+        }
+}
+#+END_SRC
+*** 编写 clock 通用逻辑(clock provider)
+**** 设备树
+provider 的设备树有两种写法:
+1. 将系统所有的clock抽象为一个虚拟的设备, 用一个节点表示, 称为 =clock controller=.
+#+begin_example
+clock:clock-controller@0x10030000{
+    compatible = "samsung,exynos4210-clock";
+    reg = <0x10030000 0x20000>;
+    #clock-cells = <1>;
+};
+
+mct@10050000{
+    compatible = "samsung, exynos4210-mct";
+    ....
+    /**
+    ,* @note clk_get 方法读取 clocks 属性来得到对应的 struct clk 指针
+    ,* 当 provider 的 #clock-cells 为0时, 只需要提供一个 clock provider name(称为 phandle);
+    ,* 为 1时, 则还需要额外提供一个序好. 可以在头文件中 define 这些序号, 比数字更加易懂.
+    ,* clock-names 是为 clocks 中指定的两个时钟设置名称, 这样 clk_get 就可以直接使用此名称.
+    ,*/
+    clocks = <&clock 3>, <&clock 334>;
+    clock-names = "fin_pll", "mct";
+#+end_example
+2. 将每个clock都分别表示一个节点, 而每一个节点即是 provider 也是 consumer（因为需要连接）
+#+begin_example
+clocks{
+    #address-cells = <1>;
+    #size-cells = <1>;
+    ranges;
+    dummy:dummy{
+        #clock-cells = <0>;
+        compatible = "fixed-clock";
+        clock-frequency = <0>;
+    };
+    //root clock
+    osc24M: osc24M@01c2005{
+            #clock-cells = <0>;
+            compatible = "allwinner, sun4i-soc-clk";
+            reg = <0x01c20050 0x4>;
+            clock-frequency = <24000000>;
+    };
+    //root clock
+    osc32k:osc32k{
+        #clock-cells = <0>;
+        compatible = "fixed-clock";
+        clock-frequency = <32768>;
+    };
+    pll1:pll1@01c20000{
+        #clock-cells = <0>;
+        compatible = "allwinner,sun4i-pll1-clk";
+        reg = <0x01c20000 0x4>;
+        clock2 = <&osc24M>;
+    };
+    cpu: cpu@01c20054{
+         #clock-cells = <0>;
+         compatible = "allwinner, sun4i-cpu-clk";
+         reg = <0x01c20054 0x04>;
+         clocks = <&osc32k>, <&osc24M>,<&pll1>,<&dummy>;
+    };
+    ahb_gates:ahb_gates@01c20060{
+        #clock-cells = <1>;
+        compatible = "allwinner,sun4i-ahb-gates-clk";
+        reg = <0x01c20060 0x08>;
+        clocks = <&ahb>;
+        /**
+        ,* @warning: clock-output-names 关键字只是为了方便 clock privider 编程方便, consumer 不可见
+        ,*/
+        clock-output-names = "ahb_usb0", "ahb_ehci0",
+        "ahb_ohci0", "ahb_ehi1"......
+    };
+};
+#+end_example
+**** API 
+位于 =include/linux/clk_provider.h=
+***** struct clk_hw
+framework 提供了 struct clk_hw 结构, 用于从 clock　provider 的角度, 描述clock :
+#+BEGIN_SRC c
+struct clk_hw{
+        struct clk　*clk;
+        /// 用于描述一个 clock 的静态数据
+        const struct clk_init_data *init;
+};
+/**
+ ,* @param name: clock 的名称
+ ,* @param ops: 该clock 的操作函数集
+ ,* @param parent_names: 该clock所有的parent clock 的名称, 这是一个字符串数组
+ ,* @param num_parents: parent 个数
+ ,* @param flags : framework 级别的 flags
+ ,*/
+struct clk_init_data{
+        const char  *name;
+        const struct clk_ops *ops;
+        const char **parent_names;
+        u8   num_parents;
+        unsigned long flags;
+};
+/**
+ ,* @brief framework flags 可以使用或的关系
+ ,*
+ ,*/
+#define CLK_SET_RATE_GATE                           BIT(0) ///在改变该 clock 的 rate时, 必须关闭
+#define CLK_SET_PARENT_GATE                      BIT(1) /// 在改变该 clock 的 parent 时, 必须关闭
+#define CLK_SET_RATE_PARENT                      BIT(2) /// 改变该 clock 的rate时, 要将改变传递到上层 parent
+#define CLK_IGNORE_UNUSED                       BIT(3) /// 忽略 disable unused 的调用
+#define CLK_IS_ROOT                                      BIT(4) /// 该clcok 为 root clock, 没有parent
+#define CLK_IS_BASIC                                      BIT(5) /// 不再使用
+#define CLK_GET_RATE_NOCAHE                    BIT(6) /// get rate 时, 不要从缓存中拿, 而是重新计算
+
+struct clk_ops{
+        int                (*prepare)(struct clk_hw *hw);
+        void             (*unprepare)(struct clk_hw *hw);
+        int                (*is_prepared)(struct clk_hw *hw);
+        void             (*unprepare_unused)(struct clk_hw *hw);
+        int                (*enable)(struct clk_hw *hw);
+        void             (*disable)(struct clk_hw *hw);
+        int                (*is_enabled)(struct clk_hw *hw);
+        void             (*disable_unused)(struct clk_hw *hw);
+        unsigned long   (*recalc_rate)(struct clk_hw *hw, unsigned long parent_rate);
+        long                (*round_rate)(struct clk_hw *hw, unsigned long, unsigned long *);
+        int                   (*set_parent)(struct clk_hw *hw, u8 index);
+        u8                   (*get_parent)(struct clk_hw *hw);
+        int                  (*set_rate)(struct clk_hw *hw, unsigned long, unsigned long);
+        void                (*init)(struct clk_hw *hw);
+};
+#+END_SRC
+***** clk_register
+通过 register 将 struct clk_hw 注册到 kernel 中. *clock framework 的核心代码会把它们转换为 struct clk 变量,
+并以 tree 的形式组织起来.
+#+BEGIN_SRC c
+struct clk *clk_register(struct device *dev, struct clk_hw *hw);
+struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
+
+void clk_unregister(struct clk *clk);
+void devm_clk_unregister(struct device *dev, struct clk *clk);
+#+END_SRC 
+***** clock 分类及register
+根据 clock 的特点, clock framework 将 clock 分为fixed rate, gate, devider, mux, fixed factor, composite.六类.
+
+每一类clock都有相似的功能, 相似的控制方式, 因而可以使用相同的逻辑, 统一处理.
+- fixed rate clock
+此类 clock 具有固定的频率, 不能开关, 不能调整频率, 不能选择 parent, 不需要提供任何的 =clk_ops= 回调函数, 是最简单的一类 clock.
+
+可以直接通过设备树配置, *clock framework core 直接从设备树中解出 clock 信息, 并自动注册到 kernel, 不需要任何driver支持*.
+
+framework 使用 struct clk_fixed_rate 结构来表示这种 clock, 另外提供了一个接口, 可以直接注册.
+#+BEGIN_SRC c
+struct clk_fixed_rate{
+        struct clk_hw hw;
+        unsigned long fixed_rate;
+        u8 flags;
+};
+
+extern const struct clk_ops clk_fixed_rate_ops;
+struct clk *clk_register_fixed_rate(struct device *dev, const char *name,
+                                    const char *parent_name, unsigned long flags,
+                                    unsigned long fixed_rate);
+#+END_SRC
+- gate clock
+此类 clock 只可开关(使用 enable/disable 函数),使用下面的函数注册:
+#+BEGIN_SRC c
+/**
+ ,* @param name : clock 名称
+ ,* @param parent_namei : parent clock 名称, 如果没有则为 NULL
+ ,* @param flags : 同上
+ ,* @param reg : 控制 clock开关的虚拟地址
+ ,* @param bit_idx : 控制bit位(是1 开还是0开).
+ ,* @param clk_gate_flags: 当为 CLK_GATE_SET_TO_DISABLE, 表示写1关闭 clock
+ ,* @param lock : 如果开关需要互斥, 可以提供一个 spinlock
+ ,*/
+struct clk *clk_register_gate(struct device *dev, const char *name,
+                              const char *parent_name, unsigned long flags,
+                              void __iomem *reg, u8_bit_idx,
+                              u8 clk_gate_flags, spinlock_t *lock);
+#+END_SRC
+- divider clock
+此类 clock 可以设置分频值(因而会提供 recalc_rate/ set_rate/ round_rate 回调).
+#+BEGIN_SRC c
+/**
+ ,* @param shift : 控制分频比的位在寄存器中的偏移
+ ,* @param width : 分频比的位数
+ ,* @param clk_divider_flags: CLK_DIVIDER_ONE_BASED: 实际 divider 的值就是寄存器的值
+ ,* CLK_DIVIDER_POWER_OF_TWO: 实际的 divider 值是寄存器值的2次方
+ ,* CLK_DIVIDER_ALLOW_ZERO:  divider 值可以位0
+ ,*/
+struct clk *clk_register_divider(struct device *dev, const char *name,
+                                 const char *parent_name, unsigned long flags,
+                                 void __iomem *reg, u8 shift, u8 width,
+                                 u8 clk_divider_flags, spinlock_t *lock);
+
+/**
+ ,* @brief 用于注册不规则的分频 clock
+ ,*/
+struct clk *clk_register_divider_table(struct device *dev, const char *name,
+                                       const char *parent_name, unsigned long flags,
+                                       void __iomem *reg, u8 shift, u8 width,
+                                       u8 clk_divider_flags, const struct clk_div_table *table,
+                                       spinlock_t *lock);
+struct clk_div_table{
+        unsigned int val;    /// 寄存器的值
+        unsigned int div;   /// 对应的分频值
+};
+#+END_SRC
+- mux clock
+这是一个多通道选择的时钟, 所以这类 clock 可以选择多个 parent, 
+#+BEGIN_SRC c
+/**
+ ,* @param parent_names :  字符串数组, 描述所有可能的 parent
+ ,* @param num_parents : parent 个数
+ ,* @param shift, width : 选择 parent 的寄存器的偏移,宽度.默认寄存器值为0对应第一个 parent
+ ,* @param clk_mux_flags : CLK_MUX_INDEX_ONE: 寄存器值不是从0开始, 而是从1开始
+ ,* CLK_MUX_INDEX_BIT :寄存器的值为 2 的幂; 
+ ,*/
+struct clk *clk_register_mux(struct device *dev, const char *name,
+                             const char **parent_names, u8 num_parents, unsigned long flags,
+                             void __iomem *reg, u8 shift, u8 width,
+                             u8 clk_mux_flags, spinlock_t *lock);
+
+/**
+ ,* @brief : 注册 mux 控制不规则的 lock
+ ,*/
+struct clk *clk_register_mux_table(struct device *dev, const char *name,
+                                   const char **parent_names, u8 num_parents, unsigned long flags,
+                                   void __iomem *reg, u8 shift, u32　mask,
+                                   u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+#+END_SRC
+
+- fixed factor clock
+此类 clock 具有固定的 factor(即 multiplier 和 divider), 虽然 mult 和 divider 可变, 但是由于parent可变, 所以也会提供 recalc_rate, set_rate, round_rate 等回调).可以直接在设备树中配置即可, 底层自动使用下面的函数.
+#+BEGIN_SRC c
+struct clk *clk_register_fix_factor(struct device *dev, const char *name,
+                                    const char *parent_name, unsigned long flags,
+                                    unsigned int mult, unsigned int div);
+#+END_SRC
+- composite lock
+是 mux,divider,gate 等 clock的组合,所以如下接口注册
+#+BEGIN_SRC c
+struct clk *clk_register_composite(struct device *dev, const char *name,
+                                   const char **parent_names, int num_parents,
+                                   struct clk_hw *mux_hw, const struct clk_ops *mux_ops,
+                                   struct clk_hw *rate_hw, const struct clk_ops *rate_ops,
+                                   struct clk_hw *gae_hw, const struct clk_ops *gate_ops,
+                                   unsigned long flags);
+#+END_SRC
+***** 设备树相关API
+provider 需要将clock的对应信息告知 framework 的 OF 模块, 这样才可以帮助将 consumer 的DTS转换为对应的 struct clk结构.
+#+BEGIN_SRC c
+/**
+ ,* @param np : 对应的设备树结点
+ ,* @param clk_src_get: 获取 struct clk指针的回调函数
+ ,* @param args : 在设备树中获取到的参数 比如: clocks = <&clock 32>, <&clock 45>
+ ,* @param data : 保存 struct clk 的指针
+ ,* @param data : 
+ ,*/
+int of_clk_add_provider(struct device_node *np,
+                        struct clk *(*clk_src_get)(struct of_phandle_args *args, void *data, void *data);
+#+END_SRC
+**** 编写步骤
+1. 分析硬件的 clock tree, 按照 framework 中的 clock 的类别, 将它们分类
+2. 将 clock_tree 在DTC中描述出来. 
+   2.1. 对于 fixed rate clocks. compatible 中固定为 "fixed-clock", 并提供 "clock-frequency" , "clock-out-names" 关键字.之后不需要在 driver 中做任何处理, framework会帮助我们搞定.
+   2.２. 对于 fixed factor clock. compatible 为 "fixed-factor-clock", 并提供 "clock-div", "clock-mult", "clock-output-names".
+3. 对于不能由 framework 处理的 clock, 需要在driver中使用 struct of_device_id 进行匹配, 并在初始化时调用 OF模块,
+查找所有的 DTS匹配项, 并执行register.
+4. 注册 clock 的同时, 将返回 struct clk指针, 保存在一个数组中, 并使用 =of_clk_add_privider= 告知 framework.
+*** 编写底层逻辑
+**** 分析 struct clk 结构
+#+BEGIN_SRC c
+/**
+ ,* @param parent :该clock当前的parent clock 的 struct clk 指针
+ ,* @param parents: 保存所有可能的 parent clock 的 struct clk 指针
+ ,* @param rate: 当前 clock rate
+ ,* @param new_rate: 新设置的 clock rate
+ ,* @param enable_count, prepare_count: 被enable和 prepare 的次数, 用于确保和 disable/unprepare 成对调用
+ ,* @param children : children clocks, 以链表的形式组织
+ ,* @param child_node: 一个 list node, 自己作为child 时, 挂到 parent 的 children list 时使用
+ ,* @param notifier_count: 记录注册到notifier的个数
+ ,*/
+struct clk{
+        const char              *name;
+        const struct clk_ops *ops;
+        struct clk_hw            *hw;
+        struct clk                 *parent;
+        const char               **parent_names;
+        struct clk                **parents;
+        u8                          num_parents;
+        unsigned long      rate;
+        unsigned long      new_rate;
+        unsigned long      flags;
+        unsigned int         enable_count;
+        unsigned int         prepate_count;
+        struct hlist_head  children;
+        struct hlist_node  child_node;
+        unsigen int           notifier_count;
+        #ifdef CONFIG_COMMON_CLK_DEBUG
+        struct dentry        *dentry;
+        #endif
+};
+#+END_SRC
+**** clock register/unregister
+***** clk_register
+clk_register 是所有 register 接口的共同实现, 负责将 clock 注册到 kernel, 并返回代表该 clock 的strcut clk 指针.
+#+BEGIN_SRC c
+struct clk *clk_register(struct device *dev, struct clk_hw *hw)
+{
+        int i, ret;
+        struct clk *clk;
+        clk = kzalloc(sizeof(*clk), GPF_KERNEL);
+        if(!clk)
+        {
+                pr_err("%s: could not allocate clk\n", __func__);
+                ret = -ENOMEM;
+                goto fail_out;
+        }
+        clk->name = kstrdup(hw->init->name, GFP_KERNEL);
+        if(!clk->name)
+        {
+                pr_err("%s, could not allocate clk->name\n", __func__);
+                ret = -ENOMEM;
+                goto fail_name;
+        }
+        clk->ops = hw->init->ops;
+        if(dev && dev->driver)
+                clk->owner = dev->driver->owner;
+        clk->hw = hw;
+        clk->flags = hw->init->flags;
+        clk->num_parents = hw->init->num_parents;
+        hw->clk = clk;
+
+        clk->parent_names = kcalloc(clk->num_parents, sizeof(char *), GFP_KERNEL);
+
+        if(!clk->parent_names)
+        {
+                pr_err("%s: could not allocate clk->parent_names\n", __func__);
+                ret = -ENOMEM;
+                goto fail_parent_names;
+        }
+        for( i = 0; i < clk->num_parents; i++)
+        {
+                clk->parent_names[i] = kstrdup(hw->init->parent_names[i], GFP_KERNEL);
+                if(!clk->parent_names[i])
+                {
+                        pr_err("%s: could not copy parent_names\n", __func__);
+                        ret = -ENOMEM;
+                        goto fail_parent_names_copy;
+                }
+        }
+
+        ret = __clk_init(dev, clk);
+        if(!ret)
+                return clk;
+
+fail_parent_names_copy:
+        while(--i >= 0)
+                kfree(clk->parent_names[i]);
+        kfree(clk->parent_names);
+fail_parent_names:
+        kfree(clk->name);
+fail_name:
+        kfree(clk);
+fail_out:
+        return ERR_PTR(ret);
+             
+}
+EXPORT_SYMBOL_GPL(clk_register);
+#+END_SRC

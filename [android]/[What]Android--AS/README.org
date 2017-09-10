@@ -3,6 +3,17 @@
 ** 基本使用
 *** 安装问题
 **** Unable to access Android SDK add-on list
+- 描述:
 在启动过程中出现这个错误是由于没有安装SDK而造成的.
+- 原因:
 
+- 解决:
 解决方法是在安装目录下的 =bin/idea.properties= 文件中最后加入一行 =disable.android.first.run=true=.
+*** 编译问题
+**** No resource identifier found for attribute 'srcCompat' in package....
+- 描述
+在新建一个 hello world 工程后, 并没有修改任何代码的情况下运行, 就出现此错误.
+- 原因
+- 解决:
+在文件 =activity_main.xml= 中找到 "xmlns:app="http://schemas.android.com/apk/res-auto"" 这一行, 
+将 =res-auto= 修改为 =lib-auto=.

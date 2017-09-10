@@ -47,6 +47,9 @@ Ctrl + R 启动命令行输入 "mstsc",
 
 ** 文件共享
 *** 直接共享
+**** smaba
+
+**** 远程挂载
 在局域网下通过 linux 编辑 windows 下的文件，原因就是 vim 的强大编辑效率。
 - windows 设置相应的共享文件夹
 - ubuntu 新建挂载文件

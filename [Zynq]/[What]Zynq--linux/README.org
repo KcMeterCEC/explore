@@ -23,6 +23,61 @@ zynq linux 的配置流程与 u-boot 极为相似, 传统的方式也是使用�
 - 设备树
 - 内核
 - 根文件系统, 包括必备的文件结构, 用户代码, 用户库以及用户模块.
+*** 设备树的自动生成
+petalinux 分析 .hdf 文件而得到设备树
+**** 生成的格式
+#+begin_example
+/**
+ ,* @param generic-name: 设备名称
+ ,* @param ip-core-name: 在 vivado 下的IP核的名称, 全部小写,下划线被破折号替代, 由 BEGIN 后的值得到
+ ,* @param name: 由 PARAMETER INSTANCE 的值得到
+ ,* @param paramter#: 在 system.mhs 文件中的 C_* 参数明得到
+ ,* @param baseaddr: 由 C_BASEADDR 得到
+ ,* @param HW_VER: 由 HW_VER 得到
+ ,* @param size: 由 "C_HIGHADDR - C_BASEADDR + 1" 得到
+ ,*/
+(name): (generic-name)@(base-address){
+        compatible = "xlnx,(ip-core-name)-(HW_VER)"
+                                [,(list of compatible devices), ...];
+        reg = <(baseaddr) (size)>;
+        interrupt-parent = <&interrupt-controller-phandle>;
+        interrupts = <...>;
+        xlnx, (parameter1) = "(string-value)";
+        xlnx,(parameter2) = <(int-value)>;
+#+end_example
+***** 实例
+#+begin_example
+BEGIN opb_uartlite
+      PARAMETER INSTANCE = opb_uartlite_0
+      PARAMETER HW_VER = 1.00.b
+      PARAMETER C_BAUDRATE = 115200
+      PARAMETER C_DATA_BITS = 8
+      PARAMETER C_ODD_PARITY = 0
+      PARAMETER C_USE_PARITY = 0
+      PARAMETER C_CLK_FREQ = 50000000
+      PARAMETER C_BASEADDR = 0XEC100000
+      PARAMETER C_HIGHADDR = 0XEC10FFFF
+      BUS_INTERFACE SOPB = opb_7
+      PORT OPB_CLk = CLK_50MHz
+      PORT Interrupt = opb_uartlite_0_Interrupt
+      PORT RX = opb_uartlite_0_RX
+      PORT TX = opb_uartlite_0_TX
+      PORT OPB_Rst = sys_bus_reset_0
+END
+
+opb_uartlite_0: serial@ec1000000{
+                device_type = "serial";
+                compatible = "xlnx, opb-uartlite-1.00.b";
+                reg = <0xec1000000 10000>;
+                interrupt-parent = <&opb_intc_0>;
+                interrupts = <1 0>;
+                current-speed = <d#115200>;
+                clock-frequency = <d#50000000>;
+                xlnx, data-bits = <8>;
+                xlnx, odd-parity = <0>;
+                xlnx, use-parity = <0>;
+};
+#+end_example
 ** 分析
 *** 启动分析
 **** 内存分布分析

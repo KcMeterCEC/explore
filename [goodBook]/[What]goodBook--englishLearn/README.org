@@ -1266,3 +1266,12 @@
 1. working scheme. 工作计划
 *** transcript
 - n. 成绩单;抄本;文字记录
+** <2017-09-10 Sun>
+*** orientation 
+- n. 方向;定向;适应;情况介绍;向东方
+1. interior orientation. 内部定向
+*** breathe
+- vi. 呼吸;低语;松口气
+- vt. 呼吸;使喘息;流露
+- 过去式/过去分词 breathed 现在分词 breathing
+1. breahe out. 呼出
