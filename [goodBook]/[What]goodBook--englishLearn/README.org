@@ -1275,3 +1275,124 @@
 - vt. 呼吸;使喘息;流露
 - 过去式/过去分词 breathed 现在分词 breathing
 1. breahe out. 呼出
+** <2017-09-11 Mon>
+*** jiffy
+- n. 一会儿,瞬间
+- 复数 jiffy,jiffies
+*** panic
+- n. 恐慌,惊慌;
+- adj. 恐慌的;没有理由的
+- vt. 使恐慌
+- vi. 十分恐慌
+- 过去式/过去分词 panicked 现在分词 panicking
+1. panic attack. 恐慌发作
+** <2017-09-12 Tue>
+*** extensive
+- adj. 广泛的;大量的;广阔的
+1. extensive management. 粗放式管理
+*** appropriate
+- adj. 适当的;恰当的;合适的;
+- vt. 占用
+1. appropriate technology. 适当技术
+*** ship
+- vt. 运送,乘船;以船运送
+- vi. 上船;乘船旅行;当船员
+- n. 船;舰;太空船
+- 过去式/过去分词 shipped 现在分词 shipping
+1. passenger ship. 客轮
+*** throughout
+- adv. 自始至终;全部
+- prep. 贯穿
+1. throughout history. 有史以来
+** <2017-09-13 Wed>
+*** enhancement
+- n. 增加;放大
+1. speech enhancement. 语音增强
+*** speech
+- n. 演讲;讲话;语音;演说
+- 复数 speeches
+1. speech contest. 演讲比赛
+*** contest
+- vt. 争辩;质疑
+- vi. 竞争;争辩
+- n. 竞赛;争夺;争论
+1. beauty contest. 选美比赛
+*** scroll
+- n. 卷轴;名册;
+- vi. 成卷形
+- vt. 使成卷形
+1. auto scroll . 自动滚屏
+*** famous
+- adj. 著名的;极好的;
+*** telecommunicaton
+- n. 电讯;无线电通讯
+*** manufacture
+- n. 制造;产品;制造业
+- vt. 制造;加工;捏造
+- vi. 制造
+- 过去式/过去分词 manufactured 现在分词 manufacturing
+*** adopt
+- vt. 采取;接受;收养;
+- vi. 采取
+1. adopt to. 适应
+*** medical
+- adj. 医学的;药的
+- n. 医生
+1. medical diagnosis. 医学诊断
+*** diagnosis
+- n. 诊断
+- 复数 diagnoses
+1. nursing diagnosis. 护理
+*** military
+- adj. 军事的;军人的;
+- n. 军队;军人
+- 复数 military / militaries
+1. military operation. 军事行动
+*** recognize
+- vt. 认出;承认
+- vi. 确认
+- 过去式/过去分词 recognized 现在分词 recognizing
+1. to recognize. 辨认
+*** mention
+- vt. 提到;提及;说起
+- n. 提及;说起
+1. mention to. 提及
+*** authenticate
+- vt. 鉴定;证明...是真实的
+- 过去式/过去分词 authenticated 现在分词 authenticating
+1. authenticate contract. 认证合同
+*** evolution
+- n. 演变;进展
+1. time evolution. 时间发展
+*** foresee
+- vt. 预见;预知
+- 过去式 foresaw 过去分词 foreseen 现在分词 foreseeing
+*** gradually
+- adv. 逐步的;渐渐的
+1. gradually forget. 慢慢忘记
+*** market
+- n. 市场;股票市场;市面
+- vt. 在市场上出售
+- vi. 作买卖
+1. capital market. 资本市场
+*** capital
+- n. 首都;资金;大写字母;资本家
+- adj. 首都的;重要的;大写的
+1. human captical. 人力资本
+*** respectively
+- adv. 分别的;各自的;
+*** consult
+- vt. 查阅;商量;向...请教
+- vi. 请教;商议;当顾问
+1. please consult. 欢迎咨询
+*** prevent
+- vt. 预防;阻止
+- vi. 防碍
+- 过去式/过去分词 prevented 现在分词 preventing
+*** interaction
+- n. 相互作用;交互作用
+- n. 互动
+*** deny
+- vt. 否定;拒绝给予;拒绝...的要求
+- vi. 否认;拒绝
+- 过去式/过去分词  denied 现在分词 denying

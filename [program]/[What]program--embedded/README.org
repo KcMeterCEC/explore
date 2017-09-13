@@ -1,7 +1,6 @@
-[What]embedded --> communication
-=================================
+* [What]embedded --> communication
 
-## 与芯片通信
+** 与芯片通信
 
 当通过与存储芯片进行通信时，可以不用**在意大小端的问题。**
 

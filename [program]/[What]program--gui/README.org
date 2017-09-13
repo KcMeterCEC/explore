@@ -3,7 +3,6 @@
 #+OPTIONS: ^:nil
 * [What] program --> GUI
 
-
 ** GUI 的选择
 
 目前将编程平台分为三类：
@@ -19,13 +18,13 @@
 
 u-boot 使用 littlev
 
-app 使用 Qt
+app 使用 miniGUI
 
 3. 基于 linux / windows等系统的桌面应用
 
-需求**运行效率**的使用 Qt
+需求 *运行效率* 的使用 Qt
 
-需求**开发效率**的使用 Python
+需求 *开发效率* 的使用 Python
 
 ** littlev
 
@@ -33,57 +32,60 @@ littlev 是免费且开源的基于 C 代码的 GUI，移植性相当强，并�
 
 *** 安装仿真环境
 
-1. 安装 SDL2
+**** 安装 SDL2
 
 SDL2 是一个库，提供一个可以直接控制硬件的接口。
+#+begin_example
+apt-cache search libsdl2
+sudo apt install libsdl2-2.0-0
+sudo apt install libsdl2-dev
+sudo apt install build-essential
+#+end_example
 
-> sudo apt install libsdl2-dev
+**** 安装 eclipse
 
-2. 安装 eclipse
-
-在官网下载 eclipse 时需要选择**大连东软信息学院**镜像站，提高下载速度。
+在官网下载 eclipse 时需要选择 *大连东软信息学院* 镜像站，提高下载速度。
 
 在安装 eclipse 之前需要先安装 java 环境：
 
-**** 懒人安装
+1. 懒人安装
 
-> sudo apt install default-jdk
+#+begin_example
+sudo apt install default-jdk
+设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-openjdk-amd64/jre/bin'"
+#+end_example
 
-> 设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-openjdk-amd64/jre/bin'"
+2. 安装正式版本
+#+begin_example
+sudo add-apt-repository ppa:webupd8team/java
+sudo apt update
+sudo apt install oracle-java8-install  (可以安装 java6/7/8/9)
+sudo apt install oracle-java8-set-default (可以安装 java6/7/8/9)
+java -version (查看版本)
+配置在各个 java 版本间切换， sudo update-alternatives --config java  , 星号代表正在使用的版本，输入编号即可选择
+设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-oracle/jre/bin'"
+#+end_example
 
-**** 安装正式版本
+**** 下载 pc 仿真代码
 
-> sudo add-apt-repository ppa:webupd8team/java
+#+begin_example
+git clone https://github.com/littlevgl/proj_pc
+cd proj_pc
+git submodule init
+git submodule update
+#+end_example
 
-> sudo apt update
+**** 启动 eclipse 并导入 littlev 工程， 编译， 运行。
+Close the start up window and go to =File->Import= choose
+=General-Existing project into workspace=.  *Browse the root
+directory* of the project and click Finish.
 
-> sudo apt install oracle-java8-install  (可以安装 java6/7/8/9)
-
-> sudo apt install oracle-java8-set-default (可以安装 java6/7/8/9)
-
-> java -version (查看版本)
-
-> 配置在各个 java 版本间切换， sudo update-alternatives --config java  , 星号代表正在使用的版本，输入编号即可选择
-
-> 设置环境变量,  编辑文件 "~/.bash_aliases" 输入 "export JAVA\_HOME='/usr/lib/jvm/java-8-oracle/jre/bin'"
-
-
-3. 下载 pc 仿真代码
-
-> git clone https://github.com/littlevgl/proj_pc
-
-> cd proj_pc
-
-> git submodule init
-
-> git submodule update
-
-4. 启动 eclipse 并导入 littlev 工程， 编译， 运行。
+*** 移植到嵌入式linux
 
 ** Qt
 *** Qt插件
 **** QWT
-QWT 是一个绘图工具集, 具有很多已经写好的UI插件,大大提高开发效率.
+     QWT 是一个绘图工具集, 具有很多已经写好的UI插件,大大提高开发效率.
 ***** 安装以及使用(windows)
 ****** 下载
 在 [[https://sourceforge.net/projects/qwt/files/qwt/][QWT下载链接]] 中进入最新版的文件夹,然后下载 =.zip= 文件(源代码)以及 =.qch= 文件(帮助文档)即可.
@@ -116,4 +118,27 @@ INCLUDEPATH += C:\Qt\Qt5.8.0\5.8\mingw53_32\include\Qwt
 - *显示* 的用 =Qt Designer= 来打开 =.ui= 文件,拖入控件,编译即可
 
 
+** miniGUI
+*** 在 linux 中安装
+**** 下载及解压
+在 [[www.minigui.com/en/download/][minigui-download]] 中依次下载 =MiniGUI Core Lib(V3.0.12, Linux), MiniGUI Resource(V3.0.12), MiniGUI Samples(V3.0.12)=, 然后使用命令 =tar -zxf= 依次解压.
+****  安装库
+#+begin_example
+#进入 minigui-res-be-3.0.12
+./configure
+sudo make install
 
+#进入 libminigui-3.0.12-linux
+#编辑文件 src/textedit/object.h
+#将 "_va.va = va; " 修改为 "strcpy(_va.va, va);"
+./configure
+make
+sudo make install
+sudo ldconfig
+
+#进入 mg-samples-3.0.12
+./configure
+
+
+#+end_example
+   
