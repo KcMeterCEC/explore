@@ -44,7 +44,7 @@ sudo apt install build-essential
 
 **** 安装 eclipse
 
-在官网下载 eclipse 时需要选择 *大连东软信息学院* 镜像站，提高下载速度。
+[[http://mirrors.opencas.org/eclipse/technology/epp/downloads/release/][国内镜像站点]] 下载 eclipse 选择CPP版本。
 
 在安装 eclipse 之前需要先安装 java 环境：
 
@@ -116,7 +116,6 @@ LIBS += -L"C:\Qt\Qt5.8.0\5.8\mingw53_32\lib" -lqwt
 INCLUDEPATH += C:\Qt\Qt5.8.0\5.8\mingw53_32\include\Qwt
 #+end_example
 - *显示* 的用 =Qt Designer= 来打开 =.ui= 文件,拖入控件,编译即可
-
 
 ** miniGUI
 *** 在 linux 中安装

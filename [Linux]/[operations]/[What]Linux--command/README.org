@@ -83,6 +83,60 @@ grep -v "string" file_name
 #递归搜索字符串
 grep "text" . -r -n
 #+end_example
+*** 包管理
+**** apt
+apt 是 apt-get 命令的一个子集, 提供了作为大多数用户常用的简洁命令方式.
+
+apt 命令从 =/etc/atp/source.list= 文件中获取软件安装源(一般都不是最新的软件包).到本地做了备份.
+
+所以软件源的选择直接关系了安装软件的网速!
+
+#+begin_example
+#从服务器获取软件包的更新列表
+sudo apt update
+
+#升级已经安装的软件
+sudo apt upgrade
+sudo apt full-upgrade #升级软件并移除不用的软件包
+
+#安装特定的软件包
+sudo apt install <package_name1> <package_name2>
+
+#安装特定的软件包, 当已经安装的情况下,则不操作,而不用升级
+sudo apt install <package_name> --no-upgrade
+
+#检查一个软件包是否有更新
+sudo apt install <package_name> --only-upgrade
+
+#安装指定版本的软件包
+sudo apt install <package_name>=<version_number>
+
+#移除指定的软件(保留配置文件)
+sudo apt remove <package_name>
+
+#完全移除一个软件
+sudo apt purge <package_name>
+
+#从列表中查找相关软件
+apt search <search term>
+
+#查看某个软件的详细信息
+apt show <package_name>
+
+#查看可以更新的软件
+apt list --upgradable
+#查看已经安装的软件
+apt list --installed
+#查看所有可用的软件
+apt list --all-versions
+
+#移除系统不需要的软件
+suao apt autoremove
+
+
+
+#+end_example
+
 ** 网络命令
 *** 文件下载
 **** 快速文件下载器 --> axel [url]

@@ -1,5 +1,32 @@
 * [What] git --> base
 ** 基本命令
+*** 在现有的仓库中包含子仓库(子模块)
+**** 在现有仓库中增加子仓库
+#+begin_example
+git submodule add <url>
+#+end_example
+在使用以上命令之后, 会在当前仓库中增加子仓库目录以及一个 =.gitmodules= 文件, 代表了包含了哪些子仓库信息.
+
+当子仓库中还包含一个子仓库时, 需要在主仓库位置先初始化子仓库.
+#+begin_example
+git submodule init 
+git submodule update
+#+end_example
+**** 推送仓库
+*注意:* 正常的操作程序是修改子仓库后, *在子仓库中进行* commit等操作, 然后再进入父仓库中 commit.
+
+使用以下命令来推送, 它会先检查并推送子仓库, 然后再推送主仓库.
+#+begin_example
+git push --recurse-submodules=on-demand
+#+end_example
+**** 删除子仓库
+#+begin_example
+git rm --cached <moduleName>
+rm -rf <moduleName>
+rm .gitmodules
+# 删除 <moduleName> 相关内容
+vim .git/config
+#+end_example
 ** 使用技巧
 *** git hook(在很多阶段可以自动运行一些脚本)
 通过使用 .git/hook/ 中的脚本, 可以让git自动化的完成一些繁琐的操作,在此目录下已经存在了一些示例脚本.

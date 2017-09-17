@@ -99,6 +99,9 @@ bitbake core-image-base
 #TARGET_DEVICE 代表在硬件板上启动文件存放的位置, 比如 /dec/mmcblk0
 sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic of=TARGET_DEVICE
 #+end_example
+*** 注意事项
+**** 从别处拷贝整个工程
+由于工程内部很多变量依然保存的是之前工程的配置, 所以需要先 *删除build/tmp/目录下的内容, 重新编译才能正常运行!*
 ** 详细说明
 *** 1. 准备工作
 **** 1.1 克隆代码库
