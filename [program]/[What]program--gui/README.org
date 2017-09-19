@@ -18,7 +18,7 @@
 
 u-boot 使用 littlev
 
-app 使用 miniGUI
+app 使用 miniGUI 或 littlev
 
 3. 基于 linux / windows等系统的桌面应用
 
@@ -27,11 +27,8 @@ app 使用 miniGUI
 需求 *开发效率* 的使用 Python
 
 ** littlev
-
 littlev 是免费且开源的基于 C 代码的 GUI，移植性相当强，并且其具有 PC 端仿真代码，大大提高了调试效率。
-
 *** 安装仿真环境
-
 **** 安装 SDL2
 
 SDL2 是一个库，提供一个可以直接控制硬件的接口。
@@ -80,7 +77,54 @@ Close the start up window and go to =File->Import= choose
 =General-Existing project into workspace=.  *Browse the root
 directory* of the project and click Finish.
 
+**** 实体按键模拟
+PC模拟是基于 SDL2 库来实现与系统底层交互的, 所以需要使用 SDL2 来创建按键.
+
 *** 移植到嵌入式linux
+**** 基本移植
+移植过程相当简单, 仅仅提供一些画点函数及滴答时钟即可.然后将 *根目录的路径添加到Makefile即可*.
+
+*** 应用说明
+**** 基本概念
+***** 面向对象
+1. littlev 是基于面向对象的程序设计思想, 但代码依然是使用 C 来实现的, 所有的类都继承自基类 =lv_obj_t=.所有的对象都可以动态的删除和创建.
+2. 对象相对于基类 =lv_obj_t= 来将, 实际上是在基类的基础上增加了新的ext数据.
+
+***** 位置
+1. 除了 =screen= 对象外(screen 代表一个基础画布), 其他的对象都具有父对象, 并且父对象移动时, 子对象也会跟着移动.
+2. 所以需要注意的是: 子对象所设置的坐标是 *相对于父对象的坐标.*
+3. 当子对象相对于父对象为负坐标时, 也就是代表子对象的负坐标范围被遮挡了.
+***** 显示层
+1. 当两个对象继承于同一个父对象时, 先创建的对象位于底层, 最新创建的位于顶层
+
+
+***** 组
+littlev 提供了组(group)的概念, 可以将实体按键与对象绑定在一起.
+
+**** 使用
+***** 对象的创建和删除
+所有的对象多有与之对应的创建函数, 但是它们的 *参数却是统一的!*
+#+BEGIN_SRC c
+/**
+ ,* @brief 创建一个对象, "type" 代表对象的类型
+ ,* @param parent: 父对象地址, 当创建一个 screen 时, 此值为 NULL
+ ,* @param copy: 复制同类型对象的属性, 当为NULL时, 则创建一个全新的对象
+ ,* @return 新建对象的地址
+ ,*/
+lv_obj_t * lv_type_create(lv_obj_t *parent, lv_obj_t *copy);
+
+/**
+ ,* @brief 删除对象
+ ,*/
+void lv_obj_dev(lv_obj_t *obj);
+#+END_SRC
+
+***** 对象的属性
+对象的属性使用 =lv_style_t= 来配置, 使用函数 =lv_obj_set_style= 来设置, *当不配置 style 时, 其默认继承父对象的设置*.并且还可以为一个对象设置两个 style, 并设置动画.
+
+*注意*: lv_style_t 不能是局部变量, 因为对象内部仅仅保存了此结构体的地址, 所以在使用对象的时候不能释放此结构体的内存.
+***** 对象与信号
+可以为对象设置一个回调函数, 当触发了一定的动作后, 便自动调用此函数.
 
 ** Qt
 *** Qt插件
@@ -116,7 +160,6 @@ LIBS += -L"C:\Qt\Qt5.8.0\5.8\mingw53_32\lib" -lqwt
 INCLUDEPATH += C:\Qt\Qt5.8.0\5.8\mingw53_32\include\Qwt
 #+end_example
 - *显示* 的用 =Qt Designer= 来打开 =.ui= 文件,拖入控件,编译即可
-
 
 ** miniGUI
 *** 在 linux 中安装

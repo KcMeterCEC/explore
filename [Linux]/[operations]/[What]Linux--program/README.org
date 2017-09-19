@@ -17,15 +17,15 @@ setsid()具有如下特性:
 2. 此进程组会成为会话的首进程, 同时此进程是进程组的组长.
 3. 此进程将脱离控制终端
 *** 编写
-**** 编写步骤
+**** 创建守护进程编写步骤
 基于上面的概念, 以及参考APUE, 可以得出编写守护进程的步骤为:
 1. 调用 *umask* 设置新建文件的权限为0. 
-2. 使用 *fork* 新建进程, 并且使父进程退出
-3. 使用 *setsid* 脱离当前会话, 并建立与终端无关的会话
-4. 将工作目录切换到根目录下
-5. 关闭文件描述符
-6. 再次使用 *fork* 创建一个子进程, 并退出父进程, 让当前进程不为组长.
-7. 设置当前进程的输入,输出,以及错误输出到 =/dev/null= , 用于清除显示.
+2. 使用 *fork, exit* 新建进程, 并且使父进程退出,使新进程不是进程组长, 保证 =setsid= 正常执行.
+3. 使用 *setsid* 脱离当前会话, 并建立与终端无关的会话, 进进程会成为新组长
+4. 将工作目录切换到根目录下,否则当前目录不能被卸载
+5. 关闭父进程所持有文件描述符, 节约空间.
+6. 设置当前进程的输入,输出,以及错误输出到 =/dev/null= , 用于清除显示.
+7. 再次使用 *fork* 创建一个子进程, 并退出父进程, 让当前进程不为组长, 避免申请终端操作.
 #+BEGIN_SRC c
 #include "apue.h"
 #include <stdio.h>
@@ -67,7 +67,7 @@ void daemonize(const char *cmd)
          ,* @note ensure future opens won't allocate controlling TTYs.
          ,*/
         sa.sa_handler = SIG_IGN;
-        sigemtyset(&sa.sa_mask);
+        sigemptyset(&sa.sa_mask);
         sa.sa_flags = 0;
         if(sigaction(SIGHUP, &sa, NULL) < 0)
         {
@@ -117,3 +117,5 @@ void daemonize(const char *cmd)
         }
 }
 #+END_SRC
+**** 守护进程的日志输出
+

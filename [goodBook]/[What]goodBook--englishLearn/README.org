@@ -1396,3 +1396,284 @@
 - vt. 否定;拒绝给予;拒绝...的要求
 - vi. 否认;拒绝
 - 过去式/过去分词  denied 现在分词 denying
+** <2017-09-14 Thu>
+*** characteristic
+- adj. 典型的;特有的;表示特征的
+- n. 特征;特性;特色
+1. characteristic function. 特征函数.
+*** relate
+- vt. 叙述;使...有联系
+- vi. 涉及;认同;符合;与...有某种关系
+- 过去式/过去分词 related 现在分词 relating
+1. directly relate. 直接关系
+*** session
+- n. 会议;开庭;开会;学期;讲习会
+1. session layer. 会话层.
+*** notion
+- n. 概念;见解;打算
+1. common notion. 普通观念
+*** bracket
+- n. 支架;括号;墙上凸出的托架
+- vt. 括在一起;把...归入同一类;排除
+*** reclaim
+- vt. 开拓;回收再利用;改造某人;使某人悔改
+- vi. 抗议;
+- n. 改造;再生胶
+1. heat reclaim. 热回收
+*** interval
+- n. 间隔;间距;幕间休息
+1. time interval. 时段
+*** journal
+- n. 日报;杂志;日记;分类帐
+*** regularly
+- adv. 定期的;有规率的;整齐的;匀称的
+*** privilege
+- n. 特权将;优待
+- vt. 给予...特权;特免
+*** lack
+- vt. 缺乏;不足;没有;需要
+- vi. 缺乏;不足;没有
+- n. 缺乏;不足
+1. lack confidence. 缺乏信心
+*** explicit
+- adj. 明确的;清楚的;直率的;详述的
+1. ecplicit function. 显函数
+*** guarantee
+- n. 保证;担保;保证人;保证书;抵押品
+- vt. 保证;担保
+- 过去式/过去分词 guaranteed 现在分词 guaranteeing
+1. guarantee fund . 保证基
+** <2017-09-15 Fri>
+*** portal
+- n. 大门,入口
+*** curious
+- adj. 好奇的;古怪的
+- 比较级 more curious 最高级 most curious
+1. stay curious. 保持好奇
+*** matrix
+- n. 矩阵;模型;母体;子宫
+- 复数 matrices / matrixes
+1. diagonal matrix. 对角矩阵
+*** orient
+- vt. 使适应;确定方向;使朝东
+- n. 东方
+- adj. 东方的
+- vi. 向东
+1. orient group. 东方集团.
+*** ancient
+- adj. 古代的;古老的;年老的
+- n. 古代人;老人
+- 比较级 more ancient. 最高级 most ancient. 
+1. ancient history. 古代史
+*** wallpaper
+- n. 壁纸
+- vi. 帖壁纸
+- vt. 帖壁纸于...
+1. computer wallpaper. 电脑壁纸
+*** uniform
+- adj. 统一的;一致的;相同的;均衡的;始终如一的
+- n. 制服
+- vt.使...穿字符
+1. uniform design. 均匀设计
+*** influence
+- n. 影响;势力;感化
+- vt. 影响;改变
+- 过去式/过去分词 influenced 现在分词 influencing
+1. influence factors. 影响因素
+*** opacity
+- n. 不透明;不传导;暧昧
+- 复数 opacities
+*** gradient
+- n. 梯度;坡度;倾斜度
+- adj. 倾斜的;步行的
+1. temperature gradient. 温度梯度
+*** border
+- n. 边境;边界;国界
+- vt. 接近;与...接壤;
+- vi. 接界;近似
+1. border guard. 边防人员
+*** radius
+- n. 半径;
+*** corner
+- n. 角落;地区
+- vi. 囤积
+*** glass
+- n. 玻璃;镜子
+- vt. 反映
+- vi. 成玻璃状
+- 复数 glasses . 
+*** notify
+- vt. 通告;公布
+- 过去式/过去分词 notified 现在分词 notifying
+*** animate
+- vt. 使...有生气;使...活泼;鼓舞;推动
+- adj. 有声明的
+- 过去式/过去分词 animated 现在分词 animating
+1. animate text. 文字动画.
+*** sketch
+- n. 素描;略图;梗概
+- vt. 画素描
+- vi. 画素描
+- 第三人称单数 sketches 过去式/过去分词 sketched 现在分词 sketching
+1. 
+*** iteratively
+- adv. 迭代的
+*** asset
+- n. 资产;优点;有用的东西;有利条件;财产;有价值的人或物
+1. current asset. 流动资产
+*** stretch
+- vt. 伸展;张开
+** <2017-09-18 Mon>
+*** snapshot
+- n. 快照;急射;简单印象
+- vt. 给...拍快照
+- vi. 拍快照
+- 过去式/过去分词 snapshot/snapshotted  现在分词 snapshotting
+1. 
+*** obtain
+- vi. 获得;流行
+- vt. 获得
+1. obtain information. 获取信息
+*** quote
+- vt. 报价;引述;举证
+- vi. 报价;引用
+- n. 引用
+- 过去式/过去分词 quoted 现在分词 quoting
+1. close quote. 右引号
+*** verbose
+- adj. 冗长的;啰嗦的
+1. verbose teacher. 唠叨的老师
+*** initialize
+- vt. 初始化
+- 过去式/过去分词 initialized 现在分词 initializing
+
+*** priodic
+- adj. 周期的;定期的
+1. periodic table. 元素周期表
+*** preemptive
+- adj. 优先购买的;先发制人的;有优先权的
+1. preemptive strikes. 先发制人的攻击
+*** statues
+- n. 雕像
+- v. 在...处装饰
+1. statues bar. 状态栏
+*** bar
+- n. 条;棒;酒吧;障碍;法庭
+- vt. 禁止;阻拦
+- prep. 除...外
+1. menu bar. 菜单栏
+*** acquisiton
+- n. 获得;收购
+1. knowledge acquisition. 知识获取
+*** conversion
+- n. 转换;变换;兑换;改变信仰
+1. mode conversion. 模式转换
+*** ordinary
+- adj. 普通的;平凡的;平常的
+- n. 普通的;平常的人
+- 复数 ordinaries
+1. ordinary train. 普通列车
+
+*** synonym
+- n. 同义词;
+*** dialect 
+- n. 方言;同源语;个人用语特征
+- adj. 方言的
+*** fresh
+- adj. 新鲜的;清新的;淡水的;无经验的
+- n. 开始;新生;泛滥
+- adv. 刚刚;最新的
+- 比较级 fresher 最高级 freshest
+*** refresh
+- vt. 更新;使...恢复;消除...的疲劳
+- vi. 恢复精神;
+1. refresh display. 刷新显示
+*** coordinate
+- n. 坐标;同等的人或物
+- adj. 并列的;同等的
+- vt. 调整;整合
+- vi. 协调
+- 过去式/过去分词 coordinated 现在分词 coordinating
+1. coordinate frame. 坐标系
+*** perspective
+- n. 观点;远景;透视图
+- adj. 透视的
+1. perspective shadow. 透视投影
+*** incorporate
+- vt. 包含;体现;把...合并
+- vi. 合并;混合;组成公司
+- adj. 合并的;一体化的
+- 过去式/过去分词 incorporated 现在分词 incorporating
+** <2017-09-19 Tue>
+*** payment
+- n. 付款;报酬;报答;偿还;惩罚;
+1. payment order. 付款单
+*** invoice
+- n. 发票;货物;发货单
+- vt. 开发票;记清单
+- 过去式/过去分词 invoiced 现在分词 invoicing
+1. customs invoice. 海关发票
+*** custom
+- n. 习惯;风俗;海关;经常光顾;顾客
+- adj. 定做的, 定制的
+1. custom design. 用户定制
+*** downgrade
+- n. 退步;下坡
+- adj. 下坡的
+- adv. 下坡的
+- vt. 使... 降级
+- 过去式/过去分词 downgraded 现在分词 downgrading
+1. downgrade ramp. 下坡匝道
+*** oxygen
+- n. 氧气
+1. active oxygen. 活性氧
+*** flat
+- adj. 平坦的;扁平的;浅的;单调的
+- adv. 平直的;断然的
+- n. 平地;平面;公寓
+- vi. 变平
+- vt. 使...变平
+- 比较级 flatter 最高级 flattest 过去式/过去分词 flatted 现在分词 flatting
+1. flat panel. 扁平画板
+*** assist
+- n. 帮助;助攻
+- vi. 参加;出席
+- vt. 帮助;促进
+1. work assist. 工作助手.
+*** proposal
+- n. 提议;建议;求婚
+*** sort
+- n. 种类;方式;品质
+- vi. 分类;协调;交往
+- vt. 将...分类;将...排序
+1. bubble sort. 冒泡排序
+*** camel
+- n. 骆驼;
+- adj. 驼色
+- vi. 工作刻板平庸的
+*** fold
+- vt. 折叠;合拢;抱住
+- n. 信徒;折痕
+- vi. 折叠起来
+*** appearance
+- n. 外貌;出现;
+1. guest appearance. 客串
+*** space
+- n. 空间;太空;距离
+- vi. 留间隔
+- vt. 隔开
+- 过去式/过去分词 spaced 现在分词 spacing.
+1. sample space. 样本空间
+*** influence
+- n. 影响;势力;感化;有影响的人或事
+- vt. 影响;改变
+- 过去式/过去分词 influenced 现在分词 influencing.
+1. influence factors. 影响因素.
+*** gradient
+- n. 梯度;坡度;倾斜度
+- adj. 倾斜的;步行的
+1. potential gradient. 电位梯度
+*** schedule
+- vt. 安排;编织目录;将...列入计划表
+- n. 时间表;计划表;一览表
+- 过去式/过去分词 scheduled 现在分词 scheduling
