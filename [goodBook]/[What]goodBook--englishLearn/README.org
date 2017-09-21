@@ -1677,3 +1677,88 @@
 - vt. 安排;编织目录;将...列入计划表
 - n. 时间表;计划表;一览表
 - 过去式/过去分词 scheduled 现在分词 scheduling
+** <2017-09-20 Wed>
+*** previous
+- adj. 以前的;早先的;过早的
+- adv. 在先;在...以前
+1. previous packet. 前一个数据包
+*** circumstance
+- n. 环境;事件;境遇
+- 过去式 circumstanced 现在分词 circumstancing
+1. operation circumstance. 运营环境
+*** rotate
+- vi. 旋转;循环
+- vt. 使...旋转;使...转动;使...轮流
+- adj. [植]辐状的
+- 过去式/过去分词 rotated 现在分词 rotating
+1. rotate direction. 旋转方向
+*** cut
+- 伤口;切口;削减;式样;削球;切入
+- vt. 切割;削减;缩短;刺痛
+- vi. 切割;相交;切牌;停拍;不出席
+- adj. 割下的;雕过的;缩减的
+1. cut out. 删除;割去;停止
+*** iterate
+- vt. 迭代;重复;反复说;重做
+- 过去式/过去分词 iterated 现在分词 iterating
+1. iterate function. 迭代函数
+*** construct
+- vt. 建造;创立
+- n. 构想;概念
+1. construct validity. 结构效度
+*** act
+- vt. 扮演;装作;
+- vi. 行动;扮演;表现;假装;起作用;
+- n. 行为;法令;段
+*** semantically
+- adv. 语义的
+1. semantically transparent. 语义透明的
+*** represent
+- vt. 代表;表现;描绘;回忆
+- vi. 代表;提出异议
+1. represent general. 表示一般
+*** expansion
+- n. 膨胀;阐述;扩张物
+1. multipole expansion. 多极展开
+*** token
+- n. 表征;代币;记号
+- adj. 象征的;表意的;作为对某事的保证
+- vt. 象征;代表
+*** instant
+- adj. 立即的;紧急的;紧迫的
+- n. 瞬间;立即;片刻
+1. instant previews. 即时预览
+*** particle
+- n. 颗粒;质点;极小量;小品词
+1. charged particle. 带电粒子
+*** policy
+- n. 政策;保险单
+- 复数 policies
+1. monetary policy. 货币政策
+*** monetary
+- adj. 货币的;财政的
+1. monetary system. 货币制度
+*** semantic 
+- adj. 语义的;语义学的
+1. semantic error. 语义错误.
+*** freshen
+- vi. 显得新鲜;减少咸味;精神饱满
+- vt. 使清新;使新鲜;使精神焕发
+1. freshen detail . 显得新鲜.
+*** trick
+- n. 诡计;恶作剧;窍门;花招;骗局;欺诈
+- vt. 欺骗;哄骗;装饰;打扮
+- vi. 哄骗;戏弄
+- adj. 特技的;欺诈的;有诀窍的
+1. dirty trick. 鬼把戏.
+** <2017-09-21 Thu>
+*** prompt
+- adj. 敏捷的;立刻的
+- vt. 提示;促进;激起;提白
+- n. 提示;付款期限;DOS命令
+- adv. 准时的
+1. No prompt . 不提示.
+*** involve
+- vt. 包含;牵涉;使陷于;潜心于
+- 过去式/过去分词 involved 现在分词 involving
+1. involve deeply. 深深卷入
