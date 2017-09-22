@@ -1,5 +1,6 @@
 * [What] kernel --> framework
 参考网站: [[www.wowotech.net][窝窝科技]]
+参考书籍: <<Linux设备驱动开发详解>>
 ** 时钟管理子系统
 commom clock framework 是用来管理系统 clock 资源的子系统, 根据职能由 *顶层到底层* 分为3个部分(很多框架的实现层次都是这种方式):
 1. 向其他 driver 提供操作 clocks 的通用 API
@@ -554,3 +555,133 @@ fail_out:
 }
 EXPORT_SYMBOL_GPL(clk_register);
 #+END_SRC
+** I2C子系统
+*** 总体概览
+Linux 的 I2C 体系结构分为3个组成部分:
+- I2C核心
+I2C核心提供了I2C总线驱动和设备驱动的注册和注销方法, I2C通信方法, 上层的与具体适配器无关的代码以及探测设备, 检测设备地址的上层代码等.
+- I2C总线驱动
+所谓的总线驱动也就是I2C控制器的驱动, 与之相关的有 =I2C控制器数据结构i2c_adapter=, =I2C控制器的算法数据结构i2c_algorithm=, =控制I2C控制器产生通信信号的函数=.
+
+经由I2C总线驱动的代码, 我们可以控制I2C控制器以主机的方式产生开始位, 停止位, 读写操作, 以及以从机的方式被读写, 产生ACK, NACK等.
+
+I2C控制器一般是直接挂接在CPU总线上的, 所以其驱动也是 =platform_driver=.
+- I2C设备驱动
+I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=, =i2c_client= 数据结构, 以及对应的功能函数.
+
+在Linux系统中, I2C设备及驱动位于 =/sys/bus/i2c/= 文件夹下.
+
+在Linux源码中, i2c驱动目录具有如下结构:
+- i2c-core.c / i2c-core.h
+实现了I2C的核心功能以及 =/proc/bus/i2c*= 的接口
+- i2c-dev.c
+实现了I2C控制器设备文件的功能, 每个I2C控制器都被分配一个设备.通过控制器访问设备时的主设备号位89, 次设备号为 0~255.
+也就是说, 此文件提供了通用的接口, 应用层可以借用这些接口访问挂接在适配器上的I2C设备的存储空间和寄存器, 并控制设备的工作方式.
+
+应用程序通过 =i2c-%d= (i2c-0, i2c-1,....)文件名并使用文件操作接口 open(), write(), read(), ioctl(), close() 等来访问这个设备.
+- busses
+此文件夹包含了I2C控制器的驱动
+- algos
+实现了一些I2C控制器的通信方法.也就是I2C协议包生成的逻辑, 一般都是由硬件来实现.
+- i2c.h (include/linux/)
+提供对 =i2c_adapter, i2c_algorithm, i2c_driver, i2c_client= 数据结构的定义.
+
+总体的软件拓扑抽象层次如下图所示:
+[[./i2c_softTopology.bmp][I2C软件拓扑]]
+整个构架的软件层次如下图所示:
+[[./i2c_framework.bmp][I2C框架]]
+
+经过I2C framework 的抽象, consumer 可以不用关心I2C总线的技术细节, 只需要通过简单的API, 就可以与 slave devices 进行数据交互.
+正常情况下, consumer 是位于内核态的其他driver. 于此同时, I2C framework也通过字符设备向用户空间提供类似的接口, 用户空间程序可以通过该接口访问 slave devices.
+
+I2C core 使用 =i2c_adapter,i2c_algorithm= 抽象I2C控制器的功能, =i2c_driver, i2c_client= 抽象 I2C slave device 的功能.
+另外, 基于I2C协议, 通过 smbus 模块实现 SMBus的功能.
+
+I2C muxes 用于实现I2C BUS的多路复用功能, 实际使用较少.
+*** 控制器驱动的编写
+**** 数据结构
+与控制器驱动密切相关的就是 =i2c_adapter, i2c_algorithm= 结构体, 具体描述一下:
+#+BEGIN_SRC c
+/**
+ ,* @brief struct i2c_msg - an I2C transaction segment beginning with START(用户空间也可以用)
+ ,* @brief addr -> 从机地址,支持7位或者10位, 10位时需要使用 I2C_M_TEN标记,以及驱动返回 I2C_FUNC_10BIT_ADDR
+ ,* @brief flags -> 标明此次传输标记
+ ,* @brief len -> 读取或者写入的字节数
+ ,* @brief buf -> 读写缓存
+ ,*/
+struct i2c_msg{
+        __u16 addr;
+        __u16 flags;
+#define I2C_M_TEN 0x0010 /// this is a ten bit chip address
+#define I2C_M_RD 0x0001 /// read data, from slave to master
+#define I2C_M_STOP 0x8000 /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_NOSTART 0x4000 /// if I2C_FUNC_NOSTART
+#define I2C_M_REV_DIR_ADDR 0x2000 /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_IGNORE_NAK 0x1000 /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_NO_RD_ACK 0x0800 /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_RECV_LEN 0x0400 /// length will be first received byte
+        __u16 len;
+        __u8 *buf;
+};
+/**
+ ,* @brief struct i2c_algorithm - represent I2C transfer method(对应一套通信协议)
+ ,* @param master_xfer -> I2C传输函数
+ ,* @param smbus_xfer -> smbus传输函数
+ ,* @param functionality -> 返回 algorithm/adapter 所支持的功能, I2C_FUNC_XXX
+ ,* @param reg_slave / unreg_slave -> 注册及注销从设备
+ ,* @note 关于 master_xfer 的错误返回说明文件位于 Documentation/i2c/fault-codes
+ ,*/
+struct i2c_algorithm{
+        int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
+        int (*smbus_xfer)(struct i2c_adapter *adap, u16 addr, unsigned short flags,
+                          char read_write, u8 command, int size, union i2c_smbus_data *data);
+        u32 (*functionality)(struct i2c_adapter *);
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+        int (*reg_slave)(struct i2c_client *client);
+        int (*unreg_slave)(struct i2c_client *client);
+#endif
+};
+/**
+ ,* @brief i2c_adapter is the structure used to identify a physical i2c bus along with
+ ,* the access algorithms necessary to access it.(代表控制器)
+ ,* @param class -> 此驱动所支持的设备类型(I2C_CLASS_HWMON, I2C_CLASS_DDC....)
+ ,* @param timeout -> 当重试超过一定时间(jiffies), 停止重试
+ ,* @param retries -> 设定当传输失败时, 重试传输的次数
+ ,* @param nr -> 此控制器的ID, 一般由设备树解析.
+ ,*/
+struct i2c_adapter{
+        struct module *owner;
+        unsigned int class;
+        const struct i2c_algorithm *algo;
+        void *algo_data;
+        
+        struct rt_mutex bus_lock;
+        
+        int timeout;
+        int retries;
+        struct device dev;
+        
+        int nr;
+        char name[48];
+        struct completion dev_released;
+        struct mutex userspace_clients_lock;
+        struct list_head userspace_clients;
+        
+        struct i2c_bus_recovery_info *bus_recovery_info;
+        const struct i2c_adapter_quirks *quirks;
+};
+
+#define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+#+END_SRC
+**** 传输标志
+一般情况下, i2c_msg 中的 flag 为0, 也就是按照标准传输方式, 具体如下表:
+
+[] 表示从机返回.
+| 标记 | 读写 | 协议                                  |
+|------+------+---------------------------------------|
+|   0  |  写   | S Addr_Wr [A] Data [A].....Data [A] P |
+|   0  |  读   | S Addr_Rd [A] Data [A].....Data NA P  |
+|   0  |  混合   | S Addr_Rd [A] Data                    |
+*** 设备驱动的编写
+
+

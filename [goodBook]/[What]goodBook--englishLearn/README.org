@@ -1762,3 +1762,33 @@
 - vt. 包含;牵涉;使陷于;潜心于
 - 过去式/过去分词 involved 现在分词 involving
 1. involve deeply. 深深卷入
+** <2017-09-22 Fri>
+*** conference
+- n. 会议;协商;讨论;联盟
+1. video conference. 视频会议
+*** amateur
+- n. 爱好者;业余爱好者;外行
+- adj. 业余的;外行的
+1. amateur transmitter. 业余无线电发射机
+*** carrier
+- n. 载体;运送者;带菌者;货架
+1. charge carrier. 电荷载子
+*** rational
+- adj. 合理的;理性的
+- n. 有理数
+- 比较级 more rational 最高级 most rational
+1. rational appeals. 理性诉求
+*** interpolation
+- n. 插入;篡改;填写;插值
+1. interpolation filter. 插值滤波器
+*** decimation
+- n. 大批杀害;抽取
+*** quadrature
+- n. 正交;求积;弦
+1. quadrature filter. 正交滤波器.
+*** deviation
+- n. 偏差;误差;背离
+1. angular deviation. 角偏差
+*** algorithm
+- n. 算法;运算法则
+1. sorting algorithm. 排序算法
