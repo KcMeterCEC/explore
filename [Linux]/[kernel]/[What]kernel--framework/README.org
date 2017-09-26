@@ -579,6 +579,8 @@ I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=
 也就是说, 此文件提供了通用的接口, 应用层可以借用这些接口访问挂接在适配器上的I2C设备的存储空间和寄存器, 并控制设备的工作方式.
 
 应用程序通过 =i2c-%d= (i2c-0, i2c-1,....)文件名并使用文件操作接口 open(), write(), read(), ioctl(), close() 等来访问这个设备.
+
+*当然,使用此文件就需要在用户代码中设置好设备的操作地址, 具体寄存器操作.虽然说可以省事, 但没有实现很好的分层.*
 - busses
 此文件夹包含了I2C控制器的驱动
 - algos
@@ -674,7 +676,7 @@ struct i2c_adapter{
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 #+END_SRC
 **** 传输标志
-一般情况下, i2c_msg 中的 flag 为0, 也就是按照标准传输方式, 具体如下表:
+一般情况下, i2c_msg 中的 flag 为0, 也就是按照标准传输方式, 具体如下表(表明了 master_xfer() 的执行流程):
 
 [] 表示从机返回.
 | 标记              | 读写 | 协议                                                       |
@@ -687,6 +689,33 @@ struct i2c_adapter{
 | I2C_M_NOSTART     | 混合 | S Addr_Rd [A] [Data] NA +S Addr_Wr [A]+ Data [A] P         |
 | I2C_M_REVDIR_ADDR |      | 读写翻转, 读的时候发 Wr 信号, 写的时候发 Rd 信号           |
 | I2C_M_STOP        |      | 传输完一个 msg 后发送一个 STOP 信号                        |
+
+对应的 master_xfer() 模板类似于:
+#+BEGIN_SRC c
+static int i2c_adapter_xxx_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+{
+        ...
+        for(i = 0; i < num; i++)
+        {
+                i2c_adapter_xxx_start();
+
+                if(msgs[i]->flags & I2C_M_RD)
+                {
+                        i2c_adapter_xxx_setaddr((msgs[i]->addr << 1) | 1);
+                        i2c_adapter_xxx_wait_ack();
+                        i2c_adapter_xxx_readbytes(msgs[i]->buf, msgs[i]->len);
+                        
+                }
+                else
+                {
+                        i2c_adapter_xxx_setaddr((msgs[i]->addr <<1));
+                        i2c_adapter_xxx_wait_ack();
+                        i2c_adapter_xxx_writegbytes(msgs[i]->buf, msgs[i]->len);
+                }
+        }
+        i2c_adapter_xxx_stop();
+}
+#+END_SRC
 **** 函数接口
 控制器驱动可以使用的接口.
 #+BEGIN_SRC c
@@ -752,7 +781,7 @@ I2C adapter 注册的时候, 会为它下面所有的 slave device 创建一个 
 
 i2c_register_adapter --> of_i2c_register_devices --> i2c_new_device 
 
-**** 编写步骤
+**** 编写步骤(drivers/i2c/busses/i2c-cadence.c)
 编写驱动需要填充 =i2c_adapter= 结构体, 所以顺序如下:
 - 在设备树文件中, 提供控制器节点的定义:
 #+begin_example
@@ -767,9 +796,48 @@ i2c0: i2c@44e0b000{
 };
 #+end_example
 - 在 =deiver/i2c/busses= 目录下新建 =i2c-xxx.c= 驱动文件, 并编写 platform driver 的基本结构.
-- 定义一个 =struct i2c_algorithm= 结构, 并根据控制器填充回调函数
+- 定义一个 =struct i2c_algorithm= 结构, 并根据控制器填充回调函数(functionality(), master_xfer())
 - 在 platform driver 的 probe 函数中, 分配一个 adapter 结构, 并初始化. 
 - 调用 =i2c_add_adapter / i2c_add_numbered_adapter= 结构将其注册到内核.
+#+BEGIN_SRC c
+static int xxx_i2c_probe(struct platform_device *pdev)
+{
+        struct i2c_adapter *adap;
+
+        ...
+        xxx_adapter_hw_init();
+        adap->dev.parent = &pdev->dev;
+        adap->dev.of_node = pdev->dev.of_node;
+
+        rc = i2c_add_adapter(adap);
+        ...
+}
+static int xxx_i2c_remove(struct platform_device *pdev)
+{
+        ...
+        xxx_adapter_hw_free();
+        i2c_dev_adapter(&dev->adapter);
+
+        return 0;
+}
+static const struct of_device_id xxx_i2c_of_match[] = {
+        {.compatible = "vendor, xxx-i2c",},
+        {},
+};
+MODULE_DEVICE_TABLE(of, xxx_i2c_of_match);
+
+static struct platform_driver xxx_i2c_driver =
+{
+        .driver = {
+                .name = "xxx-i2c",
+                .owner = THIS_MODULE,
+                .of_match_table = xxx_i2c_of_match,
+        },
+        .probe = xxx_i2c_probe,
+        .remove = xxx_i2c_remove,
+};
+module_platform_driver(xxx_i2c_driver);
+#+END_SRC
 *** 设备驱动的编写
 **** 数据结构
 I2C framework 使用 =struct i2c_client= 抽象 i2c slave device:
@@ -790,7 +858,40 @@ struct i2c_client{
         struct device dev;
         int irq;
         struct list_head detected;
+#if IS_ENABLE(CONFIG_I2C_SLAVE)
+        i2c_slave_cb_t slave_cb;
+#endif
 };
+/**
+ ,* @brief struct i2c_driver - represent an I2C device driver
+ ,* @param class -> 表示此驱动支持哪种类型的I2C设备
+ ,* @param attach_afapter -> (此函数不再使用)
+ ,* @param probe -> 绑定设备的回调
+ ,* @param remove -> 卸载设备的回调
+ ,* @param shutdown -> 关闭设备的回调
+ ,* @param alert -> 警告
+ ,* @param command -> callback for bus-wide signaling(optional)
+ ,* @param id_table -> 列出此驱动支持的I2C设备, 总线驱动函数 i2c_device_match() 中会调用 i2c_match_id()
+ ,* 函数匹配用户定义的ID 和 驱动ID
+ ,* @param decetct -> 用于检测设备的回调
+ ,* @param address_list -> 已经挂载的I2C设备地址.
+ ,* @param clients: 链接所有已经挂载的设备
+ ,*/
+struct i2c_driver{
+        unsigned int class;
+        int (*attach_adapter)(struct i2c_adapter *) __deprecated;
+        int (*probe)(struct i2c_client *, const struct i2c_device_id *);
+        int (*remove)(struct i2c_client *);
+        void (*shutdown)(struct i2c_client *);
+        void (*alert)(struct i2c_client *, unsigned int data);
+        int (*command)(struct i2c_client *client, unsigned int cmd, void *arg);
+        struct device_driver driver;
+        const struct i2c_device_id *id_table;
+        int (*detect)(struct i2c_client *, struct i2c_board_info *);
+        const unsigned short *address_list;
+        struct list_head clients;
+};
+#define to_i2c_driver(d) container_of(d, struct i2c_driver, driver)
 #+END_SRC
 
 **** 函数接口
@@ -808,6 +909,7 @@ extern int i2c_master_recv(const struct i2c_client *client, char *buf, int count
 extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
 /// unclocked flavor
 extern int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
+
 
 #+END_SRC
 **** 编写流程
@@ -837,7 +939,7 @@ I2C总线上的设备有两种形态, 一种是设备全部使用I2C与系统通
 };
 #+end_example
 
-***** 形式1的编写步骤
+***** 形式1的编写步骤(drivers/misc/eeprom/at24.c  drivers/regulator/fpuze100-regulator.c)
 - 根据设备的硬件连接, 设置其设备树.
 #+begin_example
 i2c0{
@@ -865,8 +967,10 @@ i2c0{
 #+end_example
 - 定义一个 =struct i2c_driver= 变量, 并调用 module_i2c_driver 将其注册到 I2C core 中
 该变量包含应该包含的DTS中的 compatible 字段相同的 of_match_table, 以及一个 probe接口.
+( =module_i2c_driver= 是一个宏, 自动完成了 =xxx_init, xxx_exit= 函数)
 - 在 adapter 注册时, 会自动为它的 slave device 创建 =struct i2c_client= 结构, 并匹配 =struct i2c_driver= 变量, 调用对应的 probe接口.
 - i2c_driver 的 probe 接口的输入参数是 =struct i2c_client= 类型指针, 可以调用 =i2c_master_send/i2c_master_recv= 接口进行简单的I2C传输.同时也可以通过该指针获得所属的 i2c_adapter 指针, 然后通过 i2c_transfer 接口进行更为复杂的 read, write 操作.(参考 =drivers/base/regmap/regmap-i2c.c= 中的 regmap_i2c_read 接口).
+- 实现I2C设备所对应类型的具体驱动. i2c_device 只是实现设备与总线的挂接, 而如果此设备驱动兼容多种真实设备, 那就需要为对应的设备实现对应的 =read(), write(), ioctl()= 函数.一般来讲, 通过misc框架新建一个字符设备驱动即可.
 ***** 形态2的编写步骤
 
 

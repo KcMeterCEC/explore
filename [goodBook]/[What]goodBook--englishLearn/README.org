@@ -1792,3 +1792,92 @@
 *** algorithm
 - n. 算法;运算法则
 1. sorting algorithm. 排序算法
+** <2017-09-25 Mon>
+*** alert
+- vt. 警告;使警觉;
+- adj. 警惕的;留心的
+- n. 警戒;警报
+- 最高级 most alert
+1. performance alert. 性能警报
+*** deprecate
+- vt. 反对;抨击;轻视;声明不赞成
+- 过去式 / 过去分词 deprecated 现在分词 deprecating
+1. 
+*** wide
+- adj. 广泛的;宽的;张大的;远离目标的
+- adv. 广泛的;广阔的;充分的
+- n. 大千世界
+- 比较级 wider 最高级 widest
+1. wide awake. 绝对清醒.
+*** notify
+- vt. 通告;公布
+- 过去式/过去分词 notified 现在分词 notifying
+1. notify message. 通知信息
+*** cadence
+- n. 节奏;韵律;抑扬顿挫
+- 过去式/过去分词 cadenced 现在分词 cadencing
+1. imperfect cadence. 不完美的韵律
+*** eliminate
+- vt. 消除;排除
+- 过去式/过去分词 eliminated 现在分词 eliminating
+1. eliminate corruption. 根除腐败
+*** boilerplate
+- n. 样板文件;引用
+*** debounce
+- n. 防反跳
+*** denote
+- vt. 表示;
+- 过去式/过去分词 denoted 现在分词 denoting
+*** transition
+- n. 过渡;转变;转换;变调
+1. view transition. 视图切换.
+*** opposite
+- adj. 相反的;对面的;对立的
+- n. 对立面;反义词
+- prep. 在...的对面
+- adv. 在对面
+1. opposite angles. 对角
+*** travel
+- vi. 旅行;行进;步行;交往;
+- vt. 经过;在...旅行
+- n. 旅行;游历;漫游
+- 过去式/过去分词 traveled / travelled 现在分词 traveling / travelling
+*** passport
+- n. 护照;手段
+*** helicopter
+- n. 直升飞机
+- vi. 乘直升飞机
+- vt. 由直升飞机运送
+*** lorry
+- n. 卡车;货车
+- 复数 lorries
+*** journalist
+- n. 新闻工作者;报人;记日志者.
+*** politics
+- n. 政治,政治学;政治活动;政纲
+1. power politics . 强权政治
+*** carol
+- vi. 欢乐地歌唱;
+- n. 颂歌;欢乐之歌
+- vt. 欢唱
+- 过去式/过去分词 caroled / carolled 现在分词 caroling / carolling
+*** coat
+- n. 外套
+- vt. 覆盖...的表面
+*** diamond
+- n. 钻石;菱形;方块牌
+- adj. 菱形的;金刚钻
+** <2017-09-26 Tue>
+*** postcard
+- n. 明信片
+*** seat
+- n. 座位;所在地;职位
+- vt. 使...坐下;可容纳...的;使就职
+*** kilo
+- n. 千克
+*** skiing
+- n. 滑雪运动;滑雪术
+- v. 滑雪
+*** regulator
+- n. 调整者;监管者;校准器.
+1. voltage regulator. 稳压器
