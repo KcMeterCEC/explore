@@ -1,0 +1,787 @@
+* [What] Zynq --> petalinux & u-boot 2016.1 
+** 配置
+默认 u-boot 的配置方式是使用 =make menuconfig= , 但在 petalinux 下使用 =petalinux-config -c u-boot=.
+petalinux 会先生成一个默认的配置文件位于 : project/subsystem/linux/configs/u-boot/config ,然后会有一个配置界面.
+与此配置界面相关联的文件有:
+1. =./scripts= 下的文件存放与配置界面相关的代码,从使用者的角度来看,不用关心
+2. =./Kconfig= 以及各个层次目录下的 Kconfig
+3. 根目录以及各个目录下的 Makefile
+4. 根目录以及各个目录下的 config.mk
+
+*** 配置流程
+1. 当使用 =petalinux-config -c u-boot= 时,petalinux 底层会传入 ARCH 值,然后系统会读取对应ARCH 以及相关目录下的 Kconfig .
+这些 Kconfig 中就含有一些配置的默认值.并且也会去读取 =project/subsystem/linux/configs/u-boot/config= 文件中的设置,最终确定
+menuconfig 中的选项状态.
+2. 当确定配置并退出界面后,petalinux 会根据配置更新 =project/subsystem/linux/configs/u-boot/config= 以及 =project/subsystem/linux/configs/u-boot/platform-auto.h=
+3. 编译生成 u-boot.bin 使用 =petalinux-build -c u-boot=
+    - 首先会拷贝 components 下的 u-boot ,到 =build/linux/u-boot/src/= 下.
+    - 然后会将步骤2文件夹中的 =platform-auto.h= 以及 =platform-top.h= 拷贝到 =build/linux/u-boot/src/<U_BOOT_SRC>/include/configs/= 目录下,同时 =platform-top.h= 会更名为 =zynq_zc70x.h=
+    - 然后拷贝步骤2文件夹中的 =config= 文件转换到 =build/linux/u-boot/<U_BOOT>/include/generated= 文件夹下,并且还会生成一些其他附加信息头文件.
+
+*结论* : 通过分析上述的配置步骤,可以得出以下结论
+1. =components/u-boot/= 下的源码是一个参考,到最终编译的时候,会被拷贝至 =/build/linux/u-boot/src= ,所以编辑 u-boot 需要编辑源文件.
+2. 配置 u-boot 时,尽量使用图形界面配置,如果图形界面没有引申出来的配置,便在 =project/subsystem/linux/configs/u-boot/platform-top.h= 文件中增加配置
+3. 退出图形界面后,可以查看 =project/subsystem/linux/configs/u-boot/= 目录来了解全部的配置情况
+4. 对于更加深入的配置,比如要增加文件,除了文件本身,还需要修改相应的 Kconfig 和 Makefile 文件
+
+*注意*: 
+1. =platform-auto.h= 这种文件是由模板拷贝过来的,如果要修改就需要修改源模板 =<petalinux>/etc/template/project/template-zynq/subsystems/linux/configs/u-boot/=
+*但是* 似乎修改失败,所以还是只有在 =platform-top.h= 中使用 =undef= 和 =define=.
+
+2. 一般做boot需要有一个配置界面,如果需要命令行和界面同时运行的话,需要把串口阻塞代码屏蔽,并且在 =cread_line= 中加入液晶显示代码.
+
+*** 在 u-boot 中增加多余的外设控制代码
+    外设控制以驱动的方式来访问更加能够便于分层设计.
+    
+*** 在 u-boot 中增加命令
+
+u-boot 中的命令文件位于 `common` 文件夹中。
+
+1. 为了与 u-boot 统一，新建的命令文件名为 `cmd_xxx.c`
+2. 参考其他的命令文件格式，新建命令处理函数以及 `U_BOOT_CMD`
+3. 在  `common/Makefile` 中增加宏定义开关，比如 `obj-$(CONFIG_CMD_ECHO) += cmd_echo.o`
+4. 在 `common/Kconfig` 中增加命令开关
+
+** 使用u-boot组件
+*** 使用液晶显示组件
+u-boot 包含了最基本的 LCD 驱动框架,用户仅仅需要提供基本的控制器驱动函数便可以输出字符.
+**** 配置
+1. 使能框架,需要使用宏定义 =CONFIG_LCD= 
+2. u-boot支持 4x6 和 8x16 字体,当要使用 4x6 字体时,需要使用宏定义 =CONFIG_VIDEO_FONT_4X6=,否则就默认使用 8x16 字体.
+3. 通过配置宏定义 =LCD_BPP= 来设置液晶颜色深度, 否则默认为8位深度.
+4. 要通过液晶默认显示一些板载信息,需要使用宏定义 =CONFIG_LCD_LOGO=.
+
+**** 流程
+1. global_data 中包含了显示缓存(framebuffer)的起始地址,也就是变量 =fb_base=.
+2. 打开了配置后,u-boot会调用液晶初始化函数 =drv_lcd_init=,位于 =common/lcd.c=, =drv_lcd_init= 进而会调用函数 =lcd_init=.
+3. 通过参考驱动代码 =drivers/video/pxa_lcd.c= 发现需要提供的函数有 =lcd_ctrl_init= , =lcd_enable=, =lcd_setcolreg=,以及数据结构 =panel_info= 的定义及赋值,
+需要注意的是,在 =lcd_ctrl_init= 函数中需要为 LCD 控制器指明 framebuffer 的地址,因为刷液晶的实质就是在更新缓存.
+4. 提供以上函数后,便可以使用函数 =lcd_printf= 显示字符,其底层是调用函数 =lcd_putc_xy0= 来刷新缓存.
+
+** 使用u-boot命令
+*** 获取硬件信息
+**** bdinfo
+显示一些 kernel 需要的基本硬件信息,比如内存地址,CPU速度等等.
+这些数据实际上是存储于 =gd->bd= 结构体下的.而有关的一些配置信息,可以查看文件 =platform-auto.h=.
+**** coninfo
+显示当前可用的终端设备,当使能了LCD 时,可以看到 LCD 可以作为输出终端,通过设置 *环境变量* 便可以将串口输出重定向到 LCD.
+其底层是在遍历 stdio 链表,从而打印出可用的终端和目前正在用的终端.
+**** flinfo
+显示 flash memory 的内存信息
+**** iminfo
+显示镜像文件的头信息,已验证文件是否正确.
+*** 内存访问
+**** base
+显示或者设置内存访问的基础地址,用于其他内存命令执行使用.默认的地址是 0.
+此命令也可以设置为 flash 的地址.
+**** crc32
+对输入的两个16进制数进行 crc32 校验,并显示结果.
+**** cmp
+对两段内存的内容进行比较,只要不相同便停止输出.
+默认是使用32位进行比较, 使用16位比较则使用命令 =cmp.w= ,使用8位做比较则使用 =cmp.b=.
+**** cp
+将一段内存的内容复制到另一段内存中,与 =cmp= 命令一样,cp也可以使用 =cp.w, cp.b=.
+当写 flash 时,需要确保 flash 已经被擦除过且没有写保护.
+当源地址和目标地址都在 flash 中时,需要先把数据拷贝到 ddr 中,然后再由 ddr 来写 flash.
+**** md
+显示一段内存的内容以及其对应的 ascii 码,通过此命令可以很直观的看到代码重定向结果.
+此命令也可以使用 =md.w, md.b=.
+**** mm
+修改内存对应位置的内容,此命令也可以使用 =mm.w, mm.b=.
+**** mtest
+内存测试,此命令会读写内存来验证正确性,需要主要不要写到 u-boot 所在位置.
+**** mw
+写一大段内存,此命令也可以使用 =mw.w, mw.b=.
+**** nm
+修改固定地址处的数据, 可以使用 =nm.w, nm.b=.
+**** loop
+无限循环的读取某片内存.
+**** erase
+擦除 flash 扇区.
+**** protect
+打开或关闭 flash 写保护.
+*** 命令执行
+**** source
+运行一个脚本.
+可以在一个文件中先写好脚本,然后通过工具 =mkimage= 将文件转换为 image.
+**** bootm
+从内存中启动一个 image 文件.一般用于启动系统.
+**** go
+在指定的地址运行代码.一般用于运行基于 u-boot 的裸机代码.
+*** 下载命令
+**** bootp
+从网络启动一个 image 文件
+**** dhcp
+分配网络地址
+**** loadb
+通过串口下载二进制代码.
+**** loads
+通过串口加载 S-Record 文件.
+**** rarpboot
+通过网络加载 image 文件,使用 RARP 协议.
+**** tftpboot
+通过网络加载 image 文件,使用 TFTP 协议.
+*** 环境变量
+**** printenv
+打印出所有的或者特定的环境变量
+u-boot具有一些默认的环境变量,只需要增加其对应的宏定义即可,参考 =include/env_default.h=.
+或者也可以定义宏 =CONFIG_EXTRA_ENV_SETTINGS= 来定义自己的变量或者覆盖原变量.
+需要运行环境变量的命令, 则使用 =run <env_name>=
+**** saveenv
+保存环境变量
+**** setenv
+设置环境变量
+**** run
+运行环境变量
+**** bootd
+运行默认的boot命令.
+*** 设备树命令
+1. 当要改变当前系统使用的设备树时,使用 =fdt addr <fdt_addr>= 命令来告诉 u-boot 使用设备树的新地址.
+2. 当设置了设备树的地址后,
+- 可以使用命令 =fdt list <node> , fdt print <node>= 来显示节点的内容
+- =fdt mknode <node>= 来增加节点
+- =fdt set <properties>= 来设置节点属性
+- =fdt rm <node>= 来删除节点
+- =fdt move <address>= 来移动设备树
+** 调试技巧
+*** 显示调试信息
+在配置文件中打开调试输出 *#define DEBUG*
+   
+** 驱动
+uboot 驱动 也使用了设备树来载入具体设备的方式.
+
+*** 设备树(/arch/arm/dts)
+
+设备树是更为灵活的方式,相比较 `platform_data` 中表示的数据,设备树表示如下:
+
+#+begin_example
+red-square
+{
+    compatible = "demo-shape";
+    colour = "red";
+    sides = <4>;
+};
+#+end_example
+让设备树工作的最简单的方式是:
+#+begin_example
+/*!
+@brief
+auto_alloc 是为申请足够的内存,用于存放将设备树转换为数据结构的空间
+ofdata_to_platdata 是为了将设备树转换为数据的方法
+
+也可以主动申请设备树数据内存,但是也需要手动释放.
+*/
+
+.platdata_auto_alloc_size = sizeof(struct dm_tast_pdata),
+.ofdata_to_platdata = testfdt_ofdata_to_platdata,
+#+end_example
+**** dtb 结构
+dtb 文件结构如下:
+| DTB header            |
+| alignment gap         |
+| memory reserve map    |
+| alignment gap         |
+| device-tree structure |
+| alignment gap         |
+| device-tree string    |
+dtb 文件头结构如下:
+| magic          |
+| totalsize      |
+| off_dt_struct  |
+| off_dt_string  |
+| off_mem_rsvmap |
+| version        |
+| ..........     |
+其中, magic 是一个固定的值, 0xd0dfeed (大端) 或者 0xedfe0dd0(小端), 可以使用命令 =hexdump -C ***.dtb= 来查看
+**** dtb 在 u-boot 中的位置
+- dtb 在 u-boot 尾部
+使用宏 =CONFIG_OF_SEPARATE= , u-boot 的编译和 dtb 的编译是分开的, 先生成 uboot.bin 文件,然后再另外生成 .dtb 文件.
+最终会追加到 uboot.bin 文件尾部, 可以通过符号 =_end=来获取 dtb 地址.
+- dtb 在 u-boot 内部
+使用宏 =CONFIG_OF_EMBED=, 在编译 u-boot 的同时编译 dtb, 最终 dtb 位于 =.dtb.init.rodata=段中, 在代码中可以通过 =_dtb_dt_begin=获取符号.
+- 使用环境变量 =fdtcontroladdr=
+通过把 dtb 加载到内存的某个位置,并在环境变量中设置 =fdtcontroladdr= 为这个地址,达到动态指定 dtb的目的
+**** 使能 fdt
+1. 打开相关的宏
+- CONFIG_OF_CONTROL    表明使用FDT
+- CONFIG_OF_SEPARATE or CONFIG_OF_EMBED 表明dtb的位置
+2. 添加 fdt
+在 =arch/arm/dts/= 下参考其他 dts 文件,增加自己的 dts 文件,并且在 Makfile 中增加选项:
+#+begin_example
+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+zynq-zc706.dtb \
+zynq-zed.dtb \
+......
+#+end_example
+所以也要使用对应的宏,比如 =CONFIG_ARCH_ZYNQ=
+由于一般一个配置会对应多个宏, 所以需要指定 dtb 文件名, 使用宏 =CONFIG_DEFAULT_DEVICE_TREE=
+#+begin_example
+#define CONFIG_DEFAULT_DEVICE_TREE  "zynq-zc702.dtb"
+#+end_example
+**** dtb 被使用的过程
+u-boot 在初始化的过程中, 需要对 dtb 做两个操作:
+1. 获取 dtb 的地址,并验证 dtb 的合法性
+2. 对 dtb 进行重定位, 并获取定位后的 dtb 地址
+在 =common/board_f.c= 的 =init_sequence_f= 中进行了以上两个步骤.
+***** fdtdec_setup (获取 dtb 的地址,并验证合法性)
+***** reserve_fdt (为 dtb 分配新的内存地址空间)
+***** relocate_dtb (重定位 dtb)
+
+**** 常用接口
+fdt 的接口地址使用 =gd->fdt_blob= 获取, 对应的 fdt 处理函数位于 =lib/fdtdec.c and lib/fdtdec_common.c=.
+***** fdt_path_offset
+=int fdt_path_offset(const void *fdt, const char *path)=
+获取一个路径相对于根节点的偏移, 就代表了获取了节点.
+比如: =node = fdt_path_offset(gd->fdt_blob, "aliases");=
+***** fdt_getprop
+=const void *fdt_getprop(const void *fdt, int nodeoffset, const char *name, int *lenp)=
+获取某个节点的 *字符串属性值*.
+比如: =mac = fdt_getprop(gd->fdt_blob, node, "mac-address",  &len);=
+***** fdtdec_get_int_array, fdtdec_get_byte_array
+=int fdtdec_get_int_array(const void *blob, int node, const char *prop_name, u32 *array, int count)=
+获取某个节点的 *整形数组属性值*.
+比如: =ret = fdtdec_get_int_array(gd->fdt_blob, node, "interrupts", cell, ARRAY_SIZE(cell));=
+***** fdtdec_get_addr 
+获取某个节点 *地址属性值*
+比如: =fdtdec_get_addr(gd->fdt_blob, node, "reg");=
+***** fdtdec_get_config_int, fdtdec_get_config_bool, fdtdec_get_config_string
+获取config节点下的整形属性, bool属性, 字符串属性 
+***** fdtdec_get_chosen_node
+=int fdtdec_get_chosen_node(const void *blob, const char *name)=
+获取 chosen 下的 name 节点偏移
+***** fdtdec_get_chosen_prop 
+=const char *fdtdec_get_chosen_prop(const void *blob, const char *name)=
+获取 chosen 下的 names属性值
+***** fdtdec_get_int
+=int fdtdec_get_int(const void *blob, int node, const char *prop_name, int default_val)=
+获得节点的某个整形属性值
+比如: =bus->udelay = fdtdec_get_int(blob, node, "i2c-gpio,delay-us", DEFAULT_UDELAY);=
+***** fdtdec_get_unit
+获得节点某个无符号整形属性值
+*** 使能设备驱动
+1. 打开设备驱动模型
+使用宏: =CONFIG_DM=
+2. 打开对应的类驱动
+使用宏: =CONFIG_DM_<driver_name>=
+比如: =CONFIG_DM_SERIAL=y=
+3. 打开对应的设备驱动
+*** 术语
+- udevice 指设备对象, 实际上就是一个结构体,在使用设备树的情况下,此对象通过解析设备树而自动生成, *用户需要来填充设备树*.
+- driver 指的是 udevice 的驱动,并且操作函数格式满足 uclass 接口,最终的操作函数会做为uclass的元素,这部分也是由 *用户来完成*.
+udevice找到对应的uclass的方式主要是通过 udevice 对应的 driver 的 id 和 uclass 对应的 uclass_driver 的 id  是否匹配.
+- uclass 是指代表一个设备类, 将同一类的设备操作方法抽象出来.实际上可以理解为包含函数指针的结构体
+- uclass_driver 是对 uclass 的操作函数,最终用户通过操作这一层的函数,来访问底层设备.
+
+uclass 和 udevice 都是动态生成的,在解析设备树的时候,会动态生成 udevice,然后找到对应的 driver,通过driver中的uclass id 得到 uclass_driver id.
+从uclass链表中查找对应的uclass是否已经生成,没有生成的话则动态生成uclass.
+
+由上可以看出,用户在完成了设备树和设备驱动的情况下,仅仅需要使用 =uclass_driver= 来找到相应设备后, 再使用上层提供的接口来操作即可.
+
+*** 驱动构架
+**** 环境变量
+与驱动相关的环境变量有:
+- gd->dm_root  : DM中的根设备,也是u-boot中第一个创建的 udevice, 对应了 dts 中的根节点
+- gd->dm_root_f : 在重定向之前的的根设备
+- gd->uclass_root: uclass 链表, 所有被 udevice 匹配的uclass 都会被挂载到这个链表上
+
+**** DM 中的主要组成部分
+***** uclass id
+每个类都有自己的ID号,定义于对应的 uclass_driver中, ID 的定义位于文件: =include/dm/uclass-id.h=
+***** uclass
+uclass定义位于文件: =include/dm/uclass.h=
+udevice 被挂载于 uclass, 而uclass又被挂载于 gd->uclass_root,所以可以使用遍历的方式找到对应的 uclass 以及对应的 udevice.
+使用函数 =int uclass_get(enum uclass_id key, struct uclass **ucp)= 可以得到对应的 uclass地址
+***** uclass_driver 
+uclass_driver 定义位于文件: =include/dm/uclass.h=
+定义一个 uclass_driver :
+#+BEGIN_SRC   c
+UCLASS_DRIVER(serial) = {
+  .id = UCLASS_SERIAL,
+  .name = "serial",
+  .flags = DM_UC_FLAG_SEQ_ALIAS,
+  .post_probe = serial_post_probe,
+  .pre_remove = serial_pre_remove,
+  .pre_auto_alloc_size = sizeof(struct serial_dev_priv),
+};
+#+END_SRC
+最终所有的 =uclass_driver= 结构体以列表的形式被放在 =.u_boot_list_2_uclass_1 和 .u_boot_list_2_uclass_3= 区间中, 这个列表简称 uclass_driver_table.
+****** 获取uclass_driver 
+#+BEGIN_SRC  c
+// 得到 uclass_driver_table 的地址
+struct uclass_driver *uclass = ll_entry_start(struct uclass_driver, uclass);
+// 得到 uclass_driver_table 长度
+const int n_ents = ll_entry_conut(struct uclass_driver, uclass);
+//从 uclass_driver_table 中获取 uclass   id 为 uclass_driver 的 ID
+struct uclass_driver *lists_uclass_lookup(enum uclass_id id);
+#+END_SRC
+***** udevice
+数据结构的定义位于 =include/dm/device.h=
+udevice 在 u-boot 解析 dtb 的过程中动态的生成.
+udevice 会连接到对应的 uclass 中, 位于 =uclass->dev_head= 链表中
+udevice 有可能会连接到父设备中,位于 =udevice->child_head= 中,并且最终的根设备是 =gd->dm_root=.
+***** driver
+driver 和 uclass_driver 的方式是相似的.
+定义一个驱动使用如下方式:
+#+BEGIN_SRC  C
+U_BOOT_DRIVER(serial_s5p) =
+{
+    .name = "serial_s5p",
+    .id  = UCLASS_SERIAL,
+    .of_match = s5p_serial_ids,
+    .ofdata_to_platdata = s5p_serial_ofdata_to_platdata,
+    .platdata_auto_alloc_size = sizeof(struct s5p_serial_platdata),
+    .probe = s5p_serial_probe,
+    .ops   = &s5p_serial_ops,
+    .flags = DM_FLAG_PRE_RELOC,
+};
+#+END_SRC
+通过以下方式来获取一个 driver
+#+BEGIN_SRC    C
+// 得到 uclass_driver table 的地址
+stuct driver *drv = ll_entry_start(stuct driver, driver);
+// 获得 driver table 的长度
+const int n_ents = ll_entry_count(struct driver, driver);
+// 根据驱动的名字搜寻到一个 driver
+struct driver *lists_driver_lookup_name(const char * name);
+#+END_SRC
+**** DM 的初始化
+1. 创建根设备 root 的 udevice, 存放在 gd->dm_root 中.根设备其实是一个虚拟设备,主要为 u-boot 的其他设备提供一个挂载点
+2. 初始化 uclass 链表 gd->uclass_root
+***** dm_init_and_scan (初始化DM)
+在 =common/board_f.c= 中,函数 =initf_dm 和 initr_dm= 都使用了这个函数.
+当 =dm_init_and_scan= 的参数为 true 时, 只会对带有 =u-boot, dm-pre-reloc=属性的节点进行解析,代表这个设备在 relocate 之前就需要使用.
+当为 false 时,则会对所有的节点都进行解析.
+**** DM 工作流程
+设备需要被 probe 之后才能被使用.通过 =device_probe= 来完成设备的激活.
+此函数的主要工作如下:
+- 分配设备私有数据
+- 对父设备进行probe
+- 执行 probe device 之前 uclass 需要调用的一些函数
+- 调用 driver 的 =ofdata_to_platdata=, 将 dts 信息转化为设备的平台数据
+- 调用driver 的 probe 函数
+- 执行 probe device 之后 uclass 需要调用的函数
+
+通过参考以上过程,用户可以根据需要编写对应的驱动函数.
+*** 使用自动测试工具
+
+1. ./test/dm/test-dm.sh
+
+*** 由上至下看驱动的调用步骤
+
+通过最简单的命令 `cmd_demo.c` 来展示调用步骤
+
+```c
+struct udevice *demo_dev;
+
+/*!
+@brief
+
+UCLASS_DEMO 代表的就是一个类的名称
+devnum 代表一个设备的编号
+demo_dev 代表就是一个设备的通用结构体
+
+通过此函数找到对应的设备
+*/
+ret = uclass_get_device(UCLASS_DEMO, devnum, &demo_dev);
+
+// 接下来便可以调用使用函数
+return demo_hello(demo_dev, ch);
+```
+```c
+int demo_hello(struct udevice *dev, int ch)
+{
+    const struct demo_ops *ops = device_get_ops(dev);
+    if(!ops->hello)
+        return -ENOSYS;
+
+    return ops->hello(dev, ch);
+}
+
+// 最终映射到底层驱动
+
+static int simple_hello(struct udevice *dev, int ch)
+{
+    const struct dm_demo_pdata *pdata = dev_get_platdata(dev);
+
+    printf("Hello from %08x:  %s %d \n", map_to_sysmem(dev), pdata->colour, pdata->sides);
+
+    return 0;
+}
+
+```
+
+*** 驱动编写
+
+参考 `demo-shape.c`
+
+定义驱动需要先为对应的方法提供函数,然后提供宏定义.
+
+```c
+
+static const struct demo_ops shape_ops =
+{
+    .hello = shape_hello,
+    .status = shape_status,
+};
+
+
+U_BOOT_DRIVER(demo_shape_drv) =
+{
+    .name = "demo_shape_drv",
+    .id = UCLASS_DEMO,
+    .ops = &shape_ops,
+    .priv_data_size = sizeof(struct shape_data),// 使用 `dev_get_priv(dev)` 访问私有数据
+};
+
+```
+
+除此之外 `U_BOOT_DRIVER`(device.h) 一般还具有以下元素:
+
+- bind 将设备与驱动绑定
+- unbind
+- probe 设备准备被使用
+- remove
+- ofdata_to_platdata 将设备树转换为数据结构
+
+工作顺序是 bind --> ofdata_to_platdata -> probe
+
+*** platform data
+
+目前官方推荐不直接使用 platform data ,而是通过设备树的方式.
+以 `demo-pdata.c` 为例
+
+```c
+static const struct dm_demo_cdata red_square =
+{
+    .colour = "red",
+    .sides = 4,
+};
+
+ststic const struct driver_info info[] =
+{
+    {
+        .name = "demo_shape_drv",
+        .platdata = &red_square,
+    },
+};
+
+demo1 = driver_bind(root, &info[0]);
+```
+
+*** 新建类
+
+参考代码 `include/dm/ucalss.h` 来添加新类
+
+*** 设备号
+
+设备号默认是从0开始编号,也可以主动载设备树中申请(*需要确保  `DM_UC_FLAG_SEQ_ALIAS` 标志被设置*):
+
+```c
+//申请的设备号为2
+aliases
+{
+    serial2 = "/serial@22230000";
+};
+
+/./下面这种方式更为直观
+aliases
+{
+    serial2 = &serial_2;
+};
+.....
+serial_2:serial@22230000
+{
+....
+};
+```
+*** 总线驱动
+
+设备可以使用函数 `dev->parent_platdata` 来获得总线的设置参数,
+
+*** 驱动的生命周期
+
+1. 绑定阶段
+
+绑定阶段有两种方法,一种是在 `U_BOOT_DEVICE()` 中直接提供设备数据结构,然后 u-boot 会调用 `device_bind()` 来绑定设备与驱动,
+还有一种是在设备树中定义设备接点,u-boot 会扫瞄设备树然后创建数据结构.
+
+2. 激活阶段
+
+当 `priv_auto_alloc_size` 为非0, 然后会申请一段私有空间,使用`dev->priv`来访问这段数据
+
+当 `platdata_auto_alloc_size` 为非0,然后会申请一段私有空间,使用`dev->platdata`来访问这段数据
+
+当`per_device_auto_alloc_size`为非0,然后会申请一段私有空间
+
+** 驱动的使用
+*** GPIO驱动
+**** 工作原理
+- 一个bank对应一个 udevice, udevice 中私有数据中存放着该bank的信息,比如相应的寄存器地址等等.
+- 上层通过调用 gpio_desc 描述符来描述一个GPIO,其中包括该GPIO所属的 udevice,在bank内的偏移,以及标志位.
+- 上层通过调用gpio core的接口从dtsi获取到GPIO属性对应的gpio_desc描述符
+- 上层使用gpio_desc描述符来作为调用gpio core的操作接口的参数
+- gpio core从gpio_desc描述符提取udevice,并调用其driver中对应的操作集,以bank内的偏移作为其参数
+- driver中提取udevice的私有数据中的bank信息,并进行相应的操作
+*** I2C驱动
+xilinx 官方所提供的驱动并没有使用宏 =U_BOOT_DRIVER=,所以可以知道它并没有使用驱动模型.
+**** 普通驱动分析
+***** 使能
+通过读取根目录下的文件 =README= 可以知道通过如下步骤可以配置使用:
+1. 使用宏 =CONFIG_SYS_I2C= 来使能I2C 子系统
+2. 使用对应的宏定义来使能对应的驱动, 比如 =#define CONFIG_ZYNQ_I2C0=
+3. 设置时钟速度以及从机地址, 比如 =CONFIG_SYS_I2C_ZYNQ_SPEED, CONFIG_SYS_I2C_ZYNQ_SLAVE=
+3. 如果使用了多路复用器,则需要使用宏 =CONFIG_SYS_NUM_I2C_BUSES, CONFIG_SYS_I2C_MAX_HOPS, CONFIG_SYS_I2C_BUSES=
+4. 如果需要使用命令则需要在 =menuconfig= 使能命令 =cmd_i2c=.
+
+*注意*: 
+- 在 zynq 中,虽然官方提供了驱动和修改了 Makfile, *却没有相应的修改 Kconfig*,所以需要增加选项.
+***** 编程使用
+参考 =common/cmd_i2c.c以及 drivers/i2c/i2c_core.c= 文件可以得出有如下操作函数
+- 选择当前操作的总线,使用函数 =int i2c_set_bus_num(unsigned int bus)=
+- 设置总线速度以及操作从机地址使用函数 =unsigned int i2c_set_bus_speed(unsigned int speed)= 以及 =int i2c_probe(uint8_t chip)=
+- 读取数据使用函数 =int i2c_read(uint8_t chip, unsigned int addr, int alen, uint8_t *buffer, int len);=
+- 写入数据使用函数 =int i2c_write(uint8_t chip, unsigned int addr, int alen, uint8_t *buffer, int len);=
+
+*注意:*
+- zynq 中对驱动的支持有些不太完整,需要用户自己修改.
+
+** 中断的使用
+** 编译过程
+现在许多CPU的启动方式和 zynq 的启动方式几乎一样, 内部ROM --> fsbl --> u-boot -> system.
+前3个阶段都是为最后的系统做准备的, 每个阶段初始化的硬件越来越广, 到最后满足系统的运行, 这3个阶段也分别称为 BL0 / BL1 / BL2.
+*** spl 编译过程
+spl(Secondary program loader)是u-boot中的一个分支,是一个精简的启动代码,用于支持运行在内部的 RAM 中.
+这和 zynq 的 fsbl 功能类似,spl的使命就是初始化必要的硬件环境好支持 u-boot 的正常运行.使能 SPL 的编译,需要打开选项
+ =CONFIG_SPL=.
+spl 编译流程也是和 u-boot 编译命令一致,在 Makefile 中走了两条分路,最终会生成 uboot.bin 和 uboot-spl.bin.
+总体流程如下:
+1. 在各个子目录源码下生成对应的 目标文件 =.o= 文件,然后根据 =u-boot-spl.lds= 中的链接关系进行链接生成 =u-boot-spl=.
+2. =u-boot-spl= 中包含了符号表,使用 =objcopy= 命令去掉符号表信息,生成 =u-boot-spl.bin=
+
+**** 从顶层的 Makefile 分析:
+在 petalinux 中, 最先运行的 Makfile 位于 : =./build/linux/u-boot/Makefile=
+此文件首先定义了一些变量,然后对一些变量进行检查.然后也规定了在此目录下建立一个 u-boot 副本,用于编译.
+然后会执行 u-boot 下的Makefile. 
+*最终的编译结果会存在于当前文件夹中, 可以查看这个编译结果来查看哪些文件 被加入了工程*
+- 通过 =u-boot.cfg= 查看总体配置
+- 通过 =u-boot.lds= 查看链接脚本
+- 通过 =u-boot.map= 查看代码分布结构以及符号表
+
+1.  根据配置,来判断是否将 `u-boot-spl.bin` 加入编译目标
+
+#+begin_example
+## line 752
+## 只有配置了 CONFIG_SPL 才会加入编译
+ALL-$(CONFIG_SPL) += spl/u-boot-spl.bin
+
+## line 1327
+spl/u-boot-spl.bin: spl/u-boot-spl
+	@:
+## 判断是分离设备树,然后执行命令 make -f scripts/Makefile.spl all
+spl/u-boot-spl: tools prepare $(if $(CONFIG_OF_SEPARATE),dts/dt.dtb)
+	$(Q)$(MAKE) obj=spl -f $(srctree)/scripts/Makefile.spl all
+#+end_example
+2. 编译 =u-boot-spl.bin=
+#+begin_example
+## line 35
+SPL_BIN := u-boot-spl
+## line 139
+ALL-y	+= $(obj)/$(SPL_BIN).bin $(obj)/$(SPL_BIN).cfg
+## line 217
+## u-boot-spl.bin 是由 u-boot-spl 使用 objcopy 命令得到的
+$(obj)/$(SPL_BIN).bin: $(obj)/$(SPL_BIN) FORCE
+	$(call if_changed,objcopy)
+
+## line 244
+## 层层调用依赖的文件并链接
+## u-boot-spl.lds : arch/arm/cpu/
+$(obj)/$(SPL_BIN): $(u-boot-spl-init) $(u-boot-spl-main) $(obj)/u-boot-spl.lds FORCE
+	$(call if_changed,u-boot-spl)
+#+end_example
+
+*** U-BOOT 编译过程
+
+普通 u-boot 编译过程大体如下：
+1. 先在相应的子文件夹中编译相应的文件
+2. 根据 `u-boot.lds` 将目标文件链接为 `u-boot` 文件
+3. 将 `u-boot` 使用 `objcopy` 去掉符号表，生成 `u-boot-nodtb.bin`
+4. 将 dts 文件编译为 `u-boot.dtb` 与 `u-boot-nodtbl.bin` 打包为 `u-boot.bin`
+
+但在 petalinux 中并不是这样,整个流程需要反复分析 log 文件 以及 build/linux/u-boot/Makefile 文件来厘清
+1. petalinux 会将 u-boot 源码拷贝一份到 =build/linux/u-boot= 目录,然后调用当前文件下的 Makefile
+
+
+
+**** 分析 =build/linux/u-boot/Makefile= 
+首先就是在此目录下执行 =make all= 
+
+#+BEGIN_SRC shell
+#+END_SRC
+
+**** 从顶层 Makefile 分析
+
+1. 生成 `u-boot.bin` 的依赖
+
+```
+## line 872
+u-boot.bin: u-boot FORCE
+	$(call if_changed,objcopy)
+	$(call DO_STATIC_RELA,$<,$@,$(CONFIG_SYS_TEXT_BASE))
+	$(BOARD_SIZE_CHECK)
+## line 1192
+u-boot:	$(u-boot-init) $(u-boot-main) u-boot.lds
+	$(call if_changed,u-boot__)
+ifeq ($(CONFIG_KALLSYMS),y)
+	$(call cmd,smap)
+	$(call cmd,u-boot__) common/system_map.o
+endif
+
+## line 1180
+cmd_u-boot__ ?= $(LD) $(LDFLAGS) $(LDFLAGS_u-boot) -o $@ \
+-T u-boot.lds $(u-boot-init)                             \
+--start-group $(u-boot-main) --end-group                 \
+$(PLATFORM_LIBS) -Map u-boot.map
+```
+2. 生成设备树
+
+编译文件位置：arch/arm/dts
+
+```
+
+## line 63
+dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+	zynq-zc706.dtb \
+	zynq-zed.dtb \
+	zynq-zybo.dtb \
+	zynq-microzed.dtb \
+	zynq-cc108.dtb \
+	zynq-afx-nand.dtb \
+	zynq-afx-nor.dtb \
+	zynq-afx-qspi.dtb \
+	zynq-cse-nand.dtb \
+	zynq-cse-nor.dtb \
+	zynq-cse-qspi.dtb \
+	zynq-picozed.dtb \
+	zynq-zc770-xm010.dtb \
+	zynq-zc770-xm011.dtb \
+	zynq-zc770-xm012.dtb \
+	zynq-zc770-xm013.dtb
+
+## line 211
+targets += $(dtb-y)
+
+# Add any required device tree compiler flags here
+DTC_FLAGS +=
+
+PHONY += dtbs
+dtbs: $(addprefix $(obj)/, $(dtb-y))
+	@:
+
+clean-files := *.dtb
+
+## ./Makefile line 833
+## make -f /scripts/Makefile.build obj=dts dtbs
+dtbs dts/dt.dtb: checkdtc u-boot
+	$(Q)$(MAKE) $(build)=dts dtbs
+
+## /scripts/Malefile.build
+## line 53
+# The filename Kbuild has precedence over Makefile
+kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))
+kbuild-file := $(if $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Kbuild,$(kbuild-dir)/Makefile)
+include $(kbuild-file)
+## line 70
+include scripts/Makefile.lib
+
+## scripts/Malefile.lib
+## line 295
+$(obj)/%.dtb: $(src)/%.dts FORCE
+	$(call if_changed_dep,dtc)
+
+
+```
+
+
+
+make menuconfig
+
+** 启动过程
+
+*** SPL
+
+从链接脚本中可以知道代码入口是 `_start`,位于 `arch/arm/lib/vector.S`
+`vector.S` 定义了异常向量表，在SPL中的异常都会导致死循环，在进入 `_start`后便进入复位处理函数（start.S）
+
+大致流程为：
+1. 关闭中断，进入管理模式（SVC），关闭 MMU 、TLB、cache,
+2. 进入 lowlevel_init,设置芯片内部参数，比如关闭看门狗、时钟、DDR、串口等初始化
+3. 进入 `_main` ，设置堆栈和 SP 参数，为运行代码 `board_init_f` 准备运行环境
+4. 跳转到 u-boot
+
+
+*** u-boot
+u-boot 中与实际硬件平台相关的结构层次如下图所示（参考于 [蜗窝科技](http://www.wowotech.net/u-boot/boot_flow_1.html) ）：
+
+![arch](./uboot_arch.jpg)
+
+- board : 代表整个硬件平台，在对应目录下主要为 **控制器之外的外设代码**
+- machine : 代表 SOC，在对应目录下主要为 **控制器内部的 CPU的外设控制器代码**
+- arch : 代表 CPU，在对应目录下主要为 **除开 CPU 内核架构外的内部代码**
+- CPU : 代表 CPU 架构，比如 "armv7",在对应目录主要为 **CPU 内核架构处理代码**
+
+由下从上看，流程大致如下图：
+
+![stream](./uboot_stream.jpg)
+
+在各个层级的调用关系为：
+
+- u-boot 启动后，会最先执行 CPU 层代码初始化基本的内核
+- CPU 相关代码会调用 ARCH 层代码初始化内部架构
+- ARCH 相关代码会调用 BOARD 层来初始化控制器外设
+- BOARD 层会根据使用的外设来调用 MACHINE 层代码，来初始化 SOC 对应的内部控制器
+
+了解 u-boot 的启动过程，最好的方式是首先打开uboot的一些调试选项，比如 `CONFIG_DISPLAY_BOARDINFO` ,选项会输出当前平台的启动流程。
+
+在 petalinux 的支持下：
+1. 需要在 `./subsystems/linux/configs/u-boot/platform-top.h` 文件中增加此项宏定义
+2. 编译 u-boot `petalinux-build -c u-boot `
+3. 生成 BOOT.bin `petalinux-package --boot --fsbl <fsbl> --fpga <fpga> --u-boot`
+
+*** 1. start.S
+
+> arch/arm/cpu/armv7/start.S
+
+
+*** 2. lowlevel_init()
+
+*** 3. board_init_f()
+
+*** 4. board_init_r()
+
+*** 5. main_loop()
+    
+> common/main.c
+
+** 启动 kernel 过程
+   在 =platform-auto.h= 中,可以看到默认的启动命令是 "default_bootcmd= run cp kernel2ram && bootm ${netstart}"
+一共进行了两个步骤:
+1. 将内核代码从存储介质拷贝到内存的特定地址, 命令展开为 =mmcinfo && fatload mmc 0 0x10000000 image.ub=
+2. 从该地址启动内核, 命令展开为 =bootm 0x10000000=
+*** 将内核拷贝到内存中
+**** mmcinfo
+此命令不仅仅是显示 mmc 信息, 还初始化了 mmc ,所以需要在 mmc 拷贝代码的情况下, 这个命令是必不可少的.
+**** fatload mmc 0 0x10000000 image.ub
+将文件 image.ub 从 mmc 0 拷贝到内存 0x10000000 的地址处.
+*** 启动内内核
+=bootm 0x10000000= 从内存 0x10000000 处启动内核.
+**** bootm 解析
+***** linux 映像文件
+由 petalinux 生成的映像文件为 =image.ub=,此镜像文件包含了 kernel,ramdisk,dtb.然后通过 bootm 命令启动.
+image.ub 的格式其实上是一个 FIT-uImage,目前基本上映像文件都以这个格式存储.
+在uboot 中,使能宏 =CONFIG_CMD_IMI=, 使用命令 =iminfo= 可以查看映像文件的格式
+***** bootm 说明
+bootm 这个命令用于启动一个操作系统映像, 它会从映像文件的头部取得一些信息,这些信息包括: 映像文件的基于的CPU架构,
+操作系统类型,映像类型,压缩方式,映像文件在内存中的加载地址,映像文件运行的入口地址,映像文件名等.紧接着 bootm 将映像加载到指定的地址,
+如果需要的话,还会解压映像并传递必要的参数给内核,最后跳转到入口地址进入内核.
+
+

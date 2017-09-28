@@ -1,0 +1,9 @@
+* [What]computer science --> Unicode
+** unicode 与 字符之间的对应关系
+*** UTF-8 (Unicode Transformation Format - 8-bit)
+UTF-8 使用最多4字节来表示一个字符, 并且兼容 ASCII 字符集, 也就是说 UTF-8 的最开始128个索引与 ASCII 是完全一样的.
+完全使用 ASCII 编码的文件, 也可以使用 UTF-8 格式解析而不会乱码.
+
+对于不同的字符其索引值的大小不一样, 所以为了节省内存空间, 不同的字符占用的索引字节数是不一样的, 如下图所示:
+[[./utf_8_str.bmp]]
+

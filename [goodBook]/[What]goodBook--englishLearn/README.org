@@ -1881,3 +1881,98 @@
 *** regulator
 - n. 调整者;监管者;校准器.
 1. voltage regulator. 稳压器
+** <2017-09-27 Wed>
+*** shape
+- n. 形状;模型;身材;具体化
+- vt. 形成;塑造;使符合
+- vi. 形成;成形;成长
+- 过去式/过去分词 shaped;现在分词 shaping.
+*** strategy
+- n. 战略,策略
+- 复数 strategies
+*** fruit
+- n. 水果;产物
+- vi. 结果实
+- vt. 使...结果实
+- 复数 fruits / fruit
+*** mathematics
+- n. 数学;数学运算
+*** petrol
+- n. 汽油
+*** bath
+- n. 沐浴;浴室;浴盆
+- vt. 洗澡
+- vi. 洗澡
+- 复数  baths 
+*** horror
+- n. 惊悚;惨状;极度厌恶;令人恐怖的事物
+*** theatre
+- n. 电影院;戏剧;阶梯式讲堂
+*** vegetarian
+- n. 素食者;食草动物
+- adj. 素食的.
+*** famous
+- adj. 著名的;极好的;
+
+** <2017-09-28 Thu>
+*** scalability
+- n. 可扩展性;可伸缩性;可量测性
+*** semantic
+- adj. 语义的;
+*** italic
+- n. 斜体字
+- adj. 斜体的
+1. bold italic. 粗斜体
+*** bold
+- adj. 大胆的;黑体的;厚颜无耻的;险峻的
+*** render 
+- vt. 致使;提出;实施;作色;以...回报
+- vi. 给予补偿
+- n. 打底;交纳;粉刷
+1. render view. 渲染视图
+*** optimal
+- adj. 最佳的;最理想的
+1. optimal solution. 最佳方案
+*** texture
+- n. 质地;纹理;结构;本质;实质
+- 过去式/过去分词 textured 现在分词 texturing
+1. surface texture. 表面纹理
+*** glyph
+- n. 字形;图像字符;
+*** unified
+- adj. 统一的;一致标准的
+- v. 统一;使...一致
+*** ideograph
+- n. 象形文字
+*** brand
+- vt. 铭刻于;打烙印于;印...商标
+- n. 商标;烙印
+*** adequate
+- adj. 充足的;适当的;胜任的
+1. adequate size. 准确的大小
+*** punctuation 
+- n. 标点;标点符号
+*** corruption
+- n. 贪污;堕落
+*** emergence
+- n. 出现;发生;露头
+*** formally
+- adv. 正式的;形式上的
+*** advertise 
+- vt. 通知;为...做广告;使...突出
+- vi. 做广告;作宣传
+- 过去式/过去分词 advertised 现在分词  advertising 
+1. advertise department. 广告部
+*** regret 
+- n. 遗憾;抱歉;悲叹
+- vt. 后悔;惋惜;哀悼
+- vi. 感到后悔;感到抱歉
+- 过去式/过去分词 regretted 现在分词 regretting
+*** decade 
+- n. 十年
+*** tend
+- vi. 趋向,倾向;照顾
+- vt. 照管
+1. tend to 倾向于
+*** octet
+- n. 八重奏;八行诗;八位字节
