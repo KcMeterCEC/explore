@@ -1976,3 +1976,14 @@
 1. tend to 倾向于
 *** octet
 - n. 八重奏;八行诗;八位字节
+** <2017-09-29 Fri>
+*** collaborator
+- n. 合作者;勾结者;通敌者
+*** crop
+- n. 产量;农作物;庄稼;平头
+- vt. 种植;收割;修剪;剪短
+- vi. 收获
+- 过去式/过去分词 cropped  现在分词 cropping
+** <2017-09-30 Sat>
+*** exclusively
+- adv. 唯一的;专有的;排外的

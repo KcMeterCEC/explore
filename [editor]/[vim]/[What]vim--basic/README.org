@@ -1,6 +1,18 @@
 * [What]vim --> basic
 [[vimcdoc.sourceforge.net/doc/usr_toc.html][vim 参考手册]]
 ** 基本操作
+*** 代码合并(vimdiff)
+除了使用 git, 使用 vimdiff 来比对个别文件, 实现合并相当方便.
+
+- 在一开始启动 vim 时, 使用命令 =vim -d <file1> <file2>= 或 =vimdiff <file1> <file2>=
+- 在使用git的情况下, 使用命令 =git conifg --global diff.tool vimdiff=
+- 在 vim 已经打开的情况下, 使用命令 =:diffthis= 打开比对功能, 使用 =:diffoff= 关闭比对.
+| 快捷键 | 意义                                 |
+|--------+--------------------------------------|
+| do     | 在当前光标处, 将参考文件内容合并过来 |
+| dp     | 在当前光标处, 将此处内容合并过去     |
+| ]c     | 跳到下一个有差异的位置               |
+| [c     | 跳到上一个有差异的位置               |
 ** 基本配置
 ** 组合高级功能
 *** 宏录制
