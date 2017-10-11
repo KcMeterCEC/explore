@@ -16,14 +16,14 @@ yocto具有如下特征:
 最终yocto可以生成镜像文件以在实际硬件平台上设置.
 *** 2. 准备工作
 为了能够保证yocto正常运行, 需要准备如下的运行环境:
-*** 2.1 linux主机
+**** 2.1 linux主机
 目前支持的主机有 Ubuntu,Fedora,openSUSE,CentOS,Debian.
 
 需要安装的依赖包有:
 - git1.8.3.1 或更高等级
 - tar1.2.4 或更高
 - Python3.4.0 或更高 
-*** 2.2 主机依赖包安装
+**** 2.2 主机依赖包安装
 **** Ubuntu 和 Debian 
 - 安装QEMU所需要的基本依赖
 #+begin_example
@@ -31,13 +31,13 @@ sudo apt install gawk wget git-core diffstat unzip texinfo gcc-multilib \
 build-essential chrpath socat cpio python python3 python3-pip python3-pexpect \
 xz-utils debianutils iputils-ping libsdl1.2-dev xterm
 #+end_example
-*** 2.3 yocto 获取
+**** 2.3 yocto 获取
 #+begin_example
 git clone git://git.yoctoproject.org/poky
 git checkout pyro
 #+end_example
 *** 3.编译镜像文件
-*** 3.1 编译仿真环境
+**** 3.1 编译仿真环境
 **** 基本配置
 #+begin_example
 cd poky
@@ -73,7 +73,7 @@ bitbake core-image-sato
 #+begin_example
 runqemu qemux86
 #+end_example
-*** 3.2 为硬件环境生成镜像文件
+**** 3.2 为硬件环境生成镜像文件
 此示例演示如何编译支持 =MinnowBoard MAX-64bit= 硬件.
 **** 3.2.1 拷贝代码
 #+begin_example
@@ -146,5 +146,70 @@ bmaptool --help
 oe-run-native bmaptool --help
 #+end_example
 *** 2. 概念
+在 linux的开发过程中, 分为应用开发和内核开发:
+**** 应用开发
+- 使用已经编译好的工具链, 使用普通的编辑器和Makefile来构建工程
+- 使用 eclipse 并安装 yocto 插件, 使用此IDE来开发APP
+**** 内核开发
+在内核开发中, 开发者应该不直接修改内核代码, 而是修改顶层文件, 这样便于以后升级内核.
+有以下几个方法便于提高开发速度:
+1. 通过使用 =Shared State Cache= 来分享自己的编译结果, 这样开发组可以通过网络文件系统来访问,而不是从头编译.
+2. 使用 =autobuilders=.
+3. 将一些脱机工具压缩打包, 然后分享给其他的开发者.
+4. 将工作站分享给开发者, 便于提高编译及测试速度.
+5. 使能 =PR Service=.
+**** 版本控制
+除了要开发的代码, 还需要将 =Metadata= 加入git中.
+**** autobuilders
+autobuilders 是开发工程的核心工具链.
+**** Append Files(附加文件)
+此类文件是构建文件(.bb)的附加文件, 后缀以 =.bbappend= 作为结尾, 此文件用于增改一些构建代码.
+
+一般来说, 一个构建文件都会对应一个同名且不同后缀的附加文件.
+
+**** BitBake
+一个用于构建工程的线程.
+**** Build Directory
+通过变量 =TOPDIR= 所指定的编译文件夹的位置.
+
+创建一个编译文件夹使用:
+#+begin_example
+#在当前目录下创建一个 build 文件夹.
+source oe-init-build-env
+#指定新建文件夹名称为 test-builds
+source oe-init-build-env test-builds
+
+
+#+end_example
+
+**** classes
+将通用的逻辑进行封装和继承, 这样用户可以方便使用, 文件的后缀为 =.bbclass=.
+**** Configuration File
+=.conf= 为后缀的文件, 表明工程的配置信息. 
+- 在 =Build Directory= 中的 conf/local.conf 文件包含用户定义的变量, 影响编译过程.
+- =meta-poky/conf/distro/poky.conf= 文件定义了 distro 配置变量, 对应于不同的编译策略.
+- 在 =source directory= 中的配置文件, 定义了对应的目标板的配置.(比如 machine/beaglebone.conf)
+**** Cross-Development Toolchain
+yocto 支持两种不同的工具链:
+- 在 BitBake 中运行的工具链用于编译镜像文件
+- 在开发应用程序所使用的工具链
+**** image
+通过 BitBake 所生成的二进制文件.
+**** layer
+代表BSP, 内核, 以及应用程序的层次结构.
+**** Metadata
+用于 BitBake 在编译的过程中的解析文件.
+**** OE-Core
+用于设置生成 Metadata.
+**** OpenEmbedded Build System
+特指 yocto project.
+**** Package 
+用于打包工具.
+**** package groups
+打包工具组.
+**** poky
+一个开源项目的名称, poky 是 yocto 项目的基础项目.
+**** recipe
+用于编译 packages 的一些设置命令. 
 
 
