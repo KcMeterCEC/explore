@@ -23,9 +23,12 @@ git push --recurse-submodules=on-demand
 #+begin_example
 git rm --cached <moduleName>
 rm -rf <moduleName>
-rm .gitmodules
+# 删除 <moduleName> 相关内容
+vim .gitmodules
 # 删除 <moduleName> 相关内容
 vim .git/config
+# 删除缓存
+rm -rf .git/modules/path_to_submodule
 #+end_example
 ** 使用技巧
 *** git hook(在很多阶段可以自动运行一些脚本)
