@@ -137,6 +137,13 @@ suao apt autoremove
 
 #+end_example
 
+*** 文件同步
+**** rsync
+相对于 =cp= 命令, =rsync= 是同步文件的不同部分, 所以其执行速度会比较快.
+#+begin_example
+#同步本地文件,加上 "--exclude" 用于排除部分文件
+rsync -av --progress [sourcefolder] [distinationfolder] --exclude [thefoldertoexclude]
+#+end_example
 ** 网络命令
 *** 文件下载
 **** 快速文件下载器 --> axel [url]

@@ -1990,3 +1990,33 @@
 ** <2017-10-05 Thu>
 *** philosophy
 - n. 哲学;哲理;人生观
+** <2017-10-12 Thu>
+*** hesitate
+- vt. 踌躇;犹豫;有疑惑
+- vi. 踌躇;犹豫;不愿
+- 过去式/过去分词 hesitated 现在分词 hesitating
+1. don't hesitate. 别再犹豫了
+*** expire
+- vi. 期满;终止;死亡;呼气
+- vt. 呼出
+- 过去式/过去分词 expired 现在分词 expiring
+1. expire data. 有效期
+*** voerall
+- adj. 全部的;全体的;一切在内的
+- adv. 全部的;总的来说
+- n. 工装裤
+*** considerable
+- adj. 相当大的;重要的;值得考虑的
+- 比较级 more considerable 最高级 most considerable 
+*** overlap 
+- n. 重叠;重复
+- vi. 部分重叠;部分的同时发生
+- vt. 与...重叠;与...同时发生
+- 过去式/过去分词 overlapped 现在分词 overlapping
+1. overlap angle. 重叠角
+*** route 
+- vi. 按某路线发送
+- n. 路线;航线;通道
+- 过去式/过去分词 routed; 现在分词 routing/routeing
+*** greatly
+- adv. 很,大大地;非常

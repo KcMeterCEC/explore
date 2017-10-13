@@ -1,0 +1,12 @@
+* [What] Windows --> command
+** 任务管理命令
+*** 关闭特定的任务
+在某些情况下, 需要关闭一些任务才能够继续安装其他程序.
+
+以 *管理员的方式打开命令行窗口*, 然后执行以下命令:
+**** Tasklist
+此命令用于列出当前正在运行的命令
+**** Taskkill
+- Taskkill /?  : 查看命令的帮助文件
+- Taskkill /IM  <process name> : 指定关闭以 <process name> 命名的进程
+- Taskkill /PID <pid1> <pid2> <...> /F  : 指定关闭以 <pidx> 为PID的进程

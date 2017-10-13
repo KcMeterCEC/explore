@@ -1,0 +1,67 @@
+* [What] driver --> IIO(Industrial I/O Subsystem)
+
+参考网站: [[https://wiki.analog.com/software/linux/docs/iio/iio][Analog Wiki]]
+
+参考文档: Documentation/iio/     Documentation/ABI/testing/sysfs-bus-iio
+** 概览
+*** 基本概念
+IIO 子系统主要包含一些传感器, AD ,DA 等器件的操作.此系统的目的是为了填补hwmon 和 input 子系统之间的
+空隙.一般此子系统下的设备是通过 SPI 或者 I2C 通信.
+
+- hwmon(硬件监视) : 主要用于低速的设备监视
+- input(输入子系统): 主要专注于与用户交互的设备(比如: 按键, 鼠标, 触摸等).
+
+通过DMA连接的串行或并行设备, 也属于此系统.
+
+
+包含以下种类:
+- ADC 以及 DAC
+- 加速度计
+- 陀螺仪
+- 惯性测量仪
+- 电容-数字转换器
+- 气压计
+- 颜色, 光, 距离传感器
+- 温度传感器
+- 磁力计
+- 直接数字合成器(DDS)
+- 锁相环(PLL)
+- 可变/可编程增益放大器(VGA, PGA)
+
+*** 构架
+[[./IIO_overview.bmp][IIO Subsystem Overview]] 
+*** 功能
+- 设备的注册及处理操作.
+- 可以通过 =sysfs= 来访问设备
+- 事件机制: 将设备的一些事件发送给用户空间.
+- 支持硬件环形队列
+- 大大降低采样缓存
+- ring buffer 存储事件, 可以查看buffer填充状态
+- 支持软件 ring buffer 以及 触发机制
+**** 软件 ring buffer 以及 触发机制
+在一些数据分析应用中, 可以使用触发机制来捕获外部信号,比如:
+- 数据准备信号
+- 外部中断信号
+- 周期中断信号
+- 用户空间读取 =sysfs= 中特定文件信号
+
+一次触发的产生, 就会引起其他的动作, 每次触发事件的产生都会被填充至 =ring buffer= 中.
+ 
+[[./IIO_ringBuffer.bmp][IIO Ring Buffer]]
+
+** 使用
+在驱动正常的情况下, 子系统会将设备映射到 :
+1. =sysfs= 下, 用于配置设备以及读取原始数据.
+2. 字符设备, 用于访问内核缓存事件等
+
+*** sysfs
+路径位于: =/sys/bus/iio/devices/deviceX= ,其目录下具有以下文件:
+- name: 设备号
+- dev: 设备节点(major:minor)
+- device configuration attributes (sampling_frequency_avaliables)
+- data channel access attributes(in_resistance_raw)
+- buffer/, events/, trigger/, scan_elements/
+
+以及文件 =/sys/bus/iio/devices/triggerY=
+*** character device
+路径位于: =/dev/iio:deviceX=
