@@ -212,4 +212,16 @@ yocto 支持两种不同的工具链:
 **** recipe
 用于编译 packages 的一些设置命令. 
 
+*** 提交一次更改
+yocto 使用邮件列表和打补丁的方式来合并和讨论更改.
 
+在开发社区, 有两个特殊的分支专用于测试一些提交申请:
+- "ross/mut" : mut(master-under-test) 存在于 =poky-contrib= 库.
+- "master-next" : 存在于 =poky= 库.
+**** 向 poky 提交(How to submit a Change)
+poky库是 yocto 项目的参考库, 包含有很多的组件及工具.主要具有以下几大组件用于提交:
+- *core metadata* : 当有 =meta= 或 =scripts= 中的内容改变时,需要提交这个分支的[[lists.openembedded.org/mailman/listinfo/openembedded-core][邮件列表]]
+- *BitBake* : 当 =bitbake= 下的文件有更新时, 发送到此[[lists.openembedded.org/mailman/listinfo/bitbake-devel][邮件列表]]
+- *meta-yocto-bsp" and "meta-poky" tress* : 当 =meta-yocto= 下的文件更新时, 提交补丁到此[[lists.yoctoproject.org/listinfo/poky][邮件列表]]
+**** 其他地方的文件修改提交
+其他文件,工具,文档的修改都提交到此[[https//lists.yoctoprojects.org/listinfo/yocto][邮件列表]], *当你修改文档的时候,有些文档内部会要求自己的邮件列表, 那么应该使用它所指定的列表*.
