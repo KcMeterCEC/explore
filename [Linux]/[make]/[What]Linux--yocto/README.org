@@ -225,3 +225,31 @@ poky库是 yocto 项目的参考库, 包含有很多的组件及工具.主要具
 - *meta-yocto-bsp" and "meta-poky" tress* : 当 =meta-yocto= 下的文件更新时, 提交补丁到此[[lists.yoctoproject.org/listinfo/poky][邮件列表]]
 **** 其他地方的文件修改提交
 其他文件,工具,文档的修改都提交到此[[https//lists.yoctoprojects.org/listinfo/yocto][邮件列表]], *当你修改文档的时候,有些文档内部会要求自己的邮件列表, 那么应该使用它所指定的列表*.
+**** 提交具体操作
+在提交更改之前,需要找到自己做了哪些改动以及修改历史, 使用以下方法来找出这些改动:
+- *Maintenance File*: 查看 =meta-poky/conf/distro/include= 文件下的 =maintainers.inc= 文件, 此文件列出了提交者.
+- *Search by File*:使用 git 命令来查看更改历史, 比如 =git status / git diff / git shortlog --filename=
+
+在提交的说明中,需要包含 =Signed-off-by:= 一行, 以及 =Developer's Certificate of Origin 1.1= 内容.也就是说, *一定要符合标准格式*.
+
+提交具体格式参考手册对应章节.
+**** 使用脚本来提交更改以及请求更新(首选)
+- 在保证自己的更改在 git 库的控制范围内
+- 加入更改 : git add .
+- 提交到本地: git commit , *提交信息要写好*.
+- 提交到远端库 : git push 
+- 通知维护者,发出合并申请: 在 =scripts= 文件夹下使用脚本 =create-pull-request 和 send-pull-request= , 具体使用方法使用 =-h= 选项查看.
+**** 使用 email 提交补丁
+- 保证自己的工作在 git 库的控制范围
+- 加入更改: git add .
+- 提交到本地: *git commit --signoff*
+- 转换提交细节到 email 消息中: git format-patch , 这样会生成 .patch 文件.
+- 发送邮件: git send-email 
+
+
+
+
+
+
+*** 通用开发模型(Common Development Models)
+
