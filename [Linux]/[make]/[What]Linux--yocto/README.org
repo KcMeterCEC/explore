@@ -2,7 +2,7 @@
 参考链接:[[www.yoctoproject.org/docs/2.3.1/mega-manual/mega-manual.html][yocto参考手册]]
 
 ** 快速准备与体验操作
-*** 1. Yocto 开发环境介绍
+*** Yocto 开发环境介绍
 yocto 提供了可以开发以及仿真ARM,MIPS,PowerPC,X86平台的开发环境, 并且可以完成Linux的
 全栈仿真应用.
 
@@ -14,16 +14,16 @@ yocto具有如下特征:
 - 基于分层式设计, 可以很好的开发和扩展
 
 最终yocto可以生成镜像文件以在实际硬件平台上设置.
-*** 2. 准备工作
+*** 准备工作
 为了能够保证yocto正常运行, 需要准备如下的运行环境:
-**** 2.1 linux主机
+**** linux主机
 目前支持的主机有 Ubuntu,Fedora,openSUSE,CentOS,Debian.
 
 需要安装的依赖包有:
 - git1.8.3.1 或更高等级
 - tar1.2.4 或更高
 - Python3.4.0 或更高 
-**** 2.2 主机依赖包安装
+**** 主机依赖包安装
 **** Ubuntu 和 Debian 
 - 安装QEMU所需要的基本依赖
 #+begin_example
@@ -31,13 +31,13 @@ sudo apt install gawk wget git-core diffstat unzip texinfo gcc-multilib \
 build-essential chrpath socat cpio python python3 python3-pip python3-pexpect \
 xz-utils debianutils iputils-ping libsdl1.2-dev xterm
 #+end_example
-**** 2.3 yocto 获取
+**** yocto 获取
 #+begin_example
 git clone git://git.yoctoproject.org/poky
 git checkout pyro
 #+end_example
-*** 3.编译镜像文件
-**** 3.1 编译仿真环境
+*** 编译镜像文件
+**** 编译仿真环境
 **** 基本配置
 #+begin_example
 cd poky
@@ -73,27 +73,27 @@ bitbake core-image-sato
 #+begin_example
 runqemu qemux86
 #+end_example
-**** 3.2 为硬件环境生成镜像文件
+**** 为硬件环境生成镜像文件
 此示例演示如何编译支持 =MinnowBoard MAX-64bit= 硬件.
-**** 3.2.1 拷贝代码
+**** 拷贝代码
 #+begin_example
 cd poky
 git clone git://git.yoctoproject.org/meta-intel
 #+end_example
-**** 3.2.2 配置
+**** 配置
 配置编译结果, 需要配置文件 =bblayers.conf, local.conf= , 这两个文件都位于 =build/conf= 文件夹中.
 #+begin_example
 cd build
 bitbake-layers "add-layer ../meta-intel"
 echo 'MACHINE = "intel-corei7-64"' >> conf/local.conf
 #+end_example
-**** 3.2.3 编译
+**** 编译
 #+begin_example
 #编译生成基础命令行版的 linux
 bitbake core-image-base
 #+end_example
 当编译完成后, 生成的文件位于 =tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic=.
-**** 3.2.4 载入镜像文件
+**** 载入镜像文件
 使用以下命令就可以生成一个可以启动的文件了:
 #+begin_example
 #TARGET_DEVICE 代表在硬件板上启动文件存放的位置, 比如 /dec/mmcblk0
@@ -103,8 +103,8 @@ sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic
 **** 从别处拷贝整个工程
 由于工程内部很多变量依然保存的是之前工程的配置, 所以需要先 *删除build/tmp/目录下的内容, 重新编译才能正常运行!*
 ** 详细说明
-*** 1. 准备工作
-**** 1.1 克隆代码库
+*** 准备工作
+**** 克隆代码库
 在完成了快速准备后, yocto 已经下载了 yocto-source 的 git 库在 =downloads= 文件夹中, 我们需要把它 clone 出来.
 #+begin_example
 #clone linux代码
@@ -114,7 +114,7 @@ git clone git://git.yoctoproject.org/meta-yocto-kernel-extras meta-yocto-kernel-
 #clone bsp 
 git clone git://git.yoctoproject.org/meta-intel.git
 #+end_example
-**** 1.2 bmap-tools
+**** bmap-tools
 =bmap-tools= 工具用于将镜像文件烧写到引导介质(比如 sdcard).
 
 使用之前使用以下命令编译此工具:
@@ -145,7 +145,7 @@ PATH=tmp/sysroots/x86_64-linux/usr/bin bmaptool copy ./tmp/deploy/images/qemux86
 bmaptool --help
 oe-run-native bmaptool --help
 #+end_example
-*** 2. 概念
+*** 概念
 在 linux的开发过程中, 分为应用开发和内核开发:
 **** 应用开发
 - 使用已经编译好的工具链, 使用普通的编辑器和Makefile来构建工程
@@ -168,7 +168,7 @@ autobuilders 是开发工程的核心工具链.
 一般来说, 一个构建文件都会对应一个同名且不同后缀的附加文件.
 
 **** BitBake
-一个用于构建工程的线程.
+一个用于构建工程的线程, 最终执行编译的实体.
 **** Build Directory
 通过变量 =TOPDIR= 所指定的编译文件夹的位置.
 
@@ -198,7 +198,7 @@ yocto 支持两种不同的工具链:
 **** layer
 代表BSP, 内核, 以及应用程序的层次结构.
 **** Metadata
-用于 BitBake 在编译的过程中的解析文件.
+用于 BitBake 在编译的过程中的解析文件, 也就是原始文件.
 **** OE-Core
 用于设置生成 Metadata.
 **** OpenEmbedded Build System
@@ -210,7 +210,7 @@ yocto 支持两种不同的工具链:
 **** poky
 一个开源项目的名称, poky 是 yocto 项目的基础项目.
 **** recipe
-用于编译 packages 的一些设置命令. 
+用于编译 packages 的一些设置命令, 调配各个部分之间的协调. 
 
 *** 提交一次更改
 yocto 使用邮件列表和打补丁的方式来合并和讨论更改.
@@ -246,10 +246,125 @@ poky库是 yocto 项目的参考库, 包含有很多的组件及工具.主要具
 - 转换提交细节到 email 消息中: git format-patch , 这样会生成 .patch 文件.
 - 发送邮件: git send-email 
 
-
-
-
-
-
 *** 通用开发模型(Common Development Models)
+yocto 具有以下几种开发模型:
+- *System Development* : 此模型包含 BSP以及内核的修改及配置开发.
+- *User Application Development* : 此模型包含 APP 开发
+- *Temporary Source Code Modification*: 此模型用于快速测试一些代码. 在测试代码完成后再更新到主分支中.
+- *Image Development using Toaster*: 用于定制最终的镜像文件
+- *Using a Development Shell*: 使用 shell 来调试组件
+**** 系统开发的工作流程(System Development Workflow)
+***** 开发BSP
+[[./bsp_create_workflow.bmp][bsp开发流程]]
+- 确保能够运行 yocto 的主机
+- 拷贝 yocto 工程代码
+- 拷贝 =meta-intel= 工程代码
+- 使用 =yocto-bsp= 脚本来完成BSP层创建
+- 配置 BSP 
+- 配置 recipe 
+- 为编译做准备
+- 编译镜像文件
+***** 修改内核
+****** 内核概览
+通过查看 yocto 的代码仓库可以发现有好几个版本的内核:
+- *linux-yocto-3.14*: 基于 linux3.14 和 yocto 1.6,1.7 而生成的稳定版工程
+- *linux-yocto-3.17*: 基于 linux3.17 和 yocto 1.7 而生成的工程, *目前已经没有维护*.
+- *linux-yocto-3.19*: 基于 linux3.19 和 yocto 1.8 而生成的稳定版工程
+- *linux-yocto-4.1*: 基于 linux4.1 和 yocto 2.0 而生成的稳定版工程
+- *linux-yocto-4.4*: 基于 linux4.4 和 yocto 2.1 而生成的稳定版工程
+- *linux-yocto-dev*: 最新的正在开发中的版本
 
+其中, 长期支持的版本有:
+- 基于 yocto 1.7,1.8,2.0 的 =linux-yocto-3.14
+- 基于 yocto 2.1 的 =linux-yocto-4.1=
+
+[[./kernel_branch.bmp][内核分支维护]]
+内核的维护是基于分支的概念, 图中 =Kernel.org Branch Point= 就是原版的linux, 其他的维护分支都是基于此分支的.
+
+=Branch Point= 右边的分支, 都代表对于不同硬件的开发, 每一个端点都是针对性的.但是它们又可以同步相互所公用的代码.
+
+在编译内核的时候, 会将内核代码拷贝到一个临时的工作区来修改, 如下图所示:
+[[./temporary.bmp][临时工作区]]
+****** 修改内核的流程
+[[./kernel_modi_workflow.bmp][内核修改流程]]
+- 首次编译来建立临时文件夹, 然后使用 =oe-init-build-env / oe-init-build-env-memres= 来获取环境变量
+- 根据需要修改内核代码
+- 根据需要更改内核配置
+- 再次重新编译内核
+
+
+**** 使用 SDK 开发 APP 的流程
+**** 修改应用代码
+在 OpenEmbedded 中还有的工具:
+- *devtool* : 
+- *Quilt*: 
+***** 使用 *devtool*
+****** 使用 *devtool add* 来增加一个应用框架
+[[./devtool_add.bmp][devtool_add]]
+- 生成新的 recipe: 从上图可以看出有3中生成的方式.
+  + =devtool add recipe fetchuri= 用于重头新建一个应用框架
+  + =devtool add recipe srctree fetchuri= 也是重头新建一个应用框架,但是应用代码不存在默认位置, *srctree* 来指定位置.
+  + =devtool add recipe srctree= 用于从外部导入一个应用代码
+- 编辑 recipe: =devtool edit-recipe recipe=
+- 编译 recipe 并且生成镜像文件: =devtool build recipe= 用于编译 recipe, =devtool build-image image= 用于生成镜像文件,文件中已经包含了 =recipe=.
+- 部署编译输出: =devtool deploy-target recipe target= 输出文件到目标硬件(运行 SSH server)
+- 完成开发 : =devtool finish recipe layer= 生成相比上次的补丁,并且复位 recipe 以用于别的开发.
+****** 使用 *devtool modify* 来编辑代码
+[[./devtool_modify.bmp][devtool modify]]
+- 准备修改代码: 修改代码也有三种方式
+  + =devtool modify recipe= : 与上一节的方式对应, 编辑本文件夹内的源码.
+  + =devtool modify recipe srctree= : 指明编辑的文件路径
+  + =devtool modify -n recipe srctree= : 指明使用外部代码和外部的 recipe 
+- 编辑代码: 经过上面步骤后, 就可以使用任意的编辑器进行修改了.
+- 编译: 正常编译即可.
+- 部署编译输出: =devtool deploy-target recipe target= (目标板需要运行SSH server)
+- 完成开发 : =devtool finish recipe layer= 生成相比上次的补丁,并且复位 recipe 以用于别的开发.
+
+****** 使用 *devtool upgrade* 使用新版本
+一般用于第三方软件有更新时, 使用此命令来获得更新的软件.
+[[./devtool_upgrade.bmp][devtool upgrade]]
+- 准备升级: =devtool upgrade -V version recipe= 默认将新代码提取到 workspace 中, 如果要指定提取路径,使用 =devtool upgrade -V version recipe srctree=.
+- 解决冲突: 
+- 编译
+- 部署输出
+- 完成
+
+***** 使用 *Quilt*
+quilt 用于捕捉代码的更改.
+- 找到并切换到源代码的位置: 位于临时文件夹中
+- 创建一个新的补丁: =quilt new my_changes.patch=
+- 通知 quilt 将要改变哪些文件: =quilt add file1.c file2.c ...=
+- 编辑代码
+- 测试本次修改的代码: =bitbake -c compile -f package=,
+- 代码测试合格后,需要更新补丁文件: =quilt refresh= ,补丁文件位于当前目录下的 =patches= 文件夹下.
+- 拷贝补丁文件: 将补丁放在 =files= 文件夹下, 然后增加文件路径到 =SRC_URI= 变量中: SRC_URI += "file://my_changes.patch"
+**** 找到临时源代码
+使用临时源码目录, 可以用来测试代码, 在代码测试完毕后再保存此次更改.
+
+临时代码目录对于编译目录是可用的, 路径被存在 =S= 变量中:
+#+begin_example
+# BP = "${BPN} -${PV}"
+S = "${WORKDIR}/${BP}"
+
+#工作目录定位到 recipe
+# TMPDIR: 编译输出目录
+# MULTIMACH_TARGET_SYS: 目标系统目录
+# PN: recipe 的名字
+# EXTENDPE: The epoch 
+# PV: recipe 版本
+# PR: recipe 修订版本
+${TMPDIR}/work/${MULTIMACH_TARGET_SYS}/${PN}/${EXTENDPE}{$PV}-{PR}
+#比如
+poky/build/tmp/work/qemux86-poky-linux/foo/1.3.0-r0
+#+end_example
+**** 使用 Toaster 配置镜像文件
+**** 使用 development shell
+使用 shell 可以很好的调试和配置.
+#+begin_example
+#使用 devshell 开发和配置 matchbox-desktop 目标
+bitbake matchbox-desktop -c devshell
+#+end_example
+**** 使用 development python shell
+#+begin_example
+bitbake matchbox-desktop -c devpyshell
+#+end_example
