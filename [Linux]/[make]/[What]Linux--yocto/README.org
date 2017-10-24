@@ -3,8 +3,15 @@
 
 ** 快速准备与体验操作
 *** Yocto 开发环境介绍
+
+yocto 的编译部分是基于 OpenEmbedded(OE)项目, OE项目使用 BitBake 来构建完整的镜像文件.
+在 yocto 中, *OE 和 BitBake两个组件结合在一起, 形成了一个新的组件, 叫做 Poky(也是yocto 项目的名称)*.
+
+
 yocto 提供了可以开发以及仿真ARM,MIPS,PowerPC,X86平台的开发环境, 并且可以完成Linux的
 全栈仿真应用.
+
+[[./oe_workflow.bmp][OE流程]]
 
 yocto具有如下特征:
 - 提供最新的linux kernel 代码, 以及相应的嵌入式开发所需要的库环境
@@ -24,7 +31,7 @@ yocto具有如下特征:
 - tar1.2.4 或更高
 - Python3.4.0 或更高 
 **** 主机依赖包安装
-**** Ubuntu 和 Debian 
+***** Ubuntu 和 Debian 
 - 安装QEMU所需要的基本依赖
 #+begin_example
 sudo apt install gawk wget git-core diffstat unzip texinfo gcc-multilib \
@@ -44,6 +51,7 @@ cd poky
 #切换到最新的release
 git checkout -b pyro origin/pyro
 #初始化编译环境,设置环境变量
+#使用此脚本后, 会新建一个 build 文件夹, 并进入这个文件夹, 以后编译的结果都在这个文件夹下.
 source oe-init-build-env
 #+end_example
 
@@ -55,8 +63,8 @@ source oe-init-build-env
 #+begin_example
 INHERIT += "rm_work"
 #+end_example
-- 默认配置是用于QEMU仿真的32位X86平台, 可以通过修改 =MACHINE= 变量来修改.
-- 默认生成的镜像文件是 RPM 格式, 可以通过修改 =PACKAGE_CLASSES= 变量改变包格式
+- 默认配置是用于QEMU仿真的32位X86平台, 可以通过修改 =local.conf= 中的 =MACHINE= 变量来修改.
+- 默认生成的镜像文件是 RPM 格式, 可以通过修改 =local.conf= 中的 =PACKAGE_CLASSES= 变量改变包格式
 
 **** 开始编译
 首次编译需要一定的时间, 因为需要首次下载文件.
@@ -79,12 +87,15 @@ runqemu qemux86
 #+begin_example
 cd poky
 git clone git://git.yoctoproject.org/meta-intel
+git checkout pyro
 #+end_example
 **** 配置
 配置编译结果, 需要配置文件 =bblayers.conf, local.conf= , 这两个文件都位于 =build/conf= 文件夹中.
 #+begin_example
 cd build
+#增加层
 bitbake-layers "add-layer ../meta-intel"
+#指定BSP
 echo 'MACHINE = "intel-corei7-64"' >> conf/local.conf
 #+end_example
 **** 编译
@@ -102,6 +113,8 @@ sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic
 *** 注意事项
 **** 从别处拷贝整个工程
 由于工程内部很多变量依然保存的是之前工程的配置, 所以需要先 *删除build/tmp/目录下的内容, 重新编译才能正常运行!*
+**** 在编译的过程中 ubuntu 自动重启
+原因不明.
 ** 详细说明
 *** 准备工作
 **** 克隆代码库
@@ -111,7 +124,7 @@ sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic
 git clone ./build/downloads/git2/git.yoctoproject.org.linux-yocto-4.10.git linux-kernel
 #clone metadata extras
 git clone git://git.yoctoproject.org/meta-yocto-kernel-extras meta-yocto-kernel-extras 
-#clone bsp 
+#clone bsp, bsp 命名规则: meta-bsp_name 
 git clone git://git.yoctoproject.org/meta-intel.git
 #+end_example
 **** bmap-tools
@@ -146,6 +159,10 @@ bmaptool --help
 oe-run-native bmaptool --help
 #+end_example
 *** 概念
+yocto 项目通过 =gitolite= 托管, 整体项目基于分层设计, 项目的具体地址: [[http://git.yoctoproject.org/cgit/cgit.cgi][yocto repositories]].
+
+*注意:* 在使用中, 要确保各个库的分支是一一对应的, 比如 poky 的分支为 pyro, 那么 meta-intel 的分支也要切换为 pyro.
+
 在 linux的开发过程中, 分为应用开发和内核开发:
 **** 应用开发
 - 使用已经编译好的工具链, 使用普通的编辑器和Makefile来构建工程
