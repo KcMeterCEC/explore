@@ -180,29 +180,31 @@ yocto 项目通过 =gitolite= 托管, 整体项目基于分层设计, 项目的�
 **** autobuilders
 autobuilders 是开发工程的核心工具链.
 **** Append Files(附加文件)
-此类文件是构建文件(.bb)的附加文件, 后缀以 =.bbappend= 作为结尾, 此文件用于增改一些构建代码.
+此类文件是构建文件(.bb) =recipe file= 的附加文件, 后缀以 =.bbappend= 作为结尾, 此文件用于增改一些构建代码.
 
 一般来说, 一个构建文件都会对应一个同名且不同后缀的附加文件.
 
+附加文件也可以一个文件匹配多个文件.
+
 **** BitBake
-一个用于构建工程的线程, 最终执行编译的实体.
+在 OpenEmbedded 构建系统中的一个工具, 用于构建镜像文件.此工具执行和调用一些线程来实现并行编译.
 **** Build Directory
-通过变量 =TOPDIR= 所指定的编译文件夹的位置.
+通过变量 =TOPDIR= 所指定的编译文件夹的位置.一般情况下都是 =poky/build/=.
 
 创建一个编译文件夹使用:
 #+begin_example
-#在当前目录下创建一个 build 文件夹.
-source oe-init-build-env
-#指定新建文件夹名称为 test-builds
+#在当前目录下创建一个 build 文件夹,设置对应的环境变量,并切换到文件夹下.
+source oe-init-build-env (source oe-init-build-env-memres)
+#在 home 目录下新建并指定新建文件夹名称为 test-builds
 source oe-init-build-env test-builds
 
 
 #+end_example
 
 **** classes
-将通用的逻辑进行封装和继承, 这样用户可以方便使用, 文件的后缀为 =.bbclass=.
+将通用的逻辑进行封装和继承, 这样用户可以方便重用, 文件的后缀为 =.bbclass=.
 **** Configuration File
-=.conf= 为后缀的文件, 表明工程的配置信息. 
+=.conf= 为后缀的文件, 表明工程的配置信息, 文件中的变量调试全局的. 
 - 在 =Build Directory= 中的 conf/local.conf 文件包含用户定义的变量, 影响编译过程.
 - =meta-poky/conf/distro/poky.conf= 文件定义了 distro 配置变量, 对应于不同的编译策略.
 - 在 =source directory= 中的配置文件, 定义了对应的目标板的配置.(比如 machine/beaglebone.conf)
@@ -213,28 +215,46 @@ yocto 支持两种不同的工具链:
 **** image
 通过 BitBake 所生成的二进制文件.
 **** layer
-代表BSP, 内核, 以及应用程序的层次结构.
+代表BSP, 内核, 以及应用程序的层次结构, 当前在这几个大类中,又由很多小的层次组成.
 **** Metadata
-用于 BitBake 在编译的过程中的解析文件, 也就是原始文件.
+用于 BitBake 在编译的过程中的解析文件, 也就是原始文件, 包括 recipes, classes, configuration files.
 **** OE-Core
-用于设置生成 Metadata.
+位于 =meta= 文件夹中, 用于 OE 和 yocto 共享的元数据.
 **** OpenEmbedded Build System
-特指 yocto project.
+特别针对于 yocto project 的构建系统.
 **** Package 
-用于打包工具.
+由 bitbake 编译所生成的二进制包.
 **** package groups
-打包工具组.
+一些配置所组合成的一个包,包含了一系列的配置.
 **** poky
-一个开源项目的名称, poky 是 yocto 项目的基础项目.
+一个开源项目的名称, poky 是 yocto 项目的基础项目, 所以 clone 下来的目录名称就叫做 poky.
 **** recipe
-用于编译 packages 的一些设置命令, 调配各个部分之间的协调. 
+以 =.bb= 后缀结尾,用于编译 packages 的一些设置命令, 调配各个部分之间的协调, 比如在哪里导入代码, 应用哪些补丁, 这些代码如何配置, 如何编译等等. 
 
+也用于描述于其他 recipe 之间的关联,以及库的依赖关系.
+
+**** source directory
+一般来说就是指代 =clone= 而来的文件夹 =poky=.
+**** task
+bitbake 用于执行时的一个单元
+**** upstream
+远程代码库
 *** 提交一次更改
+
+yocto 维护的主分支就是 =master= , 其他普通开发者通过 clone 此库, 然后将满意的更改提交到特定库 =poky-contrib=.
+
+然后由 yocto 的主要维护人员来判断是否合并入 =master= 分支中.
+
 yocto 使用邮件列表和打补丁的方式来合并和讨论更改.
 
 在开发社区, 有两个特殊的分支专用于测试一些提交申请:
 - "ross/mut" : mut(master-under-test) 存在于 =poky-contrib= 库.
 - "master-next" : 存在于 =poky= 库.
+**** 使用 git 时的一些良好的习惯
+1. 每完成一个小的改动,并且测试通过后,便可以提交一次.这样便于以后回溯,也更加清晰明了.
+2. 要善于利用分支. =master= 分支代表的就是目前产品最新且最为稳定的阶段, 此分支通过很多 =tags= 来表明各个阶段.
+*要增加一个新功能或者修复一个bug时,需要新建一个分支.在此分支测试通过后再合并到主分支中去,然后删除此分支.*
+3. 在不同功能分支的情况下,如果几个分支都需要更改相同的部分, *那么应该修改它们的共同分支*.
 **** 向 poky 提交(How to submit a Change)
 poky库是 yocto 项目的参考库, 包含有很多的组件及工具.主要具有以下几大组件用于提交:
 - *core metadata* : 当有 =meta= 或 =scripts= 中的内容改变时,需要提交这个分支的[[lists.openembedded.org/mailman/listinfo/openembedded-core][邮件列表]]
