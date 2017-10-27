@@ -115,7 +115,7 @@ sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic
 由于工程内部很多变量依然保存的是之前工程的配置, 所以需要先 *删除build/tmp/目录下的内容, 重新编译才能正常运行!*
 **** 在编译的过程中 ubuntu 自动重启
 原因不明.
-** 详细说明
+** 系统概览
 *** 准备工作
 **** 克隆代码库
 在完成了快速准备后, yocto 已经下载了 yocto-source 的 git 库在 =downloads= 文件夹中, 我们需要把它 clone 出来.
@@ -265,7 +265,7 @@ poky库是 yocto 项目的参考库, 包含有很多的组件及工具.主要具
 **** 提交具体操作
 在提交更改之前,需要找到自己做了哪些改动以及修改历史, 使用以下方法来找出这些改动:
 - *Maintenance File*: 查看 =meta-poky/conf/distro/include= 文件下的 =maintainers.inc= 文件, 此文件列出了提交者.
-- *Search by File*:使用 git 命令来查看更改历史, 比如 =git status / git diff / git shortlog --filename=
+- *Search by File*:使用 git 命令来查看更改历史以及负责维护的作者联系方式, 比如 =git status / git diff / git shortlog --filename=
 
 在提交的说明中,需要包含 =Signed-off-by:= 一行, 以及 =Developer's Certificate of Origin 1.1= 内容.也就是说, *一定要符合标准格式*.
 
@@ -328,7 +328,6 @@ yocto 具有以下几种开发模型:
 - 根据需要修改内核代码
 - 根据需要更改内核配置
 - 再次重新编译内核
-
 
 **** 使用 SDK 开发 APP 的流程
 **** 修改应用代码
@@ -405,3 +404,6 @@ bitbake matchbox-desktop -c devshell
 #+begin_example
 bitbake matchbox-desktop -c devpyshell
 #+end_example
+** 详细说明
+*** 基本开发步骤(Common Tasks)
+**** 创建一个层(understanding and creating layers)
