@@ -407,3 +407,146 @@ bitbake matchbox-desktop -c devpyshell
 ** 详细说明
 *** 基本开发步骤(Common Tasks)
 **** 创建一个层(understanding and creating layers)
+在 =source directory= 目录中包含了通用层和BSP层,层目录以 =meta-= 作为开头.
+***** 以非脚本的方式创建自己的层
+使用以下通用步骤,在不使用脚本的情况下创建一个层:
+- 首先需要检查已经创建了哪些层,有没有和自己冲突的.在 [[layers.openembedded.org/layerindex/branch/master/layers][OpenEmbedded layers]] 网站中查看已经开发好的层,可以直接拿来用.
+- 创建一个文件夹,以 =meta-= 作为开头以代表一个层, 比如 =meta-mylayer, meta-GUI_xyz, meta-mymachine=
+- 进入层文件夹,并创建 =conf/layer.conf= 文件(可以从 =meta-yocto-bsp/conf/layer.conf= 中拷贝).
+#+begin_example
+# 下面是 =meta-yocto-bsp/conf/layer.conf= 中的内容:
+# BBPATH 后接的是配置文件和类文件的目录地址, LAYERDIR 就代表当前层的目录
+# BitBake 通过 BBPATH 指明的路径来找到此层配置文件,类文件等等
+#We have a conf and classes directory, and to BBPATH
+BBPATH .= ":${LAYERDIR}"
+
+# BBFILES 后接的是 recipes 文件以及其附加文件
+#We have recipes-* directories , add to BBFILES
+BBFILES += "${LAYERDIR}/recipes-*/*/*/*.bb \
+            ${LAYERDIR}/recipes-*/*/*/*.bbappend"
+# BBFILE_COLLECTIONS 接的是层的名称
+BBFILE_COLLECTIONS += "yoctobsp"
+# BBFILE_PATTERN_yoctobsp 后面是一个正则表达式, 用于匹配 BBFILES 中所选出来的文件
+BBFILE_PATTERN_yoctobsp = "^${LAYERDIR}/"
+# BBFILE_PRIORITY_yoctobsp 用于设置层的优先级, 当有同一个 recipe 在多个层中时,
+# 用于选择先使用哪个层
+BBFILE_PRIORITY_yoctobsp = "5"
+# LAYERVERSION_yoctobsp 使用一个数字,用于表明层的版本
+LAYERVERSION_yoctobsp = "3"
+#+end_example
+- 增加内容: 对比其他层,增加 =README= 文件, 然后根据层的作用创建其他内容.
+  + 当用于支持一个新的硬件时, 增加 =conf/machine/=
+  + 当用于增加发行版的功能, 增加 =conf/distro/=
+  + 当用于创建新的 recipe, 在层目录下增加 =recipes-*= 目录
+- 兼容性验证
+***** 使用脚本的方式创建一个层
+使用脚本 =yocto-layer= 就可以简单的创建一个层.
+- 设置优先级
+- 是否创建 recipe
+- 是否创建附加文件
+
+#+begin_example
+#创建层文件名为 "meta-mylayer" 的层
+#使用此命令后, 会自动创建 conf , COPYING.MIT , README 文件
+#如果选择创建配方文件,则会创建 "layer/recies-example/example/"
+#如果选择创建附加文件,则会创建 "layer/recipes-example-bbappend/example-bbappend/"
+#使用 yocto-layer help 查看更多信息
+yocto-layer create mylayer
+#+end_example
+
+- 在使用此脚本后, 还需要将层路径加入 =BBLAYERS= 变量中!
+
+***** 创建层需要考虑的要点
+- 不能从其他层中直接拷贝 recipes 文件然后修改, 正确的方式是创建其对应的附加文件 =.bbappend= 来修改.
+- 不能从其他层中直接拷贝 include 文件, 使用 =.bbappend= 修改 recipes 文件的引用.或者在新的 recipes 文件中加入 include 文件的相对路径.
+- 合理的使用附加文件,可以更加优雅且安全的配置.
+#+begin_example
+###########1. 通过修改变量来支持不同的硬件
+# 比如新建层 meta-one 是用于对硬件 "one"的支持, 那么可以新建一个 base-files.bbappend
+# 对于此硬件的依赖变量 DEPENDS 需要设置仅仅对 one 硬件有效, 需要为变量增加后缀
+DEPENDS_one = "foo"
+DEPENDS_append_one = "foo"  #_append 等价于 "+="
+DEPENDS_prepend_one = "foo" #_prepend 等价于 "=+"
+# 比如想要在系统使用 musl C 库的同时才依赖 "argp-standalone",需要如下使用
+DEPENDS_append_libc-musl = "argp-standalone"
+
+###########2. 将特殊的文件放在对应的位置
+# 比如当新建层中具有 recipe 文件 "base-files.bb",此文件具有 SRC_URI 变量将此文件变为全局文件
+# 那么如果想要对应硬件 "one" 而扩展此文件:
+FILESEXTRAPATHS_prepend := "${THISDIR}/${BPN}:"
+# 就应该将扩展文件放在指明硬件的文件夹下,比如将文件放在 "meta-one/recipes-core/base-files/base-files/one"
+# 中,而不是放在 "meta-one/recipes-core/base-files/base-files/" 中,因为这样会导致附加文件应用于所有的硬件
+
+###########3. 从远程库拷贝的层文件都要放在源文件下,于其他层文件属于同一目录!
+
+
+
+
+#+end_example
+
+***** 层兼容性测试
+可以在 [[https://www.yoctoproject.org/webform/yocto-project-compatible-registration][兼容 logo 申请网站]] 申请 logo, 申请表格有以下几部分:
+- contact information : 提供自己的信息,所使用的 yocto 版本,以及层说明
+- Acceptance criteria: 做一些选择并给出自己选 "No" 的原因
+- recommendations : 基本的选择
+
+在填写表格之前, 还需要使用 =yocto-compat-layer.py= 脚本来做兼容性测试.
+#+begin_example
+source oe-init-build-env
+yocto-compat-layer.py your_layer_directory
+#+end_example
+使用此命令后,脚本将会做以下测试:
+- common.test_readme: 测试是否存在 README 文件,并且文件非空
+- common.test_parse: 测试 bitbake 可以解析这些文件并且没有出错
+- common.test_show_environment : 测试环境没有问题
+- common.test_signatures: 测试 BSP 和 DISTRO 层没有改变 recipes 文件的签名
+- bsp.test_bsp_defines_machines: 测试 BSP 层是否配置了当前支持的设备
+- bsp.test_bsp_no_set_mathines: 确定当层被加入时 BSP 层没有设置设备
+- distro.test_distro_defines_distros: 测试 DISTRO 层是否包含配置文件
+- distro.test_distro_no_set_distro: 确定当层被加入时, DISTRO 层没有设置
+
+
+***** 使能层
+在使用层之前, 需要先使能层. 也就是将层的路径添加进 =BBLAYERS= 变量中,位于 build 文件夹下的 =conf/bblayers.conf= 
+
+bitbake 就是通过此变量找到对应的层, 然后分析对应的 =conf/layer.conf= 文件, 将层的 recipes, classes,configurations 添加到源文件中.
+#+begin_example
+LCONF_VERSION = "6"
+
+BBPATH = "${TOPDIR}"
+BBFILES ?= ""
+
+BBLAYERS ?= " \
+  $HOME/poky/meta \
+  $HOME/poky/meta-poky \
+  $HOME/poky/meta-yocto-bsp \
+  $HOME/poky/meta-mylayer\
+#+end_example
+***** 在层中使用 =.bbappend= 文件
+通过使用 =.bbappend= 文件来修改位于他处的 =.bb= 文件,两个文件的名称必须相同.比如 =somapp_2.3.1.bbappend= 文件对应于 =someapp_2.3.1.bb= 文件.
+
+如果没有找到对应的文件,那么 bitbake 在编译的时候是会报错的.通过查看 =BB_DANGLINGAPPENDS_WARNONLY= 变量获取更多信息.
+***** 设定层的优先级(prioritizing your layer)
+当多个层中有多个 =.bb= 或 =.bbappend= 文件时, 此优先级用于决定载入的先后顺序.
+
+使用变量 =BBFILE_PRIOPITY= 来确定优先级:
+#+begin_example
+BBFILE_PRIOPITY = "1"
+#+end_example
+***** 层管理
+使用工具可以查看层之间的关系:
+#+begin_example
+bitbake-layers command [arguments]
+#command 具有以下几种:
+# - help: 显示帮助
+# - show-layers: 显示层
+# - show-recipes: 显示层以及他的 recipes
+# - show-overlayed: 显示具有相同名字的 recipes
+# - show-appends: 显示附加文件以及原文件
+# - show-cross-depends: 显示recipes之间的依赖关系
+# - add-layer: 在 bblayers.conf 文件中增加一个层的路径
+# - remove-layer: 从 bblayers.conf 文件中删除一个层
+# - flatten: 将所有层的配置都列出来.这会创建一个 "flattened" 文件夹包含这些所有配置.
+#+end_example
+
+**** 配置镜像文件(customizing images)
