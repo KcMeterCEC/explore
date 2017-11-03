@@ -1,0 +1,47 @@
+* [What]program --> docker
+
+** 基本概念
+docker 的工作流程和 git 特别类似.
+*** 镜像
+指的就是运行的文件系统环境包, 里面包含了必要的库, 一般镜像是存储于远程库中的,供大家分享.
+*** 容器
+将远程镜像抓取下来, 然后创建的实体就是容器. 这是用户的实际运行环境.对容器的更改, 可以反映到镜像中.
+
+镜像以增量的方式保存以前的更改可以为不同时期的状态创建一个 tag.
+*** 仓库
+用于存储镜像的位置,类似于 github.
+** 准备及安装
+*** 在 ubuntu16.04 中安装及配置
+**** 卸载以前的版本
+#+begin_example
+sudo apt remove docker docker-engine docker.io
+#+end_example
+**** 安装
+#+begin_example
+# 安装基础环境
+sudo apt update
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+
+#添加国内的镜像
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+
+sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+   $(lsb_release -cs) \
+   stable"
+#安装
+sudo apt install
+sudo apt install docker-ce
+#+end_example
+**** 启动及配置
+#+begin_example
+#启动
+sudo systemctl enable docker
+sudo systemctl start docker
+#建立用户组,(默认root 和 docker组 的用户才可以访问 docker 引擎的 socker
+sudo groupadd docker
+#将当前用户加入组
+sudo usermod -aG docker ${USER}
+#将从阿里云获得的加速器地址加入配置, 然后重新启动(参考阿里云)
+sudo vim /etc/docker/daemon.json
+#+end_example
