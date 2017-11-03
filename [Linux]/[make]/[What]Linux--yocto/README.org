@@ -505,7 +505,6 @@ yocto-compat-layer.py your_layer_directory
 - distro.test_distro_defines_distros: 测试 DISTRO 层是否包含配置文件
 - distro.test_distro_no_set_distro: 确定当层被加入时, DISTRO 层没有设置
 
-
 ***** 使能层
 在使用层之前, 需要先使能层. 也就是将层的路径添加进 =BBLAYERS= 变量中,位于 build 文件夹下的 =conf/bblayers.conf= 
 
@@ -550,3 +549,207 @@ bitbake-layers command [arguments]
 #+end_example
 
 **** 配置镜像文件(customizing images)
+***** 使用 local.conf 来增加包
+=build/conf/local.conf= *仅仅是用来增加包(packages)*,不能会镜像文件进行深度配置.
+
+增加一个包的时候使用 =IAMGE_INSTALL= 变量,并且增加 =_append= 后缀:
+#+begin_example
+#注意 strace 前面还有一个空格
+IMAGE_INSTALL_append = " strace"
+#+end_example
+
+为了使增加的包仅仅对于指定的硬件,还可以再增加后缀:
+#+begin_example
+#指定仅仅在 core-image-minimal 中增加 strace 包
+IMAGE_INSTALL_append-core-image-minimal = " strace"
+#+end_example
+***** 使用变量 =IMAGE_FEATURES / EXTRA_IMAGE_FEATURES= 
+在 recipes 文件中使用 =IMATGE_FEATURES= , 在 =local.conf= 文件中使用 =EXTRA_IMAGE_FEATURES= , 
+来使能或者关闭印象的一些特征.
+
+参考文件 =meta/classes/core-image.bbclass, meta/conf/bitbake.conf= 中列出了如何使用这些变量.
+
+实际上也是来添加包, 最终这些变量所指定的包都会添加到变量 =IMAGE_INSTALL= 中.
+
+
+
+
+***** 使用 =.bb= 文件
+可以自己新建一个 recipe 文件来指定镜像需要增加什么,在新建文件的开头需要加入以下两行:
+#+begin_example
+IMAGE_INSTALL = "packagegroup-core-x11-base package1 package2"
+inherit core-image 
+#+end_example
+
+在实际使用中,可以拷贝其他的 .bb 文件,然后重命名为自己的文件,最后再来增加自己所需要的东西.
+***** 使用包组(Custom Package Groups) 
+当一个 image 需要进行很多的包定制时, 使用包组 recipe 文件, 参考 =meta/recipes-core/packagegroups/packagegroup-base.bb=.
+***** 改变主机名称
+默认情况下, 镜像的主机名称和变量 =MACHINE= 一致, 最终在运行的目标机上的 =/etc/hostname= 就保存了主机名.
+
+可以通过新建 =base_files.bbappend= 然后使用变量 =hostname= 来设置主机名,也可以在配置文件中使用 =hostname_pn-base-files= 来设置:
+#+begin_example
+#in an append file 
+hostname="myhostname"
+#in a configuration file
+hostname_pn-base-files = "myhostname"
+#+end_example
+
+**** 新建一个 recipe 文件(Writing a New Recipe)
+[[./recipe_create.bmp][process]]
+***** 新建
+新建一个 recipe 可以使用以下3种快捷方式:
+- devtool add : 
+- recipetool create:使用此命令前需要进入 build 文件夹, 然后执行脚本 =oe-init-build-env / oe-init-build-env-memres=.
+  + =recipetool create -o OUTFILE= 创建一个基本的recipe
+  + =recipetool create -o OUTFILE source= 在文件夹 source 中创建 recipe 
+  + =recipetool create -o OUTFILE -x EXTERNALSRC source= 基于 EXTERNALSRC 提取源码然后新建 recipe 到文件夹 source
+  + =recipetool create -d -o OUTFILE source= 在文件夹 source 中创建 recipe, 并包含调试信息
+- existing recipes: 拷贝一个已经存在的 recipe, 在此基础上作修改, openembedded 提供了很多: [[https://layers.openembedded.org/layerindex/branch/master/layers][recipe]]
+  + 在使用此方法前,需要确保自己已经很熟悉这个存在的 recipe.
+  + 如果不想使用 =recipetool= 也没有现成的 recipe 供参考, 那么使用如下结构:
+#+begin_example
+DESCRIPTION = ""
+HOMEPAGE = ""
+LICENSE = ""
+SECTION = ""
+DEPENDS = ""
+LIC_FILES_CHKSUM = ""
+SRC_URI = ""
+#+end_example
+***** 保存和命名 recipe
+新建完 recipe 需要将其放在层中, 并正确命名,这样才能让 bitbake 识别这些文件.
+- 保存: bitbake 通过每个层的 =conf/layer.conf= 和 =BBFILES= 变量来寻找 recipes.
+#+begin_example
+BBFILES += "${LAYERDIR}/recipes-*/*/*.bb\
+            ${LAYERDIR}/recipes-*/*/*.bbappend"
+#+end_example
+- 命名: basename_version.bb , 使用小写字符.
+#+begin_example
+cups_1.7.0.bb
+gawk_4.0.2.bb
+irssi_0.8.16-rc1.bb
+#+end_example
+***** recipe 基本语法
+****** 变量
+变量以大写字母和下划线组成, 通过双引号包含的字符串给变量赋值, 字符串中可以包含其他变量名(${VAR})
+
+除了赋值操作外, 还可以使用附加操作("+= , xxx_append"), 赋值操作 "= / += / ?= /:= " 与 makefile 语法一致.
+- = : 使用时才真正赋值, 这样确保变量值最符合上下文
+- := : 立即赋值
+- ?= : 选择赋值. 当变量为空时, 才赋值, 否则不做改变
+- += : 追加赋值. 将右值追加到变量中, *此操作会自动在两段内容间加空格*.
+- =+ : 在前面增加赋值. 将右值增加到变量头, *此操作会自动在两段内容间加空格*.
+- xx_append : 在变量 xx 后追加赋值. *此操作不会自动添加空格, 并且优先级在 \=+ , += , =, 之后*.
+  + 可以在 append 后增加 target 来指明此追加仅仅对指定的目标. SRC_URI_append_sh4 = " file://fix-makefile.patch" (*注意引号的空格*)
+- xx_perpend: 与 _append 类似, 对应加在变量最前(*空格要加在字符串后*). CFLAGS_perpend_sh4 = "-I${S}/myincludes " 
+
+变量名可以重新赋值,或者对于特定的目标设置特定的值.
+
+
+#+begin_example
+S = "${WORKDIR}/postfix-${PV}"
+CFLAGS += "-DNO_ASM"
+SRC_URI_append = " file://fixup.patch"
+KBRANCH = "standard/base"
+KBRANCH_qemuarm = "standard/arm-versatile-926ejs"
+#+end_example
+****** 函数
+函数的语法与 =shell= 一样.
+#+begin_example
+do_install(){
+    autotoos_do_install
+    install -d ${D} ${base_bindir}
+    mv ${D} ${bindir}/sed ${D} ${base_bindir}/sed
+    rmdir ${D}${bindir}/
+}
+#+end_example
+****** 关键字
+- inherit : 导入一个函数
+- include / require : 包含其他文件
+- export : 将局部变量转为全局变量
+#+begin_example
+export POSTCONF = "${STAGING_BINDIR}/postconf"
+inherit autoconf
+require otherfile.inc
+#+end_example
+****** 注释
+与 shell 一样, 使用 =#= 做注释.
+****** 续行符
+使用 =\=
+****** 使用 python
+可以在 recipe 中嵌入 python 语法, 使用方式: =${@python_code}= , python_code 即为需要执行的代码
+#+begin_example
+SRC_URI = "ftp://ftp.info-zip.org/pub/infozip/src/zip${@d.getVar('PV',1).replace('.','')}.tgz"
+#+end_example
+
+***** 编译和运行 recipe 
+这个过程会多次重复, 因为需要反复修改和重新配置 recipe.
+#+begin_example
+#提供 recipe 的基本名字
+bitbake basename
+#在编译过程中, bitbake 会生成一个临时文件夹, 存放了源码,日志,编译中间文件等等.
+#使用以下命令找到临时文件夹地址
+bitbake -e basename | grep ^WORKDIR=
+#+end_example
+在最终生成的文件夹中就可以验证 recipe.
+***** 抓取代码
+
+有很多开源的代码,可以直接从网上下载应用.
+
+recipe 中的 =SRC_URI= 变量指明了源文件的路径.
+#+begin_example
+SRC_URI = "ftp://ftp.berlios.de/pub/cdrecord/alpha/cdrtools-${PV}.tar.bz2"
+#+end_example
+当路径是压缩包的形式时, =do_unpack= 任务会自动解包.
+
+当路径是版本控制系统时, 那么还需要设置需要抓取的版本号.
+#+begin_example
+SRCREV = "d6918c8832....."
+
+PR = "r6"
+PV = "1.0.5+git${SRCPV}"
+
+SRC_URI = "git://git.kernel.dk/blktrace.git \
+           file://ldflags.patch"
+#+end_example
+
+当 =SRC_URI= 具有多个链接地址时, 需要指明它们的 =md5 和 sha256= 校验.
+#+begin_example
+SRC_URI = "${DEBIAN_MIRROR}/main/a/apmd/apmd_3.2.2.orig.tar.gz;name=tarball \
+           ${DEBIAN_MIRROR}/main/a/apmd/apmd_${PV}.diff.gz;name=patch"
+
+SRC_URI[tarball.md5sum] = "bl36309e8...."
+SRC_URI[tarball.sha256sum] = "7f7d9....."
+
+SRC_URI[patch.md5sum] = "57e1b58....."
+SRC_URI[patch.sha256sum] = "7905ff..."
+#+end_example
+
+当 =SRC_URI= 中的地址以 =file:= 开头时, bitbake 自动搜寻本地文件夹, 路径根据 =FILESPATH= 决定.
+
+***** 提取代码
+在编译期间, =do_unpack= 任务会自动的解压缩 recipe, 变量 =S= 指定了压缩包的位置.
+
+如果压缩包的内部结构与 =${BPN}-${PV}= 相同, 那么 =S= 就不需要设置.如果结构不统一或者是从 SCM 中获取的代码, 那么就需要指定 =S=.
+***** 给代码打补丁
+默认情况下, 当抓取的代码中具有补丁文件时, =do_patch= 任务会自动的打补丁.
+***** 许可
+recipe 中需要包含 =LICENSE= 和 =LIC_FILES_CHKSUM= 变量.
+- LICENSE : 需要查看源码的 LICENSE 然后给此变量赋值, 标准的名字位于 =meta/files/common-license/ 或 meta/conf/licenses.conf 中的 SPDXLICENSEMAP 标记=.
+- LIC_FILES_CHKSUM: 此变量用于确定 license 文件没有被修改过. 此值可以先随便设置一个,然后在编译过程中查看输出警告的正确值,再填入其中.
+#+begin_example
+LIC_FILES_CHKSUM = "file://COPYING;md5=xxx"
+#+end_example
+
+***** 依赖
+编译时的依赖库使用变量 =DEPENDS= 指定, 运行时的依赖库由变量 =RDEPENDS= 指定.
+***** 配置
+在实际编译之前, 都需要配置源码的编译方式.
+- autotools : 当源码中包含 =configure.ac= 文件时, 那么源码的构建就需要使用到 autotools.
+所以 recipe 中需要 inherit =autotools= 类, 并且不需要包含 =do_configure= 任务.
+- CMake: 当源码中包含 =CMakeLists.txt= 文件时, 就会用到 CMake, 所以 recipe 中需要 inherit =cmake= 类, 并且不需要包含 =do_configure= 任务.
+- Other: 当源码中不包含 =configure.ac 或 CMakeLists.txt= 文件时, 那么 recipe 中就需要包含 =do_configure= 任务. 这种情况下还需要自己完成 Makfile 或者一些脚本.
+
+当配置完成后, 可以查看文件 =log.do_configure= 来判断配置是否合理.
+***** 头文件包含

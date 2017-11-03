@@ -599,6 +599,8 @@ I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=
 I2C core 使用 =i2c_adapter,i2c_algorithm= 抽象I2C控制器的功能, =i2c_driver, i2c_client= 抽象 I2C slave device 的功能.
 另外, 基于I2C协议, 通过 smbus 模块实现 SMBus的功能.
 
+[[./i2c_smbus.bmp][i2c & smbus]]
+
 I2C muxes 用于实现I2C BUS的多路复用功能, 实际使用较少.
 *** 控制器驱动的编写
 **** 数据结构
