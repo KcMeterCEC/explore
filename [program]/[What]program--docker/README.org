@@ -10,6 +10,8 @@ docker 的工作流程和 git 特别类似.
 将远程镜像抓取下来, 然后创建的实体就是容器. 这是用户的实际运行环境.对容器的更改, 可以反映到镜像中.
 
 镜像以增量的方式保存以前的更改可以为不同时期的状态创建一个 tag.
+
+*当容器中指定的应用终结时, 容器也自动终止*.
 *** 仓库
 用于存储镜像的位置,类似于 github.
 ** 准备及安装
@@ -245,4 +247,84 @@ sha256:f477a6e18e989839d25223f301ef738b69621c4877600ae6467c4e5289822a79B/78.42 M
 3. 如果有与此镜像对应的容器存在, 那么需要先删除容器
 
 *** 容器
+容器是独立运行的一个或一组应用, 以及它们的运行态环境. 虚拟机可以理解为模拟运行的一套操作系统和基于系统的应用.
+**** 启动
+***** 首次启动
+- docker run [option] <image name>:<tag> [command]  或者 docker container run [option] <image name>:<tag> [command]
+  + docker run -t -i ubuntu:14.04 /bin/bash : 启动一个容器并打开其交互终端
 
+执行这些命令后, docker 在后台运行的标准操作包括:
+- 检查本地是否存在指定的镜像, 不存在就从公有库下载
+- 利用镜像创建并启动一个容器
+- 分配一个文件系统, 并在只读的镜像层外面挂载一层可读可写层
+- 从宿主主机配置的网桥中桥接一个虚拟接口到容器中去
+- 从地址池配置一个 ip 地址给容器
+- 执行用户指定的应用程序
+- 执行完毕后容器被终止
+***** 启动已终止的容器
+- docker start <container name> 或者 docker container start 
+**** 后台运行
+在运行命令中加入 =-d= 参数, 容器就不会输出结果打印到宿主机上面. 使用命令 =docker logs <container name> / docker container logs <container name>= 来查看信息输出.
+
+通过命令 =docker ps / docker container ls= 查看正在运行的容器.
+
+**** 终止容器
+
+- docker stop <container name>: 终止一个运行中的容器.
+- docker ps -a : 查看所有的容器信息
+- docker restart <container name>/ docker container restart <container name> : 重启一个容器
+**** 进入容器
+***** attach
+- docker attach <container name> : 进入容器
+***** nsenter
+nsenter 会启动一个新的 shell 进程, 同时会把这个新进程切换到和目标进程相同的命令空间, 这样就相当于进入了容器内部.
+
+为了连接到容器, 还需要找到容器的第一个进程的PID
+#+begin_example
+PID=$(docker inspect --format "{{ .State.Pid}}" <container name>)
+#+end_example
+
+然后连接到容器
+#+begin_example
+nsenter --target ${PID} --mount --uts --ipc --net --pid
+#+end_example
+**** 导出和导入
+- docker export <container name> > <filename.tar> / docker container export <container name> > <filename.tar>: 导出容器快照
+- docker import <URL/file> / docker image import <URL/file>: 将容器快照导入
+
+**** 删除
+- docker rm <container name> : 删除一个处于终止状态的容器, 加入 =-f= 则会停止一个容器并删除, =docker rm $(docker ps -a -q)= 删除所有处于终止状态的容器
+- docker container rm <container name> / docker container prune
+
+*** 仓库
+**** docker hub 
+- docker login : 仓库
+- docker search <image name>: 查找镜像
+- docker pull / push <image name> : 抓取或推送到库
+**** 私有仓库
+可以使用 =docker-registry= 来创建本地的私有仓库
+
+*** 数据管理
+**** 数据卷
+- 数据卷可以一个或多个容器使用
+- 对数据卷的修改会立即生效
+- 对数据卷的更新不会影响镜像
+- 数据卷会一直存在, 即是容器被删除.
+
+- sudo docker run -d -P --name web -v /webapp training/webapp python app.py : 使用 =-v= 创建一个数据卷并挂载到容器中.
+- docker rm -v : 删除一个数据卷
+- sudo docker run -d -P --name web -v /src/webapp:/opt/webapp taraining/webapp python app.py : 挂载 *本地* 目录 =/src/webapp= 到容器的 /opt/webapp 目录中
+- sudo docker run --rm -it -v ~/.bash_history:/.bash_history ubuntu /bin/bash : 挂载 *本地* 文件 =~/.bash_history= 到容器的 /.bash_history 文件上
+- docker inspect web : 查看数据卷信息
+
+
+**** 数据卷容器
+如果有一些持续更新的数据需要载容器之间共享, 最好创建数据卷容器.
+
+*** 网络访问
+**** 外部访问
+使用 =-P / -p= 来指定主机到容器的端口映射(P -> 随机映射 p -> 指定映射), 可以通过 =docker ps= 来查看实际映射情况
+- sudo docker run -d -p 5000:5000 training/webapp python app.py : 本地5000端口映射到容器的5000端口
+- sudo docker run -d -p 127.0.0.1:5000:5000 training/webapp python app.py : 映射到指定地址的指定端口
+- sudo docker run -d -p 127.0.0.1::5000 training/webapp python app.py : 映射到指定地址的任意端口
+- docker port <container name> 5000 : 查看映射端口的配置
