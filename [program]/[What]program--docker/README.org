@@ -1,5 +1,7 @@
 * [What]program --> docker
 
+参考: [[https://www.gitbook.com/book/yeasy/docker_pratics/details][Docker - 从入门到实践]]  [[https://docs.docker.com][docker document]]
+
 ** 基本概念
 docker 的工作流程和 git 特别类似.
 *** 镜像
@@ -23,14 +25,13 @@ sudo apt update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
 
 #添加国内的镜像
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-
+curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
 sudo add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   $(lsb_release -cs) \
-   stable"
+    "deb [arch=amd64] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu \
+    $(lsb_release -cs) \
+    stable"
 #安装
-sudo apt install
+sudo apt update
 sudo apt install docker-ce
 #+end_example
 **** 启动及配置
@@ -42,6 +43,206 @@ sudo systemctl start docker
 sudo groupadd docker
 #将当前用户加入组
 sudo usermod -aG docker ${USER}
+#验证是否加入成功
+groups ${USER}
+#重启系统
+sudo reboot
 #将从阿里云获得的加速器地址加入配置, 然后重新启动(参考阿里云)
 sudo vim /etc/docker/daemon.json
 #+end_example
+
+** 使用
+*** 镜像
+**** 获取镜像
+镜像存储于 [[https://hub.docker.com/explore/][docker hub]] 中, 类似于 github.
+
+获取镜像的格式为:
+#+begin_example
+# [docker registry address] 指的是 <域名/IP>[:端口号]. 如果不填那就默认是 docker hub 地址
+# [repository name] 指的是 <用户名>/<镜像名>. 如果在 docker hub 地址上不填, 那用户名就默认是 library
+# <tag> 则是对应镜像所建立的标签, 和 git 中的 tag 类似
+# 比如 docker pull ubuntu:14.04 就是获取 docker hub 下的 library/ubuntu:14.04
+docker pull [option] [docker registry address]<repository name>:<tag>
+#+end_example
+**** 通过镜像启动容器
+#+begin_example
+#启动镜像里面的bash
+# -it : 启动一个交互式(i)的终端(t)
+# -rm : 在容器退出后, 删除其所占有的空间
+# ubuntu:14.04 bash : 以 ubuntu:14.04 为基础,并启动里面的bash
+docker run -it --rm ubuntu:14.04 bash
+#+end_example
+
+**** 查看镜像
+- docker images / docker image ls : 查看已经下载下来的镜像
+- docker images -a : 在显示所有镜像的同时也显示中间层镜像(多个镜像共用的层)
+- docker images <image name> : 根据仓库命列出镜像
+- docker images <image name>:<tag> : 列出某个镜像的特定标签
+- docker images -f since/before=<image name>:<tag> : 在某个镜像之后(之前)建立的镜像
+- docker image prune : 删除所有的虚悬镜像(dangling image).
+**** 定制镜像
+***** 使用 commit (不推荐)
+在容器中, 修改的文件系统都会被记录于容器存储层了,使用 =docker commit= 命令将这些变化保存为一个镜像.
+#+begin_example
+docker commit [option] [container id or name] [<repository name>[:<tag>]]
+
+#一般的应用如下
+docker commit --author "author information" --message "commit message" <container name>\
+ <repository name>:<new tag name>
+#+end_example
+
+- docker history <repository name>:<tag> : 显示修改历史
+***** 使用 Dockerfile
+Dockerfile 就是又一系列的脚本组成了, 表示了从最开始到现在镜像所构建的每一层的命令.
+这样对于以后的维护工作就透明简洁了.
+
+- 使用习惯 : 为Dockerfile 新建一个空目录, 然后编辑此文件, 当有软件包需要编译时, *将软件包拷贝至当前目录*.
+  + 简单点理解, Dockerfile 有点类似于 makefile.
+
+当编辑好 Dockerfile 后, 在 Dockerfile 文件所在目录处执行命令:
+#+begin_example
+# context path : 上下文路径
+# docker 是基于 C/S 架构的运行机制, 通常我们操作的都是客户端, 然后与服务器进行消息通信.
+# 在编译过程中, 需要给 build 命令指定一个上下文路径, build命令会将此路径下的所有文件都压缩拷贝至服务器
+# 所以, 在需要安装一些软件包的时候, 需要主动将软件包拷贝到上下文目录下(一般是当前目录), 然后所有操作都在此目录
+# 下完成
+docker build [options] -t <image name>:<tag name> <context path>
+
+#也可以使用简易命令
+docker image build
+#+end_example
+
+****** 指令
+- FROM : 指定基础镜像, 代表后面命令的修改都是在此镜像的基础之上完成的. *必须是 Dockerfile 中的第一条命令*.
+  + 当使用 =FROM scratch= 时, 代表不基于任何镜像构建,很多时候就是直接将可执行文件复制进镜像即可.
+#+begin_example
+FROM nginx
+....
+#+end_example
+- RUN : 执行命令行的命令, 可以执行 shell 脚本的命令
+  + *每执行RUN都会启动一个容器新建立一层镜像, 也就是说各个RUN命令之间没有联系!* 可以将多个命令集合在一个RUN中减少层数
+#+begin_example
+FROM debian:jessie 
+RUN echo '<h1>Hello, Docker!</h1>' > /usr/share/nginx/html/index.html 
+RUN apt-get update
+RUN apt-get install -y gcc libc6-dev make 
+RUN make -C /usr/src/redis 
+RUN make -C /usr/src/redis install 
+....
+#+end_example
+#+begin_example
+# 执行命令的中间文件, 应该删除以保证包尽量的小
+FROM debian:jessie
+
+RUN buildDeps='gcc libc6-dev make' \
+    && apt-get update \
+    && apt-get install -y $buildDeps \
+    && wget -O redis.tar.gz "http://download.redis.io/releases/redis-3.2.5.tar.gz" \
+    && mkdir -p /usr/src/redis \
+    && tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1 \
+    && make -C /usr/src/redis \
+    && make -C /usr/src/redis install \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm redis.tar.gz \
+    && rm -r /usr/src/redis \
+# 清理 apt 缓存
+    && apt-get purge -y --auto-remove $buildDeps
+#+end_example
+- COPY : 在服务器端, *相对于上下文环境* 复制文件
+  + COPY <source> <destination>
+- ADD : 高级复制
+  + ADD 的源路径可以是 URL 或 压缩(gzip, bzip2, xz)文件, 这样可以自动下载以及解压缩到目的地址去
+- CMD : 容器启动命令, 用于指定默认的容器主进程的启动命令. *在实际使用时, 启动容器后面跟着的命令就会替换 CMD 的默认值, 否则就运行CMD指定的命令*
+  + 需要注意的是, *在容器中不能启动后台命令*.因为一个容器就是一个进程, 而不是虚拟机.
+- ENTRYPOINT : 入口点, 也是用于指定容器启动程序及参数
+  + 在实际使用时, 可以在启动容器名后面跟参数, 这个参数就会作为 ENTRYPOINT 的参数.
+#+begin_example
+FROM ubuntu:16.04
+RUN apt-get update \
+    && apt-get install -y curl \
+    && rm -rf /var/lib/apt/lists/*
+ENTRYPOINT ["curl", "-s", "http://ip.cn"]
+
+#当外部使用 docker run myip -i 时, 实际 -i 就作为参数传递给了 ENTRYPOINT ,
+# 也就是说,容器在启动后会运行命令为: curl -s http://ip.cn -i
+#+end_example
+- ENV 设置环境变量
+  + ENV <key> <value>  / ENV <key1>=<value1> <key2>=<value2>
+#+begin_example
+ENV NODE_VERSION 7.2.0
+
+RUN curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-x64.tar.xz" \
+  && curl -SLO "https://nodejs.org/dist/v$NODE_VERSION/SHASUMS256.txt.asc" \
+  && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
+  && grep " node-v$NODE_VERSION-linux-x64.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
+  && tar -xJf "node-v$NODE_VERSION-linux-x64.tar.xz" -C /usr/local --strip-components=1 \
+  && rm "node-v$NODE_VERSION-linux-x64.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
+  && ln -s /usr/local/bin/node /usr/local/bin/nodejs
+#+end_example
+- ARG : 构建参数, 这些参数都是在构建命令的时候所使用的, 该默认值可以在构建命令 =docker build= 中使用 =--build-arg <argument name>=<value>= 来覆盖.
+  + ARG <argument name>[=<default value>]
+- VOLUME : 定义匿名卷, 为了避免向容器存储层写入大量数据,需要将这些数据保存在卷中.
+  + VOLUE ["<path1>", "<path2>"...] / VOLUE <path>
+#+begin_example
+# /data 目录就会在运行时自动挂载为匿名卷, 任何向 /data 中写入的信息都不会记录进容器存储层.
+VOLUME /data
+#+end_example
+- EXPOSE : 声明端口, 声明运行时容器提供服务的端口, 但并不一定会使用此端口
+  + EXPOER <port1> [<port2> ...]
+  + 在运行容器时使用 =-p <宿主端口>:<容器端口>= 就会将容器对应的端口服务公开给外界访问
+- WORKDIR 指定工作目录, *此命令可以影响以后的层*.
+  + WORKDIR <path>
+- USER 指定当前用户, *此命令可以影响以后的层*.
+  + USER <user name>
+- HEALTHCHECK: 健康检查, 检查容器是否运行正常
+  + HEALTHCHECK [option] CMD <command> : 设置检查容器健康状况的命令
+  + HEALTHCHECK NONE : 如果基础镜像有健康检查指令, 此命令用于屏蔽掉健康检查指令.
+
+#+begin_example
+# HEALTHCHECK 支持下列选项
+--interval=<间隔> : 两次健康检查的间隔
+--timeout=<时长> : 如果超过时间无响应, 则本次检查被视为失败,默认30秒
+--retries=<次数> : 当连续几次失败后, 容器就被视为 unhealthy, 默认3次
+
+#+end_example
+#+begin_example
+FROM nginx
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+#每5秒检查一次, 超过3秒就视为失败, 使用命令 curl 来检查
+HEALTHCHECK --interval=5s --timeout=3s \
+  CMD curl -fs http://localhost/ || exit 1
+#+end_example
+
+如果容器为 unhealthy , 可以使用 =docker inspect= 来查看.
+- ONBUILD : OUTBUILD 后面跟其他指定, *这些指令在当前镜像构建时并不会被执行. 只有当以当前镜像为基础镜像,区构建下一级镜像的时候才会被执行*.
+  + ONBUILD <command> 
+
+
+
+
+
+***** 使用压缩包导入
+通过压缩包导入的镜像将会作为第一层镜像.
+
+- docker import [option] <file>|<URL>| [<repository>[:<tag>]] 
+#+begin_example
+docker import \
+    http://download.openvz.org/template/precreated/ubuntu-14.04-x86_64-minimal.tar.gz \
+    openvz/ubuntu:14.04
+Downloading from http://download.openvz.org/template/precreated/ubuntu-14.04-x86_64-minimal.tar.gz
+sha256:f477a6e18e989839d25223f301ef738b69621c4877600ae6467c4e5289822a79B/78.42 MB
+#+end_example
+
+**** 删除镜像
+删除镜像使用如下指令
+- docker rmi [option] <image1> [<image2> ...]
+对应的删除容器则使用
+- docker rm [option] <container>
+
+*注意*: 删除命令不一定会真的删除镜像,有以下几种情况:
+1. 如果有多个标签指向了同一个镜像, 那么就只是删除标签.
+2. 如果有多个镜像以此层为基础, 那么需要其他层删除后才能删除此层
+3. 如果有与此镜像对应的容器存在, 那么需要先删除容器
+
+*** 容器
+

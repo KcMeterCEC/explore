@@ -271,3 +271,27 @@ Defaults env_reset, timestamp_timeout=<time>
 #也可以强制退出 sudo 状态
 sudo -K
 #+end_example
+** 系统
+*** setting locale failed(LC_ALL = (unset))
+当进行 =apt= 安装的时候, 都会出现类似的警告.解决流程如下:
+- 查看目前的语言环境, 以及目前的设置
+  + locale -a : 列出语言环境
+  + locale : 列出目前的设置
+    - LANG : 当一些语言环境缺少语言设置时,就使用这个默认的设置
+    - LC_ADDRESS : 用于显示地址的语言
+    - LC_ALL : 最高优先级的变量, 可以覆盖其他设置
+    - LC_COLLATE: collation order
+    - LC_CTYPE : 
+    - LC_MONETARY : 货币语言
+    - LC_MEASUREMENT :测量系统
+    - LC_MESSAGES:交互式消息
+    - LC_NUMERIC:数字
+    - LC_PAPER:
+    - LC_RESPONSE:回复语言
+    - LC_TELEPHONE:电话号码
+    - LC_TIME:显示时间
+- 进行设置
+  + less /usr/share/i18n/SUPPORTED : 查看可以被设置的语言
+  + sudo locale-gen en_US.UTF-8 : 根据上面输出, 选择语言环境生成
+
+*注意*: 如果以上方法没有作用, 那么就修改 =/etc/default/locale= 文件,将 =LC_ALL= 设置.

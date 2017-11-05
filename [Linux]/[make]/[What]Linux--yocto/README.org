@@ -753,3 +753,22 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=xxx"
 
 当配置完成后, 可以查看文件 =log.do_configure= 来判断配置是否合理.
 ***** 头文件包含
+当需要在编译的过程中与硬件通信或者配置内核等,都需要包含头文件.
+
+*注意*: 无论在任何情况下都不能修改文件 =meta/recipes-kernel/linux-libc-headers/linux-libc-headers.inc= 文件, 这会影响很多.
+
+需要修改文件的话, 最好还是通过 =.bbappend= 来完成.并且 recipe 需要如下行:
+#+begin_example
+do_configure[depends] += "virtual/kernel:do_shared_workdir"
+#+end_example
+***** 编译
+在源码被抓取,解压缩并配置完成后, =do_compile= 任务便开始运行了.
+
+在此任务执行失败的情况下, 有以下几种可能:
+- 并行编译错误 : 由于编译任务之间的依赖关系, 如果依赖任务先于被依赖项执行,那么就会存在找不到文件的情况,解决方法是关闭此功能:
+#+begin_example
+PARALLEL_MAKE = ""
+#+end_example
+- 编译路径错误: 当路径错误时, 需要检查文件 =log.do_compile= .
+- 没有找到文件或库: 这个由于依赖没有设置完整的原因, 需要去 recipe 中重新设置.
+***** 安装
