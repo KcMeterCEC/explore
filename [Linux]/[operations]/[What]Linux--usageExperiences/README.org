@@ -295,3 +295,7 @@ sudo -K
   + sudo locale-gen en_US.UTF-8 : 根据上面输出, 选择语言环境生成
 
 *注意*: 如果以上方法没有作用, 那么就修改 =/etc/default/locale= 文件,将 =LC_ALL= 设置.
+*** sudo : unable to resolve host xxx
+出现这个问题原因是主机名不匹配导致的, 比如主机名称为 =virtual=,那么需要检查以下文件:
+- 确保 =/etc/hostname= 包含主机名
+- 确保 =/etc/hosts= 的主机名为 =127.0.1.1 virtual=

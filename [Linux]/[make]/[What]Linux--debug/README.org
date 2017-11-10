@@ -113,3 +113,18 @@ BUG()的变体叫做 =BUG_ON(condition)= ,当 *条件成立则抛出Oops*.
 跟踪系统详细的运行状态和流程,可以跟踪记录系统中的特定事件.
 *** LTP 压力测试
 *** Benchmark 评估系统
+** 应用调试
+*** 文件传输
+**** lrzsz(串口传输)
+当有网络的情况下, 通常是使用 tftp 来收发文件, 但当没有网络时, 则可以使用 =lrzsz= 来完成.
+
+下载 [[https://ohse.de/uwe/software/lrzsz.html][源码]] , 并解压缩后使用下面的命令编译
+#+begin_example
+# prefix 指定编译输出的文件夹路径
+CC=arm-linux-gnueabihf-gcc ./configure --target=arm --prefix=/home/cec/Downloads/lrzsz-0.12.20/build/
+make
+make install
+#+end_example
+然后将编译好的 =bin= 目录下的应用拷贝至文件系统, 其中 lrz 接收, lsz 发送.
+
+在 linux 主机下一般使用终端 minicom.连接好开发板后, 开发板首先运行 =lrz= ,然后在主机下 =CTRL-A s= ,选择 zmodem 然后传输文件.

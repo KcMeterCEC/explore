@@ -1,7 +1,7 @@
 * [What]yocto --> base
 参考链接:[[www.yoctoproject.org/docs/2.3.1/mega-manual/mega-manual.html][yocto参考手册]]
 
-** 快速准备与体验操作
+** 快速准备与体验操作(基本环境搭建)
 *** Yocto 开发环境介绍
 
 yocto 的编译部分是基于 OpenEmbedded(OE)项目, OE项目使用 BitBake 来构建完整的镜像文件.
@@ -45,7 +45,7 @@ git checkout pyro
 #+end_example
 *** 编译镜像文件
 **** 编译仿真环境
-**** 基本配置
+***** 基本配置
 #+begin_example
 cd poky
 #切换到最新的release
@@ -66,7 +66,7 @@ INHERIT += "rm_work"
 - 默认配置是用于QEMU仿真的32位X86平台, 可以通过修改 =local.conf= 中的 =MACHINE= 变量来修改.
 - 默认生成的镜像文件是 RPM 格式, 可以通过修改 =local.conf= 中的 =PACKAGE_CLASSES= 变量改变包格式
 
-**** 开始编译
+***** 开始编译
 首次编译需要一定的时间, 因为需要首次下载文件.
 
 *注意:* 首次编译及下载会消耗很多CPU和内存, 所以最好将UI界面退出, 进入命令行界面.否则容易导致 *ubuntu自动重启*.
@@ -76,20 +76,20 @@ INHERIT += "rm_work"
 bitbake core-image-sato
 #+end_example
 
-**** 开始仿真
+***** 开始仿真
 使用 =Ctrl -C= 退出仿真环境.
 #+begin_example
 runqemu qemux86
 #+end_example
 **** 为硬件环境生成镜像文件
 此示例演示如何编译支持 =MinnowBoard MAX-64bit= 硬件.
-**** 拷贝代码
+***** 拷贝代码
 #+begin_example
 cd poky
 git clone git://git.yoctoproject.org/meta-intel
 git checkout pyro
 #+end_example
-**** 配置
+***** 配置
 配置编译结果, 需要配置文件 =bblayers.conf, local.conf= , 这两个文件都位于 =build/conf= 文件夹中.
 #+begin_example
 cd build
@@ -98,13 +98,13 @@ bitbake-layers "add-layer ../meta-intel"
 #指定BSP
 echo 'MACHINE = "intel-corei7-64"' >> conf/local.conf
 #+end_example
-**** 编译
+***** 编译
 #+begin_example
 #编译生成基础命令行版的 linux
 bitbake core-image-base
 #+end_example
 当编译完成后, 生成的文件位于 =tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic=.
-**** 载入镜像文件
+***** 载入镜像文件
 使用以下命令就可以生成一个可以启动的文件了:
 #+begin_example
 #TARGET_DEVICE 代表在硬件板上启动文件存放的位置, 比如 /dec/mmcblk0
@@ -115,7 +115,156 @@ sudo dd if=tmp/deploy/images/intel-corei7-64/core-image-base-intel-corei7-64.wic
 由于工程内部很多变量依然保存的是之前工程的配置, 所以需要先 *删除build/tmp/目录下的内容, 重新编译才能正常运行!*
 **** 在编译的过程中 ubuntu 自动重启
 原因不明.
-** 系统概览
+** 实际应用说明(简单粗暴)
+*** 使用 QEMU
+- 控制台切换: QEMU环境下也可以通过 =Ctrl + Alt + <number>= (注意, *是数字键不是功能键*)来切换几个控制台.
+- 关闭启动画面: 在QEMU启动是, 使用 =Alt + left= 关闭启动画面,此时可以清楚的查看控制台输出
+- 取消鼠标捕获: 当在QEMU中跳不出来时, 使用 =Ctrl + Alt= 来取消捕获(默认情况下不需要此操作).
+**** 运行 
+在运行之前必须要初始化运行环境: =source oe-init-build-env= or =source oe-init-build-env-memres=.
+
+命令格式: =runqemu [option] [...]=
+
+选项的种类:
+- QEMUARCH: 指定要仿真的环境, 其值必须为: qemux86,qemux86_64,qemuarm,qemumips,qemumipsel,qemumips64,qemush4,qemuppc,qemumicroblaze,qemuzynq
+- VM: 虚拟镜像文件, 也就是 =.vmdk= 文件,文件名前缀必须为: qemux86, qemux86-64, qemuarm, qemumips64, qemumips, qemuppc, qemush4
+- ROOTFS: 具有后缀 =ext2, ext3, ext4, jffs2, nfs, btrfs= 的文件系统.
+- KERNEL: 当提供 =.bin= 文件, qemu就将其作为内核文件
+- MACHINE: 与 =QEMUARCH= 相同
+- ramfs: RAM 文件系统, FSTYPE 的值为 =cpio.gz= .
+- iso: ISO 镜像, FSTYPE 的值为 =.iso=.
+- nographic: 设置控制台为 =ttys0=.
+- serial: 使能串口映射到 =/dev/ttyS0=.
+- biosdir: 建立用于保存 =BIO,VGA VGA BIOS, keymaps= 的文件夹
+- biosfilename: 定制 BIOS 的名称
+- qemuparams=\"xyz\": 传递 qemu 参数, 使用此方法可以传递很多设置
+- bootparams=\"xyz\": kernel 的启动参数
+- audio: 使能音频输出, 此设置只能用于 =qemux86 or qemux86-64=,并且要确保kernel 含有音频驱动
+- slirp: 使能网络
+- kvm: 在 qemux86 or qemux86-64 构架下使能 KVM, 同时需要满足以下条件:
+  + =MACHINE= 需要设置为 qemux86 or qemux86-64
+  + 构建主机必须具备 KVM, 也就是说有设备 =/dev/kvm=, 同时具有读写权限
+- kvm-host: 
+- publicvnc: 使能 VNC
+#+begin_example
+#如果有名称相同的 image, QEMU 自动使用最新的一个
+runqemu qemux86
+#指定 image 和文件系统
+runqemu qemux86 core-image-minimal ext3
+#使能 RAM disk 和 audio
+runqemu qemux86 ramfs audio
+#指定虚拟镜像
+runqemu /hone/scott-lenovo/vm/core-image-minimal-qemux86.vmdk
+#+end_example
+**** 在NFS下使用
+当需要主机和仿真环境的文件相互访问时, 可以使用 NFS.
+***** 设置
+在文件夹 =scripts= 下有脚本 =runqemu-extract-sdk= , 首先使用此脚本提取根文件系统到本地路径, 
+然后再启动 =runqemu= 指定此路径.
+#+begin_example
+runqemu-extract-sdk ./tmp/deploy/images/qemux86/core-image-sato-qemux86.tar.bz2 test-nfs
+
+runqemu qemux86 ./test-nfs
+#+end_example
+***** 启动和停止NFS
+- 开始NFS共享: runqemu-export-rootfs start file-system-location
+- 停止共享: runqemu-export-rootfs stop file-system-localtion
+- 重新启动共享: runqemu-export-rootfs restart file-system-location 
+
+*** 使用SDK
+**** 概念
+所有的SDK都具有以下几个部分:
+- cross-development toolchain: 包含编译器,调试器,辅助工具
+- Libraries, Headers and Symbols: 针对镜像的库, 头文件, 符号表
+- Environment Setup Script: 在使用SDK前,使用脚本来配置开发环境
+SDK开发环境包含以下几个部分:
+- THe self-contained SDK: 包含工具链以及文件系统
+- QEMU: 
+- Eclipse IDE Yocto Plug-in: 
+- various performance-related tools: 
+
+标准SDK和扩展SDK比较
+| Feature            | Standard SDK | Extensible SDK                                    |
+|--------------------+--------------+---------------------------------------------------|
+| Toolchain          | yes          | yes                                               |
+| Debugger           | yes          | yes                                               |
+| Size               | 100+ MBytes  | 1+ GBytes(or 300+ MBytes for minimal w/toolchain) |
+| devtool            | no           | yes                                               |
+| build images       | no           | yes                                               |
+| updateable         | no           | yes                                               |
+| manages sysroot    | no           | yes                                               |
+| installed packages | no           | yes                                               |
+| construction       | packages     | shared state                                      | 
+
+通用的SDK设置步骤:
+1. 安装
+2. 下载并编译镜像文件 
+3. 部属和验证
+**** Extensible SDK
+***** 安装与配置
+先在 [[http://downloads.yoctoproject.org/releases/yocto/yocto-2.3.1/toolchain][yocto toolchain]] 中根据主机构架下载脚本, 使用脚本 =poky-glibc-host_system-image_type-arch-toolchain-ext-release_version.sh= 来安装 SDK 包.
+- host_system: i686 or x86_64
+- image_type: 镜像类型
+- arch: 对应的目标板类型 =i586, x86_64, powerpc, mips, armv7a or armv5te.....= .
+- release_version: the release number of the yocto 
+#+begin_example
+#主机x86_64构架,目标构架是 i586, 镜像文件是 core-image-sato, 基于yocto 2.3.1
+poky-glibc-x86_64-core-image-sato-i586-toolchain-ext-2.3.1.sh
+#+end_example
+
+*注意*: 在安装 SDK前需要确保安装路径具有写权限!
+
+在确保安装完成后,在使用 SDK 前还需要运行环境变量设置脚本, 以及 yocto 环境脚本,例如
+#+begin_example
+source environment-setup-core2-64-poky-linux
+source oe-init-build-env
+#+end_example
+在运行完此脚本后, 以下环境变量就被设置了:
+- SDKTARGETSYSROOT : 用于交叉编译的根文件系统路径
+- PKG_CONFIG_PATH: pkg-config 文件的路径
+- CONFIG_SITE: 预配置文件
+- CC: C 编译器指定
+- CXX: C++ 编译器指定
+- CPP: C 预处理器指定
+- AS: 汇编器指定
+- LD: 连接器指定
+- GDB: gdb 
+- STRIP: strip
+- RANLIB: ranlib
+- OBJCOPY: objcopy
+- OBJDUMP: objdump
+- AR: AR
+- NM: NM
+- TARGET_PREFIX: 工具链的二进制前缀
+- CROSS_COMPILE: 工具链的二进制前缀
+- CONFIGURE_FLAGS: 配置
+- CFLAGS: c编译标记
+- CXXFLAGS: c++编译标记
+- LDFLAGS: 链接标记
+- CPPFLAGS: 预处理标记
+ 
+***** 使用 =devtool= 开发
+devtool 的基本命令是:
+- devtool add: 增加一个app
+- devtool modify: 设置开始编辑app
+- devtool upgrade: 更新配置
+
+默认的操作都是在 =poky/build/workspace= 文件夹下的.
+
+****** devtool add
+需要注意的是, 此命令 *是在具有源码的基础上再使用!*, 会将源码联合 =appends,recipes= 文件组合成一个 recipe ,
+*分别的安装在 =poky/build/workspace= 文件夹下*, 这样就是一个完整的 yocto 应用程序单元, 可以使用工具安装进文件系统等等操作.
+
+- devtool add [recipe name] [source path] : 来增加一个recipe
+- devtool edit-recipe [recipe name] : 来编辑 recipe 原始文件(.bb)
+- devtool build [recipe name] : 编译 recipe ,并在目标板上或QEMU运行(目标板或QEMU需要运行image, 并且具有ssh server). 
+- devtool build-image [image-name]: 编译 recipe 并写入镜像文件
+- devtool deploy-target [recipe name] [target] : 将recipe 部属到目标板上.
+
+
+
+
+** 系统概览(手册简要翻译,有坑)
 *** 准备工作
 **** 克隆代码库
 在完成了快速准备后, yocto 已经下载了 yocto-source 的 git 库在 =downloads= 文件夹中, 我们需要把它 clone 出来.
@@ -404,7 +553,7 @@ bitbake matchbox-desktop -c devshell
 #+begin_example
 bitbake matchbox-desktop -c devpyshell
 #+end_example
-** 详细说明
+** 详细说明(手册简要翻译,有坑)
 *** 基本开发步骤(Common Tasks)
 **** 创建一个层(understanding and creating layers)
 在 =source directory= 目录中包含了通用层和BSP层,层目录以 =meta-= 作为开头.
@@ -772,3 +921,132 @@ PARALLEL_MAKE = ""
 - 编译路径错误: 当路径错误时, 需要检查文件 =log.do_compile= .
 - 没有找到文件或库: 这个由于依赖没有设置完整的原因, 需要去 recipe 中重新设置.
 ***** 安装
+ =do_install= 任务负责安装, 它会将会把编译后的文件系统从 =${S},${B},${WORKDIR}= 文件夹到 =${D}=,
+组成的一个层次结构就是目标系统的镜像.
+
+在构建期间需要注意以下事项:
+- autotools and cmake : 当 recipe 是由 autotools or cmake 构建时, 构建系统会自动安装.对于其他未被包括的需要提供 =do_install_append=.
+- other(using make install): 如果 recipe 中没有 autotolls and cmake,那么就需要提供 =do_install= 函数.
+- manual : 定义 =do_install= 函数, 函数首先要使用 =install -d= 来创建文件夹 =${D}=, 然后才使用 =install=.
+***** 使能系统服务程序
+当需要系统开机启动一个守护进程的话, recipe 需要作额外的设置.
+
+当有 =do_install= 函数时, 需要修改此函数, 否则需要增加 =do_install_append= 函数.
+
+=OpenEmbedded build system= 提供两个启动服务的方式:
+- sysvinit: 用于设置 =init= 进程,recipe 需要继承自类 =update-rc.d= , 还要设置 =INITSCRIPT_PACKAGES,INITSCRIPT_NAME,INITSCRIPT_PARAMS= 变量.
+- systemd(system management daemon) : systemd 用于替代 sysvinit. recipe 需要继承自 =systemd= 类.
+
+***** 打包
+打包过程如下:
+- splitting files: =do_package= 任务用于将 recipe 中的文件分类打包
+- running QA Checks: =insane= 类提供了一个单元测试的功能.
+- Hand-Checking Your Packages: 在构建完系统后, 需要检查 =${WORKDIR}/packages-split= 文件夹, 如果发现了问题,需要设置 =PACKAGES,FILES,do_install(_append)=.
+- Splitting an Application into Multiple Packages: 
+- Installing a Post-Installation Script: 
+- Marking Package Architecture: 默认情况下包对应任何架构, 如果需要指定架构需要在 recipe 中加入如下语句:
+#+begin_example
+PACKAGE_ARCH ="${MACHINE_ARCH}"
+#+end_example
+  + 如果包用于所有架构,那么 recipe 中需要继承 allarch 类:
+#+begin_example
+inherit allarch
+#+end_example
+***** 多个recipes 共享文件
+recipe 经常会用到其他 recipes 的文件, 这个过程是通过 sysroot 来完成的,
+这些文件夹由 =do_install= 任务填充, =do_populate_sysroot= 来应用.
+***** recipes 的版本
+版本命令方式建议使用 =PV= 变量来完成, 格式为: "previous_version + current_version".
+#+begin_example
+REALPV = "0.8.16-rc1"
+PV = "0.8.15+${REALPV}"
+#+end_example
+      
+***** 后置脚本
+当包已经被包含至镜像文件后, 后置脚本就立即运行. 新建函数 =pkg_postinst_PACKAGENAME()= 函数就可以增加脚本.
+#+begin_example
+pkg_postinst_PACKAGENAME()
+{
+# Commands to carry out 
+}
+
+#使用如下方式可以在启动的时候才运行脚本
+pkg_postinst_PACKAGENAME()
+{
+if [ x"$D" = "x" ];
+then
+    #Actions to carry out on the device go here
+else
+    exit 1
+fi
+}
+#+end_example
+***** 实例说明
+****** hello world
+#+begin_example
+#使用本地单文件编译
+SUMMARY = "Simple helloworld application"
+SECTION = "examples"
+LICENSE = "MIT"
+LIC_FILES_CHECKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=...."
+
+#源码文件
+SRC_URI = "file://helloworld.c"
+
+#源码目录
+S = "${WORKDIR}"
+
+#指明如何编译
+do_compile()
+{
+    ${CC} helloworld.c -o helloworld
+}
+#指明放在根文件系统的什么位置
+do_install()
+{
+    install -d ${D}${bindir}
+    install -m 0755 helloworld ${D}${bindir}
+}
+#+end_example
+****** 使用autotool(hello_2.3.bb)
+#+begin_example
+SUMMARY = "GNU Helloworld application"
+SECTION = "examples"
+LICENSE = "GPLV2+"
+LIC_FILES_CHKSUM = "file://COPYING;md5=xxxx"
+
+SRC_URI = "${GNU_MIRROR}/hello/hello-${PV}.tar.gz"
+
+inherit autotools gettext
+#+end_example
+
+****** 使用 makefile
+#+begin_example
+SUMMARY = "Tools for managing memory technology devices"
+SECTION = "base"
+DEPENDS = "zlib lzo e2fsprogs util-linux"
+HOMEPAGE = "http://www.linux-mtd.infradead.org/"
+LICENSE = "GPLv2+"
+LIC_FILES_CHKSUM = "file://COPYING;md5=....\
+                    file://include/common.h;beginline=1;endline=17;md5=....."
+
+SRCREV = "......."
+SRC_URI = "git://git.infradead.org/mtd-utils.git \
+           file://add-exclusion-to-mkfs-jffs2-git-2.patch"
+
+PV = "1.5.1+git{SRCPV}"
+
+S = "${WORKDIR}/git"
+
+EXTRA_OEMAKE = "'CC=${CC}' 'RANLIB=${RANLIB}' 'AR=${AR}' 'CFLAGS=${CFLAGS} -I${S}/include -DWITHOUT_XATTR' 'BUILDDIR=${S}'"
+
+do_install()
+{
+    oe_runmake install DESTDIR=${D} SBINDIR=${sbindir} MANDIR=${mandir} INCLUDEDIR=${includedir}
+}
+
+PACKAGE =+ "mtd-utils-jffs2 mtd-utils-ubifs mtd-utils-misc"
+
+FILES_mtd-utils-jffs2 = "${sbindir}/mkfs.jffs2 ${sbindir}/jffs2dump ${sbindir}/jffs2reader ${sbindir}/sumtool"
+
+#+end_example
