@@ -1,6 +1,9 @@
 * [What]Android --> Android Studio
 
 ** 基本使用
+*** 基本设置
+**** 字体设置
+在 =File -> Settings -> Editor -> Font= 下有基本设置,但是默认情况下不能被更改, 所以需要 *save as* 自己的设置,然后更改
 *** 安装问题
 **** Unable to access Android SDK add-on list
 - 描述:

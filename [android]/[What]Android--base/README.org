@@ -42,6 +42,7 @@ vim /etc/fstab
 *** 基本概念
 Android驱动 = Linux驱动 + 封装
 
+linux驱动通过JNI封装, 然后经过引擎形成一个统一访问层. 上层APP经过此层来达到统一访问底层的目的.
 | java语言开发的APP |
 | framework         |
 | java与C接口层     |
