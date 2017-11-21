@@ -1,0 +1,6 @@
+* [What] Windows --> usage
+** 系统运维
+*** 清除COM口缓存
+1. 使用 =[Win] + [R]= 后输入 =regedit= 进入注册表
+2. 进入 =HKEY_LOCAL_MACHINE/SYSTEM/CurrentControlSet/Control/COM Name Arbiter= 
+3. 删除 =ComDB= 条目, 然后重启系统.

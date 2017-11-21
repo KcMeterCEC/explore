@@ -98,7 +98,7 @@ docker commit --author "author information" --message "commit message" <containe
 Dockerfile 就是又一系列的脚本组成, 表示了从最开始到现在镜像所构建的每一层的命令.
 这样对于以后的维护工作就透明简洁了.
 
-- 使用习惯 : 为Dockerfile 新建一个空目录, 然后编辑此文件, 当有软件包需要编译时, *将软件包拷贝至当前目录*.
+- 使用习惯 : 为Dockerfile 新建一个空目录, 然后编辑此文件, 当有软件包需要编译时, *将软件包拷贝至当前目录, 然后在 dockerfile 中使用 ADD 命令再统一拷贝到一个文件夹中*.
   + 简单点理解, Dockerfile 有点类似于 makefile.
 
 当编辑好 Dockerfile 后, 在 Dockerfile 文件所在目录处执行命令:
@@ -218,7 +218,6 @@ HEALTHCHECK --interval=5s --timeout=3s \
 如果容器为 unhealthy , 可以使用 =docker inspect= 来查看.
 - ONBUILD : OUTBUILD 后面跟其他指定, *这些指令在当前镜像构建时并不会被执行. 只有当以当前镜像为基础镜像,区构建下一级镜像的时候才会被执行*.
   + ONBUILD <command> 
-
 
 
 ***** 使用压缩包导入

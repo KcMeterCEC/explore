@@ -36,7 +36,7 @@ yocto具有如下特征:
 #+begin_example
 sudo apt install gawk wget git-core diffstat unzip texinfo gcc-multilib \
 build-essential chrpath socat cpio python python3 python3-pip python3-pexpect \
-xz-utils debianutils iputils-ping libsdl1.2-dev xterm
+xz-utils debianutils iputils-ping libsdl1.2-dev xterm subversion texi2html texinfo
 #+end_example
 **** yocto 获取
 #+begin_example
@@ -261,8 +261,33 @@ devtool 的基本命令是:
 - devtool build-image [image-name]: 编译 recipe 并写入镜像文件
 - devtool deploy-target [recipe name] [target] : 将recipe 部属到目标板上.
 
+** 实战(raspberry pi 3-b)
+参考网站 : [[www.jumpnowtek.com/rpi/Raspberry-Pi-Systems-with-Yocto.html][Building Raspberry Pi Systems with Yocto]]
+*** 环境搭建
+在基本环境搭建的基础上, 基于 raspberry 还需要做如下工作:
+#+begin_example
+#切换到 morty 分支
+git checkout morty
+#获取 openembedded 层的 morty 分支
+git clone -b morty git://git.openembedded.org/meta-openembedded
+#获取 qt 层的 morty 分支
+git clone -b morty https://github.com/meta-qt5/meta-qt5.git
+#获取 raspberry 层的 morty 分支
+git clone -b morty git://git.yoctoproject.org/meta-raspberrypi
+
+#在其他文件夹下 clone 层 meta-rpi, 这一层是与BSP相关的层
+cd ~
+mkdir rpi
+cd ~/rpi
+git clone -b morty git://github.com/jumpnow/meta-rpi
+
+#使用 yocto 脚本为 raspberry 构建新建文件夹, 脚本会自动添加一些必要的文件.
+source oe-init-build-env ~/rpi/build 
 
 
+
+
+#+end_example
 
 ** 系统概览(手册简要翻译,有坑)
 *** 准备工作

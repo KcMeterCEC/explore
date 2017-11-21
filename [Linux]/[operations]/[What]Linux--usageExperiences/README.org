@@ -80,6 +80,10 @@ git clone git@<host_ip>:<reponame>
 4. 需要向github提交时, *需要再服务器本地库pull一次以更新, 然后再push至github上去*.
 
 **** gitlab (网页通信的服务器, 类似于github)
+***** 使用docker
+参考 [[https://docs.gitlab.com/omnibus/docker/][documentation]]
+
+*需要注意, docker 环境中使用的 SSH端口是 22.所以目前系统所使用的端口需要更改端口号!*
 ***** 安装及配置
 1. 基本安装
 #+begin_example
@@ -129,6 +133,8 @@ sudo gitlab-ctl stop
 sudo systemctl disable gitlab-runsvdir.service
 #+end_example
 *** 搭建局域网代码查看服务器(OpenGrok)
+**** 使用 docker
+[[https://hub.docker.com/r/itszero/opengrok][opengrok docker]]
 **** 准备工作
 ***** 安装JDK1.8或更新版本
 ****** 安装openjdk
@@ -233,9 +239,12 @@ sudo OpenGrok index <所有项目代码根目录>
 ***** 登录服务
 登录地址为: =http://YOUR_WEBAPP_SERVER:WEBAPPSRV_PORT/source=
 
+*** 搭建项目管理服务器
+**** 简易版本服务器(libreplan)
+此版本提供了 [[https://hub.docker.com/r/libreplan/libreplan][docker image]] , 只需要按照说明步骤部属即可.
 ** 用户管理
-*** 为普通用户增加 sudo 权限
-**** 命令行法
+# *** 为普通用户增加 sudo 权限
+# **** 命令行法
 #+begin_example
 sudo usermod -aG sudo <username>
 #+end_example

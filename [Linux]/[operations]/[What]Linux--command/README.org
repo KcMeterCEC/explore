@@ -92,12 +92,15 @@ apt 命令从 =/etc/atp/source.list= 文件中获取软件安装源(一般都不
 所以软件源的选择直接关系了安装软件的网速!
 
 #+begin_example
-#从服务器获取软件包的更新列表
+#从服务器获取软件包的更新列表,资源索引文件放在 /var/lib/apt/lists 文件夹中
 sudo apt update
 
 #升级已经安装的软件
 sudo apt upgrade
 sudo apt full-upgrade #升级软件并移除不用的软件包
+
+#升级系统
+sudo apt dist-upgrade
 
 #安装特定的软件包
 sudo apt install <package_name1> <package_name2>
@@ -165,3 +168,5 @@ sudo apt install nethogs
 #run
 sudo nethogs
 #+end_example
+**** 局域网扫瞄 nmap
+- nmap -sP 192.168.11.0/24 : 扫瞄局域网中已经连接的设备IP
