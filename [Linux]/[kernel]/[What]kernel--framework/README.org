@@ -4,6 +4,9 @@
 参考书籍: <<Linux设备驱动开发详解>>
 
 - [[#%E6%97%B6%E9%92%9F%E7%AE%A1%E7%90%86%E5%AD%90%E7%B3%BB%E7%BB%9F(clock)][时钟管理子系统]]
+  + [[#driver 使用通用API(clock consumer)]]
+  + [[编写 clock 通用逻辑(clock provider)]]
+  + [[编写底层驱动][编写底层驱动]]
 
 ** 时钟管理子系统(clock)
 commom clock framework 是用来管理系统 clock 资源的子系统, 根据职能由 *顶层到底层* 分为3个部分(很多框架的实现层次都是这种方式):
