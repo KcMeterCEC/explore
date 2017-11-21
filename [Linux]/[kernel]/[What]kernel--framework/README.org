@@ -3,10 +3,9 @@
 
 参考书籍: <<Linux设备驱动开发详解>>
 
-- [[#%E6%97%B6%E9%92%9F%E7%AE%A1%E7%90%86%E5%AD%90%E7%B3%BB%E7%BB%9F(clock)][时钟管理子系统]]
-  + [[#driver 使用通用API(clock consumer)]]
-  + [[编写 clock 通用逻辑(clock provider)]]
-  + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][#编写底层逻辑]]
+- [[#%E6%97%B6%E9%92%9F%E7%AE%A1%E7%90%86%E5%AD%90%E7%B3%BB%E7%BB%9F(clock)][时钟管理子系统(clock)]]
+  + [[#driver%E4%BD%BF%E7%94%A8%E9%80%9A%E7%94%A8API(consumer)][driver使用通用API]]
+  + [[#%E7%BC%96%E5%86%99clock%E9%80%9A%E7%94%A8%E9%80%BB%E8%BE%91(provider)][编写clock通用逻辑(provider)]]
   + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][编写底层逻辑]]
 
 ** 时钟管理子系统(clock)
@@ -27,7 +26,7 @@ common clock framework 的管理对象就是这些可以调节的各个部分, �
 - 设置时钟频率
 - 设置时钟树的连接关系
 
-*** driver 使用通用API(clock consumer)
+*** driver使用通用API(consumer)
 通用API位于 =include/linux/clk.h= 中.
 
 **** 使用顺序
@@ -203,7 +202,7 @@ int xxx_probe(struct platform_device *pdev)
         }
 }
 #+END_SRC
-*** 编写 clock 通用逻辑(clock provider)
+*** 编写clock通用逻辑(provider)
 **** 编写设备树
 provider 的设备树有两种写法:
 1. 将系统所有的clock抽象为一个虚拟的设备, 用一个节点表示, 称为 =clock controller=.
