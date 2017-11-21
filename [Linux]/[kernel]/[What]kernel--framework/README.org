@@ -7,6 +7,7 @@
   + [[#driver 使用通用API(clock consumer)]]
   + [[编写 clock 通用逻辑(clock provider)]]
   + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][#编写底层逻辑]]
+  + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][编写底层逻辑]]
 
 ** 时钟管理子系统(clock)
 commom clock framework 是用来管理系统 clock 资源的子系统, 根据职能由 *顶层到底层* 分为3个部分(很多框架的实现层次都是这种方式):
