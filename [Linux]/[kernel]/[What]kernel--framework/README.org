@@ -7,6 +7,9 @@
   + [[#driver%E4%BD%BF%E7%94%A8%E9%80%9A%E7%94%A8API(consumer)][driver使用通用API]]
   + [[#%E7%BC%96%E5%86%99clock%E9%80%9A%E7%94%A8%E9%80%BB%E8%BE%91(provider)][编写clock通用逻辑(provider)]]
   + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][编写底层逻辑]]
+- [[#I2C%E5%AD%90%E7%B3%BB%E7%BB%9F][I2C子系统]]
+- [[#gpio subsystem][gpio subsystem]]
+
 
 ** 时钟管理子系统(clock)
 commom clock framework 是用来管理系统 clock 资源的子系统, 根据职能由 *顶层到底层* 分为3个部分(很多框架的实现层次都是这种方式):
@@ -646,9 +649,12 @@ I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=
 提供对 =i2c_adapter, i2c_algorithm, i2c_driver, i2c_client= 数据结构的定义.
 
 总体的软件拓扑抽象层次如下图所示:
-[[./i2c_softTopology.bmp][I2C软件拓扑]]
+
+[[i2c_softTopology.bmp][I2C软件拓扑]]
+
 整个构架的软件层次如下图所示:
-[[./i2c_framework.bmp][I2C框架]]
+
+[[i2c_framework.bmp][I2C框架]]
 
 经过I2C framework 的抽象, consumer 可以不用关心I2C总线的技术细节, 只需要通过简单的API, 就可以与 slave devices 进行数据交互.
 正常情况下, consumer 是位于内核态的其他driver. 于此同时, I2C framework也通过字符设备向用户空间提供类似的接口, 用户空间程序可以通过该接口访问 slave devices.
@@ -1031,6 +1037,7 @@ i2c0{
 - i2c_driver 的 probe 接口的输入参数是 =struct i2c_client= 类型指针, 可以调用 =i2c_master_send/i2c_master_recv= 接口进行简单的I2C传输.同时也可以通过该指针获得所属的 i2c_adapter 指针, 然后通过 i2c_transfer 接口进行更为复杂的 read, write 操作.(参考 =drivers/base/regmap/regmap-i2c.c= 中的 regmap_i2c_read 接口).
 - 实现I2C设备所对应类型的具体驱动. i2c_device 只是实现设备与总线的挂接, 而如果此设备驱动兼容多种真实设备, 那就需要为对应的设备实现对应的 =read(), write(), ioctl()= 函数.一般来讲, 通过misc框架新建一个字符设备驱动即可.
 ***** 形态2的编写步骤
+** gpio subsystem
 
 
 
