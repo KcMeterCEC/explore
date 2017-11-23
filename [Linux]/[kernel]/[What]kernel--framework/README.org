@@ -9,6 +9,8 @@
   + [[#%E7%BC%96%E5%86%99%E5%BA%95%E5%B1%82%E9%80%BB%E8%BE%91][编写底层逻辑]]
 - [[#I2C%E5%AD%90%E7%B3%BB%E7%BB%9F][I2C子系统]]
 - [[#gpio subsystem][gpio subsystem]]
+  + [[#%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8][直接使用]]
+  + [[#%E6%A6%82%E8%A7%88][概览]]
 
 
 ** 时钟管理子系统(clock)
@@ -1038,6 +1040,169 @@ i2c0{
 - 实现I2C设备所对应类型的具体驱动. i2c_device 只是实现设备与总线的挂接, 而如果此设备驱动兼容多种真实设备, 那就需要为对应的设备实现对应的 =read(), write(), ioctl()= 函数.一般来讲, 通过misc框架新建一个字符设备驱动即可.
 ***** 形态2的编写步骤
 ** gpio subsystem
+*** 直接使用
+参考文档 =Documentation/gpio/=.
+**** 设备树的设置
+当一个驱动中需要使用到GPIO时, 需要在对应 *设备节点里面加入GPIO节点*.
+
+节点的格式为: [function]-gpios = <&[gpio_node_name] [gpio_index] [gpio_initialize]>
+- [function] : 用于driver 中对应function 申请此IO
+- [gpio_node_name] : 定义 GPIO 节点的名称
+- [gpio_index] : 指明需要使用第几个GPIO
+- [gpio_initialize]: 指定GPIO的初始状态, *此值需要参考对应控制器设备树文档*.
+#+begin_example
+foo_device{
+    compatible = "acme, foo";
+    ...
+    leg-gpios = <&gpio 15 GPIO_ACTIVE_HIGH>,
+                <&gpio 16 GPIO_ACTIVE_HIGH>,
+                <&gpio 17 GPIO_ACTIVE_HIGH>;
+
+    power-gpios = <&gpio 1 GPIO_ACTIVE_LOW>;
+};
+#+end_example
+**** 获取GPIO的操作权限
+#+BEGIN_SRC c
+struct gpio_desc *red, *green, *blue, *power;
+
+red = gpiod_get_index(dev, "led", 0, GPIOD_OUT_HIGH);
+green = gpiod_get_index(dev, "led", 1, GPIOD_OUT_HIGH);
+blue = gpiod_get_index(dev, "led", 2, GPIOD_OUT_HIGH);
+
+power = gpiod_get(dev, "power", GPIOD_OUT_HIGH);
+#+END_SRC
+*** 概览
+根据SOC控制GPIO用途, 可以分为3类:
+1. pin controller : 此类寄存器用于控制GPIO功能的选择.
+  + 配置引脚属于哪种功能: 是普通GPIO还是使用复用功能
+  + 配置引脚特性: 是上拉还是下拉
+2. GPIO controller : 当 =pin controller= 控制为普通GPIO时, 使用此类寄存器
+  + 配置是输入还是输出
+  + 如果是输出, 配置输出高还是低
+  + 如果是输入, 那么就可以读取电平值
+3. interrupt controller: 当GPIO具有中断功能时, 使用此类寄存器
+  + 控制中断使能还是失能
+  + GPIO的触发方式
+  + 中断状态的清除
+
+根据SOC的不同, 控制器以及控制方式不同, 并且芯片外围也可能接上GPIO扩展芯片等等.
+
+为了抽象这些差异, linux kernel 提供了 =GPIO subsystem= , 此系统具有3个软件模块来对应3种控制器分类:
+1. pin control subsystem: 驱动 =pin controller= 的软件子系统
+2. GPIO subsystem: 驱动 =GPIO controller= 的软件子系统
+3. GPIO interrupt chip driver: 此部分作为 =interrupt subsystem= 中的一个底层硬件驱动模块存在.
+
+**** pin control subsystem 
+[[pin_control_subsystem.jpg]]
+
+- 内核中的其他驱动,通过调用 =pin control core= 模块的接口就可以控制GPIO功能选择.
+- =pin control core= 是硬件无关模块, 它抽象了所有 =pin controller driver= 的不同硬件特性, 统一操作接口
+- =pin controller driver= 就是针对不同硬件的驱动.
+
+**** gpio subsystem
+[[gpio_subsystem.jpg]]
+
+- 内核中的其他驱动调用 =gpio lib= 提供的接口来操作GPIO
+- =gpio lib= 抽象 =gpio controller driver= 的不同硬件特性, 统一操作接口
+- =gpio controller driver= 就是针对不同硬件的驱动
+*** 分析
+**** pin control subsystem 
+***** 文件位置
+此子系统位于 =linux/drivers/pinctrl= 文件夹下,具有以下源文件:
+- core.c / core.h : 核心代码
+- pinctrl-utils.c / pinctrl-utils.h : 组合的功能函数 
+- pinmux.c / pinmux.h : 端口复用
+- pinconf.c / pinconf.h : 配置
+- devicetree.c / devicetree.h : 设备树解析
+- pinctrl-xxxx.c  : 底层驱动
+
+与之相关的头文件位于 =linux/include/linux/pinctrl=:
+- consumer.h : 用于其他驱动调用, 可以设置复用功能,电气特性等
+- devinfo.h : struct device 中包含了 =struct dev_pin_info *pins=, 用于表示引脚的初始状态信息.
+- machine.h : 与 machine 模块的接口
+- pinconf-generic.h : 提供给 pin control driver 
+- pinconf.h / pinctrl-state.h / pinmux.h : 提供给pin control driver
+
+***** 整体框架
+pin control subsystem 的功能包括:
+- 管理系统中 *所有可以控制的pin*, 在系统初始化的时候, 枚举所有可以控制的pin, 并标识这些pin.
+- 管理系统中 *所有pin的复用*, 有些pin需要几个组合起来形成一个 =pin group=.
+- 管理系统中 *所有pin的特性*, 比如上下拉,驱动能力等.
+
+[[pin_control_and_other.jpg]]
+
+[[pin_control_diagram.jpg]]
+
+上图表示的是各个模块之间的关系.
+***** 向其他模块提供的接口
+对于其他模块, 调用 =pin control subsystem= 一般具有以下需求:
+1. 设置端口基本功能, GPIO的映射功能由 function 和group 绑定.
+  + function: 代表复用的功能
+  + group : 代表复用所对应的引脚, 一个复用功能可能会对应多组引脚.
+2. 设置电气特性
+3. 状态转变.当与GPIO连接的设备处于睡眠模式时,此管脚需要处于其他状态.
+  + pin control state: 代表设备可能处于非常多的状态中的一个
+  + pin control state holder: 管理一个设备的所有 pin control 状态
+  + driver 的调用顺序为: 获取 =pin control state holder= -> 设置 =pin control state= -> 释放 =pin control state holder=.
+
+#+BEGIN_SRC c
+/**
+ ,* @brief per-device pin control state holder
+ ,* @param node: global list node
+ ,* @param dev:the device using this pin control handle
+ ,* @param states:a list of state for this device
+ ,* @param state:the current state 
+ ,* @param dt_maps:the mapping table chunks dynamically parsed from device tree for this device 
+ ,* @param users: reference count
+ ,*/
+struct pinctrl
+{
+        struct list_head node;
+        struct device *dev;
+        struct list_head states;
+        struct pinctrl_state *state;
+        struct list_head dt_maps;
+        struct kref users;
+};
+/**
+ ,* @brief a pinctrl_state for a device
+ ,* @param node: list node for struct pinctrl's @states field
+ ,* @param name: the name of this state
+ ,* @param settings: a list of setting for this state 
+ ,*/
+struct pinctrl_state
+{
+        struct list_head node;
+        const char *name;
+        struct list_head settings;
+};
+struct pinctrl_setting
+{
+        struct list_head node;
+        enum pinctrl_map_type type;
+        struct pinctrl_dev *pctldev;
+        const char *dev_name;
+        union{
+                struct pinctrl_setting_mux mux;
+                struct pinctrl_setting_configs configs;
+        };
+};
+
+struct pinctrl_setting_mux
+{
+        unsigned group;
+        unsigned func;
+};
+struct pinctrl_setting_configs
+{
+        unsigned group_or_pin;
+        unsigned long *configs;
+        unsigned num_configs;
+}
+#+END_SRC
+
+
+
 
 
 

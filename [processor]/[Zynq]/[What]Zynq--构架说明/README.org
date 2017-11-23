@@ -1,5 +1,9 @@
 * [What] Zynq --> 构架说明
 
+- [[#片上存储空间 On-Chip Memory(OCM)][OCM]]
+- [[#中断异常与模式][中断异常与模式]]
+- [[#I2C 控制器][I2C]]
+- [[#GPIO][GPIO]]
 
 ** 片上存储空间 On-Chip Memory(OCM)
 
@@ -31,8 +35,8 @@ BootROM 为了保证自己的运行空间，将其中的 64KB 设置到高位内
 
 通过修改 XSLCR_OCM_CFG_RESETVAL ，然后**在执行应用代码前**调用此函数即可，对于通过 JATG 下载的代码，需要[修改配置脚本](https://github.com/KcMeterCEC/explore/blob/master/%5BWhat%5D%E5%9F%BA%E7%A1%80%E7%A1%AC%E4%BB%B6--DDR%E7%9F%A5%E8%AF%86/document.md)。
 
-** 中断、异常、模式
-
+** 中断异常与模式
+   
 *** 概览
 
 ARM 中具有不同的工作模式, 有些模式又称为异常,而中断是属于异常中的两种.
@@ -333,3 +337,10 @@ I2C 接口的 SCL 线会被拉低,来支持慢速处理模式.当从机把 SCL �
 =I2C_SCL_Clock = CPU_1x_Clock / ((22 * (divisor_a +1) x (divisor_b +1)))=
 常用设置如下所示:
 [[./I2C_clk.jpg]]
+** GPIO
+*** 构架
+[[gpio_diagram.jpg]]
+
+从上图构架上可以看出, zynq 具有54个MIO和64个EMIO, 这些控制寄存器是连续的所以从编程上来看不需要特别注意地址.
+
+*注意*: GPIO在使用前需要在 vivado 中的 zynq ip 核配置使能, 对于 EMIO还需要设置管脚映射.
