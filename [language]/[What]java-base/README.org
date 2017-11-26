@@ -1,64 +1,393 @@
 * [What] java --> base
 
-** 数据类型
+参考网站:[[www.runoob.com/java/java-basic-syntax.html][菜鸟教程]]
 
-| c/c++       | java          |
-|-------------+---------------|
-|             | byte          |
-| char(ascII) | char(unicode) |
-| unsigned    |               |
-| short       | short         |
-| int         | int           |
-| long        | long          |
-| bool        | boolean       |
-| float       | float         |
-| double      | double        |
-| 指针/引用   | 引用          |
+- [[#基本格式与类型][基本格式与类型]]
+- [[#对象和类][对象和类]]
+- [[#基本数据类型][基本数据类型]]
+- [[#修饰符][修饰符]]
+- [[#运算符][运算符]]
+- [[#常用类][常用类]]
 
-** 运算符,表达式,语句
-与c/c++ 一模一样
-** 快速整理
-*** instanceof : 判断一个对象是不是某个类的实例
+** 基本格式与概览
+*** 基本格式
+**** 基本结构
 #+BEGIN_SRC java
-class Father{
-        public void printInfo()
-                {
-                        System.out.println("This is father");
-                }
-        
+/**
+ ,* @brief : 最简单的代码
+ ,* @note:
+ ,* 1. 此文件的名称是: HelloWorld.java, 也就是说类名要和文件名一致
+ ,* 2. 类名的首字母需要大写,如果类名由若干单词组成,那么每个单词的首字母应该大 写
+ ,* 3. 所有的方法名都应该以小写字母开头,如果含有若干单词,则后面的每个单词首字母大写
+ ,* 3. 编译命令： javac HelloWorld.java,用于将源文件编译为class字节码文件
+ ,* 4. 运行命令： java HelloWorld,后面跟类名
+ ,*/
+public class HelloWorld{
+        /// java 程序有且仅有一个main方法,所有的java程序由此方法开始执行, args[0]是第一个参数，以此推类
+        public static void main(String[] args){
+                System.out.println("Hello World");
+                System.out.println(args[0]);
+        }     
 }
-class Son extends Father{
-        public void printInfo()
-                {
-                        System.out.println("This is son");
-                }
-        
-}
-public class Test{
-        public static void main(String args[])
-                {
-                        Father f = new Father();
-                        Son    s = new Son();
+#+END_SRC
+*** 概览
+**** 标识符
+标识符与C语言标识符规则一致, 在此基础之上, *JAVA可以以 $ 为开始或作为标识符内部字符*
+**** 修饰符
+JAVA可以使用修饰符来修饰类中方法和属性:
+- 访问控制修饰符: default, public, protected, private
+- 非访问控制修饰符: final, abstract, strictfp
+**** 变量
+- 局部变量
+- 类变量(静态变量)
+- 成员变量(非静态变量)
 
-                        print(f);
-                        print(s);
-                }
-        public static void print(Father f)
+**** 枚举
+#+BEGIN_SRC java
+class FreshJuice{
+        enum FreshJuiceSize{SMALL, MEDIUM, LARGE}
+        FreshJuiceSize size;
+}
+
+public class FreshJuiceTest{
+        public static void main(String [] args){
+                FreshJuice juice = new FreshJuice();
+                juice.size = FreshJuice.FreshJuiceSize.MEDIUM;
+        }
+}
+#+END_SRC
+
+**** 关键字
+下表列出了与C语言不同的关键字:
+| 关键字       | 描述                                                                       |
+|--------------+----------------------------------------------------------------------------|
+| abstract     | 抽象方法, 抽象类的修饰符                                                   |
+| assert       | 断言条件是否满足                                                           |
+| boolean      | 布尔类型                                                                   |
+| byte         | 8位有符号数据                                                              |
+| catch        | 和try搭配捕捉异常信息                                                      |
+| char         | 16位的 Unicode 字符数据类型                                                |
+| class        | 定义类                                                                     |
+| extends      | 表示一个类是另一个类的子类                                                 |
+| final        | 表示一个值在初始化后就不能再改变了,表示方法不能被重写,或者一个类不能有子类 |
+| finally      | 无论有没有异常发生都执行代码                                               |
+| implements   | 表示一个类实现了接口                                                       |
+| import       | 导入类                                                                     |
+| instanceof   | 测试一个对象是否是某个类的实例                                             |
+| interface    | 接口,一种抽象类型,仅有方法和常量的定义                                     |
+| native       | 表示方法用非java代码实现                                                   |
+| new          | 分配新类的实例                                                             |
+| package      | 一系列相关类组成一个包                                                     |
+| private      | 表示私有字段或者方法等,只能从类内部访问                                    |
+| protected    | 表示字段只能通过类或者其子类访问子类或者在同一个包内的其他类               |
+| public       | 表示共有属性或者方法                                                       |
+| strictfp     | 浮点数比较使用严格的规则                                                   |
+| super        | 表示基类                                                                   |
+| synchronized | 表示同一时间只能由一个线程访问的代码块                                     |
+| this         | 表示调用当前实例或者调用另一个构造函数                                     |
+| throw        | 抛出异常                                                                   |
+| throws       | 定义方法可能抛出的异常                                                     |
+| transient    | 修饰不要序列划的字段                                                       |
+| try          | 表示代码块要做异常处理或者和finally配合表示是否抛出异常都执行finally中的代码 |
+** 对象和类
+*** 类中变量
+- 局部变量: 在方法内定义的变量,方法结束后变量内存就被销毁了.
+- 成员变量: 定义在类中, 在方法之外的变量.成员变量可以被类中方法访问
+- 类变量: 类变量也声明在类中,方法之外, *但声明为static类型*.
+  + 无论一个类创建了多少个对象, 类只拥有变量的一份拷贝.
+  + 类变量一般是用于被声明为常量.
+  + 类变量被声明为 =public,static,final= 类型时, 类变量名称一般使用大写字母.否则就与一般变量的命名方式一致.
+
+*** 概览
+#+BEGIN_SRC java
+/**
+ ,* @note
+ ,* 1. 一个源文件只能有一个public类
+ ,* 2. 一个源文件可以有多个非public类
+ ,* 3. 如果一个类定义在某个包中,那么package语句应该在源文件的首行
+ ,* 4. 如果源文件包含import语句,那么应该放在package语句和类定义之间.如果没有package语句,那么import语句应该在源文件中最前面.
+ ,*/
+public class Puppy{
+        /// 类变量
+        static int allClicks = 0;
+        /// 成员变量
+        int puppyAge;
+        /**
+         ,* @note: 每个类都有构造方法,如果没有显式地为类定义构造方法,
+         ,* Java 会提供一个默认构造方法.
+         ,* 在创建对象的时候,至少要调用一个构造方法, 构造方法名称必须与类同名,一个类可以有多个构造方法
+         ,*/
+        public Puppy(String name){
+                System.out.println("小狗的名字是:" + name);
+        }
+        public void setAge(int age){
+                puppyAge = age;
+        }
+        public int getAge(){
+                System.out.println("小狗的年龄为:" + puppyAge);
+                return puppyAge;
+        }
+        public static void main(String [] args){
+                Puppy mypuppy = new Puppy("tommy");
+                mypuppy.setAge(2);
+                mypuppy.getAge();
+                System.out.println("变量值:" + mypuppy.puppyAge);
+        }
+}
+#+END_SRC
+
+** 基本数据类型
+*** 内置数据类型
+java数据类型与C类似, 但需要注意的是: JAVA数据类型是 *一个对象*,所以它具有自己的方法.
+#+BEGIN_SRC java
+public class PrimitiveTypeTest{
+        public static void main(String[] args){
+                System.out.println("byte size:" + Byte.SIZE);
+                System.out.println("Byte minimum:" + Byte.MIN_VALUE);
+                System.out.println("Byte maximum:" + Byte.MAX_VALUE);
+        }
+}
+#+END_SRC
+*** 引用类型
+- 引用类型非常类似于 C/C++ 指针, 引用类型指向的变量是引用变量,这些变量在声明时被指定为一个特定的类型,一旦声明后,类型就不能被改变了.
+- 对象,数组都是引用数据类型
+- 所有引用类型的默认值都是NULL
+- 一个引用变量可以用来引用与之兼容的类型
+*** 常量
+使用 =final= 关键字来修饰常量:
+#+BEGIN_SRC java
+final double PI = 3.141592653;
+#+END_SRC
+字符串常量和字符常量都可以包含任何Unicode字符,例如:
+#+BEGIN_SRC java
+char a = '\u0001';
+String a = "\u0001";
+#+END_SRC
+- 整数的默认类型是 int 
+- 浮点必须在数字后跟上 F 或者 f
+*** 自动类型转换
+不同类型在运算时,会先转换为同一类型,然后才运算.
+
+转换是将低级数据类型转换为高级: byte,short,char -> int -> long -> float -> double
+
+规则如下:
+- 不能对 =boolean= 类型进行类型转换
+- 不能把对象类型转换为不相关类的对象
+- 把容量大的类型转换为容量小的类型时必须使用强制类型转换
+- 转换过程中可能导致溢出或损失精度
+- 浮点数到整数的转换时通过舍弃小数得到的, 而不是四舍五入
+*** 强制类型转换
+格式与C一致: (type)value 
+- 转换的数据类型必须是兼容的
+** 修饰符
+修饰符用来定义类,方法或者变量,通常放在语句的最前端:
+#+BEGIN_SRC java
+public class className{
+        private boolean myFlag;
+        static final double WEEKS = 9.5;
+        protected static final int BOXWIDTH = 42;
+        public static void main(String[] args){
+                
+        }
+}
+#+END_SRC
+*** 访问控制修饰符
+| 修饰符    | 当前类 | 同一包内 | 子孙类 | 其他包 |
+|-----------+--------+----------+--------+--------|
+| public    | Y      | Y        | Y      | Y      |
+| protected | Y      | Y        | Y      | N      |
+| default   | Y      | Y        | N      | N      |
+| private   | Y      | N        | N      | N      |
+
+- 接口里的变量都隐式声明为 =public static final=, 接口里的方法默认情况下权限为 =public=.
+- 被声明为 =private= 的方法,变量和构造方法只能被所属类访问, *类和接口不能声明为 private*.
+  + private 主要用来隐藏类的实现细节和保护类的数据.
+- protected 不能用于类和接口, 方法和成员变量能够声明为 protected,但是接口的成员变量和成员方法不能声明为 protected.
+- 父类中声明为 public 的方法在子类中也必须为 public
+- 父类中声明为 protected 的方法在子类中要么声明为 protected , 要么为 public, 不能为 private.
+
+*** 非访问修饰符
+- static 修饰符, 用来修饰类,方法和类变量
+- final 修饰符,用来修饰类,方法和变量,final 修饰的类不能被继承, 修饰的方法不能被继承类重新定义, 修饰的变量为常量,不能被修改.
+- abstract 修饰符, 用来创建抽象类和抽象方法.
+- synchronized 和 volatile 修饰符, 主要用于线程的编程.
+**** static
+- static 用于方法外变量时,称为静态变量(类变量).无论一个类实例化多少对象, 它的静态变量只有一份拷贝.
+- static 用于方法时, 声明独立于对象的静态方法.静态方法不能使用类的非静态变量,静态方法从参数列表得到数据,然后计算这些数据.
+#+BEGIN_SRC java
+public class InstanceCounter{
+        private static int numInstances = 0;
+        protected static int getCount(){
+                return numInstances;
+        }
+        private static void addInstance(){
+                numInstances++;
+        }
+        InstanceCounter(){
+                addInstance();
+        }
+        public static void main(String[] args){
+                System.out.println("Starting with " + InstanceCounter.getCount() + " instances");
+                for(int i = 0; i < 500; i++)
                 {
-                        if( f instanceof Son)
-                        {
-                                Son son = (Son)f;
-                                son.printInfo();
-                        }
-                        else if(f instanceof Father)
-                        {
-                                f.printInfo();
-                        }
+                        new InstanceCounter();
+                }
+                System.out.println("Created " + InstanceCounter.getCount() + " instances");
+        }
+}
+#+END_SRC
+
+**** final 
+***** 变量
+- final 用于变量时能被显式的初始化并且只能被初始化一次.被声明为 =final= 的对象的引用不能指向不同的对象.
+但是 final 对象里的数据可以被改变.
+- final 修饰符通常和static 修饰符一起使用来创建类常量.
+
+***** 方法
+- 类中的 final 方法可以被子类继承, 但是不能被子类修改.
+***** 类
+- final 类不能被继承.
+**** abstract
+***** 抽象类
+- 抽象类不能用来实例化对象, 声明抽象类的唯一目的式为了将来对该类进行扩充.
+- 一个类不能同时被 abstract 和 final 修饰.
+- 抽象类可以包含抽象方法和非抽象方法
+#+BEGIN_SRC java
+abstract class Caravan{
+        private double price;
+        private String model;
+        private String year;
+        public abstract void goFast();
+}
+#+END_SRC
+***** 抽象方法
+- 抽象方法式一种没有任何实现的方法, 该方法的具体实现由子类提供.
+- 抽象方法不能被声明为 =final 和 static=.
+- 任何继承抽象类的子类必须实现父类的所有抽象方法, 除非该子类也是抽象类.
+- 如果一个类包含若干个抽象方法, 那么该类必须声明为抽象类.抽象类可以不包含抽象方法.
+#+BEGIN_SRC java
+public abstract class SuperClass{
+        abstract void m();
+}
+class SubClass extends SuperClass{
+        void m(){
+                ....
+        }
+}
+#+END_SRC
+**** synchronized 
+- synchronized 声明的方法 *同一时间只能被一个线程访问*.
+**** transient
+- 序列化的对象包含被 =transient= 修饰的实例变量时, java 虚拟机跳过该特定的变量.该修饰符包含在定义变量的语句中, 用来预处理类和变量的数据类型.
+**** volatile
+- volatile 修饰的成员变量在每次被线程访问时, 都强制从共享内存中读取该成员变量的值.当成员变量发生变化时, 会强制线程将变化值回写到共享内存.
+这样在任何时刻, 两个不同的线程总是看到某个成员变量的同一个值.
+** 运算符
+绝大部分与C一样, 下面列出新增部分:
+| 操作符     | 描述                                                                                            | 例子                                                            |
+|------------+-------------------------------------------------------------------------------------------------+-----------------------------------------------------------------|
+| >>>        | 按位右补零操作符.左操作数的值按右操作数指定的位数右移,移动得到的空位以零填充                    | A = 60; A >>> 2 得到15, 即 0000 1111                            |
+| instanceof | 检查对象是否是一个特定的类型,格式: (Object reference variable)instanceof (class/interface type) | boolean result = a instanceof Car (检查对象是否是 Car 类的实例) |
+
+
+** 循环
+与C一样, 在此基础上, JAVA提供了 *增强for循环, 主要用于数组*.
+#+BEGIN_SRC java
+for(声明语句 : 表达式)
+{
+        //代码句子
+}
+#+END_SRC
+- 声明语句: 声明新的局部变量, 该变量的类型必须和数组元素的类型匹配. 其作用域限定在循环语句块, 其值与此时数组元素的值相等.
+- 表达式:表达式是要访问的数组名, 或者是返回值位数组的方法.
+#+BEGIN_SRC java
+public class Test{
+        public static void main(String [] args){
+                int [] numbers = {10, 20, 30, 40, 50};
+                for(int x : numbers){
+                        System.out.print(x);
+                        System.out.print(",");
+                }
+                System.out.print("\n");
+                String[] names = {"James", "Larry", "Tom", "Lacy"};
+                for(String name : names){
+                        System.out.print(name);
+                        System.out.print(",");
+                }
+        }
+}
+#+END_SRC
+
+** 分支
+与C一致.
+** 常用类
+*** Number & Math 
+- 所有的包装类(Integer,Long,Byte,Double,Float,Short)都是抽象类 Number 的子类.
+#+BEGIN_SRC java
+public class Test{
+        public static void main(String [] args)
+                {
+                        Integer x = 5;
+                        x = x + 10;
+                        System.out.println(x);
                 }
 }
 #+END_SRC
-    
-*** static : 外部可以直接使用 static 定义的方法,而不用创建实例化的对象
+
+Math 类包含了用于执行基本数学运算的属性和方法, Math 的方法都被定义位 static 形式.
+#+BEGIN_SRC java
+public class Test{
+        public static void main(String [] args)
+                {
+                        System.out.println("90 度正弦值:" + Math.sin(Math.PI/2));
+                        System.out.println("0 度余弦值:" + Math.cos(0));
+                        System.out.println("60 度正切值:" + Math.tan(Math.PI/3));
+                        System.out.println("1的反正切值:" + Math.atan(1));
+                        System.out.println(Math.PI);
+                }
+}
+#+END_SRC
+*** Character
+Character 类提供了一系列方法来操纵字符.
+#+BEGIN_SRC java
+Character ch = new Character('a');
+#+END_SRC
+*** String
+String 类用于创建和操作字符串.
+- String 类是不可改变的,  *一旦创建了String对象, 那它的值就无法改变了.*
+#+BEGIN_SRC java
+String greeting = "菜鸟教程"
+#+END_SRC
+#+BEGIN_SRC java
+public class StringDemo{
+        public static void main(String []args){
+                char[] helloArray = {'r', 'u', 'n', 'o', 'o','b'};
+                String helloString = new String(helloArray);
+                System.out.println(helloString);
+        }
+                
+}
+#+END_SRC
+*** StringBuffer
+当对字符串进行修改的时候, 需要使用 =StringBuffer= 和 =StringBuilder= 类.
+
+和 =String= 类不同的是, =StringBuffer= 和 =StringBuilder= 类的对象能够被多次修改, 并且不产生新的未使用对象.
+
+=StringBuilder= 和 =StringBuffer= 之间的最大不同在于 =StringBuilder= 的方法不是线程安全的.
+
+=StringBuilder= 相较于 =StringBuffer= 有速度优势, 多数情况下使用 =StringBuilder= 类.
+#+BEGIN_SRC java
+public class Test{
+        public static void main(String []args){
+                StringBuffer sBuffer = new StringBuffer("菜鸟教程官网：");
+                sBuffer.append("www");
+                sBuffer.append(".runoob");
+                sBuffer.append(".com");
+                System.out.println(sBuffer);
+        }
+}
+#+END_SRC
+
 ** 异常
 当程序发生异常时,可以处理或者默认不处理,处理又分为自己主动处理和让别人处理.
 
@@ -84,17 +413,9 @@ public class Pack{
                 }
 }
 #+END_SRC
-*** 权限
-| 种类      | 同一个类 | 同一个包 | 不同包的子类的 *内部* | 不同包的非子类 |
-|-----------+----------+----------+-----------------------+----------------|
-| private   | V        |          |                       |                |
-| default   | V        | V        |                       |                |
-| protected | V        | V        | V                     |                |
-| public    | V        | V        | V                     | V              |
 **** public 
 - 当类名前具有 =public= 时,代表它可以被全局访问
 - 当类名没有 =public= 时,代表它只能被 *同一包内访问* (同文件夹).
-
 
 ** 内部类
 内部类就是在类内部再定义一个类,内部类可以访问外部类的私有变量及属性.
