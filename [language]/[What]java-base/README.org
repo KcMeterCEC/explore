@@ -7,7 +7,16 @@
 - [[#基本数据类型][基本数据类型]]
 - [[#修饰符][修饰符]]
 - [[#运算符][运算符]]
+- [[#循环][循环]]
 - [[#常用类][常用类]]
+- [[#数组][数组]]
+- [[#方法][方法]]
+- [[#流,文件,IO][流,文件,IO]]
+- [[#异常][异常]]
+- [[#继承][继承]]
+- [[#重写与重载][重写与重载]]
+- [[#多态][多态]]
+- [[#抽象类][抽象类]]
 
 ** 基本格式与概览
 *** 基本格式
@@ -289,7 +298,6 @@ class SubClass extends SuperClass{
 | >>>        | 按位右补零操作符.左操作数的值按右操作数指定的位数右移,移动得到的空位以零填充                    | A = 60; A >>> 2 得到15, 即 0000 1111                            |
 | instanceof | 检查对象是否是一个特定的类型,格式: (Object reference variable)instanceof (class/interface type) | boolean result = a instanceof Car (检查对象是否是 Car 类的实例) |
 
-
 ** 循环
 与C一样, 在此基础上, JAVA提供了 *增强for循环, 主要用于数组*.
 #+BEGIN_SRC java
@@ -388,12 +396,735 @@ public class Test{
 }
 #+END_SRC
 
+*** Date
+java.util 包提供了 Date 类来封装当前日期和时间.
+
+*** 正则表达式
+java.util.regex 包主要包括以下三个类:
+- Pattern
+- Matcher
+- PatternSyntaxException
+*** scanner
+java.util.Scanner 是 java5 的新特征, 通过 Scanner 类来获取用户的输入.
+** 数组
+*** 声明
+#+BEGIN_SRC java
+dataType[] arrayRefVar;
+dataType arrayRefVar[];
+
+///example:
+double[] myList;
+double myList[];
+#+END_SRC
+*** 创建
+#+BEGIN_SRC java
+dataType[] arrayRefVar = new dataType[arraySize];
+dataType[] arrayRefVar = {value0, value1, value2,...};
+
+///example
+double[] myList = new double[10];
+#+END_SRC
+
+*** 处理
+- 使用基本的for循环:
+#+BEGIN_SRC java
+public class TestArray{
+        public static void main(String[] args){
+                double[] myList = {1.9, 2.9, 3.4, 3.5};
+
+                for(int i = 0; i < myList.length; i++)
+                {
+                        System.out.println(myList[i] + " ");
+                }
+                double total = 0;
+                for(int i = 0; i < myList.length; i++)
+                {
+                        total += myList[i];
+                }
+                System.out.println("Total is " + total);
+                double maximum = myList[0];
+                for(int i = 1; i < myList.length; i++)
+                {
+                        if(myList[i] > maximum){
+                                maximum = myList[i];
+                        }
+                }
+                System.out.println("maximum is " + max);
+        }
+}
+#+END_SRC
+- 使用高级for循环:
+#+BEGIN_SRC java
+public class TestArray{
+        public static void main(String[] args){
+                double[] myList = {1.9, 2.9, 3.4, 3.5};
+
+                for(double element: myList){
+                        System.out.println(element);
+                }
+        }
+}
+#+END_SRC
+- 作为函数的参数:
+#+BEGIN_SRC java
+public static void printArray(int[] array){
+        for(int i = 0; i < array.length; i++){
+                System.out.print(array[i] + " ");
+        }
+}
+#+END_SRC
+- 作为函数的返回值
+#+BEGIN_SRC java
+public static int[] reverse(int[] list){
+        int[] result = new int[list.length];
+
+        for(int i = 0, j = result.length - 1; i < list.length; i++, j--){
+                result[j] = list[i];
+        }
+        return result;
+}
+#+END_SRC
+- 多维数组
+#+BEGIN_SRC java
+type arrayName = new type[arraylength1][arraylength2];
+
+//example
+int a [][] = new int[2][3];
+
+String s[][] = new String[2][];
+s[0] = new String[2];
+s[1] = new String[3];
+s[0][0] = new String("Good");
+s[0][1] = new String("Luck");
+s[1][0] = new String("to");
+s[1][1] = new String("you");
+s[1][2] = new String("!");
+#+END_SRC
+- java.util.Arrays 类能方便地操作数组, 它所提供的所有方法都是静态的.
+  + 给数组赋值: 通过 fill 方法
+  + 对数组排序: 通过 sort 方法,按升序
+  + 比较数组: 通过 equals 方法比较数组元素值是否相等
+  + 查找数组元素: 通过 binarySearch 方法能对排序号的数组进行二分查找法操作
+** 方法
+java 方法是语句的集合, 它们在一起执行一个功能.
+- 方法是解决一类问题的步骤的有序组合
+- 方法包含于类和对象中
+- 方法在程序中被创建, 在其他地方被引用.
+*** 命令规则
+- 必须以字母, '_'或'$'开头
+- 可以包括数字,但不能以它开头
+*** 定义
+#+begin_example
+修饰符 返回值类型 方法名(参数类型 参数名){
+       方法体
+       return 返回
+}
+#+end_example
+#+BEGIN_SRC java
+public static int age(int birthday){
+}
+#+END_SRC
+*** 调用
+java 支持两种调用方法的方式, 根据方法是否返回值来选择.
+#+BEGIN_SRC java
+public class TestMax{
+        public static void main(String[] args){
+                int i = 5;
+                int j = 2;
+                int k = max(i, j);
+                System.out.println(i + " and " + j + "compare, the maximum is: " + k);
+        }
+        public static int max(int num1, int num2){
+                int result;
+                if(num1 > num2)
+                        result = num1;
+                else
+                        result = num2;
+
+                return result;
+        }
+}
+#+END_SRC
+*** 方法的重载
+方法具有相同的名字, 但参数不同.
+
+java编译器根据方法签名判断哪个方法应该被调用.
+*** 变量作用域
+方法内定义的变量被称为局部变量, 局部变量的作用范围从声明开始, 直到包含它的块结束.
+*** 构造方法
+当一个对象被创建的时候, 构造方法用来初始化该对象.
+- 构造方法和它所在类的名字相同, 但 *构造方法没有返回值*.
+- java 自动提供了默认的构造方法, 它把所有成员初始化为0.一但定义了自己的构造方法, 默认构造方法就会失败.
+#+BEGIN_SRC java
+class MyClass{
+        int x;
+        MyClass(){
+                x = 10;
+        }
+}
+#+END_SRC
+*** 可变参数
+方法的可变参数声明: =typeName... parameterName=.
+- 一个方法中只能指定一个可变参数, 它必须是方法的最后一个参数, 任何普通的参数必须载它之前声明
+#+BEGIN_SRC java
+public class VaragsDemo{
+        public static void main(String[] args){
+                printMax(34, 3, 3, 2, 56.5);
+                printMax(new double[]{1, 2, 3,});
+        }
+        public static void printMax(double... numbers){
+                if(numbers.length == 0){
+                        System.out.println("No argument passed");
+                        return;
+                }
+                double result = numbers[0];
+
+                for(int i = 1; i < numbers.length; i++){
+                        if(numbers[i] > result){
+                                result = numbers[i];
+                        }
+                }
+                System.out.println("The maximum value is " + result);
+        }
+}
+#+END_SRC
+*** finalize() 方法
+finalize() 方法在对象被垃圾收集器析构(回收)之前调用, 用来清除回收对象.
+#+BEGIN_SRC java
+protected void finalize(){
+        
+}
+#+END_SRC
+#+BEGIN_SRC java
+public class FinalizationDemo{
+        public static void main(String[] args){
+                Cake c1 = new Cake(1);
+                Cake c2 = new Cake(2);
+                Cake c3 = new Cake(3);
+                
+                c2 = c3 = null;
+                //调用java垃圾收集器
+                System.gc();
+        }
+        class Cake extends Object{
+                private int id;
+                public Cake(int id){
+                        this.id = id;
+                        Syste.out.println("Cake Object " + id + "is created");
+                }
+                protected void finalize() throws java.lang.Throwable{
+                        super.finalize();
+                        System.out.println("Cake Object " + id + "is disposed");
+                }
+        }
+}
+#+END_SRC
+** 流,文件,IO
+[[./io_stream.jpg]]
+java.io 包几乎包含了所有操作输入,输出需要的类, 所有这些流类代表了输入源和输出目标.
+
+一个流可以理解为一个数据的序列, 输入流表示从一个源读取数据, 输出流表示向一个目标写数据.
+*** 读取控制台输入
+控制台输入由 System.in 完成.
+
+为了获得绑定到控制台的字符流, 可以把 system.in 包装在一个 BufferedReader 对象中来创建一个字符流.
+#+BEGIN_SRC java
+BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+#+END_SRC
+BufferedReader 对象创建后, 使用 read() 方法从控制台读取一个字符, 或者用 readLine() 方法读取一个字符串.
+**** 从控制台读取多字符输入
+读取一个字符, 使用 =read()= 方法,每次调用 read 方法它从输入流读取一个字符并把该字符作为整数值返回,当流结束的时候返回 -1, 该方法抛出 IOException:
+#+BEGIN_SRC java
+int read() throws IOException
+#+END_SRC
+#+BEGIN_SRC java
+import java.io.*;
+
+public class BRRead{
+        public static void main(String[] args) throws IOException{
+                char c;
+
+                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+                System.out.println("input char, enter 'q' to exit.");
+                do{
+                        c = (char)br.read();
+                        System.out.println(c);
+                }
+                while(c != 'q');
+        }
+}
+#+END_SRC
+**** 从控制台读取字符串
+从标准输入读取一个字符串需要使用 BufferedReader 的 readLine() 方法.
+#+BEGIN_SRC java
+import java.io.*;
+public class BRReadLines{
+        public static void main(String[] args) throws IOException{
+                BufferReader br = new BufferReader(new InputStreamReader(System.in));
+
+                String str;
+                System.out.println("Enter lines of text.");
+                System.out.println("Enter 'end' to quit.");
+                do{
+                        str = br.readLine();
+                        System.out.println(str);
+                }
+                while(!str.equals("end"));
+        }
+}
+#+END_SRC
+
+*** 控制台输出
+- 控制台输出由 print() 和 println() 完成.这些方法都由类 PrintStream 定义, System.out 是该类对象的一个引用
+- PrintStream 继承了 OutputStream 类, 并且实现了方法 write(). 这样 write() 也可以用来向控制台写操作.
+- PrintStream 定义 write(): =void write(int byteval)=.将 byteval 的低八位写到流中.
+- 实际建议使用 =System.out.print(), System.out.println()=.
+
+*** 读写文件
 ** 异常
+异常是程序中的一些错误, 但并不是所有的错误都是异常, 并且错误有时候是可以避免的.
+
+异常发生的原因通常包含以下几大类:
+- 用户输入了非法数据
+- 要打开的文件不存在
+- 网络通信时连接中断或者JVM内存溢出
+
+异常的类型:
+- 检查性异常: 最具代表的检查性异常是用户错误或问题引起的异常,这是程序员无法预见的.
+- 运行时异常: 运行时异常是可能被程序员避免的异常.
+- 错误: 错误不是异常, 而是脱离程序员控制的问题.
+*** Exception 类的层次
+[[./exception.jpg]]
+
+- 所有的异常类是从 java.lang.Exception 类继承的子类.
+- java程序通常不捕获错误
+- Error 用来指示运行时环境发生的错误
+
 当程序发生异常时,可以处理或者默认不处理,处理又分为自己主动处理和让别人处理.
 
 java中的 =RunTimeException= (发生以后程序退出) 以及 =Error= 都不处理,用户主要处理的是 =IOException=.
-*** try...catch...finally --> 自己处理
-*** throws --> 让别人处理
+
+*** 捕获异常
+使用 =try/catch= 可以捕获异常, =try/catch= 代码块中的代码称为保护代码:
+- catch 语句包含要捕获异常类型的声明.当保护代码块中发生一个异常时, try后面的catch块就会被检查.
+如果发生的异常包含在 catch 块中, 异常会被传递到该 catch 块, 这和传递一个参数到方法是一样的.
+#+BEGIN_SRC java
+try{
+        //程序代码
+}catch(ExcetptionName e1){
+        //Catch 块
+}
+#+END_SRC
+#+BEGIN_SRC java
+import java.io.*
+public class ExcepTest{
+        public static void main(String[] args){
+                try{
+                        int a[] = new int[2];
+                        System.out.println("Access element three:" + a[3]);
+                }catch(ArrayIndexOutOfBoundException e){
+                        System.out.println("Exception thrown:" + e);
+                }
+                System.out.println("Out of the block");
+        }
+}
+#+END_SRC
+- 一个 try 代码块后面跟随多个 catch 代码块的情况叫多重捕获.
+#+BEGIN_SRC java
+try{
+        file = new FileInputStream(fileName);
+        x = (byte)file.read();
+}catch(IOException i){
+        i.printStackTrace();
+        return -1;
+}catch(FileNotDoundException f){
+        f.printStackTrace();
+        return -1;
+}
+#+END_SRC
+*** throws/throw 
+如果一个方法没有捕获一个检查性异常,那么该方法必须使用 throws 关键字来声明, 或者使用 throw 关键字抛出异常.
+#+BEGIN_SRC java
+import java.io.*;
+public class className{
+                        /// 抛出一个 RemoteException 异常
+        public void deposit(double amount) throws RemoteException
+                {
+                        throw new RemoteException();
+                }
+}
+
+public class className{
+        ///抛出多个异常
+        public void withdraw(double amount) throws RemoteException, InsufficientFundsException
+                {
+                        
+                }
+}
+
+#+END_SRC
+*** finally
+用种类创建在 try 代码块后面执行的代码块.无论是否发生异常, *finally代码块中的代码总会被执行*.
+#+BEGIN_SRC java
+try{
+        
+}catch(...){
+        
+}catch(...){
+        
+}finally{
+        
+}
+#+END_SRC
+
+*** 自定义异常
+自定义异常需要注意:
+- 所有异常都必须是 Throwable 子类
+- 如果希望写一个检查性异常类, 则需要继承 Exception 类
+- 如果希望写一个运行时异常, 需要继承 RuntimeException 类.
+#+BEGIN_SRC java
+class MyException extends Exception{
+}
+#+END_SRC
+#+BEGIN_SRC java
+/// InsufficientFundsException.java
+import java.io.*;
+public class InsufficientFundsException extends Exception
+{
+        private double amount;
+        public InsufficientFundsException(double amount)
+                {
+                        this.amount = amount;
+                }
+        public double getAmount()
+                {
+                        return amount;
+                }
+}
+///CheckingAccount.java
+import java.io.*;
+public class CheckingAccount
+{
+        private double balance;
+        private int number;
+        public CheckingAccount(int number){
+                this.number = number;
+        }
+        public void deposit(double amount)
+                {
+                        balance += amount;
+                }
+        public void withdraw(double amount) throws InsufficientFundsException
+                {
+                        if(amount <= balance)
+                        {
+                                balance -= amount;
+                        }
+                        else
+                        {
+                                double needs = amount - balance;
+                                throw new InsufficientFundsException(needs);
+                        }
+                }
+        public double getBalance()
+                {
+                        return balance;
+                }
+        public int getNumber()
+                {
+                        return number;
+                }
+}
+///BankDemo.java
+public class BankDemo{
+        public static void main(String[] args){
+                CheckingAccount c = new CheckingAccount(101);
+                System.out.println("Depositing $500.");
+                c.deposit(500);
+                try{
+                        System.out.println("\nWithdrawing $100.");
+                        c.withdraw(100);
+                        System.out.println("\nWithdrawing $600.");
+                        c.withdraw(600);
+                }catch(InsufficientFundsException e)
+                {
+                        System.out.println("Sorry. but you are short $" + e.getAmount());
+                        e.printStackTrace();
+                }
+        }
+}
+#+END_SRC
+
+*** 通用异常
+在java中定义了两种类型的异常和错误.
+- JVM(javav虚拟机)异常: 由JVM抛出的异常或错误.
+- 程序级异常:由程序或者API程序抛出的异常.
+** 继承
+- 子类拥有父类 *非private* 的属性和方法
+- 子类可以拥有自己的属性和方法
+- 子类可以用自己的方式实现父类的方法
+- Java的继承是单继承, 这是 java 区别于 C++ 继承的一个特性
+- 所有的类都是继承于 =java.lang.Object=,当一个类没有继承关键字时, 则默认继承 object
+*** 继承的基本格式
+#+BEGIN_SRC java
+class ParentClass{
+        
+}
+class ChildClass extends ParentClass{
+        
+}
+#+END_SRC
+*** 继承关键字
+- extends: 单一继承,一个子类只能拥有一个父类
+- implements: 类可以同时继承多个接口
+#+BEGIN_SRC java
+public interface A{
+        public void eat();
+        public void sleep();
+}
+public interface B{
+        public void show();
+}
+public class C implements A,B{
+}
+#+END_SRC
+*** super, this
+- super: 实现子类对父类成员的访问,用来引用当前对象的父类.
+- this: 指向自己的引用
+#+BEGIN_SRC java
+class Animal{
+        void eat(){
+                System.out.println("animal: eat");
+        }
+}
+class Dog extends Animal{
+        void eat(){
+                System.out.println("dog: eat");
+        }
+        void eatTest(){
+                this.eat();
+                super.eat();
+        }
+}
+public class Test{
+        public static void main(String[] args){
+                Animal a = new Animal();
+                a.eat();
+                Dog d = new Dog();
+                d.eatTest();
+        }
+}
+#+END_SRC
+*** final 
+- final 关键字声明的类可以把类定义为不能继承的, 即最终类. 或者修饰方法时, 该方法不能被子类重写.
+- 当类被修饰为 final 时, 其方法会自动被修饰为 final, *但是实例变量不是fianl*.
+
+*** 构造
+- 子类不能继承父类的构造函数, *但是父类的构造函数带有参数时, 子类必须在自己的构造函数中显式的使用 super 关键字调用父类的构造函数以初始化变量*.
+- 如果父类是无参数的构造函数, 则子类不需要显式调用父类的构造函数, 此时在创建对象时, 系统会自动调用父类的无参构造函数.
+#+BEGIN_SRC java
+class SuperClass{
+        private int n;
+        SuperClass(){
+                System.out.println("SuperClass()");
+        }
+        SuperClass(int n){
+                System.out.println("SuperClass(int n)");
+                this.n = n;
+        }
+}
+class SubClass extends SuperClass{
+        private int n;
+        SubClass(){
+                super(300);
+                System.out.println("SubClass()");
+        }
+        public SubClass(int n){
+                System.out.println("SubClass(int n):" +n);
+                this.n = n;
+        }
+}
+public class TestSuperSub{
+        public static void main(String[] args){
+                SubClass sc = new SubClass();
+                SubClass sc2 = new SubClass(200);
+        }
+}
+#+END_SRC
+
+** 重写与重载
+*** 重写(Override)
+重写的规则如下:
+- 返回类型以及参数列表必须完全与被重写的方法相同
+- 访问权限不能比父类中被重写的方法和访问权限更低.
+- 父类的成员方法只能被它的子类重写
+- 声明为 final 的方法不能被重写
+- 声明为 static 的方法不能被重写, 但是能够被再次声明
+- 子类和父类在同一个包重, 那么子类可以重写父类所有方法, 除了声明为 private 和 final 的方法.
+- 子类和父类不在同一个包中, 那么子类只能够重写父类的声明为 public 和 protected 的非final方法
+- 重写的方法能够抛出任何非强制异常, 无论被重写的方法是否抛出异常.但是重写的方法不能抛出新的强制性异常, 或者比被重写方法声明的更广泛的强制性异常, 反之则可以.
+- 构造方法不能被重写.
+- 如果不能继承一个方法, 则不能重写这个方法.
+#+BEGIN_SRC java
+class Animal{
+        public void move(){
+                System.out.println("Animals can move");
+        }
+}
+class Dog extends Animal{
+        public void move(){
+                System.out.println("Dogs can run");
+        }
+}
+public class TestDog{
+        public static void main(String[] args){
+                Animal a = new Animal();
+                Animal b = new Dog();
+
+                a.move();
+                b.move();
+        }
+}
+#+END_SRC
+*** 重载(Overload)
+重载的规则如下:
+- 重载的方法必须改变参数列表
+- 重载的方法可以改变返回类型
+- 重载的方法可以改变访问修饰符
+- 重载的方法可以声明新的或更广的检查异常
+- 方法能够载同一个类重或者载一个子类中被重载
+- 无法以返回值类型作为重载函数的区分标准
+#+BEGIN_SRC java
+public class OverLoading{
+        public int test(){
+                System.out.println("test1");
+                return 1;
+        }
+        public void test(int a){
+                System.out.println("test2");
+        }
+        public String test(int a, String s){
+                System.out.println("test3");
+                return "returntest3";
+        }
+        public String test(String s, int a){
+                System.out.println("test4");
+                return "returntest4";
+        }
+        public static void main(String[] args){
+                Overloading o = new OverLoading();
+                System.out.println(o.test());
+                o.test(1);
+                System.out.println(o.test(1, "test3"));
+                System.out.println(o.test("test4", 1));
+        }
+}
+#+END_SRC
+** 多态
+多态存在的三个必要条件:
+- 继承
+- 重写
+- 父类引用指向子类对象,当使用多态方式调用方法时, 首先检查父类中是否有该方法,没有则编译错误.有则调用子类同名的方法.
+#+BEGIN_SRC java
+public class Test{
+        public static void main(String[] args){
+                show(new Cat());
+                show(new Dog());
+
+                Animal a = new Cat();
+                a.eat();
+                Cat c = (Cat)a;
+                c.work();
+        }
+        public static void show(Animal a){
+                a.eat();
+
+                if(a instanceof Cat){
+                        Cat c = (Cat)a;
+                        c.work();
+                }else if(a instanceof Dog){
+                        Dog c = (Dog)a;
+                        c.work();
+                }
+        }
+}
+abstract class Animal{
+        abstract void eat();
+}
+class Cat extends Animal{
+        public void eat(){
+                System.out.println("吃鱼");
+        }
+        public void work(){
+                System.out.println("抓老鼠");
+        }
+}
+class Dog extends Animal{
+        public void eat(){
+                System.out.println("吃骨头");
+        }
+        public void work(){
+                System.out.println("看家");
+        }
+}
+#+END_SRC
+
+** 抽象类
+如果一个类中没有包含足够的信息来描述一个具体的对象, 这样的类就是抽象类.
+
+抽象类除了不能实例化对象之外, 类的其他功能依然存在, 成员变量,方法,访问方式和普通的类一样.
+
+由于抽象类不能实例化对象, 所以抽象类必须被继承才能被使用.一个类只能继承一个抽象类, 而一个类却可以实现多个接口.
+
+使用 =abstract class= 来定义抽象类:
+#+BEGIN_SRC java
+public abstract class Employee{
+        private String name;
+        private String address;
+        private int number;
+        public Employee(String name, String address, int number){
+                System.out.println("Constructing an Employee");
+                this.name = name;
+                this.address = address;
+                this.number = number;
+        }
+        public double computePay(){
+                System.out.println("Inside Employee computePay");
+                return 0.0;
+        }
+        public void mailCheck(){
+                System.out.println("Mailing a check to " + this.name + " " + this.address);
+        }
+        public String toString(){
+                return name + " " + address + " " + number;
+        }
+        public String getName(){
+                return name;
+        }
+        public String getAddress(){
+                return address;
+        }
+        public void setAddress(String newAddress){
+                address = newAddress;
+        }
+        public int getNumber(){
+                return number;
+        }
+}
+#+END_SRC
+*** 抽象方法
+抽象方法的具体实现由它的子类确定, 使用 =abstract= 来声明抽象方法, *只包含方法名, 没有方法体*.
+- 如果一个类包含抽象方法, 那么该类必须是抽象类.
+- 任何子类必须重写父类的抽象方法, 或者声明自身为抽象类.
+- 构造方法和类方法(static 修饰)不能声明为抽象方法.
+#+BEGIN_SRC java
+public abstract class Employee{
+        private String name;
+        private String address;
+        private int number;
+        public abstract double computePay();
+}
+#+END_SRC
 ** 包和权限
 *** 包
 **** package --> 将编译的结果打包
