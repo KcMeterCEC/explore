@@ -4,6 +4,10 @@
 
 - [[#基本环境][基本环境]]
 - [[#基本语法][基本语法]]
+- [[#数据类型][数据类型]]
+- [[#存储类][存储类]]
+- [[#运算符][运算符]]
+- [[#函数][函数]]
 
 ** 基本环境
 *** g++ 应用说明
@@ -50,6 +54,74 @@ int main()
 | reinterpret_cast | typename     | friend      | const_cast |
 | virtual          | delete       | static_cast | wchar_t    |
 | mutable          | dynamic_cast | namespace   | template   |
+** 数据类型
+*** 基本类置类型
+相比C来说,C++多了一个 =wchar_t= 类型， 用于显示unicode码。
+
+对于常量来说，当前面以 ‘L’ 开头时，则表示它是一个宽字符常量（例如 L'x'),
+此时它就是以 =wchar_t= 类型来存储的。
+** 存储类
+相比较C，C++增加了以下存储类：
+- mutable
+- thread_local(C++11)
+
+=从C++11开始，auto关键字不再是C++存储类说明符，且 register关键字被弃用。=
+*** auto
+在从C++11及以后， auto关键字用于两种情况：
+- 声明变量时根据初始化表达式自动推断该变量的类型
+- 声明函数时函数返回值的占位符
+#+BEGIN_SRC c++
+auto f = 3.14;//double
+auto s("hello"); //const char *
+auto z = new auto(9);// int *
+auto x1 = 5, x2 = 5.0, x3 = 'r';//错误，必须初始化为同一类型
+#+END_SRC
+*** static 
+当 =static= 用于类数据成员上时，会导致仅有一个成员的副本被类的所有对象共享。
+*** mutable
+mutable 仅仅适用于类对象，它允许对象的成员替代常量。也就是说，mutable 成员可以通过 const 成员函数修改。
+*** thread_local
+thread_local 仅仅可在它在其上创建的线程上访问。变量在创建线程时创建，并在销毁线程时销毁。
+
+每个线程都有其自己的变量副本。
+
+thread_local 不能用于函数的声明或定义。
+#+BEGIN_SRC c++
+thread_local int x;
+class X{
+        static thread_local std::string s;
+};
+static thread_local std::string X::s;
+
+void foo()
+{
+        thread_local std::vector<int> v;
+}
+   
+#+END_SRC
+** 运算符
+*** 强制转换
+C++支持多种强制转换运算符：
+- const_cast<type>(expr) : const_cast 运算符用于修改类型的 const/volatile属性。
+除了const或volatile属性之外，目标类型必须与源类型相同。主要用来操作所传对象的const属性，可以加上const属性，也可以去掉const属性
+- dynamic_cast<type>(expr):在运行时执行转换
+- reinterpret_cast<type>(expr):把指针改为其他类型的指针
+- static_cast<type>(expr):非动态转换，没有运行时类检查来保证转换的安全性。
+
+** 函数
+- 函数可以使用引用来修改实际参数。
+- 定义函数时可以为参数列表后边的每个参数指定默认值，当调用函数时，如果实际参数值留空，则使用这个默认值。
+*** lambda 函数与表达式
+C++11提供了对匿名函数的支持，称为 Lambda 函数（表达式）。
+
+Lambda 表达式把函数看作对象。
+
+表达式形式如下：
+=[capture](parameters)->return-type{body}= >> =[](int x, int y){return x < y;}=
+如果没有返回值可以表示为：
+=[capture](parameters){body}= >> =[]{++global_x;}=
+
+
 ** 内存模型和名称空间
 *** 内存模型
 **** 头文件格式及其包含格式
