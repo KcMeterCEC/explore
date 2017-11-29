@@ -17,6 +17,13 @@
 - [[#重写与重载][重写与重载]]
 - [[#多态][多态]]
 - [[#抽象类][抽象类]]
+- [[#接口][接口]]
+- [[#包和权限][包和权限]]
+- [[#数据结构][数据结构]]
+- [[#集合框架][集合框架]]
+- [[#泛型][泛型]]
+- [[#序列化][序列化]]
+- [[#文档注释][文档注释]]
 
 ** 基本格式与概览
 *** 基本格式
@@ -1125,17 +1132,183 @@ public abstract class Employee{
         public abstract double computePay();
 }
 #+END_SRC
+** 接口
+接口并不是类, 编写接口的方式和类很相似,但类描述对象的属性和方法,接口则包含类要实现的方法.
+
+接口与类的相似点:
+- 一个接口可以有多个方法
+- 接口文件保存在 .java 结尾的文件中, 文件名和接口名一致
+- 接口的字节码文件保存在 .class 结尾的文件中
+- 接口相应的字节码文件必须在与包名称相匹配的目录结构中
+
+接口与类的区别:
+- 接口不能用于实例化对象
+- 接口没有构造方法
+- 接口中所有的方法必须是抽象方法
+- 接口不能包含成员变了,除了 static 和　final 变量
+- 接口不是被类继承了, 而是要被类实现
+- 接口支持多继承
+
+接口特性
+- 接口中每个方法也是隐式抽象的，接口中的方法会被隐式的指定为　public abstract,所以不用使用 =abstract= 关键字。
+- 接口中可以含有变量，但是接口中的变量会被隐式的指定为　public static final.
+- 接口中的方法式不能在接口中实现的，只能由实现接口的类来实现接口中的方法
+
+抽象类和接口的区别
+- 抽象类中的方法可以有方法体，就是能实现方法的具体功能，但是接口中的方法不行
+- 抽象类中的成员变量可以是各种类型的，而接口中的成员变量只能是　public static final 
+- 接口中不能含有静态代码块以及静态方法（用　static 修饰的方法），而抽象类是可以有静态代码块和静态方法
+- 一个类只能继承一个抽象类，而一个类却可以实现多个接口
+*** 接口的声明和实现
+声明接口使用以下格式:
+#+BEGIN_SRC java
+[可见度] interface 接口名称　[extends 其他类名]{
+}
+
+public interface NameOfInterface{
+        
+}
+#+END_SRC
+
+实现接口使用以下格式:
+#+BEGIN_SRC java
+... implements 接口名称[,其他接口1,其他接口2,.....,]
+#+END_SRC
+
+重写接口中声明的方法时， 需要注意以下规则：
+- 类在实现接口方法时，不能抛出强制性异常，只能在接口中，或者继承接口的抽象类中抛出该强制性异常
+- 类在重写方法时要保持一致的方法名，并且应该保持相同或者相兼容的返回值类型
+- 如果实现接口的类是抽象类，那么就没有必要实现该接口的方法。
+
+在实现接口时，需要注意一些规则：
+- 一个类可以同时实现多个接口
+- 一个类只能继承一个类， *但是能实现多个接口*.
+- 一个接口能继承另一个接口，这和类之间的继承比较相似
+
+#+BEGIN_SRC java
+interface Animal{
+        public void eat();
+        public void travel();
+}
+
+public class MammalInt implements Animal{
+        public void eat(){
+                System.out.println("Mammal eats");
+        }
+        public void travel(){
+                System.out.println("Mammal travels");
+        }
+        public int noOfLegs(){
+                return 0;
+        }
+
+        public static void main(String args[]){
+                MammalInt m = new MammalInt();
+                m.eat();
+                m.travel();
+        }
+}
+#+END_SRC
+
+*** 接口的继承
+一个接口能继承另一个或多个接口，同样使用 =extends= 关键字
+#+BEGIN_SRC java
+public interafce Hockey extends Sports,Event
+#+END_SRC
+#+BEGIN_SRC java
+public interafce Sports{
+        public void setHomeTeam(String name);
+        public void setVisitingTeam(String name);
+}
+public interface FootBall extends Sports{
+        public void homeTeamScored(int points);
+        public void visitingTeamScored(int points);
+        public void endOfQuarter(int quarter);
+}
+public interface Hockey extends Sports{
+        public void homeGoalScored();
+        public void visitingGoalScored();
+        public void endOfPeriod(int period);
+        public voiid overtimePeriod(int ot);
+}
+#+END_SRC
+*** 标记接口
+标记接口是没有任何方法和属性的接口， 它仅仅表明它的类属于一个特定的类型，共其他代码来测试允许做一些事情。
+标识接口的作用：给某个对象打一个标记，使对象拥有某个或某些特权。
+
+标记接口的目的：
+- 建立一个公共的父接口。使用一个标记接口来建立一组接口的父接口。
+- 向一个类添加数据类型
+*** 什么时候使用抽象类和接口
+- 如果你拥有一些方法并且想让它们中的一些有默认实现，那就使用抽象类
+- 如果你想实现多重继承，那就必须使用接口
+- 如果基本功能在不断改变，那就需要使用抽象类。 *如果不断改变基本功能并且使用接口，那么就需要改变所有实现了该接口的类。*
 ** 包和权限
-*** 包
-**** package --> 将编译的结果打包
-package 用于避免类命名污染.
+使用包机制是为了防止命名冲突，访问控制，提供搜索和定位类、接口、枚举和注释等。
+
+包的作用：
+- 把功能相似或相关的类或接口组织在同一个包中，方便类的查找和使用
+- 包同文件夹一样，也采用了树形目录的存储方式。同一个包中的类名字是不同的，不同包中的类名字是可以相同的。当同时调用两个不同包中相同类名的类时，应该加上包名加以区别。
+- 包也限定了访问权限，拥有包访问权限的类才能访问某个包中的类
+
+规定:
+- 如果其他的源文件包含了这个包提供的类、接口、枚举或者注释类型的时候，都必须将这个包的声明放在这个源文件的开头。
+- 包声明应该在源文件的第一行， *每个源文件只能有一个包声明* ，这个文件中的每个类型都应用于它。
+- 如果一个源文件中没有使用包声明，那么其中的类、函数、枚举、注释等将被放在一个无名包中。
+- 类文件中可以包含任意数量的 import 声明。import 声明必须在包声明之后，类声明之前。
+
+语法：
+#+BEGIN_SRC java
+package pkg1[.pkg2[.pkg3...]];
+
+/**
+ ,* @note : 最终文件 Something.java 的保存位置位于 net/java/util/Something.java 
+ ,*/
+package net.java.util;
+
+public class Something{
+        ...
+}
+#+END_SRC
+
+*** 创建包
+#+BEGIN_SRC java
+/// Animal.java
+package animals;
+
+interface Animal{
+        public void eat();
+        public void travel();
+}
+#+END_SRC
+#+BEGIN_SRC java
+package animals;
+
+public class MammalInt implements Animal{
+        public void eat(){
+                System.out.println("Mammal eats");
+        }
+        public void travel(){
+                System.out.println("Mammal travels");
+        }
+        public int noOfLegs(){
+                return 0;
+        }
+        public static void main(String [] args){
+                MammalInt m = new MammaInt();
+
+                m.eat();
+                m.travel();
+        }
+}
+#+END_SRC
 #+BEGIN_SRC java
 //将编译的结果打包到 a.b.c.d 文件夹下
 //编译时使用命令 javac -d . Pack.java
 //执行时使用命令 java a.c.c.d.Pack
 //在其他文件中导入类使用 import a.b.c.d.Pack
 //其他文件使用类就使用 a.b.c.d.Pack.main(), 若没有重名的类, 也可以直接使用 Pack.main();
-package a.b.c.d;
+import a.b.c.d.Pack;
 
 public class Pack{
         public static void main(String args[])
@@ -1144,11 +1317,18 @@ public class Pack{
                 }
 }
 #+END_SRC
-**** public 
-- 当类名前具有 =public= 时,代表它可以被全局访问
-- 当类名没有 =public= 时,代表它只能被 *同一包内访问* (同文件夹).
+*** 使用 import 
+使用 =import= 导入包。
+#+BEGIN_SRC java
+import package1[.package2..].(classname|*);
+#+END_SRC
+*** package 目录结构
+类放在包中会有两种主要的结果：
+- 包名成为类名的一部分
+- 包名必须与相应的字节码所在的目录结构相吻合。
 
-** 内部类
+
+*** 内部类
 内部类就是在类内部再定义一个类,内部类可以访问外部类的私有变量及属性.
 #+BEGIN_SRC java
 class Outer{
@@ -1170,7 +1350,18 @@ public class InnerDemo{
                 }
 }
 #+END_SRC
+** 数据结构
+java 中的主要数据结构有以下几种：
+- 枚举(Enumeration)
+- 位集合(BitSet)
+- 向量(Vector)
+- 栈(Stack)
+- 字典(Dictionary)
+- 哈希表(Hashtable)
+- 属性(Properties)
+** 集合框架
+** 泛型
+** 序列化
+** 文档注释
 ** JNI(Java Native Interface)
 java通过统一的接口来访问 c/c++ 库函数
-*** System.loadLibrary --> 加载C库
-*** 
