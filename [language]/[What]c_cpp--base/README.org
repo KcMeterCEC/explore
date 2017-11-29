@@ -1,4 +1,55 @@
 * [What]c/c++ --> base
+
+参考网站：[[www.runoob.com/cplusplus][菜鸟教程]]
+
+- [[#基本环境][基本环境]]
+- [[#基本语法][基本语法]]
+
+** 基本环境
+*** g++ 应用说明
+- g++ filename.cpp : 编译文件
+- g++ filename.cpp -o outputName : 指定输出的可执行文件名
+- g++ file1.cpp file2.cpp -o outputName: 编译多个文件
+- g++ -g -Wall -std=c++11 fileName.cpp : 包含调试信息，使能警告，使用C++11标准
+常用命令选项
+| 选项         | 解释                                               |
+|--------------+----------------------------------------------------|
+| -ansi        | 只支持 ANSI标准的C语法，将禁止 GNUC 的某些特性语法 |
+| -c           | 只编译生成目标文件                                 |
+| -DMACRO      | 以字符串“1”定义 MACRO 宏                           |
+| -DMACRO=DEFN | 以字符串“DEFN”定义MACRO宏                          |
+| -E           | 只进行预编译过程                                   |
+| -g           | 生成调试信息                                       |
+| -IDIRECTORY  | 指定额外的头文件搜索路径 DIRECTORY                 |
+| -LDIRECTORY  | 指定额外的库函数搜索路径 DIRECTORY                 |
+| -ILIBRARY    | 链接时搜索指定函数库 LIBRARY                       |
+| -m486        | 针对486进行代码优化                                |
+| -o           | 指定生成的输出文件                                 |
+| -Ox          | 进行 X 优化，X最大为3                              |
+| -shared      | 生成共享目标文件                                   |
+| -static      | 禁止使用共享链接                                   |
+| -UMACRO      | 取消对宏 MACRO 的定义                              |
+| -w           | 不生成任何警告信息                                 |
+| -Wall        | 生成所有警告信息                                   |
+
+** 基本语法
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+int main()
+{
+        cout << "Hello world";
+        return 0;
+}
+#+END_SRC
+相比C,C++增加了以下关键字:
+| new              | this         | operator    | throw      |
+| explicit         | private      | export      | protected  |
+| try              | public       | catch       | typeid     |
+| reinterpret_cast | typename     | friend      | const_cast |
+| virtual          | delete       | static_cast | wchar_t    |
+| mutable          | dynamic_cast | namespace   | template   |
 ** 内存模型和名称空间
 *** 内存模型
 **** 头文件格式及其包含格式
