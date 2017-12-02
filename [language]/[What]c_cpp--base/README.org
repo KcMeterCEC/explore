@@ -8,6 +8,11 @@
 - [[#存储类][存储类]]
 - [[#运算符][运算符]]
 - [[#函数][函数]]
+- [[#数组][数组]]
+- [[#字符串][字符串]]
+- [[#引用][引用]]
+- [[#输入和输出][输入和输出]]
+- [[#对象和类][对象和类]]
 
 ** 基本环境
 *** g++ 应用说明
@@ -121,7 +126,362 @@ Lambda 表达式把函数看作对象。
 如果没有返回值可以表示为：
 =[capture](parameters){body}= >> =[]{++global_x;}=
 
+** 数组
+Array 是固定大小的，不能增加额外的元素，当我们想定义不固定大小的字符时，可以使用 vector(向量)标准库。
+#+BEGIN_SRC c++
+#include <iostream>
+#include <vector>
+using namespace std;
 
+int main{
+        vector<int> vec;
+        int i;
+
+        cout << "vector size = " << vec.size() <<endl;
+        for(i = 0; i < 5; i++){
+                vec.push_back(i);
+        }
+
+        cout << "extened vector size = " << vec.size() << endl;
+
+        return 0;
+}
+#+END_SRC
+
+** 字符串
+*** String 类
+#+BEGIN_SRC c++
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+int main()
+{
+        string str1 = "Hello";
+        string str2 = "World";
+        string str3;
+        int len;
+
+        str3 = str1;
+        cout << "str3:" << str3 << endl;
+
+        str3 = str1 + str2;
+        cout << "str1 + str2:" << str3 << endl;
+
+        len = str3.size();
+        cout << "str3.size():" << len << endl;
+
+        return 0;
+}
+#+END_SRC
+** 引用
+
+引用是变量附属在内存位置的第二个标签。
+
+引用与指针的不同：
+- 不存在空引用。引用必须连接到一块合法内存。
+- 一旦引用被初始化为一个对象，就不能被指向到另一个对象。指针可以在任何时候指向另一个对象
+- 引用必须在创建时被初始化。指针可以在任何时间被初始化。
+*** 创建引用
+#+BEGIN_SRC c++
+int i = 17;
+int & r = i;
+#+END_SRC
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+int main()
+{
+        int i;
+        double d;
+
+        int& r = i;
+        double& s = d;
+
+        i = 5;
+        cout << "Value of i:" << i << endl;
+        cout << "Value of i reference:" << r <<endl;
+
+        d = 11.7;
+        cout << "Value of d:" << d <<endl;
+        cout << "Value of d reference:" << s <<endl;
+
+        return 0;
+}
+#+END_SRC
+
+*** 引用作为参数
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+void swap(int&x, int&y);
+int main()
+{
+        int a = 100;
+        int b = 200;
+        cout << "交换前，a的值:" << a << endl;
+        cout << "交换前, b的值:" << b << endl;
+
+        swap(a, b);
+        
+        cout << "交换后，a的值:" << a << endl;
+        cout << "交换后, b的值:" << b << endl;
+
+        return 0;
+}
+void swap(int&x, int&y)
+{
+        int temp;
+        temp = x;
+        x = y;
+        y = temp;
+
+        
+}
+#+END_SRC
+*** 引用作为返回值
+使用引用时，需要注意：
+- 返回引用时，要注意被引用的对象不能超出作用域。因为它的内存已经被释放了。
+- 不能返回函数内部new分配的内存的引用。
+- 可以返回类成员的引用，但最好是const。
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+double vals[] = {10.1, 12.6, 33.1, 24.1, 50.0};
+
+double& setValues(int i)
+{
+        return vals[i];
+}
+int main()
+{
+        cout << "改变前的值" << endl;
+        for(int i = 0; i < 5; i++)
+        {
+                cout << "vals[" << i << "]=";
+                cout << vals[i] << endl;
+        }
+        setValues(1) = 20.23;
+        setValues(3) = 70.8;
+
+        
+        cout << "改变后的值" << endl;
+        for(int i = 0; i < 5; i++)
+        {
+                cout << "vals[" << i << "]=";
+                cout << vals[i] << endl;
+        }
+        return 0;
+}
+#+END_SRC
+** 输入和输出
+c++库提供了以下头文件用于IO操作：
+- <iostream> : 定义了 =cin,cout,cerr,clog= 对象，对应于标准输入流，标准输出流，非缓冲标准错误流，缓冲标准错误流
+- <iomanip>: 通过参数化的流操纵器(setw,setpercision)，来声明对执行标准化IO有用的服务
+- <fstream>: 文件处理IO服务
+*** 标准输出流(cout)
+cout 是 ostream 类的一个实例，cout 与流插入运算符 << 结合使用。
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+int main()
+{
+        char str[] = "Hello C++";
+
+        cout << "Value of str is: " << str << endl;
+}
+#+END_SRC
+*** 标准输入流(cin)
+cin 是 istream 类的一个实例，cin 与流提取运算符 >> 结合使用。
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+int main()
+{
+        char name[50];
+
+        cout << "Please enter your name:";
+        cin >> name;
+        cout << "Your name is :" << name << endl;
+}
+#+END_SRC
+*** 标准错误流(cerr)
+cerr 是 ostream 类的实例，cerr对象是非缓冲的，与流插入运算符 << 结合使用。
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+int main()
+{
+        char str[] = "Unable to read ...";
+
+        cerr << "Error message: " << str << endl;
+}
+#+END_SRC
+*** 标准日志流(clog)
+clog 是 ostream 类的实例，clog对象是缓冲的，与流插入运算符 << 结合使用。
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+int main()
+{
+        char str[] = "Unable to read ....";
+        clog << "Error message: " << str << endl;
+}
+#+END_SRC
+
+** 对象和类
+面向对象编程(OOP)是一种特殊的,设计程序的概念性方法,C++通过一些特性改进了C语言,使得应用这种方法更容易.下面是最重要的OOP特性:
+- 抽象
+- 封装和数据隐藏
+- 多态
+- 继承
+- 代码的可重用性
+*** 过程性编程和面向对象编程
+采用过程性编程方法时,首先考虑要遵循的步骤,然后考虑如何表示这些数据.
+
+采用OOP方法时,首先从用户的角度考虑对象,描述对象所需的数据以及描述用户与数据交互所需的操作.完成对接口的描述后,需要确定如何实现接口和数据存储.
+*** 抽象和类
+在计算中,为了根据信息与用户之间的接口来表示它,抽象是至关重要的.也就是说,将问题的本质特征抽象出来,并根据特征来描述解决方案.
+**** 类型
+在C++中,指定基本类型完成了三项工作:
+1. 决定数据对象需要的内存数量
+2. 决定如何解释内存中的位
+3. 决定可以使用数据对象执行的操作或方法
+
+对于内置类型来说,有关操作的信息被内置到编译器中.但在C++中定义用户自定义类型时, *必须自己提供这些信息*.付出这些劳动换来了根据实际需要定制新数据类型的强大功能和灵活性.
+**** C++中的类
+类是一种将抽象转换为用户定义类型的C++工具,它将数据表示和操纵数据的方法组合成一个整洁的包.
+
+一般来说,类规范由两个部分组成(类声明提供了类的蓝图,而方法定义则提供了细节).
+- 类声明: 以数据成员的方式描述数据部分,以成员函数(被称为方法)的方式描述公有接口.
+- 类方法定义: 描述如何实现类成员函数.
+
+#+BEGIN_SRC C++
+class Stock// 以关键字 "class" 定义类, 类名首字符大写
+{
+private://只能通过公共成员访问的类成员(数据隐藏)
+        char company[30];// 类成员可以是数据也可以是函数
+        int shares;
+        double share_val;
+        double total_val;
+        void set_tot() {total_val = shares * share_val;}//在类声明之内定义成员函数,为内联函数.在类声明之外,可以使用 inline 显示设定为内联
+public://公共接口的类成员(抽象)
+        void acquire(const char *co, int n, double pr);
+        void buy(int num, double price);
+        void sell(int num, double price);
+        void update(double price);
+        void show();
+};
+#+END_SRC
+类设计尽可能的将公有接口与实现细节分开.公有接口表示设计的抽象组件,将实现细节放在一起并将它们与抽象分开被称为封装.
+
+数据隐藏是一种封装,将实现的细节隐藏在私有部分中,就像Stock类对 set_tot() 所做的那样,也是一种封装.
+
+封装的另一个例子是将类函数定义和类声明放在不同的文件中.
+
+**** 实现类成员函数
+类成员函数相比C的普通函数而言,还有两个特殊的特征:
+- 定义成员函数时,使用作用域解析运算符(::)来标识函数所属的类. =void Stock::update(double price)= 作用域解析运算符确定了方法定义对应的类的身份, *类的其他成员函数不必使用作用域解析运算符,就可以使用同类下的方法*.
+- 类方法可以访问类的 private 组件.
+***** 创建对象
+#+BEGIN_SRC C++
+Stock kate,joe;
+
+//使用对象的方法与使用结构成员一样
+kate.show();
+joe.show();
+#+END_SRC
+
+*** 类的构造和析构函数
+**** 构造函数
+在创建对象时,自动初始化对象.
+***** 声明和定义构造函数
+构造函数和类名相同,并且没有返回类型! 比如:Stock(const string &co, long n = 0, double pr = 0.0);
+***** 使用构造函数
+#+BEGIN_SRC C++
+// 显式地调用
+Stock food = Stock{"World Cabbage", 250, 1.25};
+//隐式的调用
+Stock garment{"Furry Mason", 50, 2.5};
+//申请内存
+Stock *pstock = new Stock{"Electroshock Games", 18, 19.0};
+
+#+END_SRC
+*当没有提供构造函数时,C++将自动提供默认构造函数,不做任何工作*.
+**** 析构函数
+对象过期时,程序将自动调用一个特殊的成员函数,完成清理工作.析构函数的名称是在类名前加上 "~",因此 stock 类的析构函数为 ~Stock().
+*并且没有参数也没有返回!*.
+
+和构造函数一样,如果程序员没有提供析构函数,编译器将隐式的声明一个默认析构函数.
+**** const 成员函数
+为了保证方法不会修改对象的数据,C++规定将 const 关键字放在函数括号后面. 比如: void Stock::show() const;
+
+*** this指针
+this指针指向用来 *调用成员函数的对象*.一般来说,所有的类方法都将this指针设置为调用它的对象的地址.
+
+- 每个成员函数(包括构造函数和析构函数)都有一个this指针,this指针指向调用对象.如果方法需要引用整个调用对象,则可以使用表达式 *this.
+- 在函数的括号后面使用const限定符将this限定为const,这样将不能使用this来修改对象的值.
+*** 对象数组
+声明对象数组的方法与声明标准类型数组相同; =Stock mystuff[4]=
+#+BEGIN_SRC C++ 
+const int STKS = 4;
+Stock stocks[STKS] =
+{
+        Stock{"NanoSmart", 12.5, 20},
+        Stock{"Boffo Object", 200, 20},
+        Stock{"ABC", 12.5, 20},
+        Stock{"Fleep", 12.5, 20},
+};
+//类包含多个构造函数
+Stock stocks2[STKS] =
+{
+        Stock{"NanoSmart", 12.5, 20},
+        Stock(),
+        Stock{"ABC", 12.5, 20},
+        Stock{"Fleep", 12.5, 20},
+};
+#+END_SRC
+*** 类作用域
+- 在类中定义的名称的作用域都为整个类,作用域为整个类的名称只在该类中是已知的,在类外是不可知的.因此可以在不同类中使用相同的类成员名而不会引起冲突.
+- 类作用域意味着不能从外部直接访问类的成员,公有成员函数也是如此.
+**** 作用域为类的常量
+#+BEGIN_SRC C++
+class Bakery
+{
+private:
+        enum {Months = 12};
+        double consts[Months];
+        ....
+};
+#+END_SRC
+*注意*: 用这种方式声明枚举并不会创建数据成员,所有对象中都不包含枚举.
+
+#+BEGIN_SRC C++
+class Bakery
+{
+private:
+        static const int Months = 12;
+        double const[Months];
+        ...
+#+END_SRC
+上述方式将创建一个名为 Months 的常量, *该常量与其他静态变量存储在一起,而不是储存在对象中,因此只有一个Months常量,被所有bakery对象共享.*
+***** C++11枚举
+#+BEGIN_SRC C++
+//由于枚举的作用域为类,就不会发生名称冲突了
+enum class egg{Small, Medium, Large, Jumbo};
+enum class t_shirt{Small, Medium, Large, Xlarge};
+#+END_SRC
+*** 抽象数据类型
 ** 内存模型和名称空间
 *** 内存模型
 **** 头文件格式及其包含格式
@@ -450,147 +810,6 @@ namespace
 - 导入名称时,首选使用作用域解析运算符或using声明方法.
 - 对于using声明,首选将其作用域设置为局部而不是全部.
 
-** 对象和类
-面向对象编程(OOP)是一种特殊的,设计程序的概念性方法,C++通过一些特性改进了C语言,使得应用这种方法更容易.下面是最重要的OOP特性:
-- 抽象
-- 封装和数据隐藏
-- 多态
-- 继承
-- 代码的可重用性
-*** 过程性编程和面向对象编程
-采用过程性编程方法时,首先考虑要遵循的步骤,然后考虑如何表示这些数据.
-
-采用OOP方法时,首先从用户的角度考虑对象----描述对象所需的数据以及描述用户与数据交互所需的操作.完成对接口的描述后,需要确定如何实现接口和数据存储.
-*** 抽象和类
-在计算中,为了根据信息与用户之间的接口来表示它,抽象是至关重要的.也就是说,将问题的本质特征抽象出来,并根据特征来描述解决方案.
-**** 类型
-在C++中,指定基本类型完成了三项工作:
-1. 决定数据对象需要的内存数量
-2. 决定如何解释内存中的位
-3. 决定可以使用数据对象执行的操作或方法
-
-对于内置类型来说,有关操作的信息被内置到编译器中.但在C++中定义用户自定义类型时, *必须自己提供这些信息*.付出这些劳动换来了根据实际需要定制新数据类型的强大功能和灵活性.
-**** C++中的类
-类是一种将抽象转换为用户定义类型的C++工具,它将数据表示和操纵数据的方法组合成一个整洁的包.
-
-一般来说,类规范由两个部分组成(类声明提供了类的蓝图,而方法定义则提供了细节).
-- 类声明: 以数据成员的方式描述数据部分,以成员函数(被称为方法)的方式描述公有接口.
-- 类方法定义: 描述如何实现类成员函数.
-
-#+BEGIN_SRC C++
-class Stock// 以关键字 "class" 定义类, 类名首字符大写
-{
-private://只能通过公共成员访问的类成员(数据隐藏)
-        char company[30];// 类成员可以是数据也可以是函数
-        int shares;
-        double share_val;
-        double total_val;
-        void set_tot() {total_val = shares * share_val;}//在类声明之内定义成员函数,为内联函数.在类声明之外,可以使用 inline 显示设定为内联
-public://公共接口的类成员(抽象)
-        void acquire(const char *co, int n, double pr);
-        void buy(int num, double price);
-        void sell(int num, double price);
-        void update(double price);
-        void show();
-};
-#+END_SRC
-类设计尽可能的将公有接口与实现细节分开.公有接口表示设计的抽象组件,将实现细节放在一起并将它们与抽象分开被称为封装.
-数据隐藏是一种封装,将实现的细节隐藏在私有部分中,就像Stock类对 set_tot() 所做的那样,也是一种封装.
-封装的另一个例子是将类函数定义和类声明放在不同的文件中.
-
-**** 实现类成员函数
-类成员函数相比C的普通函数而言,还有两个特殊的特征:
-- 定义成员函数时,使用作用域解析运算符(::)来标识函数所属的类. =void Stock::update(double price)= 作用域解析运算符确定了方法定义对应的类的身份, *类的其他成员函数不必使用作用域解析运算符,就可以使用同类下的方法*.
-- 类方法可以访问类的 private 组件.
-***** 创建对象
-#+BEGIN_SRC C++
-Stock kate,joe;
-
-//使用对象的方法与使用结构成员一样
-kate.show();
-joe.show();
-#+END_SRC
-
-*** 类的构造和析构函数
-**** 构造函数
-在创建对象时,自动初始化对象.
-***** 声明和定义构造函数
-构造函数和类名相同,并且没有返回类型! 比如:Stock(const string &co, long n = 0, double pr = 0.0);
-***** 使用构造函数
-#+BEGIN_SRC C++
-// 显式地调用
-Stock food = Stock{"World Cabbage", 250, 1.25};
-//隐式的调用
-Stock garment{"Furry Mason", 50, 2.5};
-//申请内存
-Stock *pstock = new Stock{"Electroshock Games", 18, 19.0};
-
-#+END_SRC
-*当没有提供构造函数时,C++将自动提供默认构造函数,不做任何工作*.
-**** 析构函数
-对象过期时,程序将自动调用一个特殊的成员函数,完成清理工作.析构函数的名称是在类名前加上 "~",因此 stock 类的析构函数为 ~Stock().
-*并且没有参数也没有返回!*.
-
-和构造函数一样,如果程序员没有提供析构函数,编译器将隐式的声明一个默认析构函数.
-**** const 成员函数
-为了保证方法不会修改对象的数据,C++规定将 const 关键字放在函数括号后面. 比如: void Stock::show() const;
-
-*** this指针
-this指针指向用来 *调用成员函数的对象*.一般来说,所有的类方法都将this指针设置为调用它的对象的地址.
-
-- 每个成员函数(包括构造函数和析构函数)都有一个this指针,this指针指向调用对象.如果方法需要引用整个调用对象,则可以使用表达式 *this.
-- 在函数的括号后面使用const限定符将this限定为const,这样将不能使用this来修改对象的值.
-*** 对象数组
-声明对象数组的方法与声明标准类型数组相同; =Stock mystuff[4]=
-#+BEGIN_SRC C++ 
-const int STKS = 4;
-Stock stocks[STKS] =
-{
-        Stock{"NanoSmart", 12.5, 20},
-        Stock{"Boffo Object", 200, 20},
-        Stock{"ABC", 12.5, 20},
-        Stock{"Fleep", 12.5, 20},
-};
-//类包含多个构造函数
-Stock stocks2[STKS] =
-{
-        Stock{"NanoSmart", 12.5, 20},
-        Stock(),
-        Stock{"ABC", 12.5, 20},
-        Stock{"Fleep", 12.5, 20},
-};
-#+END_SRC
-*** 类作用域
-- 在类中定义的名称的作用域都为整个类,作用域为整个类的名称只在该类中是已知的,在类外是不可知的.因此可以在不同类中使用相同的类成员名而不会引起冲突.
-- 类作用域意味着不能从外部直接访问类的成员,公有成员函数也是如此.
-**** 作用域为类的常量
-#+BEGIN_SRC C++
-class Bakery
-{
-private:
-        enum {Months = 12};
-        double consts[Months];
-        ....
-};
-#+END_SRC
-*注意*: 用这种方式声明枚举并不会创建数据成员,所有对象中都不包含枚举.
-
-#+BEGIN_SRC C++
-class Bakery
-{
-private:
-        static const int Months = 12;
-        double const[Months];
-        ...
-#+END_SRC
-上述方式将创建一个名为 Months 的常量, *该常量与其他静态变量存储在一起,而不是储存在对象中,因此只有一个Months常量,被所有bakery对象共享.*
-***** C++11枚举
-#+BEGIN_SRC C++
-//由于枚举的作用域为类,就不会发生名称冲突了
-enum class egg{Small, Medium, Large, Jumbo};
-enum class t_shirt{Small, Medium, Large, Xlarge};
-#+END_SRC
-*** 抽象数据类型
 ** 运算符重载
 运算符重载将重载的概念扩展到运算符上,允许赋予C++运算符多种含义. *C++根据操作数的数目和类型来决定采用哪种操作*.
 
