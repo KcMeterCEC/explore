@@ -13,6 +13,7 @@
 - [[#引用][引用]]
 - [[#输入和输出][输入和输出]]
 - [[#对象和类][对象和类]]
+- [[#继承][继承]]
 
 ** 基本环境
 *** g++ 应用说明
@@ -418,6 +419,97 @@ Stock *pstock = new Stock{"Electroshock Games", 18, 19.0};
 
 #+END_SRC
 *当没有提供构造函数时,C++将自动提供默认构造函数,不做任何工作*.
+***** 使用初始化列表来初始化字段
+#+BEGIN_SRC c++
+class Line
+{
+public:
+        void setLength(double len);
+        double getLength(void);
+        Line(double len);
+private:
+        double length;
+};
+
+
+Line::Line(double len): length(len)
+{
+        cout << "Object is being created, length = " << len << endl;
+}
+/// 等价于
+Line::Line(double len)
+{
+        cout << "Object is being created, length = " << len << endl;
+        length = len;
+}
+#+END_SRC
+假设类C，具有多个字段 X,Y,Z 需要初始化，多个字段使用逗号分隔
+#+BEGIN_SRC c++
+C::C(double a, double b, double c): X(a), Y(b), Z(c)
+{
+        ...
+}
+#+END_SRC
+**** 拷贝构造函数
+拷贝构造函数在创建对象时，使用同一类中之前创建的对象来初始化新创建的对象，类的对象需要拷贝时，拷贝构造函数将会被调用，拷贝构造函数用于：
+- 通过使用另一个同类型的对象类初始化新创建的对象
+- 复制对象，把对象作为参数传递给函数
+- 复制对象，从函数返回这个对象
+
+如果在类中没有定义拷贝构造函数，编译器会自动定义一个。 *如果带有指针变量并有动态内存分配或构造函数中有分配其他资源，则它必须有一个拷贝构造函数*.
+
+#+BEGIN_SRC c++
+classname (const classname &obj){
+}
+#+END_SRC
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Line
+{
+public:
+        int getLength(void);
+        Line(int len);
+        Line(const Line &obj);
+        ~Line();
+private:
+        int *ptr;
+                
+};
+
+Line::Line(int len)
+{
+        cout << "调用构造函数" << endl;
+        ptr = new int;
+        ,*ptr = len;
+}
+Line::Line(const Line &obj)
+{
+        cout << "调用拷贝构造函数并为指针 ptr 分配内存" << endl;
+        ptr = new int;
+        ,*ptr = *obj.ptr;
+}
+Line::~Line(void)
+{
+        cout <<"释放内存"<<endl;
+        delete ptr;
+}
+int Line::getLength(void)
+{
+        return *ptr;
+}
+
+int main()
+{
+        Line line(10);
+
+        Line line2 = line;
+
+        return 0;
+}
+#+END_SRC
 **** 析构函数
 对象过期时,程序将自动调用一个特殊的成员函数,完成清理工作.析构函数的名称是在类名前加上 "~",因此 stock 类的析构函数为 ~Stock().
 *并且没有参数也没有返回!*.
@@ -426,6 +518,47 @@ Stock *pstock = new Stock{"Electroshock Games", 18, 19.0};
 **** const 成员函数
 为了保证方法不会修改对象的数据,C++规定将 const 关键字放在函数括号后面. 比如: void Stock::show() const;
 
+*** 友元函数
+类的友元函数是定义在类外部，但有权访问类的所有私有(private)成员和保护(protected)成员， *尽管友元函数的原型有在类的定义中出现过，但是友元函数不是成员函数*.
+
+友元可以是一个函数，该函数被称为友元函数，友元也可以是一个类，该类被称为友元类，这种情况下，整个类及其所有成员都是友元。
+
+使用 =friend= 关键字定义友元函数。
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+class Box
+{
+        double width;
+public:
+        double length;
+        friend void printWidth(Box box);
+        void setWidth(double wid);
+};
+
+void Box::setWidth(double wid)
+{
+        width = wid;
+}
+
+void printWidth(Box box)
+{
+        cout << "Width of Box" << box.width << endl;
+}
+
+int main()
+{
+        Box box;
+
+        box.setWidth(10.0);
+        printWidth(box);
+
+        return 0;
+}
+
+#+END_SRC
+*** 内联函数
+如果想把一个函数定义为内联函数，则需要在函数名前面放置关键字 inline ， 在调用函数之前需要对函数进行定义。如果已定义的函数多于一行，编译器会忽略 inline 限定符。
 *** this指针
 this指针指向用来 *调用成员函数的对象*.一般来说,所有的类方法都将this指针设置为调用它的对象的地址.
 
@@ -481,7 +614,168 @@ private:
 enum class egg{Small, Medium, Large, Jumbo};
 enum class t_shirt{Small, Medium, Large, Xlarge};
 #+END_SRC
+*** 类静态成员
+使用 =static= 关键字把类成员定义为静态的。这意味着 *无论创建多少个类的对象，静态成员都只有一个副本。*
+- 静态成员在类的所有对象中是共享的。如果不存在其他的初始化语句，在创建第一个对象时，所有的静态数据都会被初始化为零。
+- *静态成员变量在类中仅仅是声明,没有定义，所以需要在类外面定义，实际上是给静态成员变量分配内存*
+
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Box
+{
+public:
+        static int objectCount;
+        Box(double l = 2.0f, double b = 2.0f, double h = 2.0f)
+        {
+                cout << "Constructor was called." << endl;
+                length = l;
+                breadth = b;
+                height = h;
+                objectCount++;
+        }
+        double Volue()
+        {
+                return length * breadth * height;
+        }
+private:
+        double length;
+        double breadth;
+        double height;
+};
+
+int Box::objectCount = 0;
+
+int main(void)
+{
+        Box Box1(3.3, 1.2, 1.5);
+        Box Box2(8.5, 6.0, 2.0);
+
+        cout << "Total objects: " << Box::objectCount << endl;
+
+        return 0;
+}
+        
+#+END_SRC
+如果把函数成员声明为静态的， 就可以把函数与类的任何特定对象独立开来，静态成员函数即使在类对象不存在的情况下也能被调用。
+
+静态函数只要使用类名加范围解析运算符::就可以访问。
+- 静态成员函数只能访问静态成员数据、其他静态成员函数和类外部的其他函数。
+- 静态成员函数有一个类范围，他们不能访问类的 this指针。可以使用静态成员函数来判断类的某些对象是否已经被创建。
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Box
+{
+public:
+        static int objectCount;
+        Box(double l = 2.0, double b = 2.0, double h = 2.0)
+        {
+                cout << "Constructor was called." << endl;
+                length = l;
+                breadth = b;
+                height = h;
+                objectCount++;
+        }
+        double Volume()
+        {
+                return length * breadth * height;
+        }
+        static int getCount()
+        {
+                return objectCount;
+        }
+private:
+        double length;
+        double breadth;
+        double height;
+};
+int Box::objectCount = 0;
+
+int main(void)
+{
+        cout << "Initialize stage count: " << Box::getCount() << endl;
+        Box Box1(3.03, 1.2, 1.5);
+        Box Box2(3.03, 1.2, 1.5);
+
+        cout << "Final stage count: " << Box::getCount() << endl;
+
+        return 0;
+}
+#+END_SRC
+*** 访问修饰符
+类成员的访问限制是通过在类主体内部对各个区域标记 =public,private,protected= 来指定的，这些被称为访问修饰符。
+成员和类的默认访问修饰符是private.
+
+#+BEGIN_SRC c++
+class Base{
+public:/// 外部可以访问
+protected:/// 外部不可访问，子类可以访问
+private:/// 外部及子类不可访问
+};
+#+END_SRC
 *** 抽象数据类型
+*** 实例代码
+**** 类成员函数
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Box
+{
+public:
+        double length;
+        double breadth;
+        double height;
+
+        double getVolume(void);
+        void setLength(double len);
+        void setBreadth(double bre);
+        void setHeight(double hei);
+};
+
+double Box::getVolume(void)
+{
+        return length * breadth * height;
+}
+
+void Box::setLength(double len)
+{
+        length = len;
+}
+
+void Box::setBreadth(double bre)
+{
+        breadth = bre;
+}
+void Box::setHeight(double hei)
+{
+        height = hei;
+}
+
+int main()
+{
+        Box Box1;
+
+        double volume = 0.0f;
+
+        Box1.setLength(6.0);
+        Box1.setBreadth(7.0);
+        Box1.setHeight(8.0);
+
+        volume = Box1.getVolume();
+
+        cout << "Box1:" << volume << endl;
+}
+       
+#+END_SRC
+** 继承
+
 ** 内存模型和名称空间
 *** 内存模型
 **** 头文件格式及其包含格式
