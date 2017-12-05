@@ -14,6 +14,11 @@
 - [[#输入和输出][输入和输出]]
 - [[#对象和类][对象和类]]
 - [[#继承][继承]]
+- [[#重载运算符和重载函数][重载运算符和重载函数]]
+- [[#多态][多态]]
+- [[#异常处理][异常处理]]
+- [[#内存模型和名称空间][内存模型和名称空间]]
+- [[#模板][模板]]
 
 ** 基本环境
 *** g++ 应用说明
@@ -775,6 +780,484 @@ int main()
        
 #+END_SRC
 ** 继承
+*** 基类和派生类
+一个类可以派生自多个类，这意味着它可以从多个基类继承数据和函数。通过派生类列表来指定基类。
+#+BEGIN_SRC c++
+class derived-class: access-specifier base-class
+#+END_SRC
+当不使用 =access-apecifier= 时，默认为 private.
+
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Shape
+{
+public:
+        void setWidth(int w)
+        {
+                width = w;
+        }
+        void setHeight(int h)
+        {
+                height = h;
+        }
+protected:
+        int width;
+        int height;
+};
+class Rectangle:public Shape
+{
+public:
+        int getArea()
+        {
+                return (width * height);
+        }
+};
+int main(void)
+{
+        Rectangle Rect;
+        Rect.setWidth(5);
+        Rect.setHeight(7);
+
+        cout << "Total area:" << Rect.getArea() << endl;
+
+        return 0;
+}
+#+END_SRC
+*** 访问控制和继承
+派生类可以访问基类中所有的非私有成员。
+| 访问     | public | protected | private |
+|----------+--------+-----------+---------|
+| 同一个类 | y      | y         | y       |
+| 派生类   | y      | y         | n       |
+| 外部类   | y      | n         | n       |
+一个派生类继承了所有的基类方法，但下列情况除外：
+- 基类的构造函数，析构函数和拷贝构造函数
+- 基类的重载运算符
+- 基类的友元函数
+*** 继承类型
+当使用不同类型的继承时，遵循以下几个规则：
+- 共有继承(public): 当一个类派生自公有基类时，基类的公有成员也是派生类的公有成员，基类的保护成员也是派生类的保护成员，基类的私有成员不能被派生类访问，但可以通过基类的公有和保护成员间接访问。
+- 保护继承(protected): 当一个类派生自保护基类时，基类的公有和保护成员将成为派生类的保护成员
+- 私有继承(private): 当一个类派生自私有基类时，基类的公有和保护成员将成为派生类的私有成员。
+*** 多继承
+#+BEGIN_SRC c++
+class <派生类名>:<继承方式1> <基类名1>,<继承方式2><基类名2>
+{
+       ....
+}
+#+END_SRC
+#+BEGIN_SRC c++
+#include <iostream>
+
+using namespace std;
+
+class Shape
+{
+public:
+        void setWidth(int w)
+        {
+                width = w;
+        }
+        void setHeight(int h)
+        {
+                height = h;
+        }
+protected:
+        int width;
+        int height;
+};
+class PaintCost
+{
+public:
+        int getCost(int area)
+        {
+                return area * 70;
+        }
+};
+
+class Rectangle: public Shape, public PantCost
+{
+public:
+        int getArea()
+        {
+                return (width * height);
+        }
+};
+int main(void)
+{
+        Rectangle Rect;
+
+        int area;
+        Rect.setWidth(5);
+        Rect.setHeight(7);
+
+        area = Rect.getArea();
+
+        cout << "Total area: " << Rect.getArea() << endl;
+
+        cout << "Total paint cost : $" << Rect.getCost(area) << endl;
+
+        return 0;
+}
+#+END_SRC
+*** 环状继承
+#+BEGIN_SRC c++
+class D
+{
+};
+class B : public D
+{
+};
+class A : public D
+{
+};
+class C : puclic B, public A
+{
+};
+#+END_SRC
+- 这种继承会创建两个D对象，所以应该使用 *虚拟继承格式*. =class 类名: virtual 继承方式 父类名=
+#+BEGIN_SRC c++
+class D
+{
+};
+class B: virtual public D
+{
+};
+class A: virtual public D
+{
+};
+class C: public B, public A
+{
+};
+#+END_SRC
+** 重载运算符和重载函数
+C++ 允许在同一作用域中的某个函数和运算符指定多个定义，分别称为函数重载和运算符重载。
+
+当调用一个重载函数或重载运算符时，编译器通过使用的参数类型与定义中的参数类型进行比较，决定选用最合适的定义，这个过程称为 *重载决策*.
+
+*** 函数重载
+同名函数的形式参数（参数的个数、类型或者顺序）必须不同， *不能仅仅通过返回类型的不同来重载函数* 。
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+class printData
+{
+public:
+        void print(int i)
+        {
+                cout << "整数为：" << i << endl;
+        }
+        void print(double f)
+        {
+                cout << "浮点数为：" << f << endl;
+        }
+        void print(string c)
+        {
+                cout << "字符串为:" << c << endl;
+        }
+};
+
+int main(void)
+{
+        printData pd;
+
+        pd.print(5);
+        pd.print(500.263);
+        pd.print("Hello C++");
+
+        return 0;
+}
+#+END_SRC
+*** 运算符重载
+运算符重载将重载的概念扩展到运算符上,允许赋予C++运算符多种含义. *C++根据操作数的数目和类型来决定采用哪种操作*.
+
+要重载运算符,需要使用被称为运算符的函数的特殊函数形式.运算符函数的格式为: =operatorop(argument-list)=
+例如, operator + ()重载 + 运算符, operator * ()重载 * 运算符. *op必须是有效的C++运算符,不能虚构一个新的符号*.
+
+示例:
+#+BEGIN_SRC c++
+Box operator+(const Box&);
+#+END_SRC
+
+#+BEGIN_SRC C++
+#include <iostream>
+using namespace std;
+
+class Box
+{
+public:
+        double getVolume(void)
+        {
+                return length * breadth * height;
+        }
+        void setLength(double len)
+        {
+                length = len;
+        }
+        void setBreadth(double bre)
+        {
+                breadth = bre;
+        }
+        void setHeight(double hei)
+        {
+                height = hei;
+        }
+        Box operator+(const Box& b)
+        {
+                Box box;
+                box.length = this->length + b.length;
+                box.breadth = this->breadth + b.breadth;
+                box.height = this->height + b.height;
+
+                return box;
+        }
+private:
+        double length;
+        double breadth;
+        double height;
+};
+int main()
+{
+        Box box1;
+        Box box2;
+        Box box3;
+        double volume = 0.0;
+
+        box1.setLength(6.0);
+        box1.setBreadth(7.0);
+        box1.setHeight(5.0);
+
+        box2.setLength(6.0);
+        box2.setBreadth(7.0);
+        box2.setHeight(5.0);
+
+        volume = box1.getVolume();
+        cout << "Volume of Box1:" << volume << endl;
+        
+        volume = box2.getVolume();
+        cout << "Volume of Box2:" << volume << endl;
+
+        box3 = box1 + box2;
+        
+        volume = box3.getVolume();
+        cout << "Volume of Box3:" << volume << endl;
+
+        return 0;
+}
+
+#+END_SRC
+**** 可重载和不可重载运算符
+可重载运算符：
+- 双目算数运算符： +,-,*,/,%
+- 关系运算符：==,!=,<,>,<=,>=
+- 逻辑运算符：||,&&,!
+- 单目运算符：+,-,*,&
+- 自增和自减：++,--
+- 位运算符：|,&,~,^,<<,>>
+- 赋值运算符：=,+=,*=,/=,&=,|=,^=,<<=,>>=
+- 空间申请与释放：new,detele,new[],delete[]
+- 其他运算符：()(函数调用),->,,(逗号),[](下标)
+不可重载运算符:
+- .(成员访问)
+- .*,->*(成员指针访问)
+- ::(域运算符)
+- sizeof
+- ?:(条件运算符)
+- #(预处理)
+
+** 多态
+C++多态意味着调用成员函数时，会根据调用函数的对象的类型来执行不同的函数。
+
+形成多态必须具备3个条件：
+- 必须存在继承关系
+- 继承关系必须有同名虚函数
+- 存在基类类型的指针或者引用，通过该指针或引用调用虚函数。
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+class Shape
+{
+protected:
+        int width, height;
+public:
+        Shape(int a = 0, int b = 0)
+        {
+                width = a;
+                height = b;
+        }
+        virtual int area()
+        {
+                cout << "Parent class area:" << endl;
+                return 0;
+        }
+};
+class Rectangle:public Shape{
+public:
+        Rectangle(int a = 0, int b = 0):Shape(a,b)
+                {
+                        
+                }
+        int area()
+        {
+                cout << "Rectangle class area:" << endl;
+                return (width * height);
+        }
+};
+class Triangle:public Shape{
+public:
+        Triangle(int a = 0, int b= 0):Shape(a, b)
+                {
+                        
+                }
+        int area()
+        {
+                cout << "Triangle class area:" << endl;
+                return (width * height / 2);
+        }
+};
+int main()
+{
+        Shape *shape;
+        Rectangle rec(10,7);
+        Triangle tri(10, 5);
+
+        shape = &rec;
+        shape->area();
+
+        shape = &tri;
+        shape->area();
+
+        return 0;
+}
+#+END_SRC
+*** 虚函数
+虚函数是在基类中使用关键字 =virtual= 声明的函数，在派生类中重新定义基类中定义的虚函数时， *会告诉编译器不要静态链接到该函数,而是根据调用的对象类型来选择调用的函数， 这被叫做动态链接或后期绑定*.
+**** 纯虚函数
+纯虚函数在基类中没有函数主体，交由派生类来实现，纯虚函数用来规定派生类的行为，也就是接口。
+- 包含纯虚函数的类是抽象类，抽象类不能定义实例，但可以声明指向实现该抽象类的具体类的指针或引用。
+- 在有动态分配堆上内存的时候，析构函数必须是虚函数，但没有必要时纯虚函数。
+- 友元函数不是成员函数，只有成员函数才可以时虚拟的，所以友元函数不能时虚函数。但可以通过让友元函数调用虚函数来解决友元的虚拟问题。
+- 析构函数应当是虚函数，将调用相应对象类型的析构函数，如果指针指向的是子类对象，将调用子类的析构函数，然后自动调用基类的析构函数。
+#+BEGIN_SRC c++
+class Shape{
+protected:
+        int width, height;
+public:
+        Shape(int a = 0, int b = 0){
+                width = a;
+                height = b;
+        }
+        virtual int area() = 0;
+};
+#+END_SRC
+** 异常处理
+C++ 异常是指在程序运行时发生的特殊情况，异常处理关键字：
+- throw: 当问题出现时，程序会抛出一个异常
+- catch: 在想要处理问题的地方，通过异常处理程序捕获异常
+- try: 标识将被激活的特定异常
+
+如果有一个块抛出一个异常，捕获异常的方法会使用 try 和 catch 关键字，try中放置可能抛出异常的代码，try块中的代码被称为保护代码。
+#+BEGIN_SRC c++
+try
+{
+        //保护代码
+}catch(ExceptionName e1)
+{
+        //catch 块
+
+}catch(ExceptionName e2)
+{
+        //catch 块
+
+}catch(ExceptionName eN)
+{
+        //catch 块
+}
+#+END_SRC
+如果想让 catch 块能够处理 try 块抛出的任何类型的异常，则必须在异常声明的括号内使用省略号 ...
+#+BEGIN_SRC c++
+try
+{
+        //保护代码
+}catch(...)
+{
+        //处理任何异常的代码
+}
+#+END_SRC
+
+#+BEGIN_SRC c++
+#include <iostream>
+using namespace std;
+
+double division(int a, int b)
+{
+        if(b == 0)
+        {
+                throw "Division by zero condition!";
+        }
+        return (a/b);
+}
+int main()
+{
+        int x = 50;
+        int y = 0;
+        double z = 0;
+
+        try
+        {
+                z = division(x, y);
+                cout << z << endl;
+        }catch(const char *msg){
+                cerr << msg << endl;
+        }
+
+        return 0;
+}
+#+END_SRC
+*** C++ 标准异常
+标准异常定义在 <exception> 中，可以在程序中使用这些标准异常。它们是以父子层次结构组织起来的：
+[[./exception.jpg]]
+*** 定义新的异常
+通过继承和重载 exception 类在定义新的异常。
+#+BEGIN_SRC c++
+#include <iostream>
+#include <exception>
+using namespace std;
+
+struct MyException:public exception
+{
+        /**
+         ,* @brief what()是异常类提供的一个公共方法，它已被所有子异常类重载，返回异常产生的原因
+         ,* @note nost throw() 不是函数，叫做异常规格说明，表示 what 函数可以抛出异常的类型
+         ,*/
+        
+        const char *what() const throw()
+                {
+                        return "C++ Exception";
+                }
+};
+int main()
+{
+        try
+        {
+                throw MyException();
+        }
+        catch (MyException & e)
+        {
+                std::cout << "MyException caught" << std::endl;
+                std::cout << e.what() << std::endl;
+        }
+        catch(std::exception & e)
+        {
+                //其他的错误
+        }
+}
+#+END_SRC
 
 ** 内存模型和名称空间
 *** 内存模型
@@ -863,7 +1346,6 @@ veep.accesses++;                //allowed
 #+END_SRC
 
 
-
 ***** 函数和链接性
 ***** 语言链接性(language linking)
 语言链接性指的是对符号的修饰规则,在c++中要使用c的库函数,需要使用 extern "C".
@@ -914,7 +1396,6 @@ delete pi;
 delete (pi);
 
 #+END_SRC
-
 
 ****** 定位new运算符
 通常,new负责载堆中找到一个足以能够满足要求的内存块.new 运算符还有另一种变体,被称为定位new运算符,它让你能够指定要使用的位置.
@@ -1023,6 +1504,7 @@ int main()
 *编译器不允许同时使用上述两个using声明,这将导致二义性.*
 ***** using编译指令和using声明之比较
 使用using编译指令导入一个名称空间中所有的名称与使用多个using声明使不一样的,而更象是大量使用作用域解析运算符.使用using声明时,就好像声明了相应的名称一样.
+
 如果某个名称已经在函数中声明了,则不能使用using声明导入相同的名称.然而,使用using编译指令时,将进行名称解析,就像在包含using声明和名称空间本身的最小声明区域中声明了名称用于.
 #+BEGIN_SRC C++
 namespace Jill{
@@ -1050,6 +1532,7 @@ int foom()
 #+END_SRC
 
 *注意*: 假设名称空间和声明区域定义了相同的名称,如果试图使用using 声明将名称空间的名称导入该声明区域,则这两个名称会发生冲突,从而出错.
+
 *如果使用using 编译指令将该名称空间的名称导入该声明区域,则局部版本将隐藏名称空间版本.*
 
 一般説来,使用using声明必使用using编译指令更安全,这是由于它只导入指定的名称.如果该名称与局部发生冲突,编译器将发出指示.using编译指令导入所有名称,
@@ -1104,26 +1587,49 @@ namespace
 - 导入名称时,首选使用作用域解析运算符或using声明方法.
 - 对于using声明,首选将其作用域设置为局部而不是全部.
 
-** 运算符重载
-运算符重载将重载的概念扩展到运算符上,允许赋予C++运算符多种含义. *C++根据操作数的数目和类型来决定采用哪种操作*.
+  
+** 模板
+模板是泛型编程的基础，泛型编程即以一种独立于任何类型的方式编写代码。
 
-要重载运算符,需要使用被称为运算符的函数的特殊函数形式.运算符函数的格式为: =operatorop(argument-list)=
-例如, operator + ()重载 + 运算符, operator * ()重载 * 运算符. *op必须是有效的C++运算符,不能虚构一个新的符号*.
-
-示例:
-#+BEGIN_SRC C++
-//mytime.h
-#ifndef MYTIME0_H__
-#define MYTIME0_H__
-class Time
+模板是创建泛型类或函数的蓝图或公式。
+*** 函数模板
+#+BEGIN_SRC c++
+template <class type> ret-type func-name(parameter list)
 {
-private:
-        int hours;
-        int minutes;
-public:
-        Time();
-        Time(int h, int m = 0);
-        void AddMin(int m);
+        
+}
+#+END_SRC
+#+BEGIN_SRC c++
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+template <typename T>
+inline T const& Max(T const & a, T const &b)
+{
+        return a < b? b:a;
+}
+int main()
+{
+        int i = 30;
+        int j = 20;
+        cout << "Max(i,j):" << Max(i,j) << endl;
+
+        double f1 = 13.5;
+        double f2 = 20.7;
+        cout << "Max(f1,f2):" << Max(f1, f2) << endl;
+
+        string s1 = "Hello";
+        string s2 = "World";
+        cout << "Max(s1, s2)" << Max(s1, s2) << endl;
+
+        return 0;
+}
+#+END_SRC
+*** 类模板
+#+BEGIN_SRC c++
+template <class type> class class-name{
+        
 };
-#endif
 #+END_SRC
