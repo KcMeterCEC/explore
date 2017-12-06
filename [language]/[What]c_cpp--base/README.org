@@ -186,9 +186,11 @@ int main()
 引用是变量附属在内存位置的第二个标签。
 
 引用与指针的不同：
-- 不存在空引用。引用必须连接到一块合法内存。
+- 不存在空引用。引用必须链接到一块合法内存。
 - 一旦引用被初始化为一个对象，就不能被指向到另一个对象。指针可以在任何时候指向另一个对象
 - 引用必须在创建时被初始化。指针可以在任何时间被初始化。
+- 引用和被引用的变量占用同一个内存， *也就是说引用不会多占用内存*, 引用就是变量的别名.
+- 在参数传递时，参数为引用时不会进行内存拷贝，节约时间与空间。
 *** 创建引用
 #+BEGIN_SRC c++
 int i = 17;
@@ -283,6 +285,14 @@ int main()
         return 0;
 }
 #+END_SRC
+*** const引用
+const引用可以用于不同类型，也可以用于无法寻址的常亮。用户无法修改const引用所链接的对象。
+#+BEGIN_SRC c++
+float f_val = 1.0f;
+const int &r = 12345;
+const int &r1 = f_val;
+#+END_SRC
+编译器对于上面这种引用在实现时会创建临时变量，然后引用其实是临时变量的别名。
 ** 输入和输出
 c++库提供了以下头文件用于IO操作：
 - <iostream> : 定义了 =cin,cout,cerr,clog= 对象，对应于标准输入流，标准输出流，非缓冲标准错误流，缓冲标准错误流
@@ -1587,14 +1597,24 @@ namespace
 - 导入名称时,首选使用作用域解析运算符或using声明方法.
 - 对于using声明,首选将其作用域设置为局部而不是全部.
 
-  
 ** 模板
 模板是泛型编程的基础，泛型编程即以一种独立于任何类型的方式编写代码。
 
-模板是创建泛型类或函数的蓝图或公式。
+模板是创建泛型类或函数的蓝图或公式,是一种更加抽象的表现形式，而不去关注具体的类型。
+- 模板的声明或定义必须在全局，名称空间，类中进行。不能在局部范围中进行
 *** 函数模板
 #+BEGIN_SRC c++
-template <class type> ret-type func-name(parameter list)
+/**
+ ,* @brief 函数模板的基本格式
+ ,* @note :
+ ,* template 关键字表示声明或定义一个模板
+ ,* class/typename 关键字只使用其中一个，后面跟代表这种类型的名称（比如name类型)
+ ,* returnType 如果有类型则使用name替代
+ ,* functionName 就是函数名
+ ,* paramter list 也就是参数列表，参数类型使用name代替。比如原来是(int a, int b),现在是(name a, name b)
+ ,* 
+ ,*/
+template <class/typename name> returnType functionName(parameter list)
 {
         
 }
@@ -1629,7 +1649,47 @@ int main()
 #+END_SRC
 *** 类模板
 #+BEGIN_SRC c++
-template <class type> class class-name{
+/**
+ ,* @brief 类模板格式
+ ,* @note 个函数模板一样，使用模板形参名 name 来代替类中使用的类型
+ ,* 使用模板的格式为 className<typeName1, typeName2> objectName,(比如：A<int> a).
+ ,*/
+template <class name1, class name 2> class className{
         
 };
+#+END_SRC
+#+BEGIN_SRC c++
+///TemplateDemo.h
+#ifndef TEMPLATE_DEMO_HXX
+#define TEMPLATE_DEMO_HXX
+template<class T> class A{
+public:
+        T g(T a, T b);
+        A();
+};
+#endif
+///TemplateDemo.cpp
+#include <iostream>
+#include "TemplateDemo.h"
+
+/**
+ ,* @note 在类模板外部定义成员函数的格式:
+ ,* template<class name1, class name2> returnType className<name1, name2>::functionName(parameter)
+ {
+ }
+ ,*/
+template<class T>A<T>::A()
+{
+        
+}
+template<class T> T A<T>::g(T a, T b)
+{
+        return a + b;
+}
+
+void main()
+{
+        A<int> a;
+        cout << a.(2, 3) << endl;
+}
 #+END_SRC
