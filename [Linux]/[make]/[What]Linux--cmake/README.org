@@ -1,0 +1,252 @@
+#+TITLE: [What]Linux--cmake
+
+参考链接:[[https://tuannguyen68.gitbooks.io/learning-cmake-a-begginner-s-guide][learning cmake a beginner's guide]]  [[https://cmake.org/cmake-tutorial][cmake tutorial]]   
+
+[[#tutorial][tutorial]]
+
+* tutorial 
+** 基本配置
+*** 安装
+#+begin_example
+sudo apt install cmake
+#+end_example
+** 快速实践，简单粗暴
+*** helloWorld
+- 新建文件夹并编写代码：
+#+BEGIN_SRC c++
+//hello.cpp
+
+#include <iostream>
+
+using namespace std;
+
+int main(void)
+{
+        cout << "Hello world!" << endl;
+
+        return 0;
+}
+#+END_SRC
+- 编写配置文件：最简单的配置文件就是具有以下基本元素(可以最短3行，但结构化不好)
+  + 当前工程名称
+  + 要编译哪些文件
+  + 输出的文件放在哪里
+
+在同一文件夹下编写 =CMakeLists.txt= 配置文件：
+#+begin_example
+#Specify the minimum version for CMake
+#使用 cmake -version 查看版本
+cmake_minimum_required(VERSION 2.8)
+
+#Project's names
+project(hello)
+
+#Set the output folder where you program will be created
+# CMAKE_SOURCE_DIR : CMakeLists.txt 文件所在位置
+# CMAKE_BINARY_DIR: 二进制文件的输出路径（此处理解可能有误）
+set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
+
+# EXECUTABLE_OUTPUT_PATH: 最终可执行文件的输出路径
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+# LIBRARY_OUTPUT_PATH: 库输出路径
+set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+# PROJECT_SOURCE_DIR: 工程的根目录路径
+#The following folder will be included
+include_directories("${PROJECT_SOURCE_DIR}")
+
+#add source file
+add_executable(hello ${PROJECT_SOURCE_DIR}/hello.cpp)
+#+end_example
+- 生成构建文件以及编译
+#+begin_example
+#检查当前编译环境以及生成构建文件，位于 build 文件夹中
+#此过程会检查C/C++编译器，中途如果出现错误则需要安装对应编译器
+cmake -H. -Bbuild
+
+#从 build 文件夹中提取构建文件并构建
+cmake --build build -- -j3
+#+end_example
+*** 带有目录架构的工程构建
+一般情况下我们都会以目录的层次结构来整理整个项目，对应的 CMake 配置文件也需要复杂一点。
+#+BEGIN_SRC c++
+/// include/Student.h
+#include <string.h>
+#include <iostream>
+using namespace std;
+
+class Student{
+private:
+        string name;
+public:
+        Student(string name);
+        virtual void display();
+};
+
+/// src/Student.cpp
+#include <iostream>
+#include "Student.h"
+using namespace std;
+
+Student::Student(string name)
+{
+        this->name = name;
+}
+void Student::display()
+{
+        cout << "A student with name " << this->name << endl;
+}
+/// src/mainapp.cpp
+#include "Student.h"
+
+int main(int argc, char *argv[])
+{
+        Student s("Joe");
+        s.display();
+
+        return 0;
+}
+#+END_SRC
+
+#+begin_example
+cmake_minimum_required(VERSION 3.5.1)
+project(student)
+
+#output path
+set(CMAKE_BINART_DIR ${CMAKE_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+#source path
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+#GLOB is used to create a list of all of the files that meet the globbing expression(i.e.. src/*.cpp)
+# and add them to a variable SOURCES
+file(GLOB SOURCES ${PROJECT_SOURCE_DIR/src/*.cpp})
+
+add_executable(testStudent ${SOURCES})
+#+end_example
+
+- 生成构建文件以及编译
+#+begin_example
+#检查当前编译环境以及生成构建文件，位于 build 文件夹中
+#此过程会检查C/C++编译器，中途如果出现错误则需要安装对应编译器
+cmake -H. -Bbuild
+
+#从 build 文件夹中提取构建文件并构建
+cmake --build build -- -j3
+#+end_example
+*** 创建一个动态链接库
+基于上面的工程代码，删除mainapp.cpp，用于生成 testStudent.so 动态链接文件
+
+#+begin_example
+cmake_minimum_required(VERSION 3.5.1)
+project(student)
+
+#set the build type bo be a release build
+set(CMAKE_BUILD_TYPE Release)
+
+#output path
+set(CMAKE_BINART_DIR ${CMAKE_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+#source path
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+#GLOB is used to create a list of all of the files that meet the globbing expression(i.e.. src/*.cpp)
+# and add them to a variable SOURCES
+file(GLOB SOURCES ${PROJECT_SOURCE_DIR/src/*.cpp})
+
+#The library is built as a shared library using the SHARED flag(other options are: STATIC or MODULE).
+#and the testStudent name is used ad the name of the shared library
+add_library(testStudent SHARED ${SOURCES})
+
+#Define an installation location for the library
+install(TARGETS testStudent DESTINATION /usr/lib)
+#+end_example
+
+- 生成构建文件以及编译
+#+begin_example
+#检查当前编译环境以及生成构建文件，位于 build 文件夹中
+#此过程会检查C/C++编译器，中途如果出现错误则需要安装对应编译器
+cmake -H. -Bbuild
+
+#从 build 文件夹中提取构建文件并构建
+cmake --build build -- -j3
+#+end_example
+*** 创建一个静态库
+基于 =带有目录架构的工程构建= 一节，删除 =mainapp.cpp= ,然后使用下面的 CMakeLists.txt
+
+#+begin_example
+cmake_minimum_required(VERSION 3.5.1)
+project(student)
+
+#set the build type bo be a release build
+set(CMAKE_BUILD_TYPE Release)
+
+#output path
+set(CMAKE_BINART_DIR ${CMAKE_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+#source path
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+#GLOB is used to create a list of all of the files that meet the globbing expression(i.e.. src/*.cpp)
+# and add them to a variable SOURCES
+file(GLOB SOURCES ${PROJECT_SOURCE_DIR/src/*.cpp})
+
+#The library is built as a shared library using the SHARED flag(other options are: STATIC or MODULE).
+#and the testStudent name is used ad the name of the shared library
+add_library(testStudent STATIC ${SOURCES})
+
+#Define an installation location for the library
+install(TARGETS testStudent DESTINATION /usr/lib)
+#+end_example
+- 生成构建文件以及编译
+#+begin_example
+#检查当前编译环境以及生成构建文件，位于 build 文件夹中
+#此过程会检查C/C++编译器，中途如果出现错误则需要安装对应编译器
+cmake -H. -Bbuild
+
+#从 build 文件夹中提取构建文件并构建
+cmake --build build -- -j3
+#+end_example
+*** 使用动态和静态库
+使用动态链接和静态链接的写法都是一样的，只是改改被链接的文件名即可。
+
+以动态链接为例，基于 =helloworld= 工程，删除 =Student.cpp= 文件，然后编写 =CMakeLists.txt=
+#+begin_example
+cmake_minimum_required(VERSION 3.5.1)
+project(student)
+
+#output path
+set(CMAKE_BINART_DIR ${CMAKE_SOURCE_DIR}/bin)
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+#link path
+link_directories(${PROJECT_SOURCE_DIR}/bin)
+set(PROJECT_LINK_LIBS libtestStudent.so)
+
+#source path
+include_directories(${PROJECT_SOURCE_DIR}/include)
+
+#GLOB is used to create a list of all of the files that meet the globbing expression(i.e.. src/*.cpp)
+# and add them to a variable SOURCES
+file(GLOB SOURCES ${PROJECT_SOURCE_DIR/src/*.cpp})
+
+add_executable(testStudent ${SOURCES})
+target_link_libraries(testStudent ${PROJECT_LINK_LIBS})
+#+end_example
+- 生成构建文件以及编译
+#+begin_example
+#检查当前编译环境以及生成构建文件，位于 build 文件夹中
+#此过程会检查C/C++编译器，中途如果出现错误则需要安装对应编译器
+cmake -H. -Bbuild
+
+#从 build 文件夹中提取构建文件并构建
+cmake --build build -- -j3
+#+end_example
