@@ -95,7 +95,7 @@ BUG()的变体叫做 =BUG_ON(condition)= ,当 *条件成立则抛出Oops*.
 *** strace
 用于跟踪一个程序的运行状况,可以查看被调用函数的参数值以及它的返回值.
 *** KGDB and kdb
-参考链接 : [[https://www.kernel.org/doc/html/latest/dev-tools/kgdb.html][内核说明文档]]
+    参考链接 : [[https://www.kernel.org/doc/html/latest/dev-tools/kgdb.html][内核说明文档]]
 
 kernel 具有 =kdb,kgdb= 两个调试前端, 并且这两个还可以动态的切换.
 
@@ -257,3 +257,9 @@ make install
 然后将编译好的 =bin= 目录下的应用拷贝至文件系统, 其中 lrz 接收, lsz 发送.
 
 在 linux 主机下一般使用终端 minicom.连接好开发板后, 开发板首先运行 =lrz= ,然后在主机下 =CTRL-A s= ,选择 zmodem 然后传输文件.
+
+***** device is locked 
+- 问题
+当minicom没有正常退出时，再次启动minicom 就会出现警告 =Device /dev/ttyUSB0 is locked=
+- 解决
+这是由于minicom对此设备进行了加锁，删除文件 =/var/lock/LCK..ttyUSB0= 即可.
