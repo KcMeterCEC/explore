@@ -11,6 +11,7 @@
 - [[#gpio subsystem][gpio subsystem]]
   + [[#%E7%9B%B4%E6%8E%A5%E4%BD%BF%E7%94%A8][直接使用]]
   + [[#%E6%A6%82%E8%A7%88][概览]]
+- [[#中断与时钟][中断与时钟]]
 
 
 ** 时钟管理子系统(clock)
@@ -1206,3 +1207,359 @@ struct pinctrl_setting_configs
 
 
 
+** 中断与时钟
+*** 概念
+**** 中断类型
+- 根据中断的来源分为内部和外部中断，比如操作系统从用户态切换到内核态需要借助软件中断
+- 根据中断是否可以屏蔽分为可屏蔽中断和不可屏蔽中断
+- 根据中断入口跳转方法的不同，中断分为向量中断和非向量中断，向量中断由硬件提供中断服务程序入口地址，非向量中断由软件提供中断服务程序入口地址
+
+ARM 多核处理器都是通过GIC（Generic Interrupt Controller）来控制中断:
+- 每个处理器都有其私有的中断PPI(Private Peripheral Interrupt)
+- 处理器之间，用户态与内核态之间通信及请求是通过软件中断完成SGI(Software Generated Interrupt).
+- 多个CPU共享外设中断SPI(Shared Peripheral Interrupt)
+
+linux 中使用函数 =extern int irq_set_affinity(unsigned int irq, const struct cpumask *m);= 来将外设绑定到固定CPU核去
+
+默认情况下，中断都是在CPU0上产生的。
+#+BEGIN_SRC c
+///将中断irq设定到CPU i 上去
+irq_set_affinity(irq, cpumask_of(i));
+#+END_SRC
+**** 中断处理程序架构
+为了满足中断处理时间尽量短的要求，Linux将中断处理程序分为顶半(Top Half)处理和底半(Bottom Half)处理两部分(优秀的 RT-thread 也是这样做的)。
+- 顶半部分用于完成尽量少的比较紧急的功能，往往只是简单的读取中断寄存器状态，并在清除中断标志后就将底半处理程序挂到设备的底半执行队列中去。
+- 底本部分几乎做了中断处理程序所有的事情， *而且可以被新中断打断*.相对来说处理并不是很紧急且相对比较耗时的工作。
+
+*注意*: 如果整个中断处理的工作本来就很少，那么就完全可以直接在顶半部分完成。
+
+查看 =/proc/interrupts= 文件可以获得系统中中断的统计信息，并能统计出每一个中断号上的中断在每个CPU上发生的次数。
+*** 中断编程
+**** 申请和释放中断
+要先申请中断才能够使用，并且在不使用后需要释放中断。
+#+BEGIN_SRC c
+typedef int irqreturn_t;
+typedef irqreturn_t (*irq_handler_t)(int, void *);
+/**
+ ,* @brief 申请一个中断
+ ,* @param irq: 要申请的硬件中断号
+ ,* @param handler: 中断处理的顶半函数
+ ,* @param flags: 中断的触发方式及处理方式
+ ,*        + IRQF_TRIGGER_RISING
+ ,*        + IRQF_TRIGGER_FAILING
+ ,*        + IRQF_TRIGGER_HIGH
+ ,*        + IRQF_TRIGGER_LOW
+ ,*        + IRQF_SHARED : 多个设备共享中断
+ ,* @param dev: 要传递给中断服务程序的私有数据,一般为设备的设备结构体地址或NULL
+ ,* @retval
+ ,*        + 0 成功
+ ,*        + -EINVAL : 中断号无效或处理函数指针为NULL
+ ,*        + -EBUSY : 中断已经被占用且不能共享
+ ,*/
+int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+
+///此函数会在合适的时候自动释放中断资源
+int devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+
+/**
+ ,* @brief 释放中断
+ ,*/
+void free_irq(unsigned int irq, void *dev_id);
+#+END_SRC
+**** 使能和屏蔽中断
+在申请了中断资源后，便可以使能及失能中断。
+#+BEGIN_SRC c
+
+/**
+ ,* @brief 使能中断
+ ,*/
+void enable_irq(int irq);
+/**
+ ,* @brief 等待目前的中断处理完成后关闭中断
+ ,* @note: 不能在中断的顶半部分调用此函数，因为它会一直等待底半部分，而底半还没有执行，就会卡死
+ ,*/
+void disable_irq(int irq);
+/**
+ ,* @brief 给中断处理发送消息，处理完成后自动关闭，此函数会立即返回
+ ,*/
+void disable_irq_nosync(int irq);
+
+//关闭本CPU内的所有中断，并保存当前的中断状态
+#define local_irq_save(flags) ...
+//根据关闭前的状态恢复中断
+#define local_irq_restore(flags) ...
+
+//关闭本CPU内所有中断
+void local_irq_disable(void);
+//打开本CPU内的所有中断
+void local_irq_enable(void);
+
+#+END_SRC
+**** 底半处理机制
+Linux 实现底半部的机制主要有 tasklet、工作队列、软中断和线程化irq.
+
+- *此处软中断指的是由软件模拟的中断机制，而不是ARM中的由软件触发的硬件中断！*.
+
+软中断和tasklet运行于软中断上下文，仍然属于原子上下文的一种，而工作队列运行于进程上下文。
+*因此，在软中断和takelet处理函数中不允许睡眠，而在工作队列处理函数中允许睡眠*.
+
+=local_bh_disable() and local_bh_enable()= 是内核中用于禁止和使能的软中断及tasklet底半部机制的函数。
+
+*注意*: 软中断以及基于软中断的tasklet如果在某段时间大量出现的话,内核会把后续软中断放入 ksoftirqd 内核线程中执行。
+***** tasklet
+tasklet 的执行上下文是软中断，执行时机通常是顶半部返回的时候。只需要定义 tasklet 及其处理函数，并将两者关联即可。
+#+BEGIN_SRC c
+/**
+ ,* @brief 定义一个tasklet结构 my_tasklet, 与 my_tasklet_func(data) 函数关联
+ ,* 传递给 my_tasklet_func 的参数就是 data
+ ,*/
+void my_tasklet_func(unsigned long);
+DECLARE_TASKLET(my_tasklet, my_tasklet_func, data);
+
+//启动底半处理机制，此函数在顶半处理中使用
+tasklet_schedule(&my_tasklet);
+
+#+END_SRC
+使用tasklet 的整体驱动模板
+#+BEGIN_SRC c
+void xxx_do_task_let(unsigned long);
+DECLARE_TASKLET(xxx_tasklet, xxx_do_task_let, 0);
+
+void xxx_do_task_let(unsigned long)
+{
+        ...
+}
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        tasklet_schedule(&xxx_tasklet);
+        ...
+        return IRQ_HANDLED;
+}
+int __init xxx_init(void)
+{
+        ...
+        result = request_irq(xxx_irq, xxx_interrupt, 0, "xxx", NULL);
+
+}
+
+void __exit xxx_exit(void)
+{
+        ...
+        free_irq(xxx_irq, xxx_interrupt);
+        ...
+}
+
+#+END_SRC
+***** 工作队列
+工作队列的执行上下文是内核线程，因此 *可以调度和睡眠*.
+#+BEGIN_SRC c
+/**
+ ,* 定义数据结构及操作函数
+ ,*/
+struct work_struct my_wq;
+void my_wq_func(struct work_struct *work);
+INIT_WORK(&my_wq, my_wq_func);
+//启动
+schedule_work(&my_wq);
+#+END_SRC
+队列处理模板
+#+BEGIN_SRC c
+struct work_struct xxx_wq;
+void xxx_do_work(struct work_struct *work);
+
+void xxx_do_work(struct work_struct *work)
+{
+        ...
+}
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        schdule_work(&xxx_wq);
+        ...
+        return IRQ_HANDLED;
+}
+int xxx_init(void)
+{
+        ...
+        result = request_irq(xxx_irq, xxx_interrupt, 0,  "xxx", NULL);
+        ...
+//与tasklet 不同之处
+        INIT_WORK(&xxx_wq, xxx_do_work);
+        ...
+}
+void xxx_exit(void)
+{
+        ...
+        freq_irq(xxx_irq, xxx_interrupt);
+        ...
+}
+#+END_SRC
+***** 软中断
+软中断的执行时机通常是顶半部分返回的时候，tasklet是基于软中断实现的，因此也运行于软中断上下文。
+
+用 =softirq_action= 结构体表示一个软中断，使用 =open_softirq()= 注册软中断对应的处理函数， =raise_softirq()= 触发一个软中断。
+
+
+
+
+***** threaded_irq
+内核中除了可以通过 =request_irq(),devm_request_irq()= 申请中断外，还可以通过下面函数申请：
+#+BEGIN_SRC c
+/**
+ ,* @brief 相比 request_irq() 内核会为相应的中断号分配一个对应的内核线程
+ ,* @brief 如果中断处理函数 handler() 返回值是 IRQ_WAKE_THREAD ,内核会调度对应的线程执行 thread_fn 函数
+ ,* @note 支持flags 中设置 IRQF_ONESHOT,内核会自动帮助我们在中断上下文中屏蔽对应的中断号，而在内核调度thread_fn 执行后，重新使能该中断号
+ ,* 当 handler 为NULL时， 内核默认使用 irq_default_primary_handler() 代替 handler() 并使用 IRQF_ONESHOT
+ ,*/
+int request_threaded_irq(unsigned int irq, irq_handler_t handler, irq_handler_t thread_fn,
+                         unsigned long flags, const char *name, void *dev);
+int devm_request_threaded_irq(struct device *dev,unsigned int irq, irq_handler_t handler, irq_handler_t thread_fn,unsigned long flags, const char *name, void *dev);
+#+END_SRC
+**** 中断共享
+在多个设备共享一根硬件中断线的情况下，需要使用中断共享的方式：
+- 共享中断的多个设备在申请中断的时候，都应该使用 =IRQF_SHARED= 标志，而且一个设备以 =IRQF_SHARED= 申请某中断成功的前提是该中断未被申请或之前申请标志也是 =IRQF_SHARED=
+- =request_irq()= 的参数 =void *dev_id= 应该使用当前设备的结构体地址
+- 在中断到来时，会遍历执行共享此中断的所有中断处理程序，直到某一个函数返回 IRQ_HANDLED .在中断处理顶半部分中，应该根据硬件寄存器中的信息比对传入的 =dev_id= 是否一致，不一致就返回 =IRQ_NONE=.
+
+#+BEGIN_SRC c
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        int status = read_int_status();// 获取中断源状态
+        if(!is_myint(dev_id, status))
+                return IRQ_NONE;
+        return IRQ_HANDLED;
+}
+int xxx_init(void)
+{
+        ...
+        result = request_irq(sh_irq, xxx_interrupt, IRQF_SHARED, "xxx", xxx_dev);
+        ...
+}
+
+void xxx_exit(void)
+{
+        ...
+        free_irq(xxx_irq, xxx_interrupt);
+        ..
+}
+#+END_SRC
+*** 内核定时器
+软件定时器是基于硬件定时器基础上实现的。
+
+内核在时钟中断发生后检测各定时器是否到期，到期后的定时器处理函数将作为软中断在底半部分执行。
+#+BEGIN_SRC c
+// 一个timer_list 结构体就代表一个软件定时器实体
+struct timer_list my_timer;
+
+/**
+ ,*初始化定时器
+ ,*/
+//初始化 timer_list 的 entry 的 next 为NULL， 并给 base 指针赋值
+void init_timer(struct timer_list *timer);
+
+//赋值定时器 function,expires,data,base成员
+TIMER_INITIALIZER(_function,_expires,_data)
+
+//定义并初始化一个软件定时器
+DEFINE_TIMER(_name, _function, _expires, _data)
+
+//初始化定时器并赋值
+__setup_timer(_timer, _fn, _data, _flags)
+
+/**
+ ,* 添加定时器到链表
+ ,*/
+void add_timer(struct timer_list *timer);
+
+/**
+ ,* 从链表删除一个定时器
+ ,*/
+int del_timer(struct timer_list *timer);
+
+/**
+ ,* 修改定时器的到期值
+ ,*/
+int mod_timer(struct timer_list *timer, unsigned long expires);
+
+#+END_SRC
+#+BEGIN_SRC c
+struct xxx_dev{
+        struct cdev dev;
+        ...
+        timer_list xxx_timer;
+};
+xxx_func1(...)
+{
+        struct xxx_dev *dev = filp->private_data;
+        ...
+        init_timer(&dev->xxx_timer);
+        dev->xxx_timer.function = &xxx_do_timer;
+        dev->xxx_timer.data = (unsigned long)dev;
+        dev->xxx_timer.expires = jiffies + delay;
+        add_timer(&dev->xxx_timer);
+        ...
+}
+xxx_func2(...)
+{
+        del_timer(&dev->xxx_timer);
+}
+static void xxx_do_timer(unsigned long arg)
+{
+        struct xxx_device *dev = (struct xxx_device *)arg;
+
+        //再次执行定时器
+        dev->xxx_timer.expires = jiffies + delay;
+        add_timer(&dev->xxx_timer);
+}
+#+END_SRC
+linux 还封装了快捷定时机制，本质是使用工作队列和定时器实现。
+#+BEGIN_SRC c
+typedef void(*work_func_t)(struct work_struct *work);
+/**
+ ,* @brief 调度一个delayed_work 在指定的延时后执行,时间到了后 delayed_work 结构中的 work_func_t 成员函数执行
+ ,*/
+int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
+
+//msecs_to_jiffies 将毫秒转换为jiffies
+schedule_delayed_work(&work, msecs_to_jiffies(poll_interval));
+
+
+//取消delayed_work
+int cancel_delayed_work(struct delay_work *work);
+int cancel_delayed_work_sync(struct delay_work *work);
+
+
+#+END_SRC
+*** 内核延时
+**** 短延时
+#+BEGIN_SRC c
+/**
+ ,* @note: linux在开机时会运行一个循环延时校准，计算出lpj，消耗时间几百毫秒
+ ,* 如果在 bootargs 中设置 lpj=xxx,则可以省略这个时间
+ ,*/
+//忙等待，根据CPU频率进行一定次数的循环
+void ndelay(unsigned long nsecs);
+void udelay(unsigned long usecs);
+void mdelay(unsigned long msecs);
+
+/**
+ ,* @note 一般忙等待使用到微秒已经足够，对于毫秒以及以上的延时使用睡眠函数
+ ,*/
+void msleep(unsigned int millisecs);
+unsigned long msleep_interruptible(unsigned int millisecs);//可以被打断
+void ssleep(unsigned int seconds);
+#+END_SRC
+**** 长延时
+内核中进行延时的一个很直观的方法是比较当前的 jiffies 和目标 jiffies
+#+BEGIN_SRC c
+// 延时100个jiffies
+unsigned long delay = jiffies + 100;
+while(time_before(jiffies,delay));
+
+unsigned long delay = jiffies + 2 * Hz;
+while(time_before(jiffies, delay));
+#+END_SRC
+**** 睡着延时
+=schedule_timeout()= 可以使当前任务休眠至指定的 jiffies 之后再重新被调度执行而 =msleep() 和 msleep_interruptible()= 都是包含了 =schedule_timeout()= 来实现的

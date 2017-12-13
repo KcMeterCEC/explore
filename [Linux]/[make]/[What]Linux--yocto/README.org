@@ -1,6 +1,10 @@
 * [What]yocto --> base
 参考链接:[[www.yoctoproject.org/docs/2.3.1/mega-manual/mega-manual.html][yocto参考手册]]
 
+- [[#快速准备与体验操作(基本环境搭建)][体验]]
+- [[#实际应用说明(简单粗暴)][应用]]
+- [[#实战(raspberry p1 3-b)][raspberrypi 实战]]
+
 ** 快速准备与体验操作(基本环境搭建)
 *** Yocto 开发环境介绍
 
@@ -281,12 +285,73 @@ mkdir rpi
 cd ~/rpi
 git clone -b morty git://github.com/jumpnow/meta-rpi
 
-#使用 yocto 脚本为 raspberry 构建新建文件夹, 脚本会自动添加一些必要的文件.
+#使用 yocto 脚本为 raspberry 构建新建文件夹, 脚本会自动添加一些必要的文件.,并切换到build文件夹下
 source oe-init-build-env ~/rpi/build 
+#+end_example
 
+*** 配置文件定制
+**** 获取配置文件
+在 =meta-rpi/conf= 中有很多的简易配置文件，可以参考。
 
+如果要拷贝至 =build/conf= 中的话需要去掉文件的 ‘-sample'后缀。
 
+#+begin_example
+#将 yocto 脚本构建的文件先重命名一个副本，然后将参考配置拷贝
+mv bblayers.conf bblayers.conf-backup 
+mv local.conf local.conf-backup 
 
+cp ../../meta-rpi/conf/local.conf.sample local.conf 
+cp ../../meta-rpi/conf/bblayers.conf.sample bblayers.conf 
+#+end_example 
+**** 编辑配置文件
+***** 编辑 bblayers.conf
+=bblayers.conf= 文件包含了构建所需要的层，层的路径需要根据当前系统做对应的修改。
+***** 编辑 local.conf 
+=local.conf= 文件包含了其他的工程配置项目，需要根据自己需求而更改。
+
+可能涉及到以下变量需要更改
+- MACHINE : 用于设置目标板的架构以及各种编译选项，说明文件位于 =meta-raspberrypi/conf/machine=
+  + raspberrypi(BCM2835)
+  + raspberrypi0(BCM2835)
+  + raspberrypi0-wifi(BCM2835)
+  + raspberrypi2(BCM2835 or BCM2837 V1.2+)
+  + raspberrypi3(BCM2837)
+  + raspberrypi-cm(BCM2835)
+  + raspberrypi-cm3(BCM2837)
+- TMPDIR: 用于构建生成的文件夹，构建的最终可执行文件以及中间过程文件都在这里
+  + 需要保证至少 *50GB* 的空间
+  + 默认的位置位于 =rpi/build/tmp=
+- DL_DIR: 此变量表示在构建过程中，下载的文件存放的位置，默认位置是 =~/rpi/build/sources= 
+- SSTATE_DIR:构建过程中所产生的大文件，默认在 =~/rpi/build/sstate-cache= 
+
+*** 开始构建
+raspberry 提供了示例镜像文件位于 =meta-rpi/images=.
+#+begin_example
+#使用脚本加载环境
+source ~/make/yocto/poky/oe-init-build-env ./build/
+#命令行版本的镜像
+bitbake console-image
+#或者qt版本的镜像
+#bitbake qt5-image 
+#+end_example
+**** 编译期间出错解决
+***** 方法一：手动下载
+很多时候的编译出错都是由于网络下载失败导致的，手动下载可以比较好的解决
+- 首先进入设置的存放下载包的路径
+- 根据编译提示使用 =axel or wget= 来获取下载包
+- 根据下载包名 =touch= 一个 =.done= 后缀的同名文件以告诉 =bitbake= 这个文件已经下载完成
+
+*如果手动下载失败，那么就 google 包名称在网上下载, 然后再手动添加 .done 后缀文件*.
+***** 方法二：清除后下载
+编译期间可能由于网络原因导致包下载失败而报错，解决办法就是删除下载不完整的包然后重新下载包，再次运行 =bitbake console-image=
+#+begin_example
+#当下载 zip 包失败时
+#清除
+bitbake -c cleansstate zip 
+#重新下载
+bitbake zip
+#再次编译
+bitbake console-image 
 #+end_example
 
 ** 系统概览(手册简要翻译,有坑)

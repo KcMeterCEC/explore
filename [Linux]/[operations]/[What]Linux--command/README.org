@@ -159,6 +159,31 @@ sudo apt install axel
 #useage, x is maximum speed(bytes per second), y is maximum number of connections
 axel -s x -n y url1 [url2] [url...]
 #+end_example
+**** wget
+wget 用于稳定下载，还可以断点续传。
+#+begin_example
+#下载单个文件
+wget http://www.linuxde.net/testfile.zip
+
+#下载后重命名
+wget -O wordpress.zip http://www.linuxde.net/download.aspx?id=1080
+
+#限速下载
+wget --limit-rate=300k http://www.linuxde.net/testfile.zip
+
+#断点续传
+wget -c http://www.linuxde.net/testfile.zip
+
+#后台下载
+wget -b http://www.linuxde.net/testfile.zip
+
+#下载多个文件时，需要先在一个文件中保存所有的下载链接
+wget -i filelist.txt
+
+#使用 FTP协议下载
+wget ftp-url #匿名
+wget --ftp-user=USERNAME --ftp-password=PASSWORD url #登录下载
+#+end_example
 *** 网络监控
 **** 网速查看 nethogs
 nethogs 用于查看哪些进程消耗了多少网络带宽
