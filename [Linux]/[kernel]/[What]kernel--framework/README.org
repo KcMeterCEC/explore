@@ -653,11 +653,11 @@ I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=
 
 总体的软件拓扑抽象层次如下图所示:
 
-[[i2c_softTopology.bmp][I2C软件拓扑]]
+[[i2c_softTopology.jpg][I2C软件拓扑]]
 
 整个构架的软件层次如下图所示:
 
-[[i2c_framework.bmp][I2C框架]]
+[[i2c_framework.jpg][I2C框架]]
 
 经过I2C framework 的抽象, consumer 可以不用关心I2C总线的技术细节, 只需要通过简单的API, 就可以与 slave devices 进行数据交互.
 正常情况下, consumer 是位于内核态的其他driver. 于此同时, I2C framework也通过字符设备向用户空间提供类似的接口, 用户空间程序可以通过该接口访问 slave devices.
@@ -665,7 +665,7 @@ I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=
 I2C core 使用 =i2c_adapter,i2c_algorithm= 抽象I2C控制器的功能, =i2c_driver, i2c_client= 抽象 I2C slave device 的功能.
 另外, 基于I2C协议, 通过 smbus 模块实现 SMBus的功能.
 
-[[./i2c_smbus.bmp][i2c & smbus]]
+[[./i2c_smbus.jpg][i2c & smbus]]
 
 I2C muxes 用于实现I2C BUS的多路复用功能, 实际使用较少.
 *** 控制器驱动的编写
@@ -1201,7 +1201,6 @@ struct pinctrl_setting_configs
         unsigned num_configs;
 }
 #+END_SRC
-
 
 
 

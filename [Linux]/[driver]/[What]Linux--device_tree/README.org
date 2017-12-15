@@ -1,4 +1,9 @@
 * [What] --> device tree
+
+- [[#设备树的组成和结构][设备树的组成和结构]]
+- [[#常用API][常用API]]
+- [[#用户空间访问][用户空间访问]]
+
 设备树将板级信息通过文本文件的形式与内核分离开来,达到灵活配置的目的,而不用修改相应的驱动代码.
 
 设备树由一系列被命名的节点(Node)和属性(Property)组成,而节点本身可以包含子节点.所谓的属性,其实就是成对出现的名称和值.
@@ -404,3 +409,7 @@ static int sirfsoc_dma_probe(struct platform_device *op)
         struct device_node *dn = op->dev.of_node;
 }
 #+END_SRC
+** 用户空间访问
+为了能够验证设备树的加载实际情况，可以查看 =/sys/firmware/devicetree/base/= 文件夹下的树形结构。
+
+同时在 =/sys/bus/*/devices/**/= 下的 =of_node= 文件会产生一个与设备树文件的符号链接，并且当此设备与对应的驱动绑定后，会有一个 =driver= 文件的符号链接指向驱动文件

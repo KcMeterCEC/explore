@@ -7,15 +7,13 @@
 
 ** 快速准备与体验操作(基本环境搭建)
 *** Yocto 开发环境介绍
-
 yocto 的编译部分是基于 OpenEmbedded(OE)项目, OE项目使用 BitBake 来构建完整的镜像文件.
 在 yocto 中, *OE 和 BitBake两个组件结合在一起, 形成了一个新的组件, 叫做 Poky(也是yocto 项目的名称)*.
-
 
 yocto 提供了可以开发以及仿真ARM,MIPS,PowerPC,X86平台的开发环境, 并且可以完成Linux的
 全栈仿真应用.
 
-[[./oe_workflow.bmp][OE流程]]
+[[./oe_workflow.jpg][OE流程]]
 
 yocto具有如下特征:
 - 提供最新的linux kernel 代码, 以及相应的嵌入式开发所需要的库环境
@@ -265,7 +263,7 @@ devtool 的基本命令是:
 - devtool build-image [image-name]: 编译 recipe 并写入镜像文件
 - devtool deploy-target [recipe name] [target] : 将recipe 部属到目标板上.
 
-** 实战(raspberry pi 3-b)
+** 实战(raspberry pi 2)
 参考网站 : [[www.jumpnowtek.com/rpi/Raspberry-Pi-Systems-with-Yocto.html][Building Raspberry Pi Systems with Yocto]]
 *** 环境搭建
 在基本环境搭建的基础上, 基于 raspberry 还需要做如下工作:
@@ -353,6 +351,20 @@ bitbake zip
 #再次编译
 bitbake console-image 
 #+end_example
+
+*** 启动系统
+在编译完后生成的boot,kernel,rootfs 都位于 =bulid/tmp/deploy/images/raspberrypi3= 文件夹下。
+
+接下来使用 =meta-rpi/scripts= 中的脚本来完成系统部署。
+
+**** 格式化SD卡
+- 首先使用命令 =lsblk= 来找到sd卡所在的盘名称，比如 =sdb=
+- 启动脚本 =sudo ./mk2parts.sh sdb= 
+**** 拷贝镜像文件
+- 新建挂载文件 =sudo mkdir /media/card=
+- 指定镜像文件路径 =export OETMP=/home/kc/github/rpi/bulid/tmp= (与 =local.conf= 中的 TMPDIR 变量值一致)
+- 指定目标文件构架 =export MACHINE=raspberrypi2= 
+- 启动拷贝 =./copy_boot.sh sdb=
 
 ** 系统概览(手册简要翻译,有坑)
 *** 准备工作
