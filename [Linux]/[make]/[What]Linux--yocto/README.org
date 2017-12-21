@@ -263,7 +263,7 @@ devtool 的基本命令是:
 - devtool build-image [image-name]: 编译 recipe 并写入镜像文件
 - devtool deploy-target [recipe name] [target] : 将recipe 部属到目标板上.
 
-** 实战(raspberry pi 2)
+** 实战(raspberry pi 3)
 参考网站 : [[www.jumpnowtek.com/rpi/Raspberry-Pi-Systems-with-Yocto.html][Building Raspberry Pi Systems with Yocto]]
 *** 环境搭建
 在基本环境搭建的基础上, 基于 raspberry 还需要做如下工作:
@@ -363,8 +363,9 @@ bitbake console-image
 **** 拷贝镜像文件
 - 新建挂载文件 =sudo mkdir /media/card=
 - 指定镜像文件路径 =export OETMP=/home/kc/github/rpi/bulid/tmp= (与 =local.conf= 中的 TMPDIR 变量值一致)
-- 指定目标文件构架 =export MACHINE=raspberrypi2= 
-- 启动拷贝 =./copy_boot.sh sdb=
+- 指定目标文件构架 =export MACHINE=raspberrypi3= 
+- 启动拷贝 =./copy_boot.sh sdb= （切换到 =rocko= 分支，并且将目标文件类型由 =zImage= 改变为 =Image=)
+- 拷贝文件系统 =./copy_rootfs.sh sdb= (默认拷贝 console, 也可以使用 =copy_rootfs.sh qt5 sdb= 拷贝带UI的文件系统)
 
 ** 系统概览(手册简要翻译,有坑)
 *** 准备工作

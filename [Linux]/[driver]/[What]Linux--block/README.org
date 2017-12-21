@@ -1,0 +1,97 @@
+#+TITLE: [What]Linux --> block and unblock
+
+*参考书籍：<<Linux设备驱动开发详解>>*
+
+- [[#阻塞与非阻塞][阻塞与非阻塞]]
+
+* 阻塞与非阻塞
+- 阻塞操作是指在执行设备操作时，若不能获得资源，则挂起进程进入睡眠状态直到满足可操作的条件后再进行操作。
+- 而阻塞操作的进程在不能进行设备操作时，并不挂起，要么放弃，要么不停地查询，直至可以进行操作为止。
+- 驱动程序应该根据用户是否提供 =O_NONBLOCK= 标志来选择是否要阻塞用户空间的进程。
+** 阻塞的实现
+*** 等待队列
+队列属于linux内核中的基础数据结构，与进程调度机制紧密结合，可以用来同步对系统资源的访问，信号量也是依赖等待队列实现的。
+**** 操作
+- 定义及初始化“等待队列头部”
+#+BEGIN_SRC c
+/// 定义头部
+wait_queue_head_t my_queue;
+///初始化头部
+init_waitqueue_head(&my_queue);
+
+///定义并初始化头部
+DECLARE_WAIT_QUEUE_HEAD(name)
+#+END_SRC
+- 队列元素操作
+#+BEGIN_SRC c
+/// 定义并初始化一个名为 name 的等待队列元素
+DECLARE_WAITQUEUE(name, tsk)
+
+/// 将队列元素添加 / 移除等待队列
+void add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
+void remove_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
+#+END_SRC
+- 等待及唤醒
+#+BEGIN_SRC c
+/// 等待事件
+wait_event(queue, condition);
+wait_event_interruptible(queue, condition);//可以被信号打断
+wait_event_timeout(queue, condition, timeout);
+wait_event_interruptible_timeout(queue, condition, timeout);//可以被信号打断
+
+/// 唤醒队列
+void wake_up(wait_queue_head_t *queue);
+void wake_up_interruptible(wait_queue_head_t *queue);//与wait_event_interrupt 成对使用
+
+
+/// 在等待队列上睡眠
+
+/**
+ ,* @brief 将目前进程的状态设置为 TASK_UNINTERRUPTIBLE,并定义一个等待队列元素，
+ ,* 之后把它挂到等待队列头部 q 指向的双向链表，直到资源可以获得, q队列指向链接的进程被唤醒
+ ,* @note 与 wake_up 成对使用
+ ,*/
+sleep_on(wait_queue_head_t *q);
+
+/**
+ ,* @brief 将目前进程的状态设置为 TASK_INTERRUPTIBLE,并定义一个等待队列元素，
+ ,* 之后把它挂到等待队列头部 q 指向的双向链表，直到资源可以获得, q队列指向链接的进程被唤醒
+ ,* @note 与 wake_up_interruptible 成对使用
+ ,*/
+interruptible_sleep_on(wait_queue_head_t *q);
+#+END_SRC
+**** 实例
+#+BEGIN_SRC c
+static ssize_t xxx_write(struct file *file, const char *buffer, size_t count, lofft_t *ppos)
+{
+        /// 定义等待队列元素
+        DECLARE_WAITQUEUE(wait, current);
+        /// 添加元素到等待队列
+        add_wait_queue(&xxx_wait, &wait);
+
+        do{
+                avail = device_writeable(...);
+                if(avail < 0){
+                        ///非阻塞
+                        if(file->f_flags & O_NONBLOCK){
+                                ret = -EAGAIN;
+                                goto out;
+                        }
+                        ///改变进程状态
+                        __set_current_seate(TASK_INTERRUPTIBLE);
+                        ///调度其他进程执行
+                        schedule();
+                        ///如果是因为信号唤醒
+                        if(signal_pending(current)){
+                                ret = -ERSTARTSYS;
+                                goto out;
+                                }
+                }
+        }while(avail < 0);
+        device_write(...);
+out:
+        remove_wait_queue(&xxx_wait, &wait);
+        set_current_state(TASK_RUNNING);
+        return ret;
+}
+#+END_SRC
