@@ -1,5 +1,9 @@
 #+TITLE: [What]protocol --> SDR
 
+- [[#概览][概览]]
+- [[#协议结构][协议结构]]
+- [[#UHD][UHD]]
+
 * 概览
 在 =IEEE micro= 中定义了 SDR 通信协议，其基本思想是：
 
@@ -13,7 +17,7 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 - 信号包用于传输高速信号，控制包用于控制所有可控的器件，环境包用于返回硬件环境
 * 协议结构
 ** 包的类型
-包类型一共有6种：、
+包类型一共有6种：
 - 数据包(data packets)
 - 环境包(context packets)
 - 控制包(control packets)
@@ -57,3 +61,159 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 
 这样流ID就可以用来区分不同情况下的数据包组。
 *** 时间戳(timestamps)
+对于单个SDR设备来说， 时间戳可以表明当前接收机返回信号的具体时间，并且还可以在这个基础上加上一个时间修正值，以表示信号到达天线那一点的精确时间。
+
+对于多个设备来说，时间戳可以同步多个设备的数据然后对应的拼接到频谱上去。
+* UHD
+** 概览
+[[files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE的协议)来完成与SDR设备的通信。
+
+最终的用户使用库的接口便可以统一抽象设备，此库可以用来单独编写应用程序或者与其他的第三方软件接口。
+
+[[./uhd_struct.jpg]]
+
+此库具有以下特点：
+1. 抽象SDR硬件设备
+2. 支持设备和主机，设备和设备之间的双向通信
+3. 通信协议以流的形式传输以包的形式来分隔
+*** API的类型
+uhd 提供了各种类型的API,对应与不同的用途：
+- 高层次API
+  + The Multi-USRP : 上层的C++接口，用于控制一个或多个SDR设备的操作
+  + The Multi-USRP : 上层的C++接口，主要是用于设备的时钟同步
+  + The C API : 上层 C 接口，可以使用C来完成对库的操作
+- 低层次API
+  + The device API : 此接口用于将实际的硬件设备抽象为统一的设备，通过此接口就可以完成与设备的通信操作
+  #+begin_example
+  1. Discover devices that are physically connected to the host system
+  2. Create a device object for a particular device identified by address.
+  3. Register a device driver into the discovery and factory sub-system.
+  4. Stream samples with metadata into and out of the device.
+  5. Set and get properties on the device object.
+  6. Access various sensors on the device.
+  #+end_example
+*** 转换器
+uhd 提供了转换器库(converters),接收来自 transport 缓存的数据转换为用户可读的格式到用户提供的数据缓存，主要用于：
+1. 转换IQ数据格式
+2. 转换接收到数据的大小端顺序
+*** 设备数据流
+数据流就是通过包做分隔的连续数据
+*** 通信协议
+目前uhd的通信协议使用的是 CHDR，简化了VITA49复杂的包格式并且包头使用8字节，便于FPGA解析包类型。
+
+[[./chdr_header.jpg]]
+
+在源码中提供了[[https://github.com/EttusResearch/uhd/tree/maint/tools/dissectors][工具]] 检查包是否符合规范
+
+** 构架分析
+*** 源码获取
+其稳定版本源码位于： [[https://github.com/EttusResearch/uhd][github]]
+
+其目录结构为：
+- firmware : 设备端控制器的代码
+  + e300 : e3x 系列控制器(zynq_ps)通过网口相关代码
+  + fx2 : usrp1,b100 系列通过 USB 相关代码
+  + fx3 : usrpb200,b210 系列通过 USB3.0 相关代码
+- fpga-src : 设备端 FPGA 的代码
+- host : uhd 主要代码目录
+- images : 有关设备的镜像文件脚本
+- tools : 调试用的工具
+
+主要的分析范围放在 =host= 文件夹以及 =tools= 下的协议分析工具下。
+*** 运行流程分析
+通过分析一个简单的示例来分析代码运行流程：
+#+BEGIN_SRC c++
+#include <uhd/utils/thread_priority.hpp>
+#include <uhd/utils/safe_main.hpp>
+#include <uhd/usrp/multi_usrp.hpp>
+#include <uhd/exception.hpp>
+#include <uhd/types/tune_request.hpp>
+#include <boost/program_options.hpp>
+#include <boost/format.hpp>
+#include <boost/thread.hpp>
+#include <iostream>
+
+int UHD_SAFE_MAIN(int argc, char *argv[]){
+        uhd::set_thread_priority_safe();
+
+        std::string device_args("addr=192.168.10.2");
+        std::string subdev("A:0");
+        std::string ant("TX/RX");
+        std::string ref("internal");
+
+        double rate(1e6);
+        double freq(915e6);
+        double gain(10);
+        double bw(1e6);
+
+        //create a usrp device
+        std::cout << std::endl;
+        std::cout << boost::format("Creating the usrp device with : %s...") % device_args << std::endl;
+        uhd::usrp::multi_usrp::sptr usrp = uhd::usrp::multi_usrp::make(device_args);
+
+        //lock mboard clocks
+        std::cout << boost::format("Lock mboard clocks:%f") % ref << std::endl;
+        usrp->set_clock_source(ref);
+
+        //always select the subdevice first, the channel mapping affects the other settings
+        std::cout << boost::format("subdev set to : %f") % subdev << std::endl;
+        usrp->set_rx_subdev_spec(subdev);
+        std::cout << boost::format("Using Device: %s") % usrp->get_pp_string() << std::endl;
+
+        //set the sample rate
+        if(rate <= 0.0){
+                std::cerr << "Please specify a valid sample rate" << std::endl;
+                return 1;
+        }
+
+        //set sample rate
+        std::cout << boost::format("Setting Rx Rate:%f Msps...") %(rate / 1e6) << std::endl;
+        usrp->set->set_rx_rate(rate);
+        std::cout << boost::format("Actual RX Rate: %f Msps...") %(usrp->get_rx_rate() / 1e6) << std::endl << std::endl;
+
+        //set freq
+        std::cout << boost::format("Setting RX Freq:%f MHz...") % (freq /1e6) << std::endl;
+        uhd::tune_request_t tune_request(freq);
+        usrp->set_rx_freq(tune_request);
+        std::cout << boost::format("Actual RX Freq:%f MHz...") %(usrp->get_rx_freq() /1e6) << std::endl <<std::endl;
+        //set the rf gain
+        std::cout << boost::format("Setting RX Gain:%f dB...") %gain << std::endl;
+        usrp->set_rx_gain(gain);
+        std::cout << boost::format("Actual RX Gain :%f dB...") %usrp->get_rx_gain() << std::endl <<std::endl;
+        //set the IF filter bandwidth
+        std::cout << boost::format("Setting RX Bandwidth:%f MHz...") % (bw / 1e6) << std::endl;
+        usrp->set_rx_bandwidth(bw);
+        std::cout << boost::format("Actual RX Bandwidth:%f MHz...") %(usrp->get_rx_bandwidth() / 1e6) << std::endl << std::endl;
+
+        //set the antenna
+        std::cout << boost::format("Setting RX Antenna:%s") %ant << std::endl;
+        usrp->set_rx_antenna(ant);
+        std::cout << boost::format("Actual RX Antenna:%s") % usrp->get_rx_antenna() << std::endl << std::endl;
+
+        return EXIT_SUCCESS;
+}
+#+END_SRC
+输出为：
+
+[[./uhd_example_out.jpg]]
+**** 流程概览
+代码运行流程分两个步骤：
+1. 在 main 函数之前，运行设备注册，打印库信息等代码
+2. 在 main 函数中找到对应的设备并挂载，执行需求函数
+***** 系统信息输出
+这些信息通过 =uhd/host/lib/version.cpp= 函数 =UHD_STATIC_BLOCK(print_system_info)= 输出的，此函数会在 =main= 之前运行。
+***** 设备的注册
+各个设备在对应的 =xxx_impl.cpp= 中都使用了函数来注册设备：
+#+begin_example
+UHD_STATIC_BLOCK(register_usrp2_device){
+    device::register_device(&usrp2_find, &usrp2_make, device::USRP);
+}
+#+end_example
+**** 创建设备
+#+BEGIN_SRC c++
+std::string device_args("addr=192.168.10.2");
+uhd::usrp::multi_usrp::sptr usup = uhd::usrp::multi_usrp::make(device_args);
+//==>
+uhd::usrp::multi_usrp::sptr usup = uhd::usrp::multi_usrp::make("addr=192.168.10.2");
+#+END_SRC
+

@@ -1,6 +1,8 @@
 #+TITLE: [What]Linux--cmake
 
-参考链接:[[https://tuannguyen68.gitbooks.io/learning-cmake-a-begginner-s-guide][learning cmake a beginner's guide]]  [[https://cmake.org/cmake-tutorial][cmake tutorial]]   
+参考链接:
+1. [[https://tuannguyen68.gitbooks.io/learning-cmake-a-begginner-s-guide][learning cmake a beginner's guide]] 
+2. [[https://cmake.org/cmake-tutorial][cmake tutorial]]   
 
 [[#tutorial][tutorial]]
 
@@ -69,6 +71,7 @@ cmake -H. -Bbuild
 cmake --build build -- -j3
 #+end_example
 *** 带有目录架构的工程构建
+**** 方案一，一个CMakeLists.txt管理整个架构
 一般情况下我们都会以目录的层次结构来整理整个项目，对应的 CMake 配置文件也需要复杂一点。
 #+BEGIN_SRC c++
 /// include/Student.h
@@ -137,6 +140,11 @@ cmake -H. -Bbuild
 #从 build 文件夹中提取构建文件并构建
 cmake --build build -- -j3
 #+end_example
+**** 方案二，每个源码目录下具有一个CMakeLists.txt 层次结构组织
+基本思想是：
+- 先层层编译当前层的源码，然后链接为一个静态库
+- 顶层的CMakeLists.txt来加入库即可
+
 *** 创建一个动态链接库
 基于上面的工程代码，删除mainapp.cpp，用于生成 testStudent.so 动态链接文件
 
