@@ -3,6 +3,11 @@
 - [[#概览][概览]]
 - [[#协议结构][协议结构]]
 - [[#UHD][UHD]]
+  + [[#概览][概览]]
+  + [[#构架分析][构架分析]]
+  + [[#具体实现][具体实现]]
+  + [[#协议分析][协议分析]]
+  + [[#移植步骤][移植步骤]]
 
 * 概览
 在 =IEEE micro= 中定义了 SDR 通信协议，其基本思想是：
@@ -121,6 +126,7 @@ uhd 提供了转换器库(converters),接收来自 transport 缓存的数据转�
 
 主要的分析范围放在 =host= 文件夹以及 =tools= 下的协议分析工具下。
 *** 运行流程分析
+**** 基本代码
 通过分析一个简单的示例来分析代码运行流程：
 #+BEGIN_SRC c++
 #include <uhd/utils/thread_priority.hpp>
@@ -202,18 +208,520 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 2. 在 main 函数中找到对应的设备并挂载，执行需求函数
 ***** 系统信息输出
 这些信息通过 =uhd/host/lib/version.cpp= 函数 =UHD_STATIC_BLOCK(print_system_info)= 输出的，此函数会在 =main= 之前运行。
+- 其中 =BOOST_PLATFORM,BOOST_COMPILER,BOOST_VERSION= 都是由 boost 库所定义的。
+- =uhd::get_version_string()= 是获取字符串 =@UHD_VERSION@=.
+  + =UHD_VERSION= 变量在 =UHDVersion.cmake= 文件中设定 
+  + cmake 会在预编译的过程中替换 =@UHD_VERSION@= 中的内容
 ***** 设备的注册
-各个设备在对应的 =xxx_impl.cpp= 中都使用了函数来注册设备：
+- 各个设备所要包含的文件都由设备目录下的 =CMakeLists.txt= 指定
+- 是否包含当前设备由 =LIBUHD_REGISTER_COMPONENT= 宏决定（比如 usrp2 就是默认添加的设备)
+- 各个设备在对应的 =xxx_impl.cpp= 中都使用了函数来注册设备：
 #+begin_example
 UHD_STATIC_BLOCK(register_usrp2_device){
     device::register_device(&usrp2_find, &usrp2_make, device::USRP);
 }
 #+end_example
-**** 创建设备
+  + =usrp2_find= 用于通过字符串匹配来向库反应设备是否匹配
+  + =usrp2_make= 用于上层调用 =make= 方法时，将此设备可操作的方法挂载。
+  + 此后，上层便可以通过调用通用函数来达到操作设备底层通信的目的。
+** 具体实现
+*** 注册设备
+查看以下代码就可以发现:
+- 在main函数之前，uhd库就将一个设备相关的信息注册进了一个动态结构数组中.
+- 其中一个数组的元素，就代表一个设备。
+#+BEGIN_SRC c++
+/// 由boost库所提供的元组， dev_fcn_reg_t 就代表一个具有 find_t,make_t,device_filter_t 三个元素的元组
+typedef boost::tuple<device::find_t, device::make_t, device::device_filter_t> dev_fcn_reg_t;
+/// instantiate the device function register container
+UHD_SINGLETON_FCN(std::vector<dev_fcn_reg_t>, get_dev_fcn_regs);
+/// ==> 等价于,创建一个动态数组，其中的元素类型是一个元组。简单理解为得到一个静态的结构体动态数组的地址。
+/// 这样就有了一个设备容器了
+static std::vector<dev_fcn_reg_t> &get_dev_fcn_regs(){
+        static std::vector<dev_fcn_reg_t> get_dev_fcn_regs;
+
+        return get_dev_fcn_regs;
+}
+/**
+ ,* @brief 将一个设备注册进系统中(device.cpp)
+ ,* @param find: 一个用于匹配设备的引用
+ ,* @param make: 一个用于指定设备具体操作的引用
+ ,* @param filter: 指定设备的类型
+ ,*/
+void device::register_device(const find_t &find, const make_t &make, const device_filter_t filter)
+{
+        UHD_LOGV(always) << "registering device" << std::endl;
+        /// 添加一个设备到容器中
+        get_dev_fcn_regs().push_back(dev_fcn_reg_t(find, make, filter));
+}
+/// xxx_impl.cpp
+UHD_STATIC_BLOCK(register_usrp2_device){
+        device::register_device(&usrp2_find, &usrp2_make, device::USRP);
+}
+#+END_SRC
+*** 发现设备
+**** 上层创建设备
+进入main后的首要操作就是要找到对应的设备，可以猜想：设备的查找是在包含设备的容器中操作的。
 #+BEGIN_SRC c++
 std::string device_args("addr=192.168.10.2");
 uhd::usrp::multi_usrp::sptr usup = uhd::usrp::multi_usrp::make(device_args);
 //==>
 uhd::usrp::multi_usrp::sptr usup = uhd::usrp::multi_usrp::make("addr=192.168.10.2");
 #+END_SRC
+查询make定义：
+#+BEGIN_SRC c++
+/**
+ ,* @brief 通过 dev_addr 创建一个设备(multi_usrp.cpp)
+ ,* @param dev_addr: 设备地址
+ ,* @return  返回一个设备对象的指针
+ ,* @throws  抛出错误 ：
+ ,* uhd::key_error 代表没有查找到设备
+ ,* uhd::index_error 发现的设备数量少于请求的数量
+ ,* @note:  此make方法直接申请一段内存然后返回 boost 指针，就相当于创建了一个对象了
+ ,* @note:  device_addr_t 是一个继承于词典的类，将地址以 [key]=[value] 的形式存储，可以有多组字符串，
+ ,* 所以在创建设备的时候，可以通过查询设备的同时发送一些设置字符串
+ ,*/
+multi_usrp::sptr multi_usrp::make(const device_addr_t &dev_addr){
+        UHD_LOG << "multi_usrp::make with args" << dev_addr.to_pp_string() << std::endl;
+        return sptr(new multi_usrp_impl(dev_addr));
+}
+multi_usrp::multi_usrp(const device_addr_t &addr){
+        _dev = device::make(addr, device::USRP);
+        _tree = _dev->get_tree();
+        _is_device3= bool(boost::dynamic_pointer_cast<uhd::device3>(_dev));
+        if(is_device3()){
+                _legacy_compat = rfnoc::legacy_compat::make(get_device3(), addr);
+        }
+}
+#+END_SRC
+可以看出，上层的创建操作最终还是应用到了底层的 device::make 方法, 并且指明的设备类型是 USRP.
 
+**** device 查找设备
+#+BEGIN_SRC c++
+/**
+ ,* @brief 根据提供的地址创建一个设备
+ ,* @param which : 当有多个设备找到时，使用哪一个设备
+ ,* @return 返回设备的指针
+ ,*/
+device::sptr device::make(const device_addr_t &hint, device_filter_t filter=ANY,size_t which=0){
+        boost::mutex::scoped_lock lock(_device_mutex);
+
+        /// 申明一个元组，包含地址和对应的 make 方法
+        typedef boost::tuple<device_addr_t, make_t> device_addr_make_t;
+        /// 定义一个动态数组，每个元素都是一个元组
+        std::vector<dev_addr_make_t> dev_addr_makers;
+
+        /// 获取设备容器中的一个元素，也就是获取注册到的一个设备描述
+        BOOST_FOREACH(const dev_fcn_reg_t &fcn, get_dev_fcn_regs()){
+                try{
+                        ///如果类型相等，那么就调用对应设备的find方法
+                        if(filter == ANY or fcn.get<2> == filter){
+                                BOOST_FOREACH(device_addr_t dev_addr, fcn.get<0>()(hint)){
+                                        //append the discovered address and its factory function
+                                        /// 调用设备的 find 方法并将其返回的地址和它的make方法添加到 dev_addr_makers 容器中
+                                        dev_addr_makers.push_back(dev_addr_make_t(dev_addr, fcn.get<1>()));
+                                }
+                        }
+                }
+                catch(const std::exception &e){
+                        UHD_MSG(error) << "Device discovery error:" << e.what() << std::endl;
+                }
+        }
+        // check that we found any devices
+        if(dev_addr_makers.size() == 0){
+                throw uhd::key_error(str(boost::format("No devices found for ---->\n%s") % hint.to_pp_string()));
+        }
+
+        //create a unique hash for the device address
+        device_addr_t dev_addr; make_t maker;
+        /// 从容器中获取设备地址和make 方法
+        boost::tie(dev_addr, maker) = dev_addr_makers.at(which);
+        /// 为设备创建一个一一对应的哈希值
+        size_t dev_hash == hash_device_addr(dev_addr);
+        UHD_LOG << boost::format("Device hash: %u") % dev_hash << std::endl;
+
+        //copy keys that were in hint but not in dev_addr
+        //this way, we can pass additional transport arguments
+        BOOST_FOREACH(const std::string &key, hint.keys()){
+                if(not dev_addr.has_key(key)) dev_addr[key] = hint[key];
+        }
+        //map device address hash to created devices
+        //此处创建的是一个静态的字典，避免重复创建同一设备
+        static uhd::dict<size_t, boost::weak_ptr<device>> hash_to_device;
+        //try to find an existing device
+        //如果此设备已经存在且被引用过，那么直接返回设备地址即可，不会再新建设备了
+        if(hash_to_device.has_key(dev_hash) and not hasd_to_device[dev_hash].expired()){
+                return hash_to_device[dev_hash].lock();
+        }
+        else
+        {
+                //create and register a new device
+                //调用设备的make方法
+                device::sptr dev = maker(dev_addr);
+                hash_to_device[dev_hash] = dev;
+                return dev;
+        }
+        
+}
+#+END_SRC
+由device::make 方法可以得知，先是通过设备的find方法获取对应设备，然后再调用make方法将设备相关操作注册进系统。
+**** 设备的find方法和make方法
+经过以上流程的分析，最终还是回到了每个设备自身的 find 和 make 方法中，下面进行一一分析。
+
+大致浏览 =usrp= 文件夹下的设备相关代码，发现实现都比较复杂。这是因为usrp设备端只是负责协议解析，
+而设备内部的具体操作是由上层代码来实现的，所以在上层代码端还可以看到AD9361的驱动代码。
+
+个人任务这种方式并没有做好软件分层和分离思想。
+
+下面以 usrpb200系列来做分析，b200系列的基本架构是通过一个usb3.0芯片来控制FPGA,达到间接控制AD9361的目的。
+
+[[./b200.jpg]]
+
+***** find
+通过分析 =find= 方法可以得出，次方法需要做两件事：
+- 确定用户请求的设备是否与自己匹配
+- 确定匹配后，确定设备真实存在
+#+BEGIN_SRC c++
+static device_addrs_t b200_find(const device_addr_t &hint)
+{
+        device_addrs_t b200_addrs;
+
+        /**
+         ,* @note: 过滤筛选
+         ,*/
+        //return an empty list of addresses when type is set to non-b200
+        if(hint.has_key("type") and hine["type"] != "b200") return b200_addrs;
+        //return an empty list of addresses when an address or resource is specified,
+        //since an address and resource is intended for a different, non-USB,device,
+        BOOST_FOREACH(device_addr_t hint_i, separate_device_addr(hint)){
+                if(hint_i.has_key("addr") || hint_i.has_key("resource")) return b200_addrs;
+        }
+        //Important note:
+        //The get device list calls are nested inside the for loop.
+        // This allows the udb guts to decontruct when not in use,
+        // so that re-enumeration after fw load can occur successfully.
+        // This requirement is a courtesy of libusb1.0 on windows
+        // 发现设备，并给usb设备下载固件
+        size_t found = 0;
+        BOOST_FOREACH(usb_device_handle::sptr handle, get_b200_device_handles(hint)){
+                //extract the firmware path for the b200
+                std::string b200_fw_image;
+                try{
+                        b200_fw_image = hint.get("fw", B200_FW_FILE_NAME);
+                        b200_fw_image = uhd::find_image_path(b200_fw_image, STR(UHD_IMAGES_DIR));
+                }
+                catch(uhd::exception &e){
+                        UHD_MSG(warning) << e.what();
+                        return b200_addrs;
+                }
+                UHD_LOG << "the firmware image:" << b200_fw_image << std::endl;
+                usb_control::sptr constol;
+                try{
+                        control = usb_control::make(handle,0);
+                }
+                //check if fw was already loaded
+                if(!(handle->firmware_loaded()))
+                {
+                        b200_iface::make(control)->load_firmware(b200_fw_image);
+                }
+                found++;
+        }
+        const boost::system_time timeout_time = boost::get_system_time() + RERNUMERATON_TIMEOUT_MS;
+
+        //search for the device until found or timeout
+        while(boost::get_system_time() < timeout_time and b200_addrs.empty() and found !=0)
+        {
+                BOOST_FOREACH(usb_device_handle::sptr handle, get_b200_device_handles(hint))
+                {
+                        usb_control::sptr control;
+                        try{
+                                control = usb_control::make(handle,0);
+                        }
+                        catch(const uhd::exception &){continue;}
+
+                        b200_iface::sptr iface = b200_iface::make(control);
+                        const mboard_eeprom_t mb_eeprom = mboard_eeprom_t(*iface, "B200");
+
+                        device_addr_t new_addr;
+                        new_addr["type"] = "b200";
+                        new_addr["name"] = mb_eeprom["name"];
+                        new_addr["serial"] = handle->get_serial();
+                        try{
+                                new_addr["product"] = B2XX_STR_NAMES[get_b200_product(handle, mb_eeprom)];
+                        }catch(const uhd::runtime_error &){
+                                new_addr["product"] = "B2??";
+                        }
+                        //this is a found b200 when the hine serial and name match or blank
+                        //此处才确定了设备地址描述符
+                        if(
+                                (not hint.has_key("name") or hint["name"] == new addr["name"]) and
+                                (not hine.has_key("serial") or hint["serial"] == new_addr["serial"])
+                          )
+                        {
+                                b200_addrs.push_back(new_addr);
+                        }
+                                
+                }
+        }
+        return b200_addrs;
+
+}
+#+END_SRC
+***** make 
+要看懂 =make= 方法，首先需要理解里面的一个 =property_tree= 类，位于 =property_tree.hpp= 。
+
+此类提供了一种类似文件系统的操作设备方式：
+- 树形结构以属性（property）为节点连接
+- 每一个属性都包含期望值和实际值
+  + 默认情况下实际值和期望值一致，也就是说并没有被设定。
+  + 可以通过设置回调函数，或者使用 =set_coerced= 函数来(必须在 MANUAL_COERCE 模式下)设置实际值
+- 可以为每个属性设定一个或多个通知回调函数(subscribers),用于告知属性的期望值或实际值已经被改变了。
+- 当实际值会根据硬件不同而不同的话，可以为属性设置一个回调函数(publisher),这样在每次获得属性时都会调用此函数。
+
+
+#+BEGIN_SRC c++
+static device::sptr b200_make(const device_addr_t &device_addr)
+{
+        uhd::transport::usb_device_handle::sptr handle;
+        ......
+        //最终是调用构造函数来新建一个设备
+        return device::sptr(new b200_impl(device_addr, handle));
+}
+b200_impl::b200_impl(const uhd::device_addr_t &device_addr, usb_device_handle::sptr &handle):
+        _product(B200),//some safe value
+        _revision(0),
+        _time_source(UNKNOWN),
+        _tick_rate(0.0)//forces a clock initialization at startulp
+{
+        //定义于 device.hpp
+        //新建一个空的属性树
+        _tree = property_tree::make();
+        _type = device::USRP;
+        const fs_path mb_path = "/mboards/0";
+        //try to match the given device address with something on the USB bus
+        //搜寻设备,并设置硬件环境
+        {......}
+        //////////////////////
+        // Initialize the properties tree
+        // 初始化树形结构
+        /////////////////////
+        //新建一个属性的入口点并设置其需求值(类似于新建一个文件，并写上内容)
+        _tree->create<std::string>("/name").set("B-Series Device");
+        _tree->create<std::string>(mb_path / "name").set(product_name);
+        _tree->create<std::string>(mb_path / "codename").set((_product ==B200MINI or _product == B205MINI) ? "Pixie":"Sqaquatch");
+        {...}
+        ///////////////
+        //create codec control object
+        //////////////
+        {
+                const fs_path codec_path = mb_path / ("rx_codecs") / "A";
+                _tree->create<std::string>(codec_path/ "name").set(product_name + "RX dual ADC");
+                _tree->create<int>(codec_path / "gains");
+        }
+        {
+                const fs_path codec_path = mb_path / ("tx_codecs") / "A";
+                _tree->create<std::string>(codec_path/ "name").set(product_name + "TX dual ADC");
+                _tree->create<int>(codec_path / "gains");
+        }
+        ////////////////
+        //create clock control objects
+        ////////////////
+        //绑定操作函数及参数
+        _tree->create<double>(mb_path/"tick_rate")
+                .set_coercer(boost::bind(&b200_impl::set_tick_rate, this, _1))
+                .set_publisher(boost::bind(&b200_impl::get_tick_rate,this))
+                .add_coerced_subscriber(boost::bind(&b200_impl::update_tick_rate, this,_1));
+        _tree->create<time_spec_t>(mb_path/"time"/"cmd");
+        _tree->create<bool>(mb_path/"auto_tick_rate").set(false);
+        //and do the misc mboard sensors
+        _tree->create<sensor_value_t>(mb_path / "sensors" / "ref_locked").set_publisher(boost::bind(&b200_impl::get_ref_locked, this));
+        //create frontend mapping
+        std::vector<size_t> default_map(2, 0);
+        default_map[1] = 1;//set this to A->0 B->1 even if there's only A
+        _tree->create<std::vector<size_t>>(mb_path / "rx_chan_dsp_mapping").set(default_map);
+        _tree->create<std::vector<size_t>>(mb_path / "tx_chan_dsp_mapping").set(default_map);
+        _tree->create<subdev_spec_t>(mb_path/ "rx_subdev_spec")
+                .set_coercer(boost::bind(&b200_impl::coerce_subdev_spec, this, _1))
+                .set(subdev_spec_t())
+                .add_coerced_subscriber(boost::bind(&b200_impl::update_subdev_spec,this, "rx", _1));
+        _tree->create<subdev_spec_t>(mb_path/ "tx_subdev_spec")
+                .set_coercer(boost::bind(&b200_impl::coerce_subdev_spec, this, _1))
+                .set(subdev_spec_t())
+                .add_coerced_subscriber(boost::bind(&b200_impl::update_subdev_spec,this, "tx", _1));
+        {...}
+}
+#+END_SRC
+*** 操作设备
+在用户代码中，发现上层在make设备后，便可以直接进行 =set_clock_source(),set_rx_subdev_spec()= 等操作了，
+下面以 =set_rx_freq()= 为例进行分析。
+**** 上层接口
+#+BEGIN_SRC c++
+double freq(915e6);
+
+uhd::tune_request_t tune_request(freq);
+usrp->set_rx_freq(tune_request);
+
+/**
+ ,* @brief set the rx center frequency(multi_usrp.hpp)
+ ,* @param tune_request: tune request instructions
+ ,* @param chan: the channel index 0 to N-1
+ ,* @return a tune result object
+ ,*/
+virtual tune_result_t set_rx_freq(const tune_request_t &tune_request, size_t chain = 0) = 0;
+
+tune_result_t set_rx_freq(const tune_request_t &tune_request, size_t chan){
+        tune_result_t result = tune_xx_subdev_and_dsp(
+                RX_SIGN,
+                _tree->subtree(rx_dsp_root(chan)),
+                _tree->subtree(rx_rf_fe_root(chan)),
+                tune_request);
+        return result;
+}
+
+static const double RX_SIGN = +1.0;
+static const double TX_SIGN = -1.0;
+static tune_result_t tune_xx_subdev_and_dsp(
+    const double xx_sign,
+    property_tree::sptr dsp_subtree,
+    property_tree::sptr rf_fe_subtree,
+    const tune_request_t &tune_request
+){
+    //------------------------------------------------------------------
+    //-- calculate the tunable frequency ranges of the system
+    //------------------------------------------------------------------
+    freq_range_t tune_range = make_overall_tune_range(
+            rf_fe_subtree->access<meta_range_t>("freq/range").get(),
+            dsp_subtree->access<meta_range_t>("freq/range").get(),
+            rf_fe_subtree->access<double>("bandwidth/value").get()
+        );
+
+    freq_range_t dsp_range = dsp_subtree->access<meta_range_t>("freq/range").get();
+    freq_range_t rf_range = rf_fe_subtree->access<meta_range_t>("freq/range").get();
+
+    double clipped_requested_freq = tune_range.clip(tune_request.target_freq);
+
+    //------------------------------------------------------------------
+    //-- If the RF FE requires an LO offset, build it into the tune request
+    //------------------------------------------------------------------
+
+    /*! The automatically calculated LO offset is only used if the
+     * 'use_lo_offset' field in the daughterboard property tree is set to TRUE,
+     * and the tune policy is set to AUTO. To use an LO offset normally, the
+     * user should specify the MANUAL tune policy and lo_offset as part of the
+     * tune_request. This lo_offset is based on the requirements of the FE, and
+     * does not reflect a user-requested lo_offset, which is handled later. */
+    double lo_offset = 0.0;
+    if (rf_fe_subtree->access<bool>("use_lo_offset").get()){
+        // If the frontend has lo_offset value and range properties, trust it
+        // for lo_offset
+        if (rf_fe_subtree->exists("lo_offset/value")) {
+            lo_offset = rf_fe_subtree->access<double>("lo_offset/value").get();
+        }
+
+        //If the local oscillator will be in the passband, use an offset.
+        //But constrain the LO offset by the width of the filter bandwidth.
+        const double rate = dsp_subtree->access<double>("rate/value").get();
+        const double bw = rf_fe_subtree->access<double>("bandwidth/value").get();
+        if (bw > rate) lo_offset = std::min((bw - rate)/2, rate/2);
+    }
+
+    //------------------------------------------------------------------
+    //-- poke the tune request args into the dboard
+    //------------------------------------------------------------------
+    if (rf_fe_subtree->exists("tune_args")) {
+        rf_fe_subtree->access<device_addr_t>("tune_args").set(tune_request.args);
+    }
+
+    //------------------------------------------------------------------
+    //-- set the RF frequency depending upon the policy
+    //------------------------------------------------------------------
+    double target_rf_freq = 0.0;
+
+    switch (tune_request.rf_freq_policy){
+        case tune_request_t::POLICY_AUTO:
+            target_rf_freq = clipped_requested_freq + lo_offset;
+            break;
+
+        case tune_request_t::POLICY_MANUAL:
+            // If the rf_fe understands lo_offset settings, infer the desired
+            // lo_offset and set it. Side effect: In TVRX2 for example, after
+            // setting the lo_offset (if_freq) with a POLICY_MANUAL, there is no
+            // way for the user to automatically get back to default if_freq
+            // without deconstruct/reconstruct the rf_fe objects.
+            if (rf_fe_subtree->exists("lo_offset/value")) {
+                rf_fe_subtree->access<double>("lo_offset/value")
+                    .set(tune_request.rf_freq - tune_request.target_freq);
+            }
+
+            target_rf_freq = rf_range.clip(tune_request.rf_freq);
+            break;
+
+        case tune_request_t::POLICY_NONE:
+            break; //does not set
+    }
+
+    //------------------------------------------------------------------
+    //-- Tune the RF frontend
+    //------------------------------------------------------------------
+    if (tune_request.rf_freq_policy != tune_request_t::POLICY_NONE) {
+        rf_fe_subtree->access<double>("freq/value").set(target_rf_freq);
+    }
+    const double actual_rf_freq = rf_fe_subtree->access<double>("freq/value").get();
+
+    //------------------------------------------------------------------
+    //-- Set the DSP frequency depending upon the DSP frequency policy.
+    //------------------------------------------------------------------
+    double target_dsp_freq = 0.0;
+    switch (tune_request.dsp_freq_policy) {
+        case tune_request_t::POLICY_AUTO:
+            /* If we are using the AUTO tuning policy, then we prevent the
+             * CORDIC from spinning us outside of the range of the baseband
+             * filter, regardless of what the user requested. This could happen
+             * if the user requested a center frequency so far outside of the
+             * tunable range of the FE that the CORDIC would spin outside the
+             * filtered baseband. */
+            target_dsp_freq = actual_rf_freq - clipped_requested_freq;
+
+            //invert the sign on the dsp freq for transmit (spinning up vs down)
+            target_dsp_freq *= xx_sign;
+
+            break;
+
+        case tune_request_t::POLICY_MANUAL:
+            /* If the user has specified a manual tune policy, we will allow
+             * tuning outside of the baseband filter, but will still clip the
+             * target DSP frequency to within the bounds of the CORDIC to
+             * prevent undefined behavior (likely an overflow). */
+            target_dsp_freq = dsp_range.clip(tune_request.dsp_freq);
+            break;
+
+        case tune_request_t::POLICY_NONE:
+            break; //does not set
+    }
+
+    //------------------------------------------------------------------
+    //-- Tune the DSP
+    //------------------------------------------------------------------
+    if (tune_request.dsp_freq_policy != tune_request_t::POLICY_NONE) {
+        dsp_subtree->access<double>("freq/value").set(target_dsp_freq);
+    }
+    const double actual_dsp_freq = dsp_subtree->access<double>("freq/value").get();
+
+    //------------------------------------------------------------------
+    //-- Load and return the tune result
+    //------------------------------------------------------------------
+    tune_result_t tune_result;
+    tune_result.clipped_rf_freq = clipped_requested_freq;
+    tune_result.target_rf_freq = target_rf_freq;
+    tune_result.actual_rf_freq = actual_rf_freq;
+    tune_result.target_dsp_freq = target_dsp_freq;
+    tune_result.actual_dsp_freq = actual_dsp_freq;
+    return tune_result;
+}
+#+END_SRC
+可见上层接口是一个虚函数，需要它的子类来实现它的功能。
+
+** 协议分析
+** 移植步骤
+*** 添加基本文件
+*** cmake添加
+*** 测试与调试
