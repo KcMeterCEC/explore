@@ -718,7 +718,6 @@ static tune_result_t tune_xx_subdev_and_dsp(
     return tune_result;
 }
 #+END_SRC
-可见上层接口是一个虚函数，需要它的子类来实现它的功能。
 
 ** 协议分析
 ** 移植步骤
