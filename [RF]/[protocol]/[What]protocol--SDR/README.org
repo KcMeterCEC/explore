@@ -1,13 +1,9 @@
 #+TITLE: [What]protocol --> SDR
-
-- [[#概览][概览]]
-- [[#协议结构][协议结构]]
-- [[#UHD][UHD]]
-  + [[#概览][概览]]
-  + [[#构架分析][构架分析]]
-  + [[#具体实现][具体实现]]
-  + [[#协议分析][协议分析]]
-  + [[#移植步骤][移植步骤]]
+#+DATE: <2018-01-07 Sun>
+#+TAGS: protocol uhd
+#+LAYOUT: post 
+#+CATEGORIES: RF, protocol
+#+NAME: <rf_protocol_sdr.org>
 
 * 概览
 在 =IEEE micro= 中定义了 SDR 通信协议，其基本思想是：
