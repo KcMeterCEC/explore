@@ -12,8 +12,7 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 - 抽象硬件底层，使得应用软件不用关心具体的硬件而独立开发。
 - 开发出的软件理论上是可以兼容所有满足此协议的底层硬件，达到跨平台的目的。
 
-[[./interface.jpg]]
-如上图所示，此协议的特点为：
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/interface.jpg?raw=true" alt="interface.jpg">如上图所示，此协议的特点为：
 - 协议包分为控制包,信号包和环境包，
 - 信号包用于传输高速信号，控制包用于控制所有可控的器件，环境包用于返回硬件环境
 #+BEGIN_HTML
@@ -55,8 +54,7 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 *** 数据包(data packets)
 数据包用于传送高速数据，此包会被频繁的发送。
 ** 包中的重要概念
-[[./concept.jpg]]
-*** 参考点(reference points)
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/concept.jpg?raw=true" alt="concept.jpg">*** 参考点(reference points)
 由于SDR硬件系统构架大同小异，所以通过 *参考点* 这个概念来表示SDR系统中每个可以程序控制的参数。
 
 比如控制本振信号的点数字是7，控制DAC采样频率的点是8（在实现中可以通过枚举类型来定义各个参考点）。
@@ -74,8 +72,7 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 
 最终的用户使用库的接口便可以统一抽象设备，此库可以用来单独编写应用程序或者与其他的第三方软件接口。
 
-[[./uhd_struct.jpg]]
-
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_struct.jpg?raw=true" alt="uhd_struct.jpg">
 此库具有以下特点：
 1. 抽象SDR硬件设备
 2. 支持设备和主机，设备和设备之间的双向通信
@@ -105,8 +102,7 @@ uhd 提供了转换器库(converters),接收来自 transport 缓存的数据转�
 *** 通信协议
 目前uhd的通信协议使用的是 CHDR，简化了VITA49复杂的包格式并且包头使用8字节，便于FPGA解析包类型。
 
-[[./chdr_header.jpg]]
-
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/chdr_header.jpg?raw=true" alt="chdr_header.jpg">
 在源码中提供了[[https://github.com/EttusResearch/uhd/tree/maint/tools/dissectors][工具]] 检查包是否符合规范
 
 ** 构架分析
@@ -200,8 +196,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 #+END_SRC
 输出为：
 
-[[./uhd_example_out.jpg]]
-**** 流程概览
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_example_out.jpg?raw=true" alt="uhd_example_out.jpg">**** 流程概览
 代码运行流程分两个步骤：
 1. 在 main 函数之前，运行设备注册，打印库信息等代码
 2. 在 main 函数中找到对应的设备并挂载，执行需求函数
@@ -373,8 +368,7 @@ device::sptr device::make(const device_addr_t &hint, device_filter_t filter=ANY,
 
 下面以 usrpb200系列来做分析，b200系列的基本架构是通过一个usb3.0芯片来控制FPGA,达到间接控制AD9361的目的。
 
-[[./b200.jpg]]
-
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/b200.jpg?raw=true" alt="b200.jpg">
 ***** find
 通过分析 =find= 方法可以得出，次方法需要做两件事：
 - 确定用户请求的设备是否与自己匹配
@@ -743,8 +737,7 @@ static tune_result_t tune_xx_subdev_and_dsp(
 *** 总结
 现在总结一下上面的步骤，如下图所示：
 
-[[./uhd_register_find.jpg]]
-** 协议分析
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_register_find.jpg?raw=true" alt="uhd_register_find.jpg">** 协议分析
 uhd官方手册并没有很清楚的解释 CHDR 协议，需要好好分析每位具体代表什么意思。
 ** 移植步骤
 假设我们的硬件构架为主机与设备通过USB通信，设备端分析协议并且底层的设备操作都是由设备端来完成的，主机仅仅需要发送命令即可，那么这种架构就是最简便的。

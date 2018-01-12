@@ -8,7 +8,7 @@
 
 import re
 import os
-import shutil 
+import shutil
 
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 pwd_str = os.path.abspath(".")
@@ -33,8 +33,8 @@ with open('README.org', 'r') as f_readme:
             new_str = "#+HTML:<img src=\"%s\" alt=\"%s\">" %(temp_str,pic_str)
             lines[i] = new_str
             print(lines[i])
-    
+
     with open(name_file,'w') as f_new:
         f_new.writelines(lines)
 
-shutil.move(name_file,"/home/cec/github/kcmetercec.github.io/hexo/source/_posts/")
+shutil.copy(name_file,"/home/cec/github/kcmetercec.github.io/hexo/source/_posts/")
