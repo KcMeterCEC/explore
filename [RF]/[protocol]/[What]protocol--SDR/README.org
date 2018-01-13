@@ -754,3 +754,65 @@ uhd官方手册并没有很清楚的解释 CHDR 协议，需要好好分析每�
 *** cmake添加
 *** 协议相关部分添加
 *** 测试与调试
+**** 终端调试信息输出
+终端的调试信息通过 =host/include/uhd/utils/msg.hpp=  中的 =UHD_MSG= 宏来输出
+#+BEGIN_SRC c++
+/*!
+ ,* A UHD message macro with configurable type.
+ ,* Usage: UHD_MSG(warning) << "some warning message" << std::endl;
+ ,*/
+#define UHD_MSG(type)\
+        uhd::msg::_msg(uhd::msg::type)()
+
+namespace uhd{ namespace msg{
+                enum type_t{
+                        status = 's',
+                        warning = 'w',
+                        error = 'e',
+                        fastpath = 'f'
+                };
+        }
+}
+#+END_SRC
+**** 增加日志输出
+在路径 =host/include/uhd/utils/log.hpp= 中提供了 =UHD_LOG= 宏，可以输出当前的时间、文件、行数、功能等日志信息到文件中。
+#+begin_example
+UHD_LOGV(<log_level>) << "the log message" << std::endl;
+UHD_LOG << "the log message" << std::endl;
+#+end_example
+
+在使用之前可以做以下设置：
+- 日志文件默认存在于 =<temp-directory>/uhd.log= 文件中，为了指定文件的位置，需要设置 =UHD_TEMP_PATH= 环境变量
+#+begin_example
+export UHD_TEMP_PATH=./
+#+end_example
+- 日志输出级别变量 =UHD_LOG_LEVEL= 控制哪些日志能输出，只有小于或等于此级别的日志才会输出。
+#+BEGIN_SRC c++
+#define UHD_LOGV(verbosity) \
+        uhd::_log::log(uhd::_log::verbosity,__FILE__,__LINE__,BOOST_CURRENT_FUNCTION)
+
+#define UHD_LOG\
+        UHD_LOGV(regularly)
+namespace uhd{namespace _log{
+                //! verbosity levels for the logger
+                enum verbosity_t{
+                        always      = 1,
+                        often       = 2,
+                        regularly   = 3,
+                        rarely      = 4,
+                        very_rarely = 5,
+                        never       = 6
+                };
+                ....
+        }
+        ....
+}
+#+END_SRC
+  + 可以在预编译的时候设置默认的日志级别
+#+begin_example
+-DUHD_LOG_LEVEL=3
+#+end_example
+  + 也可以在运行时来动态的修改
+#+begin_example
+export UHD_LOG_LEVEL=3
+#+end_example
