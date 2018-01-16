@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 # 将　README.org 文件复制一份出来并移动到博客的　_post 目录中
-#　1. 读取　README.org 中的　"#+NAME:" 字段，并新建此字段所指定的文件
-#  2. 将 README.org 中的内容复制一份到新建文件中
+#　1. 读取　xxx.org 中的　"#+NAME:" 字段，并新建此字段所指定的文件
+#  2. 将 xxx.org 中的内容复制一份到新建文件中
 #　3. 将文件中的图片文件地址重定向到github中的地址去
 
 import re
@@ -40,3 +40,4 @@ with open(raw_file_name, 'r') as f_readme:
         f_new.writelines(lines)
 
 shutil.copy(name_file,"/home/cec/github/kcmetercec.github.io/hexo/source/_posts/")
+os.remove(name_file)
