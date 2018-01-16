@@ -10,6 +10,8 @@ import re
 import os
 import shutil
 
+raw_file_name = input("Please input the file name:")
+
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 pwd_str = os.path.abspath(".")
 new_str = re.search('/home/cec/github/explore(.+)', pwd_str).group(1)
@@ -18,7 +20,7 @@ html_str += "/"
 print("The prefix of picture:",html_str)
 
 
-with open('README.org', 'r') as f_readme:
+with open(raw_file_name, 'r') as f_readme:
     lines = f_readme.readlines()
     flen = len(lines)
     for i in range(flen):

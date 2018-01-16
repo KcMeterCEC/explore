@@ -1,0 +1,71 @@
+#+TITLE: [What]SDR通信协议概览
+#+DATE: <2018-01-16 Tue> 
+#+TAGS: protocol_rf
+#+LAYOUT: post 
+#+CATEGORIES: RF, protocol, UHD
+#+NAME: <rf_protocol_sdr_overview.org>
+
+* 概览
+在 =IEEE micro= 中定义了 SDR（软件无线电） 通信协议，其基本思想是：
+
+SDR的底层由一个软件引擎总管，其他应用软件（本机软件或者上位机软件）通过一个统一的协议来与引擎通信达到控制底层硬件的目的。
+
+这种构架具有如下优点：
+- 抽象硬件底层，使得应用软件不用关心具体的硬件而独立开发。
+- 开发出的软件理论上是可以兼容所有满足此协议的底层硬件，达到跨平台的目的。
+
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/interface.jpg?raw=true" alt="interface.jpg">如上图所示，此协议的特点为：
+- 协议包分为控制包,信号包和环境包，
+- 信号包用于传输高速信号，控制包用于控制所有可控的器件，环境包用于返回硬件环境
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 协议结构
+** 包的类型
+包类型一共有6种：
+- 数据包(data packets)
+- 环境包(context packets)
+- 控制包(control packets)
+- 扩展数据包(extension data packets)
+- 扩展环境包(extension context packets)
+- 扩展控制包(extension control packets)
+
+其中数据包，环境包以及控制包是主要使用的类型，其他3个是可选类型(比如将电源管理放在扩展控制包中，将频谱信息放在扩展数据包中，将系统多于参数放在扩展环境包中)。
+
+包头表明了包的类型。
+
+如果一个解码引擎不支持对应的扩展包，它就会忽略包的内容并且返回警告信息。
+
+*** 环境包(context packets)
+环境包指定了当前发射机和接收机的状态参数，也就是当前目标硬件的运行环境，比如：
+- 射频频率
+- 中频频率
+- 带宽
+- ADC,DAC的采样率以及位数
+- 增益
+- 电压
+- 滤波器阶数
+- 带外衰减
+- 时间戳，时间戳延时
+
+一旦这些参数中的任意一个参数改变了，引擎就会发送一个环境包，包中包含了被改变的参数。
+*** 控制包(control packets)
+控制包用于控制发射机和接收机的一切可控的参数，引擎在接收到这些包以后解析并控制对应的硬件。
+
+当应用软件需要改变某些参数的时候才会发送控制包。
+*** 数据包(data packets)
+数据包用于传送高速数据，此包会被频繁的发送。
+** 包中的重要概念
+#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/concept.jpg?raw=true" alt="concept.jpg">
+*** 参考点(reference points)
+由于SDR硬件系统构架大同小异，所以通过 *参考点* 这个概念来表示SDR系统中每个可以程序控制的参数。
+
+比如控制本振信号的点数字是7，控制DAC采样频率的点是8（在实现中可以通过枚举类型来定义各个参考点）。
+*** 流ID(stream IDs)
+数据包与其他包具有一定的关联性，比如当前数据包的内容仅仅对应于DAC的采样率为某个值时才有效，那么这个数据包与DAC的控制包就有同一个流ID。
+
+这样流ID就可以用来区分不同情况下的数据包组。
+*** 时间戳(timestamps)
+对于单个SDR设备来说， 时间戳可以表明当前接收机返回信号的具体时间，并且还可以在这个基础上加上一个时间修正值，以表示信号到达天线那一点的精确时间。
+
+对于多个设备来说，时间戳可以同步多个设备的数据然后对应的拼接到频谱上去。
