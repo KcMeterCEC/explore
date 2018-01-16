@@ -1,14 +1,16 @@
-#+TITLE: [What]protocol --> SDR
+#+TITLE: [What]基于 USRP UHD 库新建设备
 #+DATE: <2018-01-07 Sun>
-#+TAGS: protocol uhd
+#+TAGS: protocol_uhd
 #+LAYOUT: post 
-#+CATEGORIES: RF, protocol
-#+NAME: <rf_protocol_sdr.org>
+#+CATEGORIES: RF, protocol, UHD
+#+NAME: <rf_protocol_uhd_device_add.org>
 
 * 概览
 在 =IEEE micro= 中定义了 SDR 通信协议，其基本思想是：
 
 SDR的底层由一个软件引擎总管，其他应用软件（本机软件或者上位机软件）通过一个统一的协议来与引擎通信达到控制底层硬件的目的。
+
+这种构架具有如下优点：
 - 抽象硬件底层，使得应用软件不用关心具体的硬件而独立开发。
 - 开发出的软件理论上是可以兼容所有满足此协议的底层硬件，达到跨平台的目的。
 
@@ -70,7 +72,7 @@ SDR的底层由一个软件引擎总管，其他应用软件（本机软件或�
 对于多个设备来说，时间戳可以同步多个设备的数据然后对应的拼接到频谱上去。
 * UHD
 ** 概览
-[[files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE的协议)来完成与SDR设备的通信。
+[[http://files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE micro 的协议)来完成与SDR设备的通信。
 
 最终的用户使用库的接口便可以统一抽象设备，此库可以用来单独编写应用程序或者与其他的第三方软件接口。
 
@@ -201,6 +203,7 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 输出为：
 
 [[./uhd_example_out.jpg]]
+
 **** 流程概览
 代码运行流程分两个步骤：
 1. 在 main 函数之前，运行设备注册，打印库信息等代码
@@ -369,7 +372,7 @@ device::sptr device::make(const device_addr_t &hint, device_filter_t filter=ANY,
 大致浏览 =usrp= 文件夹下的设备相关代码，发现实现都比较复杂。这是因为usrp设备端只是负责协议解析，
 而设备内部的具体操作是由上层代码来实现的，所以在上层代码端还可以看到AD9361的驱动代码。
 
-个人任务这种方式并没有做好软件分层和分离思想。
+个人认为这种方式并没有做好软件分层和分离思想。
 
 下面以 usrpb200系列来做分析，b200系列的基本架构是通过一个usb3.0芯片来控制FPGA,达到间接控制AD9361的目的。
 
@@ -750,8 +753,25 @@ uhd官方手册并没有很清楚的解释 CHDR 协议，需要好好分析每�
 假设我们的硬件构架为主机与设备通过USB通信，设备端分析协议并且底层的设备操作都是由设备端来完成的，主机仅仅需要发送命令即可，那么这种架构就是最简便的。
 *** 添加基本文件
 根据 =架构分析，具体实现= 两个步骤的分析，我们现在可以模拟一个简单的设备（不包含底层协议基本操作），依然以 b200 系列为模板建立自己的设备。
+- 拷贝b200文件夹下所有文件，并将模板重命名为 =dev_template=
+- 仅仅保留 =xxx_impl.cpp, xxx_impl.hpp, xxx_io_impl.cpp= 文件，并去掉不需要的函数及内容
+- 对应修改 CMAKE 脚本，将此模板加入编译列表
+- 为了便于调试在构建时加入选项 =-DUHD_LOG_LEVEL=0=,也就是输出所有的调试信息
 
-*** cmake添加
+*注意：* uhd库使用到了boost库，但不要使用boost最新的源码，这会导致构建失败。
+#+begin_example
+#安装基本的依赖库
+sudo apt-get install libboost-all-dev libusb-1.0-0-dev python-mako doxygen python-docutils cmake build-essential
+#将构建生成的文件放在当前文件夹下, github/uhd/host 为源码路径
+cmake -DCMAKE_INSTALL_PREFIX=./ /home/kc/github/uhd/host 
+make 
+make test
+make install 
+sudo ldconfig
+#+end_example
+
+- 目前我们将库安装在一个测试文件夹中，所以需要设置环境变量 =UHD_DIR= 以指定库路径，否则 cmake 无法找到库的位置
+- 使用示例代码 =host/examples/init_usrp= 来测试模板文件是否已经成功添加进设备数组。
 *** 协议相关部分添加
 *** 测试与调试
 **** 终端调试信息输出
@@ -784,7 +804,7 @@ UHD_LOG << "the log message" << std::endl;
 在使用之前可以做以下设置：
 - 日志文件默认存在于 =<temp-directory>/uhd.log= 文件中，为了指定文件的位置，需要设置 =UHD_TEMP_PATH= 环境变量
 #+begin_example
-export UHD_TEMP_PATH=./
+export UHD_TEMP_PATH=/home/kc/test/uhd/log
 #+end_example
 - 日志输出级别变量 =UHD_LOG_LEVEL= 控制哪些日志能输出，只有小于或等于此级别的日志才会输出。
 #+BEGIN_SRC c++
