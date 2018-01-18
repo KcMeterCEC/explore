@@ -16,6 +16,9 @@ gcc -g hello.c -o hello
 #+begin_example
 set(CMAKE_BUILD_TYPE Debug)
 #+end_example
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
 ** 为文件输入参数
 在启动gdb后 =gdb ./hello= ，很多程序需要带入口参数，那么就需要使用命令 =set args= 
 #+begin_example
