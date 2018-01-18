@@ -15,6 +15,8 @@ gcc -g hello.c -o hello
 很多时候也会使用CMake来生成，一般在 CMakeLists.txt 文件中加入：
 #+begin_example
 set(CMAKE_BUILD_TYPE Debug)
+#或者也可以在入口参数中指定
+cmake -DCMAKE_BUILD_TYPE=Debug ....
 #+end_example
 #+BEGIN_HTML
 <!--more-->
@@ -57,6 +59,9 @@ show args
 | b *<address>           | 在地址处设定断点                                     |
 | b if<condition>        | 神命令，一般在循环体中特定时候打断点，比如 b if i=10 |
 | info breakpoints       | 查看当前设定的所有断点                               |
+| clear <linenum>        | 删除在linenum处的断点                                |
+| clear [<file:>]<func>  | 删除（某个文件中）某个函数的断点                     |
+| clear                  | 删除当前行所在的断点                                 |
 ** 执行
 - next，缩写 n
 - step,  缩写 s

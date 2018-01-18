@@ -702,33 +702,3 @@ dd
 #在 Unix 中统计当前文件的单词数
 :write !wc 
 #+end_example
-* 脚本
-** 基本示例
-#+begin_example
-;给变量复制 let {变量} = {表达式}
-let i = 1
-;条件循环 
-; while {条件}
-;     {语句}
-;endwhile
-while i < 5
-    echo "count is" i
-    let i += 1
-endwhile
-#+end_example
-
-*** 变量
-- 由 ASCII 字符, 数字, 下划线组成. *变量名前加 =s:= 代表局部变量, 否则是全局变量*, 要列出当前定义的所有变量使用命令 =:let=.
-    + b:name  缓冲区的局部变量
-    + w:name  窗口局部变量
-    + g:name  全局变量
-    + v:name  预定义变量
-- 使用 =:unlet= 删除变量, 使用 =:unlet! varName= 删除不确定是否存在的变量 =varName=
-- 当一个脚本结束时, 它使用的局部变量不会自动被删除, 下一次脚本被执行时, 旧的变量值仍然可被使用.
-
-* 疑难杂症
-** vim 打开部分文件无法高亮
-- 描述
-在偶然的某个时间打开以前打开过的文件后, 无法语法高亮了.
-- 解决
-将 =~/.vimviews/= 文件夹下清空即可.
