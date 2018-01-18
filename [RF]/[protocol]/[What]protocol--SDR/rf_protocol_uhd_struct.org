@@ -316,7 +316,7 @@ device::sptr device::make(const device_addr_t &hint, device_filter_t filter=ANY,
 [[./b200.jpg]]
 
 **** find
-通过分析 =find= 方法可以得出，次方法需要做两件事：
+通过分析 =find= 方法可以得出，此方法需要做两件事：
 - 确定用户请求的设备是否与自己匹配
 - 确定匹配后，确定设备真实存在
 #+BEGIN_SRC c++
@@ -410,12 +410,22 @@ static device_addrs_t b200_find(const device_addr_t &hint)
 
 此类提供了一种类似文件系统的操作设备方式：
 - 树形结构以属性（property）为节点连接
-- 每一个属性都包含期望值和实际值
-  + 默认情况下实际值和期望值一致，也就是说并没有被设定。
-  + 可以通过设置回调函数，或者使用 =set_coerced= 函数来(必须在 MANUAL_COERCE 模式下)设置实际值
-- 可以为每个属性设定一个或多个通知回调函数(subscribers),用于告知属性的期望值或实际值已经被改变了。
+- 每一个属性都包含期望值和限定值
+  + 默认情况下限定值和期望值一致，也就是说限定值并没有被设定。
+  + 可以通过设置回调函数来根据期望值返回限定值，或者使用 =set_coerced= 函数来(必须在 =MANUAL_COERCE= 模式下)手动设置限定值
+- 可以为每个属性设定一个或多个通知回调函数(subscribers),用于告知属性的期望值或限定值已经被改变了。
 - 当实际值会根据硬件不同而不同的话，可以为属性设置一个回调函数(publisher),这样在每次获得属性时都会调用此函数。
 
+*需要注意的是：* 由于上层操作底层设备也是通过文件树来访问的，那么 *文件树的名字就需要有一个统一的规则* ，现将规则整体如下表所示：
+| 字符串         | 说明                                    | 应用示例                            |
+|----------------+-----------------------------------------+-------------------------------------|
+| mboards        | 文件树的根目录用于指定母板              | /mboards/0,/mboards/1               |
+| rx_subdev_spec | 接收通道描述符以 dboard:subdev 方式描述 | /mboards/0/rx_subdev_spec           |
+| tx_subdev_spec | 发射通道描述符以 dboard:subdev 方式描述 | /mboards/0/tx_subdev_spec           |
+| rx_dsps        | 接收端的DSP控制                         | /mboard/0/rx_dsps                   |
+| tx_dsps        | 发射端的DSP控制                         | /mboard/0/tx_dsps                   |
+| dbboards       | 描述子板的文件夹，子板以树形的方式存在  | /mboard/0/dbboards/A/rx_frontends/A |
+|                |                                         |                                     |
 
 #+BEGIN_SRC c++
 static device::sptr b200_make(const device_addr_t &device_addr)
