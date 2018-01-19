@@ -4,6 +4,8 @@
 #+LAYOUT: post 
 #+CATEGORIES: RF, protocol, UHD
 #+NAME: <rf_protocol_uhd_struct_analyze.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
 
 * 概览
 [[http://files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE micro 的协议)来完成与SDR设备的通信。
@@ -424,8 +426,10 @@ static device_addrs_t b200_find(const device_addr_t &hint)
 | tx_subdev_spec | 发射通道描述符以 dboard:subdev 方式描述 | /mboards/0/tx_subdev_spec           |
 | rx_dsps        | 接收端的DSP控制                         | /mboard/0/rx_dsps                   |
 | tx_dsps        | 发射端的DSP控制                         | /mboard/0/tx_dsps                   |
-| dbboards       | 描述子板的文件夹，子板以树形的方式存在  | /mboard/0/dbboards/A/rx_frontends/A |
-|                |                                         |                                     |
+| dbboards       | 描述子板的文件夹，子板以树形的方式存在 | /mboard/0/dbboards/A/rx_frontends/A |
+| ...            | ....                                   | ....                                |
+
+说明： 文件树的文件类有点多，仅仅靠分析代码罗列出来效率太低。一个比较好的办法是，通过 gdb调试 和 库的警告输出来填充需要的文件树。
 
 #+BEGIN_SRC c++
 static device::sptr b200_make(const device_addr_t &device_addr)
