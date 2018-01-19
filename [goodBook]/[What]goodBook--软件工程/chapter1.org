@@ -1,0 +1,8 @@
+#+TITLE: [What]book --> 软件工程_概论
+#+DATE: <2018-01-14 Sun>
+#+TAGS: 软件工程
+#+LAYOUT: post
+#+CATEGORIES: book,软件工程,概论
+#+NAME: <book_se_chapter1.org>
+
+* 软件　＝　程序　＋　软件工程
