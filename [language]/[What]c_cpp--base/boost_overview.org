@@ -1,0 +1,119 @@
+#+TITLE: [What]boost库 入门
+#+DATE: <2018-01-19 Fri>
+#+TAGS: boost
+#+LAYOUT: post 
+#+CATEGORIES: language,c/c++,boost
+#+NAME: <language_boost_overview.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+boost 库是C++的增强库，强化了C++的很多功能。
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+
+* 准备与安装
+在 [[www.boost.org][官网 ]]下载最新包，然后解压缩 =tar -xjf boost_65_1.tar.bz2=.
+
+boost大部分的类都是直接定义于头文件中的，对于部分复杂的库，还需要单独安装。
+
+在解压后的文件夹中具有脚本 =bootstrap.sh=,可以将库文件编译并安装(一般安装在 =/usr/local/= 文件夹中)。
+#+begin_example
+./bootstrap.sh --help
+#+end_example
+最简单粗暴的做法：
+#+begin_example
+./bootstrap.sh --prefix=/usr/local/
+sudo ./b2 install
+#+end_example
+经过以上脚本后，库文件在安装在了 =/usr/local/lib/=, 头文件在 =/usr/local/include/=.
+* 基本使用
+** hello world
+#+BEGIN_SRC c++
+/**
+ ,* @brief hello.cpp
+ ,* @note: 此程序从管道接收数据然后迭代的乘以3并显示结果
+ ,*/
+#include <boost/lambda/lambda.hpp>
+#include <iostream>
+#include <iterator>
+#include <algorithm>
+
+int main(int argc, char *argv[])
+{
+        using namespace boost::lambda;
+        typedef std::istream_iterator<int> in;
+        std::for_each(in(std::cin), in(), std::cout << (_1 * 3) << " ");
+
+        return 0;
+}
+#+END_SRC
+#+begin_example
+g++ hello.cpp
+echo 1 2 3 | ./a.out
+#+end_example
+** smart pointer library
+智能指针库是一系列对象，用于动态的申请内存，并且会自动的在合适的时候释放。
+** scoped_ptr:Scoped Object Ownership(boost/smart_ptr/scoped_ptr.hpp)
+=scoped_ptr= 是一个模版类，保存了动态申请内存的指针值，并且会自动释放。释放内存是通过析构函数或者 =reset= 函数中完成的。
+
+传统使用指针的方式是先用 =new= 在堆上申请一块内存，然后在不使用的时候使用 =delete= 释放内存。
+但 =delete= 需要程序员自己保证，某些时候如果不注意则会导致内存泄漏或者野指针。
+
+=scoped_ptr= 在构造函数中申请内存，并在析构函数中释放内存。当此对象的作用域结束时，便会调用析构而释放内存，程序员就不用关心释放问题了。
+
+- =scoped_ptr= 足够的简单，所以它的执行速度与内置的指针一样快。
+- 此对象不允许拷贝，所以能保证安全。
+- 不能用于数组，数组使用 =scoped_array= 类。
+#+BEGIN_SRC c++
+#include <boost/scoped_ptr.hpp>
+#include <iostream>
+
+struct Shoe{
+        ~Shoe(){
+                std::cout << "Buckle my shoe!\n";
+        }
+};
+class MyClass{
+        boost::scoped_ptr<int> ptr;
+public:
+        MyClass():ptr(int){
+                *ptr = 0;
+        }
+        int add_one(){
+                return ++*ptr;
+        }
+};
+
+int main(){
+        boost::scoped_ptr<Shoe> x(new Shoe);
+        MyClass my_instance;
+        std::cout << my_instance.add_one() << '\n';
+        std::cout << my_instance.add_one() << '\n';
+
+        return 0;
+}
+#+END_SRC
+** thread
+=thread= 库用于创建多个线程，并管理之间的数据共享等。
+#+BEGIN_SRC c++
+#include <boost/thread.hpp>
+#include <iostream>
+void thread()
+{
+        for(int i = 0; i < 5; i++)
+        {
+                std::cout << i << '\n';
+        }
+}
+int main()
+{
+        boost::thread t(thread);
+        ///等待线程结束，没有这一句的话，线程会由于进程退出而无法运行。
+        t.join();
+}
+#+END_SRC
+#+begin_example
+g++ thread.cpp -o thread -lboost_thread -lboost_system
+#+end_example

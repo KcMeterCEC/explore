@@ -1,5 +1,6 @@
 #+TITLE: [What] vim 基本操作总结
-#+DATA: <2018-01-18 Thu>
+#+DATE: <2018-01-18 Thu>
+#+TAGS: vim
 #+LAYOUT: post
 #+CATEGORIES: editer, vim
 #+NAME: <editer_vim_overview.org>

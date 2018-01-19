@@ -1,0 +1,6 @@
+#+TITLE: [What]cmake 常用功能
+#+DATE: <2018-01-19 Fri>
+#+TAGS: cmake
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, cmake
+#+NAME: <linux_cmake_usage.org>
