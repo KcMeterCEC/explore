@@ -1,83 +1,27 @@
-#+TITLE: [What]protocol --> SDR
-#+DATE: <2018-01-07 Sun>
-#+TAGS: protocol uhd
+#+TITLE: [What]USRP UHD 构架分析
+#+DATE: <2018-01-16 Tue> 
+#+TAGS: protocol_rf
 #+LAYOUT: post 
-#+CATEGORIES: RF, protocol
-#+NAME: <rf_protocol_sdr.org>
+#+CATEGORIES: RF, protocol, UHD
+#+NAME: <rf_protocol_uhd_struct_analyze.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
 
 * 概览
-在 =IEEE micro= 中定义了 SDR 通信协议，其基本思想是：
-
-SDR的底层由一个软件引擎总管，其他应用软件（本机软件或者上位机软件）通过一个统一的协议来与引擎通信达到控制底层硬件的目的。
-- 抽象硬件底层，使得应用软件不用关心具体的硬件而独立开发。
-- 开发出的软件理论上是可以兼容所有满足此协议的底层硬件，达到跨平台的目的。
-
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/interface.jpg?raw=true" alt="interface.jpg">如上图所示，此协议的特点为：
-- 协议包分为控制包,信号包和环境包，
-- 信号包用于传输高速信号，控制包用于控制所有可控的器件，环境包用于返回硬件环境
-#+BEGIN_HTML
-<!--more-->
-#+END_HTML
-* 协议结构
-** 包的类型
-包类型一共有6种：
-- 数据包(data packets)
-- 环境包(context packets)
-- 控制包(control packets)
-- 扩展数据包(extension data packets)
-- 扩展环境包(extension context packets)
-- 扩展控制包(extension control packets)
-
-其中数据包，环境包以及控制包是主要使用的类型，其他3个是可选类型(比如将电源管理放在扩展控制包中，将频谱信息放在扩展数据包中，将系统多于参数放在扩展环境包中)。
-
-包头表明了包的类型。
-
-如果一个解码引擎不支持对应的扩展包，它就会忽略包的内容并且返回警告信息。
-
-*** 环境包(context packets)
-环境包指定了当前发射机和接收机的状态参数，也就是当前目标硬件的运行环境，比如：
-- 射频频率
-- 中频频率
-- 带宽
-- ADC,DAC的采样率以及位数
-- 增益
-- 电压
-- 滤波器阶数
-- 带外衰减
-- 时间戳，时间戳延时
-
-一旦这些参数中的任意一个参数改变了，引擎就会发送一个环境包，包中包含了被改变的参数。
-*** 控制包(control packets)
-控制包用于控制发射机和接收机的一切可控的参数，引擎在接收到这些包以后解析并控制对应的硬件。
-
-当应用软件需要改变某些参数的时候才会发送控制包。
-*** 数据包(data packets)
-数据包用于传送高速数据，此包会被频繁的发送。
-** 包中的重要概念
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/concept.jpg?raw=true" alt="concept.jpg">*** 参考点(reference points)
-由于SDR硬件系统构架大同小异，所以通过 *参考点* 这个概念来表示SDR系统中每个可以程序控制的参数。
-
-比如控制本振信号的点数字是7，控制DAC采样频率的点是8（在实现中可以通过枚举类型来定义各个参考点）。
-*** 流ID(stream IDs)
-数据包与其他包具有一定的关联性，比如当前数据包的内容仅仅对应于DAC的采样率为某个值时才有效，那么这个数据包与DAC的控制包就有同一个流ID。
-
-这样流ID就可以用来区分不同情况下的数据包组。
-*** 时间戳(timestamps)
-对于单个SDR设备来说， 时间戳可以表明当前接收机返回信号的具体时间，并且还可以在这个基础上加上一个时间修正值，以表示信号到达天线那一点的精确时间。
-
-对于多个设备来说，时间戳可以同步多个设备的数据然后对应的拼接到频谱上去。
-* UHD
-** 概览
-[[files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE的协议)来完成与SDR设备的通信。
+[[http://files.ettus.com/manual/page_uhd.html][USRP Hardware Driver(UHD)]] 是由 Ettus Research 公司所提供的开源免费SDR库，使用此库统一的协议(简化了IEEE micro 的协议)来完成与SDR设备的通信。
 
 最终的用户使用库的接口便可以统一抽象设备，此库可以用来单独编写应用程序或者与其他的第三方软件接口。
 
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_struct.jpg?raw=true" alt="uhd_struct.jpg">
+[[./uhd_struct.jpg]]
+
 此库具有以下特点：
 1. 抽象SDR硬件设备
 2. 支持设备和主机，设备和设备之间的双向通信
 3. 通信协议以流的形式传输以包的形式来分隔
-*** API的类型
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+** API的类型
 uhd 提供了各种类型的API,对应与不同的用途：
 - 高层次API
   + The Multi-USRP : 上层的C++接口，用于控制一个或多个SDR设备的操作
@@ -93,20 +37,21 @@ uhd 提供了各种类型的API,对应与不同的用途：
   5. Set and get properties on the device object.
   6. Access various sensors on the device.
   #+end_example
-*** 转换器
+** 转换器
 uhd 提供了转换器库(converters),接收来自 transport 缓存的数据转换为用户可读的格式到用户提供的数据缓存，主要用于：
 1. 转换IQ数据格式
 2. 转换接收到数据的大小端顺序
-*** 设备数据流
+** 设备数据流
 数据流就是通过包做分隔的连续数据
-*** 通信协议
+** 通信协议
 目前uhd的通信协议使用的是 CHDR，简化了VITA49复杂的包格式并且包头使用8字节，便于FPGA解析包类型。
 
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/chdr_header.jpg?raw=true" alt="chdr_header.jpg">
+[[./chdr_header.jpg]]
+
 在源码中提供了[[https://github.com/EttusResearch/uhd/tree/maint/tools/dissectors][工具]] 检查包是否符合规范
 
-** 构架分析
-*** 源码获取
+* 构架分析
+** 源码获取
 其稳定版本源码位于： [[https://github.com/EttusResearch/uhd][github]]
 
 其目录结构为：
@@ -120,8 +65,8 @@ uhd 提供了转换器库(converters),接收来自 transport 缓存的数据转�
 - tools : 调试用的工具
 
 主要的分析范围放在 =host= 文件夹以及 =tools= 下的协议分析工具下。
-*** 运行流程分析
-**** 基本代码
+** 运行流程分析
+*** 基本代码
 通过分析一个简单的示例来分析代码运行流程：
 #+BEGIN_SRC c++
 #include <uhd/utils/thread_priority.hpp>
@@ -196,17 +141,19 @@ int UHD_SAFE_MAIN(int argc, char *argv[]){
 #+END_SRC
 输出为：
 
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_example_out.jpg?raw=true" alt="uhd_example_out.jpg">**** 流程概览
+[[./uhd_example_out.jpg]]
+
+*** 流程概览
 代码运行流程分两个步骤：
 1. 在 main 函数之前，运行设备注册，打印库信息等代码
 2. 在 main 函数中找到对应的设备并挂载，执行需求函数
-***** 系统信息输出
+**** 系统信息输出
 这些信息通过 =uhd/host/lib/version.cpp= 函数 =UHD_STATIC_BLOCK(print_system_info)= 输出的，此函数会在 =main= 之前运行。
 - 其中 =BOOST_PLATFORM,BOOST_COMPILER,BOOST_VERSION= 都是由 boost 库所定义的。
 - =uhd::get_version_string()= 是获取字符串 =@UHD_VERSION@=.
   + =UHD_VERSION= 变量在 =UHDVersion.cmake= 文件中设定 
   + cmake 会在预编译的过程中替换 =@UHD_VERSION@= 中的内容
-***** 设备的注册
+**** 设备的注册
 - 各个设备所要包含的文件都由设备目录下的 =CMakeLists.txt= 指定
 - 是否包含当前设备由 =LIBUHD_REGISTER_COMPONENT= 宏决定（比如 usrp2 就是默认添加的设备)
 - 各个设备在对应的 =xxx_impl.cpp= 中都使用了函数来注册设备：
@@ -218,8 +165,8 @@ UHD_STATIC_BLOCK(register_usrp2_device){
   + =usrp2_find= 用于通过字符串匹配来向库反应设备是否匹配
   + =usrp2_make= 用于上层调用 =make= 方法时，将此设备可操作的方法挂载。
   + 此后，上层便可以通过调用通用函数来达到操作设备底层通信的目的。
-** 具体实现
-*** 注册设备
+* 具体实现
+** 注册设备
 查看以下代码就可以发现:
 - 在main函数之前，uhd库就将一个设备相关的信息注册进了一个动态结构数组中.
 - 其中一个数组的元素，就代表一个设备。
@@ -252,8 +199,8 @@ UHD_STATIC_BLOCK(register_usrp2_device){
         device::register_device(&usrp2_find, &usrp2_make, device::USRP);
 }
 #+END_SRC
-*** 发现设备
-**** 上层创建设备
+** 发现设备
+*** 上层创建设备
 进入main后的首要操作就是要找到对应的设备，可以猜想：设备的查找是在包含设备的容器中操作的。
 #+BEGIN_SRC c++
 std::string device_args("addr=192.168.10.2");
@@ -289,7 +236,7 @@ multi_usrp::multi_usrp(const device_addr_t &addr){
 #+END_SRC
 可以看出，上层的创建操作最终还是应用到了底层的 device::make 方法, 并且指明的设备类型是 USRP.
 
-**** device 查找设备
+*** device 查找设备
 #+BEGIN_SRC c++
 /**
  ,* @brief 根据提供的地址创建一个设备
@@ -358,19 +305,20 @@ device::sptr device::make(const device_addr_t &hint, device_filter_t filter=ANY,
 }
 #+END_SRC
 由device::make 方法可以得知，先是通过设备的find方法获取对应设备，然后再调用make方法将设备相关操作注册进系统。
-**** 设备的find方法和make方法
+*** 设备的find方法和make方法
 经过以上流程的分析，最终还是回到了每个设备自身的 find 和 make 方法中，下面进行一一分析。
 
 大致浏览 =usrp= 文件夹下的设备相关代码，发现实现都比较复杂。这是因为usrp设备端只是负责协议解析，
 而设备内部的具体操作是由上层代码来实现的，所以在上层代码端还可以看到AD9361的驱动代码。
 
-个人任务这种方式并没有做好软件分层和分离思想。
+个人认为这种方式并没有做好软件分层和分离思想。
 
 下面以 usrpb200系列来做分析，b200系列的基本架构是通过一个usb3.0芯片来控制FPGA,达到间接控制AD9361的目的。
 
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/b200.jpg?raw=true" alt="b200.jpg">
-***** find
-通过分析 =find= 方法可以得出，次方法需要做两件事：
+[[./b200.jpg]]
+
+**** find
+通过分析 =find= 方法可以得出，此方法需要做两件事：
 - 确定用户请求的设备是否与自己匹配
 - 确定匹配后，确定设备真实存在
 #+BEGIN_SRC c++
@@ -459,17 +407,29 @@ static device_addrs_t b200_find(const device_addr_t &hint)
 
 }
 #+END_SRC
-***** make 
+**** make 
 要看懂 =make= 方法，首先需要理解里面的一个 =property_tree= 类，位于 =property_tree.hpp= 。
 
 此类提供了一种类似文件系统的操作设备方式：
 - 树形结构以属性（property）为节点连接
-- 每一个属性都包含期望值和实际值
-  + 默认情况下实际值和期望值一致，也就是说并没有被设定。
-  + 可以通过设置回调函数，或者使用 =set_coerced= 函数来(必须在 MANUAL_COERCE 模式下)设置实际值
-- 可以为每个属性设定一个或多个通知回调函数(subscribers),用于告知属性的期望值或实际值已经被改变了。
+- 每一个属性都包含期望值和限定值
+  + 默认情况下限定值和期望值一致，也就是说限定值并没有被设定。
+  + 可以通过设置回调函数来根据期望值返回限定值，或者使用 =set_coerced= 函数来(必须在 =MANUAL_COERCE= 模式下)手动设置限定值
+- 可以为每个属性设定一个或多个通知回调函数(subscribers),用于告知属性的期望值或限定值已经被改变了。
 - 当实际值会根据硬件不同而不同的话，可以为属性设置一个回调函数(publisher),这样在每次获得属性时都会调用此函数。
 
+*需要注意的是：* 由于上层操作底层设备也是通过文件树来访问的，那么 *文件树的名字就需要有一个统一的规则* ，现将规则整体如下表所示：
+| 字符串         | 说明                                    | 应用示例                            |
+|----------------+-----------------------------------------+-------------------------------------|
+| mboards        | 文件树的根目录用于指定母板              | /mboards/0,/mboards/1               |
+| rx_subdev_spec | 接收通道描述符以 dboard:subdev 方式描述 | /mboards/0/rx_subdev_spec           |
+| tx_subdev_spec | 发射通道描述符以 dboard:subdev 方式描述 | /mboards/0/tx_subdev_spec           |
+| rx_dsps        | 接收端的DSP控制                         | /mboard/0/rx_dsps                   |
+| tx_dsps        | 发射端的DSP控制                         | /mboard/0/tx_dsps                   |
+| dbboards       | 描述子板的文件夹，子板以树形的方式存在 | /mboard/0/dbboards/A/rx_frontends/A |
+| ...            | ....                                   | ....                                |
+
+说明： 文件树的文件类有点多，仅仅靠分析代码罗列出来效率太低。一个比较好的办法是，通过 gdb调试 和 库的警告输出来填充需要的文件树。
 
 #+BEGIN_SRC c++
 static device::sptr b200_make(const device_addr_t &device_addr)
@@ -543,7 +503,7 @@ b200_impl::b200_impl(const uhd::device_addr_t &device_addr, usb_device_handle::s
         {...}
 }
 #+END_SRC
-***** 回到上层
+**** 回到上层
 现在再回到上层的 =multi_usrp_impl= 构造函数：
 #+BEGIN_SRC c++
 multi_usrp_impl(const device_addr_t &addr){
@@ -557,10 +517,10 @@ multi_usrp_impl(const device_addr_t &addr){
         }
 }
 #+END_SRC
-*** 操作设备
+** 操作设备
 在用户代码中，发现上层在make设备后，便可以直接进行 =set_clock_source(),set_rx_subdev_spec()= 等操作了，
 下面以 =set_rx_freq()= 为例进行分析。
-**** 上层接口
+*** 上层接口
 #+BEGIN_SRC c++
 double freq(915e6);
 
@@ -729,21 +689,12 @@ static tune_result_t tune_xx_subdev_and_dsp(
 - 获取属性树的值
 - 设置需求值
 - 读取真正设置到的值
-**** 底层逻辑
+*** 底层逻辑
 在make设备的时候，为相应的属性树绑定了对应的回调函数，当这些数值被改变后便会调用对用的回调。
 
 而回调中就会调用底层的通信逻辑。
 
-*** 总结
+** 总结
 现在总结一下上面的步骤，如下图所示：
 
-#+HTML:<img src="https://github.com/KcMeterCEC/explore/blob/master/[RF]/[protocol]/[What]protocol--SDR/uhd_register_find.jpg?raw=true" alt="uhd_register_find.jpg">** 协议分析
-uhd官方手册并没有很清楚的解释 CHDR 协议，需要好好分析每位具体代表什么意思。
-** 移植步骤
-假设我们的硬件构架为主机与设备通过USB通信，设备端分析协议并且底层的设备操作都是由设备端来完成的，主机仅仅需要发送命令即可，那么这种架构就是最简便的。
-*** 添加基本文件
-根据 =架构分析，具体实现= 两个步骤的分析，我们现在可以模拟一个简单的设备（不包含底层协议基本操作），依然以 b200 系列为模板建立自己的设备。
-
-*** cmake添加
-*** 协议相关部分添加
-*** 测试与调试
+[[./uhd_register_find.jpg]]

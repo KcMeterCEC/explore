@@ -1,0 +1,17 @@
+#+TITLE: [What]cmake 常用功能
+#+DATE: <2018-01-19 Fri>
+#+TAGS: cmake
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, cmake
+#+NAME: <linux_cmake_usage.org>
+
+cmake的功能太多，所以用此文来记录一些常用的功能的 *基本使用规则* ，避免遗忘。
+
+#+begin_example
+这些说明都是查询官方文档而做的笔记，英语比较渣(^_^!)，无法做到一目十行。
+每次遗忘都要重头来看，比较耗时间......
+#+end_example
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 

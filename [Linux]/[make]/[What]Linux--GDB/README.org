@@ -1,61 +1,100 @@
-#+TITLE: [What]Linux --> Debugging with GDB
-*You can use this manual at your leisure to read all about GDB.However,a handful of commands are enough to get started using the debugger.*
+#+TITLE: [What]GDB 基本使用总结
+#+DATE: <2018-01-18 Thu>
+#+TAGS: debug 
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, gdb 
+#+NAME: <linux_debug_gdb_overview.org>
 
-* 快速操作简单粗暴
-** 图形化调试代码
-*** 启动或退出图形化窗口
-- =CTRL + X A= or =layout src=
-* 1 A Sample GDB Session
-* 2 Getting In and Out of GDB
-在使用 GDB前,需要让编译器 *将代码的调试信息包含在可执行文件中*.以C为例,gcc编译器需要加上 =-g= 选项:
+* 正式调试前的准备工作
+** 生成带调试信息的可执行文件
+在使用 GDB前,需要让编译器 *将代码的调试信息包含在可执行文件中* ，以C为例,gcc编译器需要加上 =-g= 选项:
 #+begin_example
 gcc -g hello.c -o hello
 #+end_example
-- 进入gdb,输入 =gdb=
-- 退出gdb,输入 =quit= 或者按下 =Ctrl-d=
-** 2.1 调用GDB
-- =gdb program=,最普通的启动gdb的命令 
-- =gdb program core=,在参数2增加一个核心转储文件 
-- =gdb program 1234=,如果想要同时监视一个正在运行的进程,可以在参数2使用进程ID,当使用远程调试裸机时,参数2的核心转储不会起作用.
-- =gdb --args gcc -O2 -c foo.c=,使用gdb来调试一些命令,此时 gdb 会调试 gcc 的编译过程
-- =gdb --silent=,禁止gdb的启动信息输出
-- =gdb -help=,显示帮助信息
 
-*** 2.1.1 选择文件
-*** 2.1.2 选择模式
-*** 2.1.3 GDB启动过程
-** 2.2 退出GDB
-- =quit [expression]= / =q= / =Ctrl-d=,[expression]可以为空
-- =Ctrl-c=,只会打断当前gdb正在执行的命令, *但并不会退出*.
+很多时候也会使用CMake来生成，一般在 CMakeLists.txt 文件中加入：
+#+begin_example
+set(CMAKE_BUILD_TYPE Debug)
+#或者也可以在入口参数中指定
+cmake -DCMAKE_BUILD_TYPE=Debug ....
+#+end_example
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+** 为文件输入参数
+在启动gdb后 =gdb ./hello= ，很多程序需要带入口参数，那么就需要使用命令 =set args= 
+#+begin_example
+#设置入口参数为 1 2 3
+set args 1 2 3
+#显示入口参数设定值
+show args 
+#+end_example
+** 启动视窗
+个人认为带有视窗的操作方式能更加清楚的反应代码上下文，启动或退出图形化窗口使用：
+- =CTRL + X A= 或 =layout src=
+** 输入和输出重映射
+很多程序都带有用户交互，如果在调试终端则操作不便，可以将输入输出映射到另一个终端：
+- 打开一个新的控制台,使用命令 =tty=,记住当前文件路径,比如 =/dev/pts/19=
+- 在GDB中使用命令 =tty /dev/pts/19=, 这样就把输入输出定向到了新控制台
+* 常用的操作命令
+** 代码查看
+- list , 缩写 l
+| 命令        | 说明                        |
+|-------------+-----------------------------|
+| l           | 显示当前行后面的源码        |
+| l -         | 显示当前行前面的源码        |
+| l <linenum> | 显示 <linenum> 行周围的源码 |
+| l <func>    | 显示 <func> 周围的源码      |
+** 设置断点
+- break, 缩写 b
+| 命令                   | 说明                                                 |
+|------------------------+------------------------------------------------------|
+| b <func>               | 在函数 <func> 中设定断点                             |
+| b <linenum>            | 在 <linenum> 行设定断点                              |
+| b -<linenum>           | 在当前行后 <linenum> 设断点                          |
+| b +<linenum>           | 在当前行前 <linenum> 设断点                          |
+| b <filename>:<linenum> | 在指定文件行数设断点                                 |
+| b <filename>:<func>    | 在指定文件函数设断点                                 |
+| b                      | 在下一条指令处断点                                   |
+| b *<address>           | 在地址处设定断点                                     |
+| b if<condition>        | 神命令，一般在循环体中特定时候打断点，比如 b if i=10 |
+| info breakpoints       | 查看当前设定的所有断点                               |
+| clear <linenum>        | 删除在linenum处的断点                                |
+| clear [<file:>]<func>  | 删除（某个文件中）某个函数的断点                     |
+| clear                  | 删除当前行所在的断点                                 |
+** 执行
+- next，缩写 n
+- step,  缩写 s
+- continue,缩写 c
+- until，缩写 u
+| 命令             | 说明                                                    |
+|------------------+---------------------------------------------------------|
+| s                | 单步执行，如果有函数则进入该函数                        |
+| s <count>        | 执行 <count> 条后停止，如果有函数则进入                 |
+| set step-mode on | 打开step-mode模式，当函数没有调试信息时，则进入汇编模式 |
+| n                | 单步执行，不会进入函数                                  |
+| n <count>        | 执行<count> 条后停止，不会进入函数                      |
+| finish           | 退出当前函数并停止                                      |
+| u                | 退出循环语句后停止                                      |
+| c                | 全速运行，直到程序退出或遇到下一个断点                  |
+| c <count>        | 全速运行并跳过<count>个断点                             |
+** 查看以及修改
+- print, 缩写 p
+  + <f> 显示格式可以使用: x(16进制),u(16进制无符号),d(十进制),o(八进制),t(二进制),c(字符),s(字符串),f(浮点)
+- examine(打印内存), 缩写 x
+  + <u> 字节对齐可以使用: b(单字节),h(双字节),w(4字节),g(8字节)
+| 命令                       | 说明                                                                    |
+|----------------------------+-------------------------------------------------------------------------|
+| p <variable>               | 查看变量 <variable> 的值                                                |
+| p <addr>@<len>             | 查看地址<addr>开始的值，打印<len>个长度                                 |
+| p /<f> <variable>          | 以 <f> 格式显示变量<variable>                                           |
+| p <variable>=<value>       | 修改变量 <variable>的值为<value>                                        |
+| watch  <expr>              | 当表达式(变量)的值有变化时则停止运行                                    |
+| rwatch <expr>              | 当表达式(变量)被读时则停止运行                                          |
+| x/<num><f><u> <address>    | 在地址<address>开始处显示<num>个单位，每个单位以<f>格式以<u>字节对齐    |
+| set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a' |
+| info                       | 查看寄存器、断点等信息                                                  |
+| disassemble                | 查看汇编代码                                                            |
 
-* 3 GDB Commands
-* 4 Running Programs Under GDB
-* 5 Stopping and Continuing
-* 6 Running programs backward
-* 7 Recording Inferior's Execution and Replaying It
-* 8 Examining the Stack
-* 9 Examining Source Files
-* 10 Examining Data
-* 11 Debugging Optimized Code
-* 12 C Preprocessor Macros
-* 13 Tracepoints
-* 14 Debugging Programs That Use Overlays
-* 15 Using GDB with Different Languages
-* 16 Examining the Symbol Table
-* 17 Altering Execution
-* 18 GDB Files
-* 19 Specifying a Debugging Target
-* 20 Debugging Remote Programs
-* 21 Configuration-Specific Information
-* 22 Controlling GDB
-* 23 Extending GDB
-* 24 Command Interpreters
-* 25 GDB Text User Interface
-* 26 Using GDB under GNU Emacs
-* 27 The GDB/MI Interface
-* 28 GDB Annotations
-* 29 JIT Compilation Interface
-* 30 In-Process Agent
-* 31 Reporting Bugs in GDB
-* 32 Command Line Editing
-* 33 Using History Interactively
+
+

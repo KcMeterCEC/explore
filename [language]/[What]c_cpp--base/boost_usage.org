@@ -1,0 +1,274 @@
+#+TITLE: [What]boost 常用功能
+#+DATE: <2018-01-19 Fri>
+#+TAGS: boost
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, boost
+#+NAME: <language_boost_usage.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+boost库的功能太多，所以用此文来记录一些常用的类和方法的 *基本使用规则* ，避免遗忘。
+#+begin_example
+这些说明都是查询官方文档而做的笔记，英语比较渣(^_^!)，无法做到一目十行。
+每次遗忘都要重头来看，比较耗时间......
+#+end_example
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+
+* BOOST_FOREACH (简易迭代器) 
+在传统的 c/c++ 中要迭代的处理一个容器的内容是相对比较麻烦的（依次将容器中的内容取出来赋值给一个对象然后处理），为此 boost库提供了 BOOST_FOREACH 宏，让编码简单。基本上常用的类型此宏都支持。
+** Hello, world 
+#+BEGIN_SRC c++
+/**
+ ,* @brief 依次从字符串中取出一个字符然后输出
+ ,* 输出的内容是： Hello,world!
+ ,*/
+#include <string>
+#include <iostream>
+#include <boost/foreach.hpp>
+
+int main()
+{
+        std::string hello( "Hello, world!" );
+
+        BOOST_FOREACH( char ch, hello )
+        {
+                std::cout << ch;
+        }
+
+        return 0;
+}
+#+END_SRC
+** 常用方式
+#+BEGIN_SRC c++
+/* 依次取出标准模板库的元素 */
+std::list<int> list_int( /*...*/ );
+BOOST_FOREACH( int i, list_int )
+{
+        // do something with i
+}
+/* 在类型不匹配的情况下自动做类型转换 */
+short array_short[] = {1,2,3};
+BOOST_FOREACH( int i, array_short )
+{
+        // The short was implicitly converted to an int
+}
+/* 可以正常的跳出循环 */
+std::deque<int> deque_int( /*...*/ );
+int i = 0;
+BOOST_FOREACH( i, deque_int )
+{
+        if( i == 0 ) return;
+        if( i == 1 ) continue;
+        if( i == 2 ) break;
+}
+/* 依次修改容器中的内容 */
+short array_short[] = { 1, 2, 3 };
+BOOST_FOREACH( short & i, array_short )
+{
+        ++i;
+}
+// array_short contains {2,3,4} here
+/* 循环的多重包含 */
+std::vector<std::vector<int> > matrix_int;
+BOOST_FOREACH( std::vector<int> & row, matrix_int )
+    BOOST_FOREACH( int & i, row )
+        ++i;
+/* 获取方法的返回值进行迭代(有些老编译器可能不支持) */
+extern std::vector<float> get_vector_float();
+BOOST_FOREACH( float f, get_vector_float() )
+{
+        // Note: get_vector_float() will be called exactly once
+}
+/* 反向迭代 */
+std::list<int> list_int( /*...*/ );
+BOOST_REVERSE_FOREACH( int i, list_int )
+{
+        // do something with i
+}
+
+#+END_SRC
+* Boost::Function(方法引用)
+Boost::Function 类似于一个可以匹配所有方法的拷贝，配合 =Boost::Bind= 饮用更佳。
+** Hello world 
+#+BEGIN_SRC c++
+/**
+ ,* @brief 新建一个指向特定方法的拷贝然后调用
+ ,*/
+#include <string>
+#include <iostream>
+#include <boost/function.hpp>
+
+struct int_div{
+        float operator()(int x, int y)const {return ((float)x)/y;}
+};
+
+/**
+ @note: 也可以这样写
+ float int_div(int x, int y)
+{
+   return ((float)x) / y;
+}
+,*/
+
+int main()
+{
+        boost::function<float (int x, int y)> f;
+        
+/*
+  @note 对应上面注释的调用方式
+  f = int_div;
+ ,*/
+        f = int_div();
+
+        if(f)
+                std::cout << f(5, 3) << std::endl;
+        else
+                std::cout << "f has no target, so it is undsafe to call" << std::endl;
+
+        //clear
+        f = 0;
+
+        return 0;
+}
+#+END_SRC
+** 常用方式
+#+BEGIN_SRC c++
+/* 绑定一个类的方法，然后应用于另一个对象 */
+struct X{
+        int foo(int){}
+};
+boost::function<int (X*, int)> f;
+
+f = &X::foo;
+
+X x;
+f(&x, 5);
+
+///使用标准库绑定
+boost::function<int (int)>f;
+X x;
+f = std::bind1st(std::mem_fun(&X::foo), &x);
+
+f(5); //call x.foo(5)
+
+/* 使用为函数创建一个引用 */
+stateful_type a_function_object;
+
+boost::function<int (int)> f;
+//f 是 a_function_object 的引用，在执行的时候不会抛出函数异常
+f = boost::ref(a_function_object);
+
+//f2 是 a_function_object 的引用，在执行的时候不会抛出函数异常
+boost::function<int (int)> f2(f);
+
+/* boost::function 还可以拿来做比较  */
+f = &X::foo;
+assert(f == &X::foo);
+#+END_SRC
+* Boost::Bind(方法绑定)
+boost::bind 是为了简化 c++ 中的 =std::bind1st 和 std::bind2nd= 方法，经过绑定后的方法主要是为了方便以后调用， 类似于给某个函数绑定了几个默认参数，以后调用的时候这些参数就会传递给此函数。
+** Hello,world 
+#+BEGIN_SRC c++
+#include <string>
+#include <iostream>
+#include <boost/function.hpp>
+#include <boost/bind.hpp>
+
+float int_div(int x, int y)
+{
+        return ((float)x) / y;
+}
+int main()
+{
+        boost::function<float (int x, int y)> f;
+
+        f = int_div;
+        std::cout << f(5, 3) << std::endl;
+
+        boost::function<float ()> f1 = boost::bind(int_div, 5, 3);
+        std::cout << f1() << std::endl;
+
+        return 0;
+}
+#+END_SRC
+假设有以下两个函数：
+#+BEGIN_SRC c++
+int f(int a, int b)
+{
+        return a + b;
+}
+
+int g(int a, int b, int c)
+{
+        return a + b + c;
+}
+#+END_SRC
+那么使用 boost::bind 为：
+#+BEGIN_SRC c++
+/// 等同于执行 f(1,2)
+boost::bind(f, 1, 2)();
+/// 等同于执行 g(1, 2, 3)
+boost::bind(g, 1, 2, 3)();
+#+END_SRC
+** 常用方式
+*** 绑定普通函数
+#+BEGIN_SRC c++
+/**
+ ,* @brief 使用占位符来替换一些参数的输入， 这样在实际使用的时候只需要输入占位符相应的参数即可
+ ,*/
+int x = 1;
+///在实际使用的时候，只需要提供x即可
+boost::bind(f, _1, 5)(x);
+///占位符还可以乱序
+boost::bind(f, _2, _1)(x, y)  //f(y, x)
+boost::bind(g, _1, 9, _1)(x)  //g(x, 9, x)
+///占位符还可以只使用其中的一个参数
+boost::bind(g, _3, _3, _3)(x, y, z) //g(z, z, z)
+boost::bind(g, _1, _1, _1)(x, y, z) //g(x, x, x)
+/**
+ ,* @brief 使用 bind 拷贝变量的值或者引用变量
+ ,*/
+int i = 5;
+///拷贝
+boost::bind(f, i, _1);
+///引用
+boost::bind(f, ref(i), _1);
+boost::bind(f, cref(i), _1);
+#+END_SRC
+*** 绑定方法重载
+需要指明函数类型，主要是由于 bind 并不能判断此函数的返回类型。
+#+BEGIN_SRC c++
+/**
+ ,* @brief 对于有重载的情况下，需要指明绑定的类型
+ ,*/
+struct F
+{
+        int operator()(int a, int b) {return a -  b;}
+        bool operator()(long a, long b){return a==b;}
+};
+
+F f;
+int x = 104;
+bind<int>(f, _1, _1)(x); //f(x ,x)
+#+END_SRC
+*** 绑定对象和其引用
+绑定对象和其引用时，需要给 bind 提供对应于该方法的对象，这样才能将方法和对象对应。
+#+BEGIN_SRC c++
+struct X
+{
+        bool f(int a);
+};
+
+X x;
+shared_ptr<X> p(new X);
+int i = 5;
+
+boost::bind(&X::f, ref(x), _1)(i);  //x.f(i)
+boost::bind(&X::f, &x, _1)(i);      //(&x)->f(i)
+///内部会创建一个拷贝
+boost::bind(&X::f, x, _1)(i);       //(internal copy of x).f(i)
+boost::bind(&X::f, p, _1)(i);       //(internal copy of p)->f(i)
+#+END_SRC
