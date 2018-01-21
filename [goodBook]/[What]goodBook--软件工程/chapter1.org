@@ -1,8 +1,118 @@
-#+TITLE: [What]book --> 软件工程_概论
-#+DATE: <2018-01-14 Sun>
+#+TITLE: [What]软件工程_概论
+#+DATE: <2018-01-21 Sun> 
 #+TAGS: 软件工程
 #+LAYOUT: post
-#+CATEGORIES: book,软件工程,概论
+#+CATEGORIES: book,软件工程
 #+NAME: <book_se_chapter1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
 
-* 软件　＝　程序　＋　软件工程
+
+* 程序，软件与软件企业之间的关系
+
+程序（算法和数据结构）是基本功，但是在算法和数据结构之上，软件工程决定了软件的质量。商业模式决定了一个软件企业的成败。
+软件从业人员和软件企业的道德操守会极大地影响软件用户的利益。
+
+相互之间的关系如下：
+
+- 程序 = 数据结构 + 算法
+- 软件 = 程序 + 软件工程
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+#+begin_example
+一个合格的软件，除了包含基本的程序构建外。为了保证软件的质量，还需要有：
+- 源代码管理(Software Configuration Management)：保证程序开发新功能，对应不同的版本，运行不同的配置等
+- 质量保障(Quality Assurance)：开发过程的辅助工具、文档来保证开发质量
+- 软件测试(Testing)：对程序进行单元测试、压力测试、实时性测试等等，验证软件是否符合预期
+- 需求分析(Requirement Analysis)：整理用户需求，确定软件功能定位
+- 软件维护(Software Maintenance)：软件后期的漏洞修复，维护任务
+- 项目管理(Project Management)：掌握软件开发进度，合理安排人员任务
+#+end_example
+- 软件企业 = 软件 + 商业模式
+** 软件开发的不同阶段
+1. 入门阶段： 对新东西的尝鲜，不考虑实用性，能跑起来即可
+2. 爱好者阶段： 入门以后能够尝试做一些东西，但也完全是自娱自乐
+3. 探索阶段：对产品开发的一个前期尝试，会应用到一些新技术，主要目的是为了验证可行性
+4. 成熟阶段：整个软件的开发都规范化，有一套标准的流程，各个部分都经过严格验证，到最后能形成一个成熟的产业链。
+* 软件工程是什么
+#+begin_example
+软件工程是把系统的、有序的、可量化的方法应用到软件开发、运营和维护上的过程。
+
+软件工程包括下列领域：软件需求分析、软件设计、软件构建、软件测试和软件维护。
+
+软件工程和下列学科相关：计算机科学、计算机工程、管理学、数学、项目管理学、质量管理、软件人体工程学、系统工程、工业设计和用户界面设计。
+#+end_example
+** 软件开发过程中的难题
+1. 复杂性：程序员理解及运用代码的能力相当有限，但软件的代码量、模块数、相互之间的关系却增长得很快。
+2. 不可见性： 程序最终被编译为二进制代码在不同的硬件平台上运行，软件工程师却无法清除的知道是如何运行的。
+3. 易变性： 为了满足不同需求的增加，兼容各个硬件环境，代码一直在改变。
+4. 服从性： 软件不能独立存在，它需要服从用户的要求、系统中其他部分的要求等。
+5. 非连续性： 很多软件模块的输入输出没有相应的变化规律，导致调试困难。
+
+** 软件工程与计算机科学的关系
+计算机科学可以分为以下两大领域：
+*** 偏理论的领域
+- 计算理论(Theoretical Computing)
+- 信息和编码理论(Information and Coding Theory)
+- 算法和数据结构(Algorithm and Data Structure)
+- 形式化方法(Formal Methods)
+- 程序设计语言(Programming Language)
+*** 偏实践的领域
+- 计算机体系结构(Computer Architecture)
+- 并行计算和分布式系统(Concurrent,Paraller and Distributed System)
+- 实时系统和嵌入式系统(Real Time and Embedded System)
+- 操作系统(Operating System)
+- 计算机网络(Networking)
+- 科学计算(Scientific Computing)
+- 安全和密码学(Security and Cryptography)
+- 人工智能(Artificial Intelligence)
+  + 模式识别(Pattern Recognition)
+  + 机器学习(Machine Learning)
+  + 数据挖掘(Data Mining)
+  + 信息提取(Information Retrieval)
+  + 等等....
+- 计算机图形学(Computer Graphics)、计算机视觉(Computer Vision)、多媒体(Multimedia)
+- 数据库和大规模数据处理(Database and Large Scale Data Processing)
+- 万维网(World Wide Web)
+- 自然语言处理和语音(Natural Language Processing and Speech)
+- 人机交互(Human Computer Interaction)
+- 软件工程(Software Engineering)
+*** 二者不同的侧重点
+计算机理论的进展会帮助软件工程，而软件工程的进展会帮助计算机科学家有效的实验和探索。
+| 计算机科学                     | 软件工程                                   |
+|--------------------------------+--------------------------------------------|
+| 发现和研究长期的、客观的真理   | 短期的实际结果                             |
+| 理想化的                       | 对各种因素的折中                           |
+| 确定性，完美，通用性           | 对不确定性和风险的管理，足够好，具体的应用 |
+| 各个学科独立深入研究，做出成果 | 关注和应用各个相关学科的知识，解决问题     |
+| 理论的统一                     | 百花齐放的实践方法                         |
+| 强调原创                       | 最好的、成熟的实践方法                     |
+| 形式化，追求简明的公式         | 在实践中建立起来的灵感和直觉               |
+| 正确性                         | 可靠性                                     |
+
+
+** 软件工程的知识领域
+1. 软件需求分析(Software Requirements)
+2. 软件设计(Software Design)
+3. 软件构建(Software Construction)
+4. 软件测试(Software Testing)
+5. 软件维护(Software Maintenance)
+6. 软件配置管理(Software Configuration Management)
+7. 软件工程管理(Software Engineering Management)
+8. 软件工程处理(Software Engineering Process)
+9. 软件工程模式和方法(Software Engineering Models and Methods)
+10. 软件质量(Software Quality)
+11. 软件工程专业实践(Software Engineering Professional Practice)
+12. 软件工程经济学(Software Engineering Economics)
+13. 计算基础(Computing Foundations)
+14. 数理基础(Mathematical Foundations)
+15. 工程基础(Engineering Foundations)
+** 软件工程的目标--创造“足够好”的软件
+什么是Bug呢？简单地说， *软件的行为和用户的期望值不一样，就叫Bug。*
+
+但这并不意味着：一个产品有 Bug 就不能发布了，没有 Bug 了就是一个完美的产品。
+
+一切以满足用户的主要需求为目标。
+
+
