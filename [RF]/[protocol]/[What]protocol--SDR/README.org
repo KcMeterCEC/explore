@@ -1,5 +1,5 @@
 #+TITLE: [What]USRP UHD 新建设备框架
-#+DATE: <2018-01-16 Tue> 
+#+DATE: <2018-01-22 Mon> 
 #+TAGS: protocol_rf
 #+LAYOUT: post 
 #+CATEGORIES: RF, protocol, UHD
@@ -50,7 +50,7 @@ cmake ../
 make 
 #+end_example
 
-接下来就是增加一些基本代码，然后不断测试此基本模板，此模板的代码位于 
+接下来就是增加一些基本代码，然后不断测试此基本模板，此模板的代码位于 [[https://github.com/KcMeterCEC/uhd/tree/device/host/lib/usrp/dev_template][github]]
 * 测试与调试
 **** 终端调试信息输出
 终端的调试信息通过 =host/include/uhd/utils/msg.hpp=  中的 =UHD_MSG= 宏来输出

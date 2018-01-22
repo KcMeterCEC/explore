@@ -272,3 +272,38 @@ boost::bind(&X::f, &x, _1)(i);      //(&x)->f(i)
 boost::bind(&X::f, x, _1)(i);       //(internal copy of x).f(i)
 boost::bind(&X::f, p, _1)(i);       //(internal copy of p)->f(i)
 #+END_SRC
+* Assignment Library(分配库)
+分配库的作用是为了简便的操作容器类，比如通过逗号或括号来写入数据：
+#+BEGIN_SRC c++
+vector<int> v;
+v += 1,2,3,4,5;
+
+map<string,int> m;
+insert(m)("Bar", 1)("Foo",2);
+#+END_SRC
+下面列出此库的一些操作方法。
+** list_of()
+list_of() 方法用于初始化一个容器，它是通过创建了一个匿名的容器然后给新容器赋值。
+#+BEGIN_SRC c++
+#include <boost/assign/list_of.hpp> // for 'list_of()'
+#include <boost/assert.hpp>
+#include <list>
+#include <stack>
+#include <string>
+using namespace std;
+using namespace boost::assign; // bring 'list_of()' into scope
+
+{
+        const list<int> primes = list_of(2)(3)(5)(7)(11);
+        BOOST_ASSERT( primes.size() == 5 );
+        BOOST_ASSERT( primes.back() == 11 );
+        BOOST_ASSERT( primes.front() == 2 );
+
+        /// 需要初始化 adapter则需要调用 to_adapter()
+        const stack<string> names = list_of( "Mr. Foo" )( "Mr. Bar")( "Mrs. FooBar" ).to_adapter();
+        /// 通过括号包含list_of,里面就可以通过逗号来拼接
+        const stack<string> names2 = (list_of( "Mr. Foo" ), "Mr. Bar", "Mrs. FooBar" ).to_adapter();
+        BOOST_ASSERT( names.size() == 3 );
+        BOOST_ASSERT( names.top() == "Mrs. FooBar" );
+} 
+#+END_SRC
