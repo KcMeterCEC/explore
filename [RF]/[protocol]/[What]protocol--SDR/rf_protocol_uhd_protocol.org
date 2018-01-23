@@ -1,0 +1,86 @@
+#+TITLE: [What]USRP UHD 协议格式分析
+#+DATE: <2018-01-22 Mon> 
+#+TAGS: protocol_rf
+#+LAYOUT: post 
+#+CATEGORIES: RF, protocol, UHD
+#+NAME: <rf_protocol_uhd_device_protocol.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+* 手册说明
+根据 [[http://files.ettus.com/manual/page_rtp.html][官方手册]] 的介绍，目前第三代以及B200系列的设备都使用CHDR通信协议，这个协议格式比VITA简单了许多，便于设备分析。
+** 协议格式
+协议也是以一个包为基本单位传输，包头通过64位长度来表示包的所有信息，后面紧跟着的是数据。
+
+对于协议分析，UHD在 =tools/chdr_dissector= 中提供了分析工具。
+*** 包格式
+| 字节偏移 | 长度（字节） | 说明           |
+|----------+--------------+----------------|
+|        0 |            8 | 包头信息       |
+|        8 |            8 | 时间戳（可选） |
+|     8/16 |            - | 数据           | 
+
+可以看到，当没有时间戳时，数据紧跟着包头信息，偏移为8字节。当有时间戳时，数据跟着时间戳后面，偏移为16字节。
+
+*** 包头格式
+|  位数 | 说明                |
+|-------+---------------------|
+| 63:62 | 包的类型            |
+|    61 | 时间戳标志，1代表有 |
+|    60 | 包结尾或包错误标志  |
+| 59:48 | 12位长度的包序列号  |
+| 47:32 | 16为包长度（字节）  |
+|  31:0 | 流ID(Stream ID,SID) |
+
+*** 包类型
+| bit 63 | bit 62 | bit 61 | bit 60 | 包类型             |
+|--------+--------+--------+--------+--------------------|
+|      0 |      0 | x      |      0 | 数据包             |
+|      0 |      0 | x      |      1 | 包结束             |
+|      0 |      1 | x      |      0 | 流控制             |
+|      1 |      0 | x      |      0 | 命名包             |
+|      1 |      1 | x      |      0 | 命令包响应（正确） |
+|      1 |      1 | x      |      1 | 命名包响应（错误） |
+*** 流ID格式（SID）
+SID 用于标识数据，一共有32位，高16位用于表示源地址，地16位用于表示目标地址。
+每个地址由8位设备地址和8位端点地址组成，设备地址用于表明是哪一个具体设备发送或接收，端点地址表示设备内部的某个模块。
+
+| SRC address | SRC endpoint | DST address | DST endpoint|
+
+* 操作说明
+基于基本包格式的操作流程，则需要分析软件流程。
+** 相关操作方法
+*** uhd::transport::vrt (include/uhd/transport/vrt_if_packet.hpp)
+此类可以处理 VITA 和 CHDR 协议，下面是它的操作方法：
+#+BEGIN_SRC c++
+/**
+ ,* @brief: 将包信息进行打包（大端模式）
+ ,* @param: packet_buff: 用户存储包头的缓存，对于CHDR大小为8字节
+ ,* @param: if_packet_info : 用户设置的包头结构
+ ,* @note: 对于CHDR _packet_info 的设置为：
+ ,* if_packet_info.link_type = LINK_TYPE_CHDR
+ ,* if_packet_info.has_cid = false
+ ,* if_packet_info.has_sid = true
+ ,* if_packet_info.has_tsi = false
+ ,* if_packet_info.has_tlr = false
+ ,*/
+UHD_API void uhd::transport::vrt::if_hdr_pack_be(uint32_t * packet_buff, if_packet_info_t & if_packet_info)
+/**
+ ,* @brief: 将包信息进行打包（小端模式）
+ ,*/
+UHD_API void uhd::transport::vrt::if_hdr_pack_le(uint32_t * packet_buff, if_packet_info_t & if_packet_info)
+/**
+ ,* @brief: 将包信息进行解包（大端模式）
+ ,* @param: packet_buff: 用户读取包头的缓存，对于CHDR大小为8字节
+ ,* @param: if_packet_info : 用户读取的包头结构
+ ,*/
+UHD_API void uhd::transport::vrt::if_hdr_unpack_be(const uint32_t * packet_buff, if_packet_info_t & if_packet_info)
+/**
+ ,* @brief: 将包信息进行解包（小端模式）
+ ,*/
+UHD_API void uhd::transport::vrt::if_hdr_unpack_le(const uint32_t * packet_buff, if_packet_info_t & if_packet_info)
+#+END_SRC
+** 操作流程
+依然以 B200 为分析参考对象，可以得出协议操作流程如下。
+
+

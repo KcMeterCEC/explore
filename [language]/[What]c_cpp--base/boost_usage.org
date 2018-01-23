@@ -307,3 +307,12 @@ using namespace boost::assign; // bring 'list_of()' into scope
         BOOST_ASSERT( names.top() == "Mrs. FooBar" );
 } 
 #+END_SRC
+* boost::shared_ptr(共享指针)
+共享指针可以指向任意对象，并在退出操作范围或者复位操作时自动销毁对象占用的动态内存。
+#+BEGIN_SRC c++
+#include <boost/shared_ptr.hpp>
+boost::shared_ptr<X> p1(new X);
+boost::shared_ptr<void> p2(new int(5));
+boost::shared_ptr<double[1024]> p3(new double[1024]);
+boost::shared_ptr<double[])(new double[n]);
+#+END_SRC

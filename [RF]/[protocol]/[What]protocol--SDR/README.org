@@ -4,6 +4,8 @@
 #+LAYOUT: post 
 #+CATEGORIES: RF, protocol, UHD
 #+NAME: <rf_protocol_uhd_device_template.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
 * 空模板的添加
 假设我们的硬件构架为主机与设备通过USB通信，设备端分析协议并且底层的设备操作都是由设备端来完成的，主机仅仅需要发送命令即可，那么这种架构就是最简便的。
