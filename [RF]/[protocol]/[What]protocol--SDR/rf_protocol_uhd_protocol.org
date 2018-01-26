@@ -1,11 +1,17 @@
 #+TITLE: [What]USRP UHD 协议格式分析
-#+DATE: <2018-01-22 Mon> 
+#+DATE:  <2018-01-25 Thu>
 #+TAGS: protocol_rf
 #+LAYOUT: post 
 #+CATEGORIES: RF, protocol, UHD
 #+NAME: <rf_protocol_uhd_device_protocol.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
+
+*说明*: 本来我的意图是以最少的代码兼容 uhd 的底层协议逻辑，结果分析了好几天都没有看懂它的这些逻辑 ^_^!!!!
+
+所以我的简易方式为： 以接口类为基类实现自己的子类，在子类中实现操作方法。
+
+至于uhd协议逻辑部分代码，等有时间再来好好分析吧。
 
 * 手册说明
 根据 [[http://files.ettus.com/manual/page_rtp.html][官方手册]] 的介绍，目前第三代以及B200系列的设备都使用CHDR通信协议，这个协议格式比VITA简单了许多，便于设备分析。
@@ -47,10 +53,8 @@ SID 用于标识数据，一共有32位，高16位用于表示源地址，地16�
 
 | SRC address | SRC endpoint | DST address | DST endpoint|
 
-* 操作说明
-基于基本包格式的操作流程，则需要分析软件流程。
-** 相关操作方法
-*** uhd::transport::vrt (include/uhd/transport/vrt_if_packet.hpp)
+* 相关操作方法
+** uhd::transport::vrt (include/uhd/transport/vrt_if_packet.hpp)
 此类可以处理 VITA 和 CHDR 协议，下面是它的操作方法：
 #+BEGIN_SRC c++
 /**
@@ -80,7 +84,105 @@ UHD_API void uhd::transport::vrt::if_hdr_unpack_be(const uint32_t * packet_buff,
  ,*/
 UHD_API void uhd::transport::vrt::if_hdr_unpack_le(const uint32_t * packet_buff, if_packet_info_t & if_packet_info)
 #+END_SRC
-** 操作流程
-依然以 B200 为分析参考对象，可以得出协议操作流程如下。
+* 控制操作
+依然以 B200 为分析参考对象，观察其处理函数，发现没有直接调用 =if_har_pack_be= 这类函数，而是使用 =host/lib/usrp/cores= 文件夹下已经封装好的类。
 
+比如在 =radio_ctrl_core_3000= 类中具有以下操作方法：
+#+BEGIN_SRC c++
+/**
+ ,* @brief 向设备中的某个地址发送数据
+ ,*/
+void poke32(const wb_addr_type addr, const uint32_t data);
+/**
+ ,* @brief 读取设备某个地址处的数据
+ ,*/
+uint32_t peek32(const wb_addr_type addr);
+#+END_SRC
+但是查看其内部具体代码，却没有直接调用接口发送的代码。经过查看代码，发现真正的发送是在一个消息线程 (=msg_task类=)中完成的。
+当调用 =poke32()= 方法，代码最后会发送一个消息：
+#+BEGIN_SRC c++
+buff->commit(sizeof(uint32)*(pack_info.num_packet_word32));
+#+END_SRC
+消息线程在判断缓存中有数据后，便会启动传输。
 
+* 流数据操作
+流的操作以测试代码 =host/examples/rx_samples_to_file.cpp= 由上至下来理解。
+
+抛开其他无关代码，与接收流有关的代码如下：
+#+BEGIN_SRC c++
+std::string cpu_format;//接收端数据格式
+std::string wire_format;//传送端数据格式
+
+//新建一个流对象
+uhd::stream_args_t stream_args(cpu_format, wire_format);
+uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+
+//配置流对象
+uhd::stream_cmd_t stream_cmd((num_requested_samples == 0) ?
+                             uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS:
+                             uhd::stream_cmd_t::STREAM_MODE_NUM_SAMPS_AND_DONE);
+stream_cmd.num_samps = size_t(num_requested_samples);//采样个数
+stream_cmd.stream_now = true;
+stream_cmd.time_spec = uhd::time_spec_t();
+rx_stream->issue_stream_cmd(stream_cmd);
+
+//接收数据
+uhd::rx_metadata_t md;
+size_t num_rx_samps = rx_stream->recv(&buff.fornt(), buff.size(), md, 3.0, enable_size_map);
+
+//停止传输
+stream_cmd.stream_mode = uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS;
+rx_stream->issus_stream_cmd(stream_cmd);
+#+END_SRC
+** 数据格式
+*** stream_args_t
+stream_args_t 用于控制流传输格式，参数以字符串的形式输入，具有以下参数可以设置。
+
+std::string cpu_format, 主机存储端支持以下格式：
+- "fc64" : complex<double>
+- "fc32" : complex<float>
+- "sc16" : complex<int16_t>
+- "sc8"  : complex<int8_t>
+
+std::string otw_format, 传递端支持以下格式：
+- "sc16" : Q16 I16 ...
+- "sc8"  : Q8_1 I8_1 Q8_0 I8_0 ...
+- "sc12" : 部分支持
+
+device_addr_t args, 以 "key=value" 的形式存储，"key" 可以取以下值：
+- "fullscale" : 用来缩放强度系数，默认是1.0
+- "peak" : 设置最大值，比如 1.0 代表 100%
+- "underflow_policy" : 
+- "spp" : 每个包大小
+
+std::vector<size_t> channels, 用于设置通道数量，默认是单通道模式
+** 命令格式
+*** stream_cmd_t
+stream command 用于设置通道参数，在采样期间设置不同的命令可以达到动态控制的目的，具体有以下选项：
+
+stream_mode_t , 控制传输模式：
+- STREAM_MODE_START_CONTINUOUS : 连续传输模式
+- STREAM_MODE_STOP_CONTINUOUS : 停止连续传输
+- STREAM_MODE_NUM_SAMPS_AND_DONE : 采样指定数据后停止
+- STREAM_MODE_NUM_SAMPS_AND_MORE : 采样指定数据后暂停，等待下一次命令
+
+stream_now,当为 true 时则启动传输，为 false 时则在指定时间传输。
+
+time_spec, 指定传输开始时间
+** 接收策略
+*** rx_stream->recv
+在接收数据时，处理策略如下：
+#+begin_example
+内部是一个环形缓存，每次用户从缓存中读取数据以及当前在缓存中的偏移标记。
+#+end_example
+** 新建流对象
+#+BEGIN_SRC c++
+rx_streamer::sptr get_rx_stream(const stream_args_t &args) {
+        _check_link_rate(args, false);
+        if (is_device3()) {
+                return _legacy_compat->get_rx_stream(args);
+        }
+        return this->get_device()->get_rx_stream(args);
+}
+#+END_SRC
+从上面这个函数可以看出，上层直接映射到了底层设备的 =get_rx_stream()= 方法中。
