@@ -1,0 +1,31 @@
+#+TITLE: [What]cmake_list 
+#+DATE: <2018-01-28 Sun>
+#+TAGS: cmake
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, cmake
+#+NAME: <linux_cmake_cmd_list.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+list 命令是对变量进行列表操作，类似于链表。
+需要注意的是：
+1. 列表内部的变量使用 =;= 做分隔
+2. 列表所作用的变量值 *仅仅在当前范围有效，即使列表是在父范围中定义的！*
+3. 列表索引从 0 开始代表第一个， -1 代表最后一个，-0 和 0 意义一样 
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+具有以下操作方式:
+- list(LENGTH <list_name> <output variable>) : 计算列表 <list_name> 的长度并将值赋值给变量 <output variable>
+- list(GET <list_name> <element index1> [<element index2> ...] <output variable>) : 从列表<list_name>从获取对应下标的值并赋值给变量 <output variable>
+- list(APPEND <list_name> [<element1> <element2> ...]):在列表<list_name>后增加新值 
+- list(FIND <list_name> <value> <output variable>): 寻找<list_name>中对应值<value>的下标并赋值给<output variable>，如果不存在返回 -1
+- list(INSERT <list_name> <element_index> <element1> [<element2>]):插入值到<list_name>中的<element_index>下标处
+- list(REMOVE_ITEM <list_name> <value> [<value2>...]): 从<list_name>中删除值
+- list(REMOVE_AT <list_name> <index> [<index2>..]):从<list_name>中删除下标对应的值
+- list(REMOVE_DUPLICATES <list_name>)：删除<list_name>中的重复值
+- list(REVERSE <list_name>):反转排列<list_name>中的值
+- list(SORT <list_name>):按字母顺序排列<list_name>中的值
+
+

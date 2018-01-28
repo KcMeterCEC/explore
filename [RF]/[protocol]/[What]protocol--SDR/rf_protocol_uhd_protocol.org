@@ -13,6 +13,10 @@
 
 至于uhd协议逻辑部分代码，等有时间再来好好分析吧。
 
+#+BEGIN_HTML 
+<!--more-->
+#+END_HTML
+
 * 手册说明
 根据 [[http://files.ettus.com/manual/page_rtp.html][官方手册]] 的介绍，目前第三代以及B200系列的设备都使用CHDR通信协议，这个协议格式比VITA简单了许多，便于设备分析。
 ** 协议格式

@@ -1,0 +1,44 @@
+#+TITLE: [What]cmake_add_library
+#+DATE: <2018-01-28 Sun> 
+#+TAGS: cmake
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, cmake
+#+NAMA: <linux_cmake_cmd_add_library.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+* cmake 构建系统
+cmake 构建系统指的是用于生成最终目标的系统，目标的可能是：
+1. 可执行文件
+2. 库
+3. 用户定义的命令集合
+** 二进制目标构建
+生成库目标使用 =add_library= 命令，生成可执行文件使用 =add_executable()= 命令。而二进制目标之间的依赖关系则是使用 =target_link_libraries()= 命令。
+#+begin_example
+#3个源文件生成库 archive
+add_library(archive archive.cpp zip.cpp lzma.cpp)
+#一个源文件编译为可执行文件
+add_executable(zipapp zipapp.cpp)
+#可执行文件依赖于库archive
+target_link_libraries(zipapp archive)
+#+end_example
+* add_library命令
+add_library 命令用于指定一些源码并将其打包为库的形式添加到工程中。
+
+具有好几种格式，下面一一说明：
+#+begin_example
+add_library(<lib_name> [STATIC | SHARED | MODULE] [EXCLUDE_FROM_ALL] source1 [source2 ...]
+#+end_example
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+将源码列表打包为以 <lib_name> 命名的库名，选项意义如下：
+- STATIC : 生成静态链接库
+- SHARED : 生成动态链接库
+- MODULE : 生成一个模块，是工程的一个插件，可以在运行时动态地加载。
+
+1. 当选项为空时，如果变量 =BUILD_SHARED_LIBS= 为 =ON= ，则生成动态库，否则为静态库。
+2. 当生成的库是动态或模块时，变量 =POSITION_INDEPENDENT_CODE= 将会自动被设置为 =ON=.
+3. 与生成库位置有关的变量为 =ARCHIVE_OUTPUT_DIRECTORY,LIBRARY_OUTPUT_DIRECTORY,RUNTIME_OUTPUT_DIRECTORY=
+4. 与库名称有关的变量为 =OUTPUT_NAME=.
+5. 与库设置有关的变量为 =EXCLUDE_FROM_ALL=.

@@ -1,0 +1,25 @@
+#+TITLE: [What]cmake_message
+#+DATE: <2018-01-28 Sun> 
+#+TAGS: cmake
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, cmake
+#+NAME: <linux_cmake_cmd_message.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+message 命令用于向用户显示消息
+
+基本格式为：
+#+begin_example
+message([<mode>] "message to display" ...)
+#+end_example
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+<mode> 具有以下值可选：
+- 空 : 不输入 <mode> 代表重要信息
+- STATUS : 附带信息, 在输出时会在前面带有 "--"
+- WARNING : 警告信息，会以空行强调，但不会影响 cmake继续执行
+- AUTHOR_WARNING : 开发者给予的警告，cmake 会继续执行
+- SEND_ERROR : 错误信息，cmake会继续执行但不会生成文件
+- FATAL_ERROR : 致命错误，cmake停止执行
