@@ -1,0 +1,27 @@
+#+TITLE: [What]GDB 使用过程问题排查 
+#+DATE: <2018-01-29 Mon>
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, gdb
+#+NAME: <linux_debug_gdb_problem.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+此文用于总结在使用GDB的过程中GDB本身所遇到的一些问题。
+* Python Exception <type 'exceptions.NameError'> Installation error: gdb.execute_unwinders function is missing:
+在调试代码的过程中出现此错误，是由于 GDB 缺少 python 组件而导致调试错误，解决步骤如下。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+** 获取GDB信息
+使用命名 =gdb --version= 观察GDB输出信息，需要注意的有两点：
+1. 查看此 gdb 的版本，然后在官网下载对应版本的源码
+2. 查看gdb的 python 组件应该安装的路径，注意下面输出：
+#+begin_example
+Could not load the Python gdb module from `/usr/local/share/gdb/python'.
+#+end_example
+** 拷贝组件
+python组件的源码路径位于 =gdb/python/lib/gdb= ,拷贝此目录下的所有文件到目标路径即可
+#+begin_example
+sudo cp -R ./* /usr/local/share/gdb/python/gdb/
+#+end_example

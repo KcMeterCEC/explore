@@ -1,9 +1,9 @@
-#+TITLE: [What]cmake_add_library
+#+TITLE: [What]cmake_构建相关命令
 #+DATE: <2018-01-28 Sun> 
 #+TAGS: cmake
 #+LAYOUT: post 
 #+CATEGORIES: linux, make, cmake
-#+NAMA: <linux_cmake_cmd_add_library.org>
+#+NAME: <linux_cmake_cmd_make.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -12,6 +12,9 @@ cmake 构建系统指的是用于生成最终目标的系统，目标的可能�
 1. 可执行文件
 2. 库
 3. 用户定义的命令集合
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
 ** 二进制目标构建
 生成库目标使用 =add_library= 命令，生成可执行文件使用 =add_executable()= 命令。而二进制目标之间的依赖关系则是使用 =target_link_libraries()= 命令。
 #+begin_example
@@ -22,16 +25,30 @@ add_executable(zipapp zipapp.cpp)
 #可执行文件依赖于库archive
 target_link_libraries(zipapp archive)
 #+end_example
-* add_library命令
+** 构建规范和使用要求
+命令 =target_include_directories(), target_compile_definitions(),target_compile_options()= 指定了构建目标的规范及要求,
+与之联系的内置变量是：
+- INCLUDE_DIRECTORIES / INTERFACE_INCLUDE_DIRECTORIES
+- COMPILE_DEFINITIONS / INTERFACE_COMPILE_DEFINITIONS
+- COMPILE_OPTIONS / INTERFACE_COMPILE_OPTIONS
+
+每个命令具有 =PRIVATE,PUBLIC,INTERAFCE= 3种模式：
+- PRIVATE 模式关联于不带 =INTERFACE_= 前缀的属性
+- INTERFACE 模式关联于带有 =INTERFACE_= 前缀的属性
+- PUBLIC 模式关联于以上两种
+#+begin_example
+target_compile_definitions(archive 
+                          PRIVATE BUILDING_WITH_LZMA 
+                          INTERFACE USING_ARCHIVE_LIB
+                          )
+#+end_example
+* add_library
 add_library 命令用于指定一些源码并将其打包为库的形式添加到工程中。
 
 具有好几种格式，下面一一说明：
 #+begin_example
 add_library(<lib_name> [STATIC | SHARED | MODULE] [EXCLUDE_FROM_ALL] source1 [source2 ...]
 #+end_example
-#+BEGIN_HTML
-<!--more-->
-#+END_HTML 
 将源码列表打包为以 <lib_name> 命名的库名，选项意义如下：
 - STATIC : 生成静态链接库
 - SHARED : 生成动态链接库
@@ -42,3 +59,258 @@ add_library(<lib_name> [STATIC | SHARED | MODULE] [EXCLUDE_FROM_ALL] source1 [so
 3. 与生成库位置有关的变量为 =ARCHIVE_OUTPUT_DIRECTORY,LIBRARY_OUTPUT_DIRECTORY,RUNTIME_OUTPUT_DIRECTORY=
 4. 与库名称有关的变量为 =OUTPUT_NAME=.
 5. 与库设置有关的变量为 =EXCLUDE_FROM_ALL=.
+
+#+begin_example
+add_library(<name> <SHARED|STATIC|MODULE|UNKNOWN> IMPORTED [GLOBAL])
+#+end_example
+* include_directories
+为构建系统指定头文件的包含路径。
+#+begin_example
+include_directories([AFTER|BEFORE] [SYSTEM] dir1 [dir2 ...])
+#+end_example
+- 当路径是相对路径时，代表是相对当前CMakeLists.txt 的路径
+- 使用此命令的路径最终会存以列表的形式存在变量 =INCLUDE_DIRECTORIES= 中
+- 当使用 =AFTER 或 BEFORE= 时，可以选择将此路径加在列表前还是列表后
+- 当使用 =SYSTEM= 选项时，此路径代表一个系统路径
+* link_directories
+为构建系统指定需要链接文件的路径。
+#+begin_example
+link_directories(dir1 dir2 ...)
+#+end_example
+说明：此命令平时使用并不多，因为在 =find_package() 和 find_library() 以及 target_link_libraries()= 命令的作用下，
+cmake便可以找到文件路径。
+* target_link_libraries
+将生成的目标与库链接起来。
+
+*注意：* 在使用此命令前，需要保证 <target> 已经生成，一般在此命令前会有 =add_executable() 或 add_library()= 命令。
+#+begin_example
+target_link_libraries(<target> [item1 [item2 [...]]]
+                     [[debug|optimized|general] <item>] ...)
+#+end_example
+- =debug= 代表这些库在调试的情况下才被链接
+- =optimized= 代表在非调试情况下才被链接
+- =general= 代表在任何情况下都被链接
+* find_package 
+寻找第三方库。
+** 普通格式
+#+begin_example
+find_package( <package> [version] [EXACT] [QUIET] [MODULE]
+              [REQUIRED] [[COMPONENTS] [components...]]
+              [OPTIONAL_COMPONENTS components...]
+              [NO_POLICY_SCOPE]
+            )
+#+end_example
+- 变量 =<package>_FOUND= 会被自动设置，以表明是否找到了库。
+- =[version]= : 指定库的兼容版本，格式是 =major[.minor[.patch[.tweak]]]=
+- =EXACT= : 要求库版本必须完全匹配
+- =QUIET= : 如果库没有被找到则禁止输出警告信息
+- =MODULE= : 仅仅使用 module 模式
+- =REQUIRED= : 如果库没有被找到则输出错误信息并停止构建
+- 可以在 =OPMPONENTS= 选项之后指定库的必须组件
+- 可以在 =OPTIONAL_COMPONENTS= 选项之后指定库的可选组件
+
+此命名具有两种模式来搜寻库，分别是 =Module= 和 =Config= 模式。
+- Module 模式下，cmake通过变量 =CMAKE_MODULE_PATH= 搜寻并执行 =Find<package>.cmake= 文件，按照此文件内容来搜寻库。
+  + 如果此路径没有找到对应文件，则会在其安装目录 =<CMAKE_ROOT>/share/cmake-<version>/Modules/= 下寻找
+- 当 Module 模式搜寻失败并且没有 =MODULE= 选项时，则进入 Config 模式。
+- 在 cmake 内部都已经内置了很多查找模块，使用命令 =cmake --help-module-list= 就可以查看支持的库。
+  + 而各个库在找到以后都会定义一些变量供使用，通过命令 =cmake --help-module Find<package>= 就可以查看变量
+*** 外部模块操作步骤
+一般情况下使用普通模式命令就可以找到库，一般的步骤如下：
+- 在 CMakeLists.txt 所在文件夹中新建文件夹 =cmake/Modules=
+- 在 =cmake= 文件夹中新建 Find<package>.cmake 文件，比如 =FindUHD.cmake= 。
+- 将 =cmake= 文件路径添加到 =CMAKE_MODULE_PATH= 中：
+#+begin_example
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules
+#+end_example
+- 执行命令
+#+begin_example
+find_package(UHD REQUIRED)
+#+end_example
+- 判断是否找到库
+#+begin_example
+if (NOT UHD_FOUND)
+    message(FATAL_ERROR "Can not find package: UHD")
+#endif
+#+end_example
+- 如果找到了库那么将头文件路径及库加入编译路径
+#+begin_example
+include_directories(${UHD_INCLUDE_DIRS})
+target_link_libraries(<output_name> ${UHD_LIBRARIES})
+#+end_example
+
+具体的实现可以参考源码，位于 [[https://github.com/KcMeterCEC/uhd/tree/maint/tools][github]]
+*** Find<package>.cmake 文件的编写
+编写步骤为：
+- 通过 =find_path= 指定头文件寻找路径
+- 通过 =find_library= 指定库文件寻找路径
+- 设置变量 =<package>_INCLUDE_DIRS= 内容到变量 =CMAKE_REQUIRED_INCLUDES=
+- 设置变量 =<package>_LIBRARIES= 内容到变量 =CMAKE_REQUIRED_LIBRARIES=
+- 使用宏 =find_package_handle_standard_args()= 设置 =<package>_FOUND= 并输出提示信息
+
+** config 模式
+#+begin_example
+find_package(<package> [version] [EXACT] [QUIET]
+             [REQUIRED] [[COMPONENTS] [components...]]
+             [CONFIG|NO_MODULE]
+             [NO_POLICY_SCOPE]
+             [NAMES name1 [name2 ...]]
+             [CONFIGS config1 [config2 ...]]
+             [HINTS path1 [path2 ... ]]
+             [PATHS path1 [path2 ... ]]
+             [PATH_SUFFIXES suffix1 [suffix2 ...]]
+             [NO_DEFAULT_PATH]
+             [NO_CMAKE_ENVIRONMENT_PATH]
+             [NO_CMAKE_PATH]
+             [NO_SYSTEM_ENVIRONMENT_PATH]
+             [NO_CMAKE_PACKAGE_REGISTRY]
+             [NO_CMAKE_BUILDS_PATH]
+             [NO_CMAKE_SYSTEM_PATH]
+             [NO_CMAKE_SYSTEM_PACKAGE_REGISTRY]
+             [CMAKE_FIND_ROOT_PATH_BOTH |
+             ONLY_CMAKE_FIND_ROOT_PATH |
+             NO_CMAKE_FIND_ROOT_PATH])
+#+end_example
+Config 模式下， =<package>_DIR= 变量指定配置文件的路径，配置文件的名称是 =<package>Config.cmake 或 <lower-case-name>-config.cmake= 。
+
+cmake在获取配置文件后，配置文件位置会存于变量 =<package>_CONFIG= 内。
+
+* find_path 
+寻找指定路径下是否包含文件 name1。
+#+begin_example
+find_path(<VAR> name1 [path1 path2 ...])
+find_path (
+          <VAR>
+          name | NAMES name1 [name2 ...]
+          [HINTS path1 [path2 ... ENV var]]
+          [PATHS path1 [path2 ... ENV var]]
+          [PATH_SUFFIXES suffix1 [suffix2 ...]]
+          [DOC "cache documentation string"]
+          [NO_DEFAULT_PATH]
+          [NO_CMAKE_ENVIRONMENT_PATH]
+          [NO_CMAKE_PATH]
+          [NO_SYSTEM_ENVIRONMENT_PATH]
+          [NO_CMAKE_SYSTEM_PATH]
+          [CMAKE_FIND_ROOT_PATH_BOTH |
+          ONLY_CMAKE_FIND_ROOT_PATH |
+          NO_CMAKE_FIND_ROOT_PATH]
+          )
+#+end_example
+- =<VAR>= : 用于存储找到文件的路径并且停止搜索， *如果后面再使用 find_path 命令，变量中有值也不会再搜寻。*
+  + 当没有找到文件时，变量的值为 =<VAR>-NOTFOUND=.
+- =NAMES= : 使用此选项后面可以跟一个文件列表
+- =HINTS/PATHS= : 后面跟路径列表
+- =DOC= : 后跟的字符串是对变量的说明
+- =PATH_SUFFIXES= : 指定前面路径的子文件夹
+- =NO_DEFAULT_PATH= : 指定没有附加的路径，如果没有使用此选项那么 cmake 的搜寻路径为：
+  + 搜寻缓存变量，通过启动cmake时设置的值 "-D<var>=value"，如果使用 =NO_CMAKE_PATH= 则可以跳过这种方式
+    + <prefix>/include/<arch> : =CMAKE_PREFIX_PATH= 决定 <prefix>， =CMAKE_LIBRARY_ARCHITECTURE= 决定 <arch>
+    + CMAKE_INCLUDE_PATH 
+    + CMAKE_FRAMEWORK_PATH 
+  + 搜寻环境变量，如果使用 =NO_CMAKE_ENVIRONMENT_PATH= 则可以跳过这种方式
+    + <prefix>/include/<arch> : =CMAKE_PREFIX_PATH= 决定 <prefix>， =CMAKE_LIBRARY_ARCHITECTURE= 决定 <arch>
+    + CMAKE_INCLUDE_PATH 
+    + CMAKE_FRAMEWORK_PATH 
+  + 搜寻 =HINTS= 后指定的路径
+  + 搜寻环境变量 =PATH= 和 =INCLUDE= 指定的路径，通过设置 =NO_SYSTEM_ENVIRONMENT_PATH= 可以跳过这一步
+  + 搜寻构建文件中指定的变量，使用 =NO_CMAKE_SYSTEM_PATH= 跳过这一步
+    + <prefix>/include/<arch> : =CMAKE_SYSTEM_PREFIX_PATH= 决定 <prefix>， =CMAKE_LIBRARY_ARCHITECTURE= 决定 <arch>
+    + CMAKE_SYSTEM_INCLUDE_PATH
+    + CMAKE_SYSTEM_FRAMEWORK_PATH 
+  + 搜寻 =PATHS= 后指定的路径
+** 与路径搜寻有关的变量
+- =CMAKE_FIND_ROOT_PATH= : 指定一个或多个文件夹路径，用于优先搜寻，此变量默认情况下为空。
+- =CMAKE_STAGING_PREFIX= : 
+- =CMAKE_SYSROOT= 
+- =CMAKE_FIND_ROOT_PATH_MODE_INCLUDE= 
+- =CMAKE_REQUIRED_INCLUDES= : 存储搜寻头文件路径的列表，在找到路径后，需要将 =<package>_INCLUDE_DIRS= 赋值给此变量
+* find_library 
+寻找指定路径下是否包含库文件。
+#+begin_example
+find_library (<VAR> name1 [path1 path2 ...])
+find_library (
+              <VAR>
+              name | NAMES name1 [name2 ...] [NAMES_PER_DIR]
+              [HINTS path1 [path2 ... ENV var]]
+              [PATHS path1 [path2 ... ENV var]]
+              [PATH_SUFFIXES suffix1 [suffix2 ...]]
+              [DOC "cache documentation string"]
+              [NO_DEFAULT_PATH]
+              [NO_CMAKE_ENVIRONMENT_PATH]
+              [NO_CMAKE_PATH]
+              [NO_SYSTEM_ENVIRONMENT_PATH]
+              [NO_CMAKE_SYSTEM_PATH]
+              [CMAKE_FIND_ROOT_PATH_BOTH |
+              ONLY_CMAKE_FIND_ROOT_PATH |
+              NO_CMAKE_FIND_ROOT_PATH]
+              )
+#+end_example
+可以看出其命令格式与 =find_path= 的格式几乎一样，通过查看文档可以发现其规则也是几乎一样的。
+** 与路径搜寻有关的变量
+- =CMAKE_REQUIRED_LIBRARIES= : 存储库搜索路径的列表，在找到路径后，需要将 =<package>_LIBRARIES= 赋值给此变量
+* FIND_PACKAGE_HANDLE_STANDARD_ARGS
+与 =find_package()= 联合使用，在 =FindXXX.cmake= 文件中调用以设置值，并且它会设置 =<packagename>_FOUND= 。
+
+注意：使用此功能需要先包含模块
+#+begin_example
+INCLUDE(FindPackageHandleStandardArgs)
+#+end_example
+
+#+begin_example
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(<name> (DEFAULT_MSG|"Custom failure message") <var1>...<varN> )
+#+end_example
+当变量 <var1> ... <varN> 都有值时，<packagename>_FOUND 就会被设置为 TRUE。
+
+#+begin_example
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(NAME [FOUND_VAR <resultVar>]
+                                       [REQUIRED_VARS <var1>...<varN>]
+                                       [VERSION_VAR   <versionvar>]
+                                       [HANDLE_COMPONENTS]
+                                       [CONFIG_MODE]
+                                       [FAIL_MESSAGE "Custom failure message"] )
+#+end_example
+* include
+载入一个文件或模块，并且运行。
+#+begin_example
+#include (<file|module> [OPTIONAL] [RESULT_VARIABLE <VAR>]
+                        [NO_POLICY_SCOPE])
+#+end_example
+- =<file|module>= : 当为 module 时， cmake 寻找 =CMAKE_MODULE_PATH= 以及cmake 模块文件夹下的文件 =<module_name>.cmake=
+- =OPTIONAL= : 如果文件不存在，则不输出警告
+- =RESULT_VARIABLE= : 当文件被找到， =<VAR>= 中保存文件名，否则其值为 =NOTFOUND= .
+- =NO_POLICY_SCOPE= : 与命令 =cmake_policy()= 有关
+* add_subdirectory
+添加一个子目录并执行，子目录中具有文件 =CMakeLists.txt= 。
+#+begin_example
+add_subdirectory(<source_dir> [binary_dir] [EXCLUDE_FROM_ALL])
+#+end_example
+- =[binary_dir]= : 指定在输出文件中放置此目录的路径，如果是相对路径，则是 *相对输出目录的路径*.
+- =[EXCLUDE_FROM_ALL]= :  将子目录中的文件作为一个单独工程被构建
+* install
+install 命令用于指定文件的安装规则。
+#+begin_example
+install(TARGETS targets... [EXPORT <export-name>]
+        [[ARCHIVE|LIBRARY|RUNTIME|FRAMEWORK|BUNDLE|
+         PRIVATE_HEADER|PUBLIC_HEADER|RESOURCE]
+         [DESTINATION <dir>]
+         [INCLUDES DESTINATION [<dir> ...]]
+         [PERMISSIONS permissions...]
+         [CONFIGURATIONS [Debug|Release|...]]
+         [COMPONENT <component>]
+         [OPTIONAL] [NAMELINK_ONLY|NAMELINK_SKIP]
+        ] [...])
+#+end_example
+- DESTINATION : 指定文件的安装目录
+- COMPONENT : 指定要按照组件的名称规则
+- RENAME : 重命名已经 *安装好的文件*
+** 与此命令有关的变量
+*** CMAKE_INSTALL_PREFIX 
+此变量用于指定库的安装目录，在编写CMakeLists.txt 时，所有的文件安装都应该在此变量之后。
+- 此变量的值会附加到变量 =CMAKE_SYSTEM_PREFIX_PATH= ,所以命令 =find_package,find_program,find_library,find_path,find_file= 都会搜寻这个路径
+
+默认值：
+- UNIX : =/usr/local= 
+  + 可以在生成 Makefile 后，使用命令 "make DESTDIR=<dir> install" 来 *再次指定 =CMAKE_INSTALL_PREFIX= 的前缀目录*.
+    + 比如 DESTDIR=/home/john,并且 CMAKE_INSTALL_PREFIX 为默认值，那么最终安装目录为 /home/john/usr/local.
+- Windows: =c:/Program= 
+

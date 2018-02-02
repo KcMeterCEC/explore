@@ -65,6 +65,15 @@ set(<variable_name> <value1> [<value2>] ... CACHE <type> <docstring> [FORCE])
   + INTERNAL :使用此选项代表一个恒定值，与使用 =FORCE= 效果一致
 - <docstring> 选项用于描述这个变量
 - [FORCE] :选项用于设置一个恒定值
+
+对于缓存变量还有一个命令可以将其设置为高级模式，高级模式的变量只有在 gui 设置显示高级模式时才显示：
+#+begin_example
+mark_as_advanced([CLEAR|FORCE] VAR [VAR2 ...])
+#+end_example
+- 如果选项为空，则新变量就会为设置为高级模式
+- =CLEAR= : 取消一个变量的高级模式
+- =FORCE= : 设置变量为高级模式
+
 ** 设置环境变量
 设置当前用户环境变量：
 #+begin_example
