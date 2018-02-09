@@ -1,0 +1,44 @@
+#+TITLE: [What]使用串口从主机传输文件到目标板
+#+DATE:  <2018-02-05 Mon>
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, usage
+#+NAME: <linux_debug_usage_serial_transfer.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+在进行嵌入式linux调试时，经常会需要将代码在主机上交叉编译后再发送到目标板上。
+
+当有网络的情况下, 通常是使用 tftp 来收发文件, 但当没有网络时, 则可以使用 =lrzsz= 来完成.
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+* 使用步骤
+** 编译可执行文件
+下载 [[https://ohse.de/uwe/software/lrzsz.html][源码]] , 并解压缩后使用下面的命令编译
+#+begin_example
+tar -xzf lrzsz-0.12.20.tar.gz
+#指定编译器，编译构架以及输出的文件夹路径
+CC=arm-linux-gnueabihf-gcc ./configure --target=arm --prefix=/home/cec/Downloads/lrzsz-0.12.20/build/
+make
+make install
+#+end_example
+然后将编译好的 =build/bin= 目录下的应用拷贝至文件系统, 其中 lrz 接收, lsz 发送.
+** 传输文件
+在 linux 主机下一般使用终端 minicom.连接好开发板后, 开发板首先运行 =lrz= ,然后在主机下 =CTRL-A s= ,选择 zmodem 然后传输文件.
+#+begin_example
+1. minicom 中选择文件使用 “单击空格键”，而进入文件夹则使用 “双击空格键”，选中后回车即可发送
+2. 当当前目录下具有相同文件时，需要使用 “lrz -y” 来覆盖当前文件
+#+end_example
+* 遇到的问题
+** device is locked 
+*** 问题 
+当minicom没有正常退出时，再次启动minicom 就会出现警告 =Device /dev/ttyUSB0 is locked=
+*** 解决
+这是由于minicom对此设备进行了加锁，删除文件 =/var/lock/LCK..ttyUSB0= 即可.
+** 网络问题
+*** 问题
+当我使用 ssh 链接到主机Linux 来使用 minicom 的时候，如果网络突发中断一次则会导致minicom工作异常。
+*** 解决
+目前只有重启系统可以比较好的解决，如果网络常常不稳定，那还是直接用主机直接操作吧（囧...）。

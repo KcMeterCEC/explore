@@ -4,6 +4,8 @@
 #+LAYOUT: post 
 #+CATEGORIES: linux, debug, gdb 
 #+NAME: <linux_debug_gdb_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
 * 正式调试前的准备工作
 ** 生成带调试信息的可执行文件
