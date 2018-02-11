@@ -1,0 +1,67 @@
+#+TITLE: [What]perf 基本使用
+#+DATE: <2018-02-11 Sun> 
+#+TAGS: debug 
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, perf 
+#+NAME: <linux_debug_perf_tutorial.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+perf 是Linux(2.6+)内置的强大的分析工具，所以其既可以用于PC也可以用于嵌入式Linux。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 全局概览
+在shell中输入 =perf= 便可列出其可执行的所有命令：
+#+begin_example
+cec@box:~/github/lepd$ perf
+
+ usage: perf [--version] [--help] [OPTIONS] COMMAND [ARGS]
+
+ The most commonly used perf commands are:
+ annotate        Read perf.data (created by perf record) and display annotated code
+ archive         Create archive with object files with build-ids found in perf.data file
+ bench           General framework for benchmark suites
+ buildid-cache   Manage build-id cache.
+ buildid-list    List the buildids in a perf.data file
+ c2c             Shared Data C2C/HITM Analyzer.
+ config          Get and set variables in a configuration file.
+ data            Data file related processing
+ diff            Read perf.data files and display the differential profile
+ evlist          List the event names in a perf.data file
+ ftrace          simple wrapper for kernel's ftrace functionality
+ inject          Filter to augment the events stream with additional information
+ kallsyms        Searches running kernel for symbols
+ kmem            Tool to trace/measure kernel memory properties
+ kvm             Tool to trace/measure kvm guest os
+ list            List all symbolic event types
+ lock            Analyze lock events
+ mem             Profile memory accesses
+ record          Run a command and record its profile into perf.data
+ report          Read perf.data (created by perf record) and display the profile
+ sched           Tool to trace/measure scheduler properties (latencies)
+ script          Read perf.data (created by perf record) and display trace output
+ stat            Run a command and gather performance counter statistics
+ test            Runs sanity tests.
+ timechart       Tool to visualize total system behavior during a workload
+ top             System profiling tool.
+ probe           Define new dynamic tracepoints
+ trace           strace inspired tool
+
+ #使用这种方式会进入一个命令的手册进行详细解说，
+ #也可以使用 perf COMMAND -h 来简略列出命令说明
+ See 'perf help COMMAND' for more information on a specific command.
+#+end_example
+* 命令简略说明
+** perf list (系统事件捕捉列表)
+系统事件分为：
+- 软件事件(Software Event):偏向系统及用户运行软件的事件，与具体的CPU类型无关
+- 硬件事件(Performance Monitoring Unit,PMU): 与CPU相关的事件，需要参考CPU相关手册
+- 捕捉点事件(Tracepoint event): 内核中的 tracepoint 事件相关
+
+*** 使用
+- 根据自身需求确定需要捕捉哪种事件
+- 输入 =perf list= 根据其列出的事件名列表以及说明确定需要使用的事件名
+- 使用 =sudo perf top -e <event name1>[,<event name2>]= 来确定捕捉哪些事件
+
+
