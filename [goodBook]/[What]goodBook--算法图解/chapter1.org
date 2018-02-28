@@ -1,0 +1,130 @@
+#+TITLE: [What]算法图解_简介
+#+DATE: <2018-02-27 Tue> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post
+#+CATEGORIES: book,算法图解(入门)
+#+NAME: <book_算法图解_chapter1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+《《算法图解》》这本书是 =数据结构及算法= 类的入门读物，由于我并非科班出身，还是以此基础再慢慢过渡到 =严书= 吧。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 概念
+=算法= 是一组完成任务的指令，任何代码片段都可以看做算法（比如 =for= 循环）。
+但优秀的算法是能够 *在保证获得相同结果的同时还要让代码的占用空间和执行速度尽量的短* ，以让程序运行在最优的状态下。
+** 算法的运行时间
+使用 =大O表示法= 来表示一个算法的运行时间（运行次数），其表达式为 =O(n)= ,'n' 代表一个操作数。
+
+注意： =大O表示法= 表示的是 *最长运行时间* 。
+- 算法的速度指的并不是时间，而是操作数的增速
+- 谈论算法的速度时，我们说的是随着输入的增加，其运行时间将以什么样的速度增加（函数曲线）
+
+*** 常见的大O运行时间
+以时间由快到慢来排序("log n "都代表"log_{2}n")：
+- O(1): 常量时间，一次得出结果，简单粗暴
+- O(log n):对数时间。比如二分查找法
+- O(n) : 线性时间。比如从包含n个元素的列表中，以遍历的方式查找元素。
+- O(n * log n): 比如快速排序算法
+- O(n^2): 比如慢速排序法
+- O(n!):非常慢的算法 
+
+*大致的时间* 计算方式为：由 =大O表示法= 算出结果，由结果除以每秒执行次数。
+#+begin_example
+比如需要汇制一个16格的网格，使用 O(log n) 得出结果为 4，如果每秒执行 10次，那么完成一次完整的算法需要0.4秒。
+当汇制1024格时，结果为10，那么完成一次完成的算法需要1秒。
+#+end_example
+
+* 二分查找(折半查找)
+当在一个 *有序列表* 中查找内容时（比如查找英文字典中某个单词的解释），有两种方式查找：
+- 从头到尾依次遍历（就如使用一个 =for= 循环从列表中依次取值来比对）
+- 以递归的方式不断从列表的中间查找（每次查找都会排除一半的元素），这就是 =二分查找法=
+
+需要注意的是：
+#+begin_example
+理论上来讲，当除一半不能得整数时，取大值或取小值都可以，因为它们的概率都是50%（比如1875/2=937.5，中值取937或938均可）。
+
+但在实际的代码处理时，为了能够有效的退出递归，则需要查找值不断的收敛（具体看代码实现）。
+#+end_example
+相比较而言二分查找法的效率比遍历法在时间上少很多：
+#+begin_example
+对于包含n个元素的有序列表，二分查找法最多需要log_{2}n步，而遍历法则最多需要n步
+#+end_example
+** c代码实现
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+static int32_t low_index = 0;
+static int32_t high_index = 0;
+static int32_t find_count = 1;
+static int32_t buffer[] =
+//0  1  2  3  4  5   6   7   8   9   10  11  12  13  14  15
+{ 0, 1, 5, 7, 8, 15, 19, 21, 25, 30, 35, 58, 69, 70, 88, 91,
+  //16  17   18   19   20   21   22   23   24   25   26   27
+  100, 123, 133, 145, 156, 178, 189, 200, 201, 258, 289, 291};
+bool find_value(int32_t low, int32_t high, int32_t request_value, int32_t *index)
+{
+        int32_t find_index = (low + high) / 2;
+
+        if(low <= high)
+        {
+                printf("low: <%3d>  high: <%3d> index: <%3d> cout: <%3d>\n",
+                       low, high, find_index, find_count);
+                if(buffer[find_index] == request_value)
+                {
+                        ,*index = find_index;
+                        return true;
+                }
+                else if(buffer[find_index] < request_value)
+                {
+                        low = find_index + 1;
+                        find_count++;
+                        return find_value(low, high, request_value, index);
+                }
+                else if(buffer[find_index] > request_value)
+                {
+                        high = find_index - 1;
+                        find_count++;
+                        return find_value(low, high, request_value, index);
+                }
+        }
+        return false;
+}
+int main(int argc, char * argv[])
+{
+        int32_t buffer_size = sizeof(buffer) / sizeof(int32_t);
+
+        printf("\nBuffer list:\n");
+        printf("index : value\n");
+        for(int i = 0; i < buffer_size; i++)
+        {
+                printf("%3d : %3d\n", i, buffer[i]);
+        }
+
+        int32_t request_value;
+        printf("Please input a number value which you want to find it's index:");
+        scanf("%d", &request_value);
+        printf("\nStarting find the index of value [%d]\n", request_value);
+
+        low_index = 0;
+        high_index = buffer_size - 1;
+
+        int32_t index;
+        if(find_value(low_index, high_index, request_value, &index) == true)
+        {
+                printf("The index of value [%d] is <%d>\n", request_value, index);
+        }
+        else
+        {
+                printf("Sorry, the list doesn't include this value.\n");
+        }
+
+        return 0;
+}
+#+END_SRC
+
+* 旅行商问题
+就是指一个商人在要到达n个城市之间寻找最短路径，为了计算最短路径则需要计算各种顺序，其次数为 n 的阶乘次，其时间复杂度就是 O(n!)。

@@ -1,0 +1,12 @@
+#+TITLE: [What]算法图解_快速排序
+#+DATE: <2018-02-28 Wed> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post
+#+CATEGORIES: book,算法图解(入门)
+#+NAMA: <book_算法图解_chapter4.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML

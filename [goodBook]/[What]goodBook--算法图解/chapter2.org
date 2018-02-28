@@ -1,0 +1,93 @@
+#+TITLE: [What]算法图解_选择排序
+#+DATE: <2018-02-28 Wed> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post
+#+CATEGORIES: book,算法图解(入门)
+#+NAME: <book_算法图解_chapter2.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+许多算法都需要在排序的基础上进行运作，其涉及到的两个基本的数据结构便是数组和链表。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 数组和链表的特点
+- 数组在内存中是连续存储的，可以随机和顺序访问，所以具有很快的访问效率。但又因为其连续性，导致其增加和删除元素变得效率低下。
+- 链表在内存中是分散存储的，所以其元素的增加、删除、拼接等操作相当方便。但又因为其分散性，只能顺序访问，元素的访问效率不如数组。
+#+begin_example
+为了能够兼容数组和链表的优势那么可以根据实际应用生成链表数组(每个数组元素中存储的是链表入口地址)，这样的操作便是：
+1. 快速匹配某一个类
+2. 在类中进行增删操作
+#+end_example
+
+常见数组和链表的操作运行时间：
+|      | 数组 | 链表 |
+|------+------+------|
+| 读写 | O(1) | O(n) |
+| 增删 | O(n) | O(1) |
+
+* 选择排序
+选择排序就是以列表的不同属性为首要条件进行遍历排序（比如以歌曲点击量排序或以歌手名称首字母排序）。
+
+具体实现为：
+- 遍历列表依次找出符合条件的元素按顺序放入另外一个列表, 遍历都需要对n个元素依次执行遍历，其时间复杂度为 O(n x n) --> O(n^2)
+  + 按理来讲，每遍历一次都会减少一个元素，为什么会是 n x n 呢？
+** c 代码实现
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+
+static int32_t buffer[] =
+{78, 51, 489, 1, 2, 75, 142, 121, 999};
+static int buffer_size;
+
+int minimum_index_get(int32_t start_index)
+{
+        int index = -1;
+        int value = buffer[start_index];
+        for(int i = start_index + 1; i < buffer_size; i++)
+        {
+                if(buffer[i] < value)
+                {
+                        value = buffer[i];
+                        index = i;
+                }
+        }
+        return index;
+}
+int main(int argc, char * argv[])
+{
+
+        printf("\nBuffer list:\n");
+        printf("index : value\n");
+        buffer_size = sizeof(buffer) / sizeof(int32_t);
+        for(int i = 0; i < buffer_size; i++)
+        {
+                printf("%3d : %3d\n", i, buffer[i]);
+        }
+        printf("\nStarting selection sort\n");
+        for(int i = 0; i < buffer_size - 1; i++)
+        {
+                int minimum_index = minimum_index_get(i);
+                if(minimum_index != -1)
+                {
+                        int temp = buffer[minimum_index];
+                        buffer[minimum_index] = buffer[i];
+                        buffer[i] = temp;
+                }
+        }
+        printf("\nNew buffer list:\n");
+        printf("index : value\n");
+        for(int i = 0; i < buffer_size; i++)
+        {
+                printf("%3d : %3d\n", i, buffer[i]);
+        }
+
+
+        return 0;
+}
+#+END_SRC
+
+
