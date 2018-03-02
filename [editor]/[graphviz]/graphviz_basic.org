@@ -3,10 +3,50 @@
 #+TAGS: graphviz
 #+LAYOUT: post
 #+CATEGORIES: editer, graphviz
-#+NAMA: <editer_graphviz_overview.org>
+#+NAME: <editer_graphviz_overview.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
+[[https://www.graphviz.org][graphviz]] 用于展示流程图、数据结构等关系图特别合适，仅仅需要写入逻辑关系便可以生成图片。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* 下载及安装
+简单粗暴(ubuntu16.04)
+#+begin_example
+sudo apt install graphviz
+#+end_example
+* 使用 DOT 语言来生成逻辑图
+DOT 语言是用于描述节点与节点之间的 *有向* 逻辑关系的语言。
+
+graphviz 通过读取 =dot= 文件来生成 [[https://graphviz.gitlab.io/_pages/doc/info/output.html][各种格式的文件]]。
+** 基本逻辑图
+- 新建 =dot= 文件 pic.gv
+#+begin_example
+# "digraph" 指定生成有向图
+# "pic" 是这个逻辑的名称
+# 如同函数一样，使用 "{}" 包含逻辑关系
+digraph pic{
+# 使用 "->" 指定逻辑指向
+# 使用 ";" 代表一行结尾
+# 节点 "main","parse"... 
+        main -> parse -> execute;
+        main -> init;
+        main -> cleanup;
+        execute -> make_string;
+        execute -> printf;
+        init -> make_string;
+        main -> printf;
+        execute -> compare;
+}
+#+end_example
+- 生成文件 pic.jpg
+#+begin_example
+# -T 指定输出文件格式
+# -o (小写) 指定输出文件名称
+dot -Tjpg pic.gv -o pic.jpg
+#+end_example
+[[./hello.jpg]]
+
+
+
