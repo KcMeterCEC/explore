@@ -1,12 +1,204 @@
 #+TITLE: [What]算法图解_快速排序
-#+DATE: <2018-02-28 Wed> 
+#+DATE: <2018-03-01 Thu> 
 #+TAGS: 数据结构与算法
 #+LAYOUT: post
 #+CATEGORIES: book,算法图解(入门)
-#+NAMA: <book_算法图解_chapter4.org>
+#+NAME: <book_算法图解_chapter4.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
+本章介绍 =分而治之（divide and conquer, D&C）= 这种 *递归式问题的解决方法* ， 并以 =快速排序= 为例实现这种方法。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* 分而治之
+使用 D&C 解决问题的过程包括两个步骤：
+1. 找出 =基线条件= ，这种条件必须尽可能简单
+2. 不断将问题分解(不断缩小问题的范围)，直到符合基线条件(不断递归直到退出)
+
+** c 代码
+假设有一数组，其元素内容依次为 2,4,6.
+*** 求数组和
+- 基线条件：当只剩最后一个数组元素时，退出递归
+- 递归条件：每次得到数组一个元素，并与剩下的元素相加
+#+BEGIN_SRC c
+#include <stdio.h>
+
+static int buffer[] = {2, 4, 6};
+static int buffer_length = 0;
+
+int buffer_sum_get(int index)
+{
+        if(index < buffer_length - 1)
+        {
+                return buffer[index] + buffer_sum_get(++index);
+        }
+        else
+        {
+                return buffer[index];
+        }
+}
+
+int main(int argc, char *argv[])
+{
+        buffer_length = sizeof(buffer) / sizeof(int);
+        printf("buffer:");
+        for(int i = 0; i < buffer_length; i++)
+        {
+                printf("%d, ", buffer[i]);
+        }
+        printf("\n");
+
+        printf("The sum of buffer is %d\n", buffer_sum_get(0));
+
+        return 0;
+}
+#+END_SRC
+*** 找出数组中的最大值
+- 基线条件： 遍历到最后一个元素
+- 递归条件：每次得到数组一个元素，并与存储的值比较
+#+BEGIN_SRC c
+#include <stdio.h>
+
+static int buffer[] = {2, 4, 6, 1, 11, 123, 6};
+static int buffer_length = 0;
+static int maximum = 0;
+
+int buffer_maximum_get(int index)
+{
+        if(maximum < buffer[index])
+        {
+                maximum = buffer[index];
+        }
+        if(index < buffer_length - 1)
+        {
+                maximum = buffer_maximum_get(++index);
+        }
+        return maximum;
+}
+
+int main(int argc, char *argv[])
+{
+        buffer_length = sizeof(buffer) / sizeof(int);
+        maximum = buffer[0];
+        printf("buffer:");
+        for(int i = 0; i < buffer_length; i++)
+        {
+                printf("%d, ", buffer[i]);
+        }
+        printf("\n");
+
+        printf("The maximum value of buffer is %d\n", buffer_maximum_get(0));
+
+        return 0;
+}
+#+END_SRC
+
+
+
+
+* 快速排序
+快速排序使用了 =分而治之= 的思想。
+具体流程为：
+1. 选择数组中的 *任意一个元素* 为基准值
+2. 将数组分成两个子数组，小于基准值的数组和大于基准值的数组
+3. 对两个子数组进行步骤2排序
+#+begin_example
+虽然在数组中选择任意一个元素都可以完成排序，但选择的位置会影响算法总运行时间。
+#+end_example
+
+- 基线条件：当拆分到只剩最后一个元素时退出
+- 递归条件：取出数组中的元素，并以此为基准排序
+** 运行时间
+- 最佳时间: O(n) * O(log n) = O(n logn)
+  + 刚好每次将数组平分为二，就如二分法一样层数复杂度为　log n
+  + 在每层都会遍历一次数组，所以复杂度为　n
+- 最糟时间: O(n) * O(n) = O(n^2)
+  + 每次分得一个空数组和一个满数组，层数复杂度为　n
+  + 在每层都会遍历一次数组，所以复杂度为　n
+
+** c代码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <string.h>
+
+static int buffer[] =
+{
+        1, 7, 3, 5, 74, 15, 91, 123, 14, 11, 8, 1, 23, 67, 199
+};
+
+static int buffer_length = 0;
+
+struct temp_buf
+{
+        int *buffer;
+        int index;
+};
+
+void quick_sort(int *buf, int len)
+{
+        if(len < 2)  return;
+
+        struct temp_buf smaller_buf;
+        struct temp_buf larger_buf;
+
+        smaller_buf.index = 0;
+        larger_buf.index = 0;
+
+        smaller_buf.buffer = (int *)malloc(sizeof(int) * len);
+        assert(smaller_buf.buffer != NULL);
+        larger_buf.buffer = (int *)malloc(sizeof(int) * len);
+        assert(larger_buf.buffer != NULL);
+
+        int pivot = buf[0];
+        for(int i = 1; i < len; i++)
+        {
+                if(buf[i] < pivot)
+                {
+                        smaller_buf.buffer[smaller_buf.index++] = buf[i];
+                }
+                else if(buf[i] >= pivot)
+                {
+                        larger_buf.buffer[larger_buf.index++] = buf[i];
+                }
+        }
+        for(int i = 0; i < smaller_buf.index; i++)
+        {
+                buf[i] = smaller_buf.buffer[i];
+        }
+        buf[smaller_buf.index] = pivot;
+        for(int i = 0; i < larger_buf.index; i++)
+        {
+                buf[smaller_buf.index + 1 + i] = larger_buf.buffer[i];
+        }
+        quick_sort(buf, smaller_buf.index);
+        quick_sort(buf + smaller_buf.index + 1, larger_buf.index);
+
+        free(smaller_buf.buffer);
+        free(larger_buf.buffer);
+}
+
+int main(int argc, char * argv[])
+{
+        buffer_length = sizeof(buffer) / sizeof(buffer[0]);
+        printf("buffer before sort:\n");
+        for(int i = 0; i < buffer_length; i++)
+        {
+                printf("%d, ", buffer[i]);
+        }
+        printf("\n");
+
+        quick_sort(buffer, buffer_length);
+
+        printf("buffer after sort:\n");
+        for(int i = 0; i < buffer_length; i++)
+        {
+                printf("%d, ", buffer[i]);
+        }
+        printf("\n");
+        return 0;
+}
+#+END_SRC
+
