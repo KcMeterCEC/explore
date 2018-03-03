@@ -23,13 +23,15 @@ graphviz 通过读取 =dot= 文件来生成 [[https://graphviz.gitlab.io/_pages/
 ** 基本逻辑图
 - 新建 =dot= 文件 pic.gv
 #+begin_example
-# "digraph" 指定生成有向图
-# "pic" 是这个逻辑的名称
-# 如同函数一样，使用 "{}" 包含逻辑关系
+/*
+   "digraph" 指定生成有向图
+   "pic" 是这个逻辑的名称
+   如同函数一样，使用 "{}" 包含逻辑关系
+,*/
 digraph pic{
-# 使用 "->" 指定逻辑指向
-# 使用 ";" 代表一行结尾
-# 节点 "main","parse"... 
+// 使用 "->" 指定逻辑指向
+// 使用 ";" 代表一行结尾
+// 节点 "main","parse"... 
         main -> parse -> execute;
         main -> init;
         main -> cleanup;
@@ -47,6 +49,63 @@ digraph pic{
 dot -Tjpg pic.gv -o pic.jpg
 #+end_example
 [[./hello.jpg]]
+** 修改逻辑属性
+具体各个属性位于 [[https://graphviz.gitlab.io/_pages/doc/info/attrs.html][官方文档]]
+*** 节点(node)属性
+- 节点属性一般单独一行，设置 *某一个节点* 的属性格式：
+#+begin_example
+节点名称 [属性1=值1,属性2=值2,...];
+#+end_example
+- 也可以单独一行来设置 *此行以后节点* 的属性
+#+begin_example
+node [属性1=值1,属性2=值2,...]
+#+end_example
+*** 连线(edge)属性
+- 连线属性与逻辑语句同一行，位于逻辑语句尾，来设置 *此行连线* 的属性：
+#+begin_example
+节点1 -> 节点2 [属性1=值1,属性2=值2,...];
+#+end_example
+- 也可以单独一行来设置 *此行以后连线* 的属性
+#+begin_example
+edge [属性1=值1,属性2=值2,...]
+#+end_example
+*** 图的属性
+图属性设置生成图的属性，一般位于逻辑的第一行：
+#+begin_example
+graph [属性1=值1,属性2=值2,...];
+#+end_example
+*** 示例
+#+begin_example
+digraph pic{
+    // 图片尺寸
+    graph [size="40,40"];
+
+    //main 节点形状
+    main [shape=box];
+    //当前行连线样式
+    main -> parse -> execute [style=dotted];
+    main -> init;
+
+    //此行以后所有节点的样式
+    node [shape=box];
+    main -> cleanup;
+
+    //此行以后所有连线的样式
+    edge [color=red];
+
+    /*
+      execute 节点指向多个节点时，可以用 {} 写在同一行
+    ,*/
+    execute -> {make_string; printf}
+    //execute -> make_string;
+    //execute -> printf;
+    init -> make_string;
+    main -> printf [style=bold,label="100 \ntimes"];
+    execute -> compare;
+}
+#+end_example
+
+[[./hello_attr.jpg]]
 
 
 

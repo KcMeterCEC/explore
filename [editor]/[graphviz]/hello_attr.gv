@@ -1,0 +1,27 @@
+digraph pic{
+    // 图片尺寸
+    graph [size="40,40"];
+
+    //main 节点形状
+    main [shape=box];
+    //当前行连线样式
+    main -> parse -> execute [style=dotted];
+    main -> init;
+
+    //此行以后所有节点的样式
+    node [shape=box];
+    main -> cleanup;
+
+    //此行以后所有连线的样式
+    edge [color=red];
+
+    /*
+    execute 节点指向多个节点时，可以用 {} 写在同一行
+    */
+    execute -> {make_string; printf}
+    //execute -> make_string;
+    //execute -> printf;
+    init -> make_string;
+    main -> printf [style=bold,label="100 \ntimes"];
+    execute -> compare;
+}
