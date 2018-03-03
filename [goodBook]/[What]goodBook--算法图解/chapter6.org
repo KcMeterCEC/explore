@@ -3,7 +3,7 @@
 #+TAGS: 数据结构与算法
 #+LAYOUT: post
 #+CATEGORIES: book,算法图解(入门)
-#+NAMA: <book_算法图解_chapter6.org>
+#+NAME: <book_算法图解_chapter6.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -41,5 +41,300 @@
 4. 如果满足要求则退出否则将此节点的所有邻居节点都加入队列然后回到步骤二
 5. 当队列为空时，则代表没有符合要求的节点
 
+[[./BFS_hello.jpg]]
+
+注意：节点如果已经检查了，那么需要标记其已经被检查过了，以避免重复检查。
+
+#+begin_example
+这是为了避免节点之间是直接或间接的互为邻居关系，
+如果不加入检查标记，将会进入无限循环。
+#+end_example
+**** c 代码
+[[./BFS_code.jpg]]
+
+假设具有以上关系图， =你= 要寻找谁的身上有钥匙(假设钥匙在 Anuj 那里)。
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+typedef struct
+{
+        char *name;
+        bool is_checked;
+        bool is_key;
+}node_t;
+
+static node_t relational_you[] =
+{
+        {
+                .name = "you",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "bob",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "alice",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "claire",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_bob[] =
+{
+        {
+                .name = "bob",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "anuj",
+                .is_checked = false,
+                .is_key = true,
+        },
+        {
+                .name = "peggy",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_alice[] =
+{
+        {
+                .name = "alice",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "peggy",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_claire[] =
+{
+        {
+                .name = "claire",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "thom",
+                .is_checked = false,
+                .is_key = false,
+        },
+        {
+                .name = "jonny",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_anuj[] =
+{
+        {
+                .name = "anuj",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_peggy[] =
+{
+        {
+                .name = "peggy",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_thom[] =
+{
+        {
+                .name = "thom",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static node_t relational_jonny[] =
+{
+        {
+                .name = "jonny",
+                .is_checked = false,
+                .is_key = false,
+        },
+};
+static struct
+{
+        node_t queue[20];
+        int    size;
+        int    remain_count;
+        int    start_index;
+        int    stop_index;
+}bfs_queue;
+
+static void bfs_queue_init(void)
+{
+        bfs_queue.size = sizeof(bfs_queue.queue) / sizeof(node_t);
+        bfs_queue.remain_count = bfs_queue.size;
+        bfs_queue.start_index = 0;
+        bfs_queue.stop_index = 0;
+}
+static bool bfs_queue_push(const node_t *node)
+{
+        if(bfs_queue.remain_count <= 0)
+        {
+                printf("bfs queue is full!\n");
+                return false;
+        }
+
+        printf("bfs push [%s]\n", node->name);
+        bfs_queue.queue[bfs_queue.stop_index] = *node;
+        if(++bfs_queue.stop_index >= bfs_queue.size)
+        {
+                bfs_queue.stop_index = 0;
+        }
+        bfs_queue.remain_count -= 1;
+
+        return true;
+}
+static bool bfs_queue_pop(node_t *node)
+{
+        if(bfs_queue.remain_count >= bfs_queue.size)
+        {
+                printf("bfs queue is empty!\n");
+                return false;
+        }
+
+        ,*node = bfs_queue.queue[bfs_queue.start_index];
+        printf("bfs pop [%s]\n", node->name);
+        if(++bfs_queue.start_index >= bfs_queue.size)
+        {
+                bfs_queue.start_index = 0;
+        }
+        bfs_queue.remain_count += 1;
+
+        return true;
+}
+static bool queue_add(node_t *node, int queue_size)
+{
+        printf("add [%s] to queue,size = %d\n", node[0].name, queue_size);
+        for(int i = 1; i < queue_size; i++)
+        {
+                if(bfs_queue_push(node + i) == false)
+                {
+                        return false;
+                }
+        }
+
+        return true;
+}
+static char first_name[10];
+bool key_find(char *name)
+{
+        node_t node;
+        node_t *node_queue;
+        int    queue_size = 0;
+
+        if(strcmp(name, "you") == 0)
+        {
+                node_queue = relational_you;
+                queue_size = sizeof(relational_you) / sizeof(node_t);
+        }
+        else if(strcmp(name, "bob") == 0)
+        {
+                node_queue = relational_bob;
+                queue_size = sizeof(relational_bob) / sizeof(node_t);
+        }
+        else if(strcmp(name, "alice") == 0)
+        {
+                node_queue = relational_alice;
+                queue_size = sizeof(relational_alice) / sizeof(node_t);
+        }
+        else if(strcmp(name, "claire") == 0)
+        {
+                node_queue = relational_claire;
+                queue_size = sizeof(relational_claire) / sizeof(node_t);
+        }
+        else if(strcmp(name, "anuj") == 0)
+        {
+                node_queue = relational_anuj;
+                queue_size = sizeof(relational_anuj) / sizeof(node_t);
+        }
+        else if(strcmp(name, "peggy") == 0)
+        {
+                node_queue = relational_peggy;
+                queue_size = sizeof(relational_peggy) / sizeof(node_t);
+        }
+        else if(strcmp(name, "thom") == 0)
+        {
+                node_queue = relational_thom;
+                queue_size = sizeof(relational_thom) / sizeof(node_t);
+        }
+        else if(strcmp(name, "jonny") == 0)
+        {
+                node_queue = relational_jonny;
+                queue_size = sizeof(relational_jonny) / sizeof(node_t);
+        }
+        else
+        {
+                assert(1);
+        }
+
+        if(queue_add(node_queue, queue_size) == false)
+        {
+                printf("Can not add [%s] to queue\n", node_queue[0].name);
+        }
+
+            do
+            {
+                    if(bfs_queue_pop(&node) == false)   return false;
+            }while(node.is_checked == true);
+
+            if(node.is_key == true)
+            {
+                    if(strcpy(first_name, node.name)) assert(1);
+                    return true;
+            }
+            else
+            {
+                    node.is_checked = true;
+                    return key_find(node.name);
+            }
+}
+int main(int argc, char *argv[])
+{
+        memset(first_name, 0, 10);
+        if(strcpy(first_name, relational_you[0].name))
+        {
+                assert(1);
+        }
+        bfs_queue_init();
+        if(key_find(first_name) == true)
+        {
+                printf("[%s] has the key!\n", first_name);
+        }
+        else
+        {
+                printf("Can not find key!\n");
+        }
+
+        return 0;
+}
+#+END_SRC
 
 
+
+
+**** 运行时间
+1. 在搜索网络过程中，需要每一条边都要搜索，时间为 O(边数)
+2. 将队列中的人数添加到总队列，时间为 O(人数)
+
+所以运行时间为 O(人数 + 边数)，写作 O(V + E),V为顶点，E为边数。

@@ -1,0 +1,26 @@
+digraph BFS_hello{
+    graph [label="BFS寻找对应节点"];
+
+    creat_queue [shape=rectangle,style=rounded,label="创建队列"];
+    neighbor_add [shape=rectangle,label="增加邻居节点"];
+    is_empty [shape=diamond,label="队列为空？"];
+    creat_queue -> neighbor_add -> is_empty;
+
+    failed_exit [shape=rectangle;label="退出处理流程"];
+    pop_node [shape=rectangle;label="获取一个节点"];
+    is_empty -> failed_exit [label="空",color=red]; 
+    is_empty -> pop_node [label="有节点"];
+
+    is_checked [shape=diamond;label="是否检查过？"];
+    pop_node -> is_checked;
+    is_checked -> pop_node [label="已检查"];
+    is_checked -> check_node [label="未检查"];
+
+    check_node [shape=diamond;label="节点满足要求？"];
+    success_exit [shape=rectangle,style=rounded,label="返回此节点"];
+    check_node -> success_exit [label="满足",color=blue];
+
+    flag_checked [shape=rectangle,label="标记已检查"];
+    check_node -> flag_checked [label="不满足"];
+    flag_checked -> neighbor_add [label="不满足"];
+}
