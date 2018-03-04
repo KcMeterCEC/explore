@@ -1,0 +1,46 @@
+#+TITLE: [What] LibreOffice_math 基本使用
+#+DATE: <2018-03-04 Sun>
+#+TAGS: libreoffice
+#+LAYOUT: post
+#+CATEGORIES: editer, libreoffice
+#+NAME: <editer_libreoffice_math_overview.org>
+
+
+=LibreOffice_math= 用于方便的生成数学公式，其软件自带了很多模版，很容易上手。以下是它的编辑说明：
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 基本的操作
+** 如何避免转义部分字符
+- 在要避免转义的字符加上双引号即可
+#+begin_example
+比如输入：
+W rSup { size 8{*} }
+默认的星号是会被翻译的，所以需要加上双引号
+W rSup { size 8{"*"} }
+#+end_example
+** 改变显示字符的样式
+许多字符的样式都有其默认值为 =bold= 或 =italic= ，可以在字符前加上属性指定以改变样式。
+#+begin_example
+比如输入：
+a + b (默认两个都是非加粗的斜体格式)
+
+然后进行属性指定
+
+nitalic a + bold b (a不为斜体，并且b变为粗体)
+#+end_example
+** 多行显示公式
+- 在要断行的字符前加入 =newline= 即可
+** 公式对齐
+有一下3种方式对齐：
+1. 在公式中增加大括号 ={}= 来细微调整
+2. 在公式中使用 =newline= 来行对齐
+3. 使用双引号包含空白字符 " " 来粗略调整
+** 包含子公式
+- 使用大括号 ={}= 来包含子公式
+#+begin_example
+比如有公式： (a + c) / 2 = m，表示为：
+{a + c} over 2 = m
+#+end_example
+** 注释
+- 使用 =%%= 在公式行尾注释，最终不会被显示

@@ -1,0 +1,16 @@
+#+TITLE: [What]高等数学_函数与极限->映射与函数
+#+DATE: <2018-03-04 Sun> 
+#+TAGS: 高等数学
+#+LAYOUT: post
+#+CATEGORIES: book,高等数学
+#+NAMA: <book_高等数学_chapter1_first.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+重新来学习高数，希望能以不同的角度和姿态来看到数学之美。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 映射
+* 函数
+
