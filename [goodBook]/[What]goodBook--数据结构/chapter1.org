@@ -1,0 +1,13 @@
+#+TITLE: [What]数据结构
+#+DATE: <2018-03-04 Sun> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post
+#+CATEGORIES: book,数据结构(提高)
+#+NAMA: <book_数据结构_chapter1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+

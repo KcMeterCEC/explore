@@ -1,0 +1,13 @@
+#+TITLE: [What]概率与统计
+#+DATE: <2018-03-04 Sun> 
+#+TAGS: 概率与统计
+#+LAYOUT: post
+#+CATEGORIES: book,概率与统计
+#+NAMA: <book_概率与统计_chapter1_first.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+

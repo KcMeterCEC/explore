@@ -1,0 +1,23 @@
+digraph dijkstra_hello{
+    graph [label="dijkstra 最短路径"];
+
+    creat_buffer [shape=rectangle,style=rounded,label="1.创建数组，存储节点，父节点，以及权重和\n2.为队列增加起始节点"];
+    node_get [shape=rectangle,label="1.从队列获取节点"];
+    is_empty [shape=diamond,label="队列为空？"];
+    creat_buffer -> node_get -> is_empty;
+    
+    end_calculate [shape=rectangle,style=rounded,label="通过终点反算出路径"];
+    is_empty -> end_calculate[label="空"];
+
+    neighbor_add [shape=rectangle,label="增加邻居节点到队列,并标记该节点已处理"];
+    time_calculate [shape=rectangle,label="计算到达节点的权重和"];
+    is_empty -> neighbor_add -> time_calculate;
+
+    is_smaller [shape=diamond,label="权重和比原来的小?"];
+    time_calculate -> is_smaller;
+    update_value [shape=rectangle,label="更新权重和以及父节点"];
+    is_smaller -> update_value;
+
+    update_value -> node_get;
+    is_smaller -> node_get;
+}
