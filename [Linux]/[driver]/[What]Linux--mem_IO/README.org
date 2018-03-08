@@ -1,132 +1,355 @@
-* [What]Linux --> 内存与IO访问
-** CPU 与内存,I/O
-*** 内存空间与I/O空间
-I/O空间的概念是存在于X86架构中的, 它通过特定的指令in,out来访问.
-在大多数嵌入式微控制器中没有I/O空间,仅有内存空间.内存空间可以直接通过地址,指针来访问,程序以及其他数据都是存在于内存空间中的.
-*** 内存管理单元MMU
-MMU提供虚拟地址和物理地址的映射,内存访问权限保护和Cache缓存控制等硬件支持.
-**** 基本概念
-1. TLB(Translation Lookaside Buffer)
-转换旁路缓存,TLB是MMU的核心部件,它缓存少量的虚拟地址与物理地址的转换关系,是转换表的Cache,因此也经常被称为"快表".
-2. TTW(Translation Table wale)
-转换表漫游,当TLB中没有缓冲对应的地址转换对应关系时,需要通过对内存中转换表的访问来获得虚拟地址和物理地址的对应关系.TTW成功后,结果应写入TLB中.
-** Linux内存管理
-在Linux系统中,进程的 *虚拟4GB内存空间* 被分为两个部分---用户空间和内核空间.
-用户空间的地址一般分布为0~3GB(即PAGE_OFFSET),剩下的3~4GB为内核空间. *用户进程只有通过系统调用(代表用户进程在内核态执行)等方式才可以访问到内核空间*.
-每个进程的用户空间都是完全独立,互不相干的, *用户进程各自由不同的页表*.而内核空间是由内核负责映射,它并不会跟着进程改变,是固定的.
-*内核空间的虚拟地址到物理地址的映射是被所有进程共享的,内核虚拟空间独立于其他程序*.
+#+TITLE: [What]Linux内存与I/O访问
+#+DATE:  <2018-03-07 Wed> 
+#+TAGS: memory
+#+LAYOUT: post 
+#+CATEGORIES: linux, memory, overview
+#+NAME: <linux_memory_overview_usage.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-Linux 中1GB的内核地址空间又被划分为物理内存映射区,虚拟内存分配区,高端页面映射区,专用页面映射区和系统保留映射区这几个区域.
-| 内存位置                        | 名称                    |
-|---------------------------------+-------------------------|
-| 0xfff0000~0xffff0fff            | 向量表                  |
-| VMALLOC_START ~ VMALLOC_END - 1 | vmalloc 和 ioremap 区域 |
-| PAGE_OFFSET ~ high_memory -1    | DMA和常规区域内存映射   |
-| MODULES_VADDR ~ MODULES_END -1  | 内核模块区域            |
-| PKMAP_BASE ~ PAGE_OFFSET -1     | 高端内存映射区                 |
+参考宋宝华老师的书 =Linux设备驱动开发详解= ，来理解Linux内存使用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* CPU 与内存,I/O
+** 内存空间与I/O空间的区别
+I/O空间的概念是存在于X86架构中的, 与内存空间做区分，它通过特定的指令in,out来访问外设寄存器的地址。
+
+但是在实际使用时，我们也可以将外设设计在X86架构的内存空间中，直接访问寄存器地址，所以 *I/O空间是可选的* 。
+
+在大多数嵌入式微控制器中没有I/O空间,仅有内存空间.内存空间可以直接通过地址,指针来访问,程序以及其他数据都是存在于内存空间中的.
+** 内存管理单元MMU
+MMU提供虚拟地址和物理地址的映射,内存访问权限保护和Cache缓存控制等硬件支持，
+用户在编写实际程序时不用考虑实际物理地址有多大，以及是否会与其他程序地址冲突等等。
+*** MMU操作原理
+MMU中比较重要的两个概念：
+- TLB(Translation Lookaside Buffer)
+  + 转换旁路缓存,TLB是MMU的核心部件,它缓存少量的虚拟地址与物理地址的转换关系,是转换表的Cache,因此也经常被称为"快表".
+- TTW(Translation Table wale)
+  + 转换表漫游,当TLB中没有缓冲对应的地址转换对应关系时,需要通过对内存中转换表的访问来获得虚拟地址和物理地址的对应关系.TTW成功后,结果应写入TLB中.
+
+MMU操作的原则都是以最快的速度来读写CPU所需要的数据或指令:
+1. 所以它会首先访问 TLB 以保证最快的速度找到映射关系然后进行存取，如果此时打开了Cache并且Cache命中，那也会直接取Cache的数据否则取内存的数据并且更新Cache
+2. 如果TLB没有命中那么就会访问 TTW找到映射关系并反过来更新TLB。
+* Linux内存管理
+- 在Linux系统中,进程的 *虚拟4GB内存空间* 被分为两个部分---用户空间和内核空间.
+- 用户空间的地址一般分布为0~3GB(即PAGE_OFFSET),剩下的3~4GB为内核空间.  
+  + *用户进程只有通过系统调用(代表用户进程在内核态执行)等方式才可以访问到内核空间*.
+  + 每个进程的用户空间都是完全独立,互不相干的, *用户进程各自由不同的页表*.而内核空间是由内核负责映射,它并不会跟着进程改变,是固定的.
+  + *内核空间的虚拟地址到物理地址的映射是被所有进程共享的,内核虚拟空间独立于其他程序*.
+
+** x86 架构下的分配
+Linux中1GB的内核地址空间又被划分为:
+| 区域名称       | 虚拟地址位置                | 相关代码             |
+|----------------+-----------------------------+----------------------|
+| 保留区         | FIXADDR_TOP ~ 4GB           | 搜索宏 FIXADDR_TOP   |
+| 专用页面映射区 | FIXADDR_START ~ FIXADDR_TOP | 搜索宏 FIXADDR_START |
+| 高端内存映射区 | PKMAP_BASE ~ FIXADDR_START  | 搜索宏 PKMAP_BASE    |
+| 隔离区         |                             |                      |
+| vmalloc分配区  | VMALLOC_START ~ VMALLOC_END | 搜索宏 VMALLOC_START |
+| 隔离区         |                             |                      |
+| 物理内存映射区 | 3GB起始最大长度896M         |                      |
+#+begin_example
+直接映射的896M物理内存分为两个区域：
+- 0 ~ 16M : ISA设备用作DMA申请
+- 16M ~ 896M : 常规区域
+#+end_example
+- 当系统物理内存超过4GB时，必须使用CPU的扩展分页(PAE)模式所提供的64位页目录才能取到4GB以上的物理内存。
+** arm linux 下的分配
+| 区域名称             | 虚拟地址位置                   | 相关代码                            |
+|----------------------+--------------------------------+-------------------------------------|
+| 向量表               | 0xfff0000~0xfff0fff            | 文档 Documentation/arm/memory.txt   |
+| 隔离区               |                                |                                     |
+| vmalloc和ioremap区域 | VMALLOC_START ~ VMALLOC_END -1 | 宏 VMALLOC_START                    |
+| 隔离区               |                                |                                     |
+| DMA和常规区域映射区  | PAGE_OFFSET ~ high_memory -1   | 宏 PAGE_OFFSET 以及变量 high_memory |
+| 高端内存映射区       | PKMAP_BASE ~ PAGE_OFFSET -1    | 宏 PKMAP_BASE                       |
+| 内核模块             | MODULES_VADDR ~ MODULES_END -1 | 宏 MODULES_VADDR                    |
+
+#+begin_example
+在编译内核的时候可以选择：
+- VMSPLIT_3G : 用户空间3G，内核空间1G。内核模块范围为 3GB-16MB ~ 3GB-2MB
+- VMSPLIT_2G : 用户空间2G，内核空间2G。内核模块范围为 2GB-16MB ~ 2GB-2MB
+
+ARM系统的Linux之所以把内核模块放在16MB范围内，主要是为了内核模块和内核本身的代码段之间的短跳转。
+#+end_example
+** DMA、常规、高端内存分布
+有以下4种可能的情况分布(地址由低到高)：
+- DMA区域 | 常规区域 | 高端内存区域 
+  + 内存较大，硬件DMA只能访问一部分地址，并且内核映射不完所有的物理内存，剩下的部分就是高端内存区域
+- DMA区域 | 高端内存区域
+  + 内存较大，硬件DMA可以访问全部地址，但内核映射不完所有的物理内存，剩下的部分就是高端内存区域
+- DMA区域 | 常规区域
+  + 内存较小，硬件DMA只能访问一部分地址，且内核可以完全映射物理内存
+- DMA区域
+  + 内存较小，硬件DMA可以访问全部地址，且内核可以完全映射物理内存
+
+DMA、常规、高端内存分布区使用的是 =buddy= 算法进行管理，它将空闲页面以 2 的 n次方进行分配，而内存申请也是也 2 的 n 次方申请，
+这样就避免了内存碎片。
+#+begin_example
+在 /proc/buddyinfo 会显示这些区域的空闲页面分布情况
+#+end_example
 
 *对于内核物理内存映射区的虚拟内存(即从DMA和常规区域映射过来的),使用 =virt_to_phys()= 实现内核虚拟地址转化为物理地址.与之相对的函数为 =phys_to_virt()=*
-** 内存存取
-*** 用户空间内存动态申请
-- 申请 malloc()
-- 释放 free()
+* 内存申请实际操作
+** 用户空间内存动态申请
+用户空间的内存申请和释放使用标准的c库即可：
+#+BEGIN_SRC c
+#include <stdlib.h>
+//申请
+void *malloc(size_t size);
+//释放
+void free(void *ptr);
+#+END_SRC
 
-*Linux内核总是采用按需调页(Demand Paging),因此当 malloc()返回的时候,虽然是成功返回,但是内核并没有真正给这个进程内存.这个时候如果去读申请的内存,内容全部是0,这个页面的映射是只读的.只有当写到某个页面的时候,内核才在页错误后,真正把这个页面给这个进程.*
+*Linux内核总是采用按需调页(Demand Paging),因此当malloc()返回的时候,虽然是成功返回,但是内核并没有真正给这个进程内存.这个时候如果去读申请的内存,内容全部是0,这个页面的映射是只读的.只有当写到某个页面的时候,内核才在页错误后,真正把这个页面给这个进程.*
+** 内核空间内存动态申请
+*** 物理内存连续申请
+函数 =kmalloc() 和 __get_free_pages()以及类似函数= 申请的区域位于 =DMA和常规区域的映射区= ，
+在物理上是连续的，与真实物理地址只有一个固定的偏移。
+- kmalloc() 底层依赖于 __get_free_pages()
+#+BEGIN_SRC c
+/**
+ ,* @brief 申请内存地址
+ ,* @param size: 要申请的字节数
+ ,* @param flags: 申请的内存类型
+ ,* @note flags 一般有以下取值：
+ ,* GFP_USER -> 为用户空间页分配内存，可能由于阻塞而导致睡眠
+ ,* GFP_KERNEL -> 为内核空间申请内存，可能由于阻塞而导致睡眠
+ ,* GFP_ATOMIC -> 原子方式申请内存，若不存在则直接返回而不阻塞(用于中断、tasklet、内核定时器等非进程上下文环境中)
+ ,* GFP_HIGHUSER -> 从高端区域中为用户空间分配
+ ,* GFP_NOIO -> 申请期间，不允许任何 I/O 初始化
+ ,* GFP_NOFS -> 申请期间，不允许任何文件系统调用
+ ,* GFP_NOWAIT -> 若不存在空闲页则不等待
+ ,* GFP_DMA -> 从DMA区域分配内存
+ ,* 还有其他取值请参考文件 include/linux/slab.h
+ ,*/
+void *kmalloc(size_t size, gfp_t flags);
 
-*** 内核空间内存动态申请
-kmalloc() 和 __get_free_pages() 及其类似函数,申请的内存位于"DMA和常规区域的映射区",而且 *在物理上也是连续的*,
-它们与真实的物理地址只有一个固定的偏移,因此存在较简单的转换关系.而vmalloc()在虚拟内存空间给出一块连续的内存区,实际上,
-*这片连续的虚拟内存在物理内存中并不一定连续*,而vmalloc()申请的虚拟内存和物理内存之间页没有简单的换算关系.
-- void *kmalloc(size_t size, int flags)  <->  kfree()
-size 代表分配块的大小
-flags : 
-        GFP_KERNEL -> 在内核空间的进程中申请内存. *若不能满足,则进程会睡眠等待*, *不能在中断上下文和持有自旋锁的时候使用*!
-        GFP_ATOMIC -> 若不存在空闲页则不等待,直接返回.
-        GFP_USER   -> 为用户空间页分配内存
-        GFP_DMA    -> 从DMA区域分配内存
-- void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
-设备移除后自动释放内存
-- __get_free_pages() / __get_zeroed_page() <-> free_pages()
-本质上是Linux内核最底层用于获取空闲内存的方法.
-- vmalloc() <-> vfree()
-一般只为存在于软件中(没有对应的硬件意义)的较大的顺序缓冲区分配内存, *vmalloc()远大于__get_free_pages()的开销*
-因此,*使用此函数来分配少量内存是不妥的.
-- slab 与内存池
+/**
+ ,* @brief 在kmalloc 的基础上申请内存并清零内存
+ ,*/
+void *kzalloc(size_t size, gfp_t flags);
 
-*** 设备 I/O 端口和 I/O 内存的访问
+/**
+ ,* @brief 释放kmalloc对应申请的内存
+ ,*/
+void kfree(const void *);
+
+/**
+ ,* @brief 内存的申请管理设备，当设备被释放时内存也跟着自动释放
+ ,*/
+void *devm_kmalloc(struct device *dev, size_t size, gfp_t gfp);
+/**
+ ,* @brief 在 devm_kmalloc 的基础上申请内存并清零内存
+ ,*/
+void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
+#+END_SRC
+*** 物理内存不一定连续申请
+函数 =vmalloc()= 申请区域位于 =vmalloc区域= ，在物理上不一定是连续的，与真实物理地址转换关系也不简单。
+- vmalloc() 一般只为存在于软件中的(没有对应硬件访问)较大的内存分配
+- vmalloc() 效率没有 kmalloc() 高，不适合用来分配小内存
+  + 在申请时会内存映射并修改页表
+- vmalloc() *不能用在原子上下文中* ，因为它内存实现使用了标志为 =GFP_KERNEL= 的 kmalloc，可能会导致睡眠
+#+BEGIN_SRC c
+void *vmalloc(unsigned long size);
+void vfree(const void *addr);
+#+END_SRC
+*** slab机制提高少量字节申请效率
+slab机制使得内核中的小对象在前后两次被使用时分配在同一块内存或同一类内存空间且保留了基本的数据结构，大大提高分配效率。
+- kmalloc() 就是使用 slab 机制实现的
+- 使用 slab机制申请的内存与物理内存之间也是简单的线性偏移关系
+- 查看 =/proc/slabinfo= 可以得到当前 slab 分配和使用情况
+#+BEGIN_SRC c
+/**
+ ,* @brief 创建一个slab缓存，保留任意数据且全部大小相同的后备缓存
+ ,* @param name: 缓存名称，最终会映射在 /proc/slabinfo 中
+ ,* @param size: 每个数据结构的大小
+ ,* @param aligh: 数据的对齐方式
+ ,* @param flags: 申请标记：
+ ,* - SLAB_POISON
+ ,* - SLAB_RED_ZONE : 
+ ,* - SLAB_HWCACHE_ALIGH : 每个数据对象被对齐到一个缓存行
+ ,* @param ctor: 对象的构造函数
+ ,*/
+struct kmem_cache *kmem_cache_create(const char *name, size_t size,
+                                     size_t align, unsigned long flags,
+                                     void (*ctor)(void *));
+
+void *kmem_cache_alloc(struct kmem_cache *cache, gfp_t flags);
+void kmem_cache_free(struct kmem_cache *cache,void *objp);
+
+/**
+ ,* @brief 释放 slab 缓存
+ ,*/
+void kmem_cache_destroy(struct kmem_cache *s);
+#+END_SRC
+
+使用例子：
+#+BEGIN_SRC c
+static kmem_cache_t *xxx_cachep;
+
+//! 申请slab缓存池
+xxx_cachep = kmem_cache_create("xxx", sizeof(struct xxx), 0, SLAB_HWCACHE_ALIGH | SLAB_PANIC,
+                               NULL);
+//! 分配对象内存
+struct xxx *ctx;
+ctx = kmem_cache_alloc(xxx_cachep, GFP_KERNEL);
+//! 使用对象内存
+
+//! 释放对象内存
+kmem_cache_free(xxx_cachep, ctx);
+
+//! 释放slab缓存池
+kmem_cache_destroy(xxx_cachep);
+#+END_SRC
+
+内存池技术也是用于分配大量小对象的后备缓存技术。
+#+BEGIN_SRC c
+mempool_t *mempool_create(int min_nr, mempool_alloc_t *alloc_fn,
+                          mempool_free_t *free_fn, void *pool_data);
+
+void *mempool_alloc(mempool_t *pool, gfp_t gfp_mask);
+void mempool_free(void *element, mempool_t *pool);
+
+void mempool_destroy(mempool_t *pool);
+#+END_SRC
+* 设备 I/O 端口和 I/O 内存的访问
 设备通常会提供一组寄存器来控制设备,读写设备和获取设备状态,这些寄存器可能位于 I/O 空间中,也可能位于内存空间中.
-当位于I/O 空间时,通常被称为 *I/O端口*;当位于内存空间时,对应的内存空间被称为 *I/O内存*.在使用I/O区域时,需要申请该区域,
-以表明驱动要访问这片区域.
-**** I/O 端口
-***** 申请与释放
-1. struct resource *request_region(unsigned long first, unsigned long n, const char *name);
-向内核申请 n 个端口,这些端口从 first开始,name 参数位设备的名称
-2. void release_region(unsigned long start, unsigned long n);
-将使用权归还给系统
-3. devm_request_region(); 使用此函数省事
-***** 读写操作
-1. 读写一字节端口
-- unsigned inb(unsigned port);
-- void outb(unsigned char byte, unsigned port);
-2. 读写16位端口
-- unsigned inw(unsigned port);
-- void outw(unsigned short word, unsigned port);
-3. 读写32位端口
-- unsigned inl(unsigned port);
-- void outl(unsigned longword, unsigned port);
-4. 读写一串字节
-- void insb(unsigned port, void *addr, unsigned long count);
-- void outsb(unsigned port, void *addr, unsigned long count);
-5. 读写一串16位
-- void insw(unsigned port, void *addr, unsigned long count);
-- void outsw(unsigned port, void *addr, unsigned long count);
-6. 读写一串32位
-- void insl(unsigned port, void *addr, unsigned long count);
-- void outsl(unsigned port, void *addr, unsigned long count);
-**** I/O 内存
-***** 申请与释放
-1. struct resource *request_mem_region(unsigned long start, unsigned long len, char *name);
-2. void release_mem_region(unsigned long start, unsigned long len);
-3. devm_request_mem_region(); 使用此函数省事
-***** 映射
-在访问I/O 内存之前,需要先将物理地址映射到虚拟地址使用 =void *ioremap(unsigned long offset, unsigned long size);=
-这个地址位于 vmalloc 映射区域,使用完成后需要释放 =void *iounmap(void *addr);=
-也可以使用函数 =void __iomem *devm_ioremap(struct device *dev, resource_size_t offset, unsigned long size);= *使用此函数映射通常不需要在驱动退出和出错处理的时候进行 iounmap()*.
-***** 读写操作函数
-- 读取
-  - readb_relaxed() / readw_relaxed() / readl_relaxed() ;不包含内存屏障
-  - readb() / readw() / readl() ; 包含一个内存屏障
-  - ioread8() / ioread16() / ioread32() ;明确
-- 写入
-  - writeb_realxed() / writew_relaxed() / writel_relaxed()
-  - writeb() / writew() / writel()
-  - iowrite8() / iowrite16() / iowrite32() ;明确
+- 当位于I/O 空间时,通常被称为 *I/O端口*;
+- 当位于内存空间时,对应的内存空间被称为 *I/O内存*.
+- 在使用I/O区域时,需要 *申请该区域* ,以表明驱动要访问这片区域.
+** I/O 端口
+I/O 端口的具体操作流程为：
+1. 申请I/O端口资源
+2. 使用读写函数操作I/O端口
+3. 释放I/O端口资源
+*** 申请与释放
+#+BEGIN_SRC c
+//! 向内核申请 n 个端口,这些端口从 start开始,name 参数为设备的名称
+//! 获得的地址为结构体类型 struct resource
+#define request_region(start,n,name) __request_region(&ioport_resource,(start),(n),(name),0)
+//! 释放端口
+#define release_region(start,n) __release_region(&ioport_resource, (start), (n))
+//! 设备资源释放后自动释放端口资源
+#define devm_request_region(dev,start,n,name) __devm_request_region(dev,&ioport_resource,(start),(n),(name))
+#+END_SRC
+*** 读写操作
+#+BEGIN_SRC c
+//!读写一字节端口
+unsigned inb(unsigned port);
+void outb(unsigned char byte, unsigned port);
+//!读写16位端口
+unsigned inw(unsigned port);
+void outw(unsigned short word, unsigned port);
+//!读写32位端口
+unsigned inl(unsigned port);
+void outl(unsigned longword, unsigned port);
+//!读写一串字节
+void insb(unsigned port, void *addr, unsigned long count);
+void outsb(unsigned port, void *addr, unsigned long count);
+//!读写一串16位
+void insw(unsigned port, void *addr, unsigned long count);
+void outsw(unsigned port, void *addr, unsigned long count);
+//!读写一串32位
+void insl(unsigned port, void *addr, unsigned long count);
+void outsl(unsigned port, void *addr, unsigned long count);
+#+END_SRC
+** I/O 内存
+I/O内存的操作流程为：
+1. 申请I/O内存资源
+2. 将资源地址映射到内核虚拟空间
+3. 使用读写函数操作
+4. 释放I/O内存资源
+*** 申请与释放
+#+BEGIN_SRC c
+//! 申请以start为开始的,n字节的I/O内存区域，名字为name
+//! 获得的地址为结构体类型 struct resource
+#define request_mem_region(start,n,name) __request_region(&iomem_resource, (start),(n),(name),0)
+//! 释放申请的内存
+#define release_mem_region(start,n) __release_region(&iomem_resource, (start),(n))
 
-**** 将设备地址映射到用户空间
-***** 内存映射与VMA
-****** mmap()
-mmap()实现了用户空间能直接访问设备的物理地址: 它将用户空间的一段内存与设备内存关联,当用户访问用户空间的这段地址范围时,实际上会转化为对设备的访问.
-*这种能力对于显示适配器一类的设备非常有意义,如果用户空间可以直接通过内存映射访问显存的话,屏幕帧的各点像素将不再需要一个从用户空间到内核空间的复制过程*
-函数原型: =int (*mmap) (struct file*, struct vm_area_strct *)=
-*驱动中的mmap()函数将在用户进行mmap()系统调用时最终被调用*
-******* 用户空间
-系统调用原型: =caddr_t mmap(caddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)=
-- len : 映射到用户空间的字节数
-- offset : 一般为0
-- prot :指定访问权限,可以取如下几个值的"或":PROT_READ(可读),PORT_WRITE(可写),PROT_EXEC(可执行),PROT_NONE(不可访问)
-- addr :一般为NULL,这样选择起始地址的任务将由内核完成
-函数的返回值就是映射到用户空间的地址.
+//! 设备资源释放后自动释放端口资源
+#define devm_request_mem_region(dev,start,n,name) __devm_request_region(dev,&iomem_resource,(start),(n),(name))
+#+END_SRC
+*** 映射
+#+BEGIN_SRC c
+/**
+ ,* @brief 从物理地址 offset处映射size字节内存到内核虚拟内存
+ ,* @note ioremap() 与 vmalloc() 类似，也需要新建页表，但不进行内存分配行为。
+ ,* 所映射的虚拟地址区为 vmalloc 映射区
+ ,*/
+void __iomem *ioremap(phys_addr_t offset, size_t size);
+//! 取消映射关系
+void iounmap(void __iomem *addr);
+//! 当设备资源释放后自动取消映射关系
+void __iomem *devm_ioremap(struct device *dev, resource_size_t offset, resource_size_t size);
+#+END_SRC
+*** 读写操作函数
+#+BEGIN_SRC c
+/**
+ ,* @brief 分别读写 8,16,32,64 位
+ ,*/
+u8  readb(const volatile void _iomem *addr);
+u16 readw(const volatile void _iomem *addr);
+u32 readl(const volatile void _iomem *addr);
+u64 readq(const volatile void _iomem *addr);
+
+void writeb(u8  value, volatile void __iomem *addr);
+void writew(u16 value, volatile void __iomem *addr);
+void writel(u32 value, volatile void __iomem *addr);
+void writeq(u64 value, volatile void __iomem *addr);
+#+END_SRC
+** 将设备地址映射到用户空间
+驱动可以通过mmap()函数来给用户空间提供设备的虚拟地址，以达到间接访问的目的。
+
+mmap()实现这样一个映射的过程：将用户空间的一段内存与设备内存关联，当用户访问用户空间的这段地址范围时，
+实际上会转化为对设备的访问。
+#+begin_example
+一般这样做的目的并不是为了用户空间来直接控制寄存器，因为这就破坏了分层的原则。
+
+一般就用于将内核空间申请的内存映射到用户空间，这样用户可以直接高效的参与内存读写，避免再进行一次数据搬移。
+比如：用户空间直接读写DMA收发的数据。
+#+end_example
+*** 内存映射与VMA
+#+BEGIN_SRC c
+//! 内核 file_operatoins 中的 mmap()
+int (*mmap)(struct file *, struct vm_area_struct *);
+
+//! 用户空间的 mmap()
+
+/**
+ ,* @brief 从内核空间映射一段内存到用户空间
+ ,* @param addr : 映射到用户空间以 addr 为起始，为NULL则自动分配
+ ,* @param length: 映射的字节数
+ ,* @param prot: 内存访问权限
+ ,* - PROT_NONE : 不可访问
+ ,* - PROT_EXEC : 可以执行
+ ,* - PROT_READ : 可读
+ ,* - PROT_WRITE: 可写
+ ,* @param flags : 内存状态
+ ,* - MAP_SHARED : 可被进程共享
+ ,* - MAP_PRIVATE: 非共享
+ ,* @param fd: 打开的文件索引
+ ,* @param offset: 从内核的 offset 偏移处开始映射
+ ,* @return 申请的地址
+ ,*/
+void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
+
+/**
+ ,* @brief 取消映射
+ ,*/
+int munmap(void *addr, size_t length);
+#+END_SRC
 当用户调用 mmap()的时候,内核会进行如下处理.
 1. 在进程的虚拟空间查找一块 VMA
 2. 将这块VMA进行映射
 3. 如果设备驱动程序或者文件系统的file_operations定义了mmap()操作,则调用它
 4. 将这个VMA插入进程的VMA链表中
 
-由mmap()系统调用映射的内存可以由munmap()解除映射 : =int munmap(caddr_t addr, size_t len);=
-******* 内核空间
-mmap()的参数 =struct vm_area_struct *vma= 就代表内核在进程的虚拟空间中找到的VMA.
-驱动中的mmap()的实现机制时建立页表,并填充VMA结构体中 =vm_operations_struct= 指针.
+驱动中的mmap()的实现机制是建立页表,并填充VMA结构体中 =vm_operations_struct= 指针.
 #+BEGIN_SRC C
+//! 用于描述一个虚拟内存区域
 struct vm_area_struct
 {
         /*The first cache line has the info for VMA tree walking.*/
@@ -139,6 +362,7 @@ struct vm_area_struct
 };
 #+END_SRC
 VMA结构体描述的虚拟地址介于 vm_start 和 vm_end之间,其 vm_ops 成员指向这个VMA的操作集, 针对VMA的操作都被包含在 vm_operations_struct 结构体中.
+
 操作范例:
 #+BEGIN_SRC C
 static int xxx_mmap(stuct file *filp, struct vm_area_struct *vma)
@@ -171,34 +395,49 @@ static struct vm_operations_struct xxx_remap_vm_ops =
         ...
 };
 #+END_SRC
-****** fault()
-**** I/O内存静态映射
+*** fault() 函数
+fault() 函数可以为设备提供更加灵活的内存映射途径。
+当访问的页不在内存时，fault()会被内核自动调用。
+
+当发生缺页时，流程为：
+1. 找到缺页的虚拟地址所在的VMA
+2. 如果必要分配中间页目录表和页表
+3. 如果页表项对应的物理页面不存在，则调用 fault() 函数，它返回物理页面的页描述符
+4. 将物理页面地址填充到页表中
+* I/O内存静态映射
 在将linux移植到目标电路板的过程中,有的会建立外设I/O内存物理地址到虚拟地址的静态映射,这个映射通过在与电路板对应的 map_desc 结构体数组中添加新的成员完成.
 #+BEGIN_SRC C
 struct map_desc{
-        unsigned long virtual;
-        unsigned long pfn;
-        unsigned long length;
-        unsigned int type;
+        unsigned long virtual;  //虚拟地址
+        unsigned long pfn;     //__phys_to_pfn(phy_addr)
+        unsigned long length;  //内存大小
+        unsigned int type;     //内存类型
 };
 #+END_SRC
-**** DMA内存
-***** DMA与Cache一致性
+* DMA内存
+** DMA与Cache一致性
 在DMA不工作的情况下或者DMA与Cache相对应的主存没有重叠区, 那么Cache 与主存中的数据具有一致性特点.二者并不会起冲突.
+
 *当DMA与Cache相对应的主存有重叠区时,当DMA更新了重叠区的内容,而Cache并没有对应的更新.此时CPU仍然使用的是陈旧的cache的数据,就会发生Cache与内存之间数据"不一致性"的错误!*
 在发生Cache与内存不一致性错误后,驱动将无法正常运行.
-Cache的不一致问题并不是只发生在DMA的情况下,实际上,它还存在于Cache使能和关闭的时刻.例如,对于带MMU功能的ARM处理器,在开启 *MMU之前需要先置Cache无效,
-否则在开启MMU之后,Cache里面有可能保存的还是之前的物理地址,这也会造成不一致性的错误!*.
-***** Linux 下的DMA编程(*DMA只是一种外设与内存的交互方式*)
+
+Cache的不一致问题并不是只发生在DMA的情况下,实际上,它还存在于Cache使能和关闭的时刻.例如,对于带MMU功能的ARM处理器,在开启 *MMU之前需要先置Cache无效,否则在开启MMU之后,Cache里面有可能保存的还是之前的物理地址,这也会造成不一致性的错误!*.
+** Linux 下的DMA编程(*DMA只是一种外设与内存的交互方式*)
 内存中用于外设交互数据的一块区域称为 DMA 缓冲区, *在设备不支持scatter/gather操作的情况下,DMA缓冲区在物理上必须上连续的.*
-****** DMA区域
+*** DMA区域
 对于大多数现代嵌入式处理器而言,DMA操作可以在整个常规内存区域进行,因此DMA区域就直接覆盖了常规内存.
-****** 虚拟地址,物理地址,总线地址
-****** DMA地址掩码
+*** 虚拟地址,物理地址,总线地址
+- 总线地址： 基于DMA硬件使用的是总线地址而不是物理地址，是从设备角度上看到的内存地址
+- 物理地址：是从CPU MMU 控制器外围角度上看到的内存地址
+- 虚拟地址：CPU看到的是MMU反映给它的地址
+*** DMA地址掩码
 设备不一定能在所有的内存地址上执行DMA操作,在这种情况下需要设置DMA能够操作的地址总线宽度.
-如果DMA只能操作24位地址,那么就应该调用 =dma_set_mask(dev,0xffffff)=,其原型为: =int dma_set_mask(struct device *dev, u64 mask)=
-****** 一致性DMA缓冲区
-为了能够避免 "DMA与Cache一致性问题",使用如下函数分配一个DMA一致性的内存区域:
+#+BEGIN_SRC c
+int dma_set_mask(struct device *dev, u64 mask)
+#+END_SRC
+如果DMA只能操作24位地址,那么就应该调用 =dma_set_mask(dev,0xffffff)=
+*** 一致性DMA缓冲区
+为了能够避免 *DMA与Cache一致性问题*,使用如下函数分配一个DMA一致性的内存区域:
 #+BEGIN_SRC C
 /*
   申请一致性DMA缓冲区
@@ -229,3 +468,13 @@ void pci_free_consisten(struct pci_dev *pdev, size_t size, void *cpu_addr, dma_a
 #+END_SRC
 *注意*:
 =dma_alloc_xxx()= 函数虽然是以 dma_alloc_开头, *但是其申请的区域不一定在DMA区域里面*.以32位ARM处理器为例,当conherent_dma_mask小于0xffffffff时,才会设置GFP_DMA标记,并从DMA区域去申请内存.
+*** 流式DMA映射
+在许多情况下缓冲区来自内核的较上层，上层很可能以普通的 kmalloc() 等方申请内存，这时就需要使用流式DMA。
+
+流式DMA操作在本质上大多就是进行关闭Cache操作，以解决一致性问题。
+
+操作步骤为：
+1. 进行流式DMA映射
+2. 执行DMA操作
+3. 取消映射
+
