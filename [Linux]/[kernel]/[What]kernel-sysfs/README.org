@@ -1,0 +1,298 @@
+#+TITLE: [What]linux -> sysfs基本使用
+#+DATE:  <2018-03-09 Fri> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, kernel, sysfs
+#+NAME: <linux_kernel_sysfs_tutorial.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+通过在内核中使用 =sysfs= 的方式将内核中的变量，函数调用映射到用户空间的 =/sys= 文件中，便于调试和修改。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+用户空间在与内核模块交互的过程中，我所知道的有以下几种方式：
+1. 在 =insmod xxx.ko= 的时候指定参数的值
+2. 通过 =read(),write(),ioctl()= 的方式读写模块
+3. 通过对 =sysfs= 中的文件读写来间接控制模块的变量或函数
+4. 通过读写 =/proc= 中的文件来获知模块状态或控制模块
+
+
+其中：
+- 方法1不够灵活
+- 方法2需要应用程序的支持，并且模块每增加一个控制项应用程序也要相应增加
+- 方法4中的文件结构化不清晰
+
+而目前 =sysfs= 中的文件结构化是做得最好最清晰的，在读写模块一些参数时直接 =cat,echo= 就能完成很多事。
+当模块有太多的配置项时（比如 =AD9361= 驱动），可以使用 =sysfs= 来生成文件进行读写，这无论是在调试阶段还是在后期控制阶段都比较方便。
+
+* 基本概念简介
+** Linux内核对象(Kobject) -> 文件夹
+Linux内核中使用了很多面向对象的思想，一个结构体就可以看做是一个类，而由这个结构体所申请的变量就是一个实例对象。
+
+在 =sysfs= 中，一个 =kobject= 对象就对应一个文件夹。
+#+BEGIN_SRC c
+/**
+ ,* @param name: 对象的名称，在 sysfs 中就是文件夹的名称
+ ,* @param parent: 父对象，在 sysfs 中就是父文件夹
+ ,* @param kref: 对象正在被几个模块使用，当没有模块使用时此对象占用内存将被释放
+ ,* 
+ ,*/
+struct kobject {
+        const char          *name;
+        struct list_head    entry;
+        struct kobject      *parent;
+        struct kset         *kset;
+        struct kobj_type    *ktype;
+        struct kernfs_node  *sd; /* sysfs directory entry */
+        struct kref         kref;
+        #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+        struct delayed_work release;
+        #endif
+        unsigned int        state_initialized:1;
+        unsigned int        state_in_sysfs:1;
+        unsigned int        state_add_uevent_sent:1;
+        unsigned int        state_remove_uevent_sent:1;
+        unsigned int        uevent_suppress:1;
+};
+#+END_SRC
+** Linux内核对象属性(kobj_attribute) -> 文件
+=kobj_attribute= 可以用来创建文件，以对应内核中的数据和方法的操作。
+#+BEGIN_SRC c
+/**
+ ,* @param name: 对象的名称，在 sysfs 中就是文件名称
+ ,* @param mode: 文件的权限，此值的设置参考文件 include/linux/stat.h
+ ,*/
+struct attribute {
+        const char              *name;
+        umode_t                 mode;
+        #ifdef CONFIG_DEBUG_LOCK_ALLOC
+        bool                    ignore_lockdep:1;
+        struct lock_class_key   *key;
+        struct lock_class_key    skey;
+        #endif
+};
+
+
+/**
+ ,* @param show: 当用户空间读取文件内容时，调取此函数
+ ,* @param store: 当用户空间写文件时,调取此函数
+ ,*/
+struct kobj_attribute {
+        struct attribute attr;
+        ssize_t (*show)(struct kobject *kobj, struct kobj_attribute *attr,
+                        char *buf);
+        ssize_t (*store)(struct kobject *kobj, struct kobj_attribute *attr,
+                         const char *buf, size_t count);
+};
+#+END_SRC
+
+
+
+
+* 使用
+** 文件夹操作(include/linux/kobject.h)
+*** 新建
+#+BEGIN_SRC c
+/**
+ ,* kobject_create_and_add - create a struct kobject dynamically and register it with sysfs
+ ,*
+ ,* @name: the name for the kobject
+ ,* @parent: the parent kobject of this kobject, if any.
+ ,*
+ ,* This function creates a kobject structure dynamically and registers it
+ ,* with sysfs.  When you are finished with this structure, call
+ ,* kobject_put() and the structure will be dynamically freed when
+ ,* it is no longer being used.
+ ,*
+ ,* If the kobject was not able to be created, NULL will be returned.
+ ,*
+ ,*/
+struct kobject *kobject_create_and_add(const char *name, struct kobject *parent);
+
+//ex:
+struct kobject *new_dir_kobj;
+
+new_dir_kobj = kobject_create_and_add("new_dir", kernel_kobj);
+#+END_SRC
+关于父目录 parent 的设置：
+- 当 parent = NULL 时，新建的文件夹位于 /sys 文件夹下
+- 在内核里面已经定义了很多文件夹了：
+  + =struct kobject * kernel_kobj;= 代表文件夹 =/sys/kernel= 
+  + =struct kobject * firmware_kobj;= 代表文件夹 =/sys/firmware=
+  + =struct kobject * power_kobj;= 代表文件夹 =/sys/power=
+  + 等等。。。
+*** 删除
+#+BEGIN_SRC c
+/**
+ ,* kobject_del - unlink kobject from hierarchy.
+ ,* @kobj: object.
+ ,*/
+void kobject_del(struct kobject *kobj)
+{
+        struct kernfs_node *sd;
+
+        if (!kobj)
+                return;
+
+        sd = kobj->sd;
+        sysfs_remove_dir(kobj);
+        sysfs_put(sd);
+
+        kobj->state_in_sysfs = 0;
+        kobj_kset_leave(kobj);
+        kobject_put(kobj->parent);
+        kobj->parent = NULL;
+}
+
+//ex:
+kobject_del(new_dir_kobj);
+#+END_SRC
+*** 重命名
+#+BEGIN_SRC c
+/**
+ ,* kobject_rename - change the name of an object
+ ,* @kobj: object in question.
+ ,* @new_name: object's new name
+ ,*
+ ,* It is the responsibility of the caller to provide mutual
+ ,* exclusion between two different calls of kobject_rename
+ ,* on the same kobject and to ensure that new_name is valid and
+ ,* won't conflict with other kobjects.
+ ,*/
+int kobject_rename(struct kobject *kobj, const char *new_name);
+
+//ex:
+kobject_rename(new_dir_kobj, "new_name_dir");
+#+END_SRC
+*** 引用计数
+当新建对象时，其内部的引用计数会自动为1，当其他的模块也要继续使用这个对象时，需要主动增加或减少引用计数。
+#+BEGIN_SRC c
+/**
+ ,* kobject_get - increment refcount for object.
+ ,* @kobj: object.
+ ,*/
+struct kobject *kobject_get(struct kobject *kobj);
+
+/**
+ ,* kobject_put - decrement refcount for object.
+ ,* @kobj: object.
+ ,*
+ ,* Decrement the refcount, and if 0, call kobject_cleanup().
+ ,*/
+void kobject_put(struct kobject *kobj);
+#+END_SRC
+** 文件操作
+*** 普通模块新建
+=include/linux/sysfs.h= 中提供了很多宏用于轻松地新建文件对象：
+#+BEGIN_SRC c
+/**
+ ,* Use these macros to make defining attributes easier. See include/linux/device.h
+ ,* for examples..
+ ,*/
+
+#define SYSFS_PREALLOC 010000
+
+#define __ATTR(_name, _mode, _show, _store) {                                        \
+                .attr = {.name = __stringify(_name),                                 \
+                         .mode = VERIFY_OCTAL_PERMISSIONS(_mode) },                  \
+                .show= _show,                                                        \
+                .store= _store,                                                      \
+        }
+
+#define __ATTR_PREALLOC(_name, _mode, _show, _store) {                               \
+                .attr = {.name = __stringify(_name),                                 \
+                         .mode = SYSFS_PREALLOC | VERIFY_OCTAL_PERMISSIONS(_mode) }, \
+                .show= _show,                                                        \
+                .store= _store,                                                      \
+        }
+
+#define __ATTR_RO(_name) {                                                           \
+                .attr= { .name = __stringify(_name), .mode = S_IRUGO },              \
+                .show= _name##_show,                                                 \
+        }
+
+#define __ATTR_WO(_name) {                                                           \
+                .attr= { .name = __stringify(_name), .mode = S_IWUSR },              \
+                .store= _name##_store,                                               \
+        }
+
+#define __ATTR_RW(_name) __ATTR(_name, (S_IWUSR | S_IRUGO),                          \
+                                _name##_show, _name##_store)
+
+#define __ATTR_NULL { .attr = { .name = NULL } }
+
+#ifdef CONFIG_DEBUG_LOCK_ALLOC
+#define __ATTR_IGNORE_LOCKDEP(_name, _mode, _show, _store) {                         \
+                .attr = {.name = __stringify(_name), .mode = _mode,                  \
+                         .ignore_lockdep = true },                                   \
+                .show= _show,                                                        \
+                .store= _store,                                                      \
+        }
+#else
+#define __ATTR_IGNORE_LOCKDEP__ATTR
+#endif
+
+#define __ATTRIBUTE_GROUPS(_name)                                                    \
+        static const struct attribute_group *_name##_groups[] = {                    \
+                &_name##_group,                                                      \
+                NULL,                                                                \
+        }
+
+#define ATTRIBUTE_GROUPS(_name)                                                      \
+        static const struct attribute_group _name##_group = {                        \
+                .attrs = _name##_attrs,                                              \
+        };                                                                           \
+        __ATTRIBUTE_GROUPS(_name)
+#+END_SRC
+
+#+BEGIN_SRC c
+//读写
+static ssize_t hello_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
+{
+        return sprintf(buf, "Hello world");
+}
+
+static ssize_t hello_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
+{
+        //读取数据
+
+        return count;
+}
+
+//新建一个文件对象
+struct kobj_attribute hello_attrs = __ATTR_RW(hello);
+
+//新建组
+ATTRIBUTE_GROUPS(hello);
+
+sysfs_create_group(new_dir_kobj, hello_groups);
+#+END_SRC
+** 在驱动中的操作(include/linux/device.h)
+驱动在加载的时候Linux就会自动的为其新建了文件夹，所以驱动仅仅需要增加文件即可。
+#+BEGIN_SRC c
+#define DRIVER_ATTR(_name, _mode, _show, _store) \
+        struct driver_attribute driver_attr_##_name = __ATTR(_name, _mode, _show, _store)
+#define DRIVER_ATTR_RW(_name) \
+        struct driver_attribute driver_attr_##_name = __ATTR_RW(_name)
+#define DRIVER_ATTR_RO(_name) \
+        struct driver_attribute driver_attr_##_name = __ATTR_RO(_name)
+#define DRIVER_ATTR_WO(_name) \
+        struct driver_attribute driver_attr_##_name = __ATTR_WO(_name)
+
+/**
+ ,* device_create_file - create sysfs attribute file for device.
+ ,* @dev: device.
+ ,* @attr: device attribute descriptor.
+ ,*/
+int device_create_file(struct device *dev,
+                       const struct device_attribute *attr);
+/**
+ ,* device_remove_file - remove sysfs attribute file.
+ ,* @dev: device.
+ ,* @attr: device attribute descriptor.
+ ,*/
+void device_remove_file(struct device *dev,
+                        const struct device_attribute *attr);
+#+END_SRC
+

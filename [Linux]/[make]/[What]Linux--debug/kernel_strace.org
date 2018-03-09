@@ -1,0 +1,244 @@
+* [What]Linux --> 调试技巧
+- [[#通用调试工具][通用调试工具]]
+- [[#内核调试][内核调试]]
+- [[#%E6%80%A7%E8%83%BD%E7%9B%91%E6%8E%A7%E4%B8%8E%E8%B0%83%E4%BC%98%E5%B7%A5%E5%85%B7][性能与调优工具]]
+- [[#应用调试][应用调试]]
+** 通用调试工具
+*** GDB
+*** DDD
+** 内核调试
+调试嵌入式linux内核的方法如下:
+1. 目标机"插桩",如打上KGDB补丁,这样主机上的GDB可以与目标机KGDB通过串口或网口通信
+2. 使用仿真器,仿真器可以直接连接目标机的JTAG/BDM,这样主机GDB就可以通过与仿真器的通信来控制目标机.
+3. 在目标板上通过printk(),Oops,strace等软件方法进行观察调试,这些方法不具备查看和修改数据结构,断点,単步等功能.
+
+所以不管时目标机"插桩"函数使用仿真器,主要的调试工具还是GDB或printk.
+*** 调试信息输出
+内核默认有很多使用 =pr_debug()/dev_dbg()= 的输出,但需要满足如下条件:
+1. 开启了 DEBUG 宏
+2. kernel printk 的默认日志级别大于7
+**** 开启DEBUG
+- 方法1
+在要输出信息的文件开头加上宏定义 =#define DEBUG=
+- 方法2
+在编译内核的时候传入参数 KCFLAGS=-DDEBUG 打开全局输出
+*** printk
+printk()会将内核信息输出到信息缓冲区中, *内核信息缓冲区是一个环形缓冲区(Ring Buffer),所以塞入消息过多则会将之前的消息冲刷掉*.
+printk()定义了8个消息级别(0~7), *数值越低,级别越高*.
+#+BEGIN_SRC C
+#define KERN_EMERG "<0>" //紧急事件,一般是系统崩溃之前提示的消息
+#define KERN_ALERT "<1>" //必须立即采取行动
+#define KERN_CRIT "<2>" //临界状态,通常涉及严重的硬件或软件操作失败
+#define KERN_ERR "<3>" //用于报告错误状态,设备驱动代码经常使用它报告硬件问题
+#define KERN_WARNING "<4>" //对可能出现问题的情况进行警告,不会对系统造成严重的问题
+#define KERN_NOTICE "<5>" //有必要进行提示的正常情形,许多与安全攸关的情况用这个级别
+#define KERN_INFO "<6>" //提示性的信息,驱动程序使用它打印出一般信息
+#define KERN_DEBUG "<7>" //调试信息
+#+END_SRC
+**** 调试信息的输出
+- pr_xxx()
+通常使用封装了 printk() 的宏,来显示调试信息.比如 pr_debug(),pr_info().
+使用 pr_xxx() API的好处是,可以在文件最开头通过 pr_fmt() 定义一个打印格式.
+#+BEGIN_SRC C
+//打印消息头带有 "NMI watchdog:"前缀
+#define pr_fmt(fmt) "NMI watchdog:" fmt
+#+END_SRC
+- dev_xxx()
+使用dec_xxx()打印的时候,设备名称会被自动打印到打印消息的前面:
+**** 修改调试等级的方法
+***** 在系统中修改 prink 文件
+通过 =/proc/sys/kernel/printk= 文件可以调节 printk() 的输出等级,该文件的4个数值表示为:
+1. 控制台的日志级别:当前的打印级别,优先级高于该值(值越小,优先级越高)的消息将被打印至控制台
+2. 默认的消息日志级别: 将用该优先级来打印没有优先级前缀的消息,也就是直接写 =printk("xxx")= 而不带打印级别的情况下,会使用该打印级别
+3. 最低的控制台日志级别: 控制台日志级别可被设置的最小值(一般是1)
+4. 默认的控制台日志级别: 控制台日志级别的默认值
+使用如下命令打印所有信息:
+=#echo 8 > /proc/sys/kernel/printk=
+*注意*:
+此文件并不控制内核消息进入 __log_buf 的门槛,因此无论消息级别是多少,都会进入 __log_buf 中,但是最终只有高于当前打印级别的内核消息才会从控制台打印.
+可以通过 =dmesg= 命令查看内核打印缓冲区, 当使用 =dmesg-c= 则不仅会显示 __log_buf 还会清楚该缓冲区的内容.也可以通过 =cat /proc/kmesg= 命令来一直显示
+内核信息.
+***** 修改启动参数
+通过在 bootargs 中设置 =ignore_loglevel= 来忽略打印级别.
+在系统启动后,也可以通过写 =/sys/module/printk/parameters/ignore_loglevel= 文件来动态设置是否忽略打印级别.
+*** DEBUG_LL 和 EARLY_PRINTK
+为了能够在控制台驱动初始化之前就打印信息,需要选择 DEBUG_LL 和 EARLY_PRINTK,也需要在 bootargs 中设置 earlyprintk 选项.
+*** 使用 /proc
+/proc 文件系统是一个虚拟文件系统,通过它可以在Linux内核空间和用户空间之间通信.可以将对虚拟文件的读写作为与内核中实体进行通信的手段.
+Linux系统的许多命令都是通过分析 /proc 下的文件来完成的.
+**** meminfo 文件
+=cat /proc/meminfo= 显示内存概况
+**** free 命令
+统计内存使用情况
+*** Oops
+当内核出现类似用户空间的 Segmentation Fault 时,Oops 会被打印到控制台和写入内核log缓冲区.
+
+在Oops 的输出信息中, 需要注意的一些信息是:
+- PC is at [function_name] + [address]
+此行指出了出错的函数, 以及执行语句在函数中的偏移地址. 然后可以通过命令得出反汇编代码, 找出C代码位置
+#+begin_example
+arm-linux-gnueabihf-objdump -d -D file.o
+#+end_example
+- 寄存器列表
+当出错的函数有参数时, 可以通过寄存器列表来查看输入的参数是否正确(如果参数过多, 还要查看栈信息)
+- 函数调用顺序
+通过查看栈信息, 可以知道此函数是如何被以层层调用进来的
+
+*** BUG_ON() 和 WARN_ON()
+内核中有许多地方调用类似的 BUG() 语句,它非常像一个内核运行时的断言,意味着本来不该执行到BUG()这条语句,一旦执行即抛出 Oops. 
+
+BUG()的变体叫做 =BUG_ON(condition)= ,当 *条件成立则抛出Oops*. 
+
+除此之外,内核还有 =WARN_ON(condition)=, 当 *条件成立则抛出栈回溯, 但是不会抛出Oops*. 
+
+有时候,WARN_ON()也可以作为一个调试技巧,比如,我们要查看这个函数时怎么一级一级被调用进来的,那可以在函数中加入一个 =WARN_ON(1)= 
+*** strace
+用于跟踪一个程序的运行状况,可以查看被调用函数的参数值以及它的返回值.
+*** KGDB and kdb
+    参考链接 : [[https://www.kernel.org/doc/html/latest/dev-tools/kgdb.html][内核说明文档]]
+
+kernel 具有 =kdb,kgdb= 两个调试前端, 并且这两个还可以动态的切换.
+
+kdb 是一个具有 shell 风格的简易调试工具, 具有查看内存,寄存器,设置断点等等功能. *在使用 kdb 之前,必须先使能 kgdb*.
+
+kgdb 是源码级别的调试工具, 与主机的 gdb 联合调试.
+
+**** 准备工作
+***** kgdb内核配置
+1. 在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger=,使能 kgdb
+2. 在 menuconfig 中选中 =Kernel hacking -> Compile-time checks and compiler options -> Compile the kernel with debug info=, 生成调试信息.
+3. 检查最后的 config ,关闭选项 =CONFIG_STRICT_KERNEL_RWX=. 这个选项会使得运行周边内存为只读状态.
+4. 使能串口或者网口驱动,使得主机可以连接嵌入式板.
+
+使用串口连接的配置如下:
+#+begin_example
+# CONFIG_STRICT_KERNEL_RWX is not set
+CONFIG_FRAME_POINTER=y
+CONFIG_KGDB=y
+CONFIG_KGDB_SERIAL_CONSOLE=y
+CONFIG_DEBUG_INFO=y
+#+end_example
+***** kdb 内核配置
+kdb 配置要在 =kgdb内核配置= 的基础上继续进行如下配置:
+1. 在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger -> KGDB_KDB: include kdb frontend for kgdb= 使能 kdb
+2. 当需要使用键盘与 kdb 交互时, 需要在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger -> KGDB_KDB: keyboard as input device= 使能键盘
+最终在 config 文件中的配置如下:
+#+begin_example
+#CONFIG_STRICT_KERNEL_RWX is not set
+CONFIG_FRAME_POINTER=y
+CONFIG_KGDB=y
+CONFIG_SERIAL_CONSOLE=y
+CONFIG_DEBUG_INFO=y
+CONFIG_KGDB_KDB=y
+CONFIG_KDB_KEYBOARD=y
+#+end_example
+***** 启动参数设置
+需要在设备树或者u-boot传递参数中加入一些启动参数, 让目标板与主机的GDB同步.
+****** kgdboc(kgdb over console)
+此参数配置了主机与目标板的交互方式.
+#+begin_example
+kgdboc=[kms][[,]kdb][[,]serial_device][,baud]
+#+end_example
+- kms : Kernel Mode Setting , 当具有视频驱动时, 可以进入到图形终端调试.
+- kbd : Keyboard 
+#+begin_example
+#通过串口连接
+kgdboc=<tty-device>,[baud]  ; kgdboc=ttyS0,115200
+#通过串口和键盘连接
+kgdboc=kbd,<serial_device>,[baud] ; kgdboc=kbd,ttyS0,115200
+#通过串口和键盘连接并且打开KMS功能
+kgdboc=kms,kbd,ttyS0,115200
+#如果需要在启动阶段的时候也进入调试模式,那么需要加上 kgdbwait
+kgdboc=ttyS0,115200 kgdbwait
+
+
+#在运行期间可以使能或关闭 kgdboc
+#enable 
+echo ttyS0 > /sys/module/kgdboc/parameters/kgdboc
+#disable
+echo "" > /sys/module/kgdboc/paramters/kgdboc 
+#+end_example
+
+使用顺序:
+1. 先使用串口终端与目标板连接,然后内核启动时会输出信息,代表它正在等待主机的 gdb.
+2. 关闭终端, 然后启动 gdb 连接目标机.
+3. 如果想要中断目标机系统并且强制进入调试模式, 需要先后发送 =Sysrq= , =g= 信息,然后再断开终端启动 gdb.
+4. 停止调试模式, 需要在终端中发送 =SysRq-G= 命令.
+****** kgdbwait
+如果使用了此参数, 在启动内核时, 内核会等待 gdb 的连接
+****** kgdbcon
+kgdbcon 使得 gdb 可以查看 =printk()= 内部参数.
+
+注意: *此功能不能在启动参数中使用!*
+#+begin_example
+#在内核命令行中使能 kgdbcon
+kgdbcon
+#在sysfs 中使能
+echo 1 > /sys/module/kgdb/parameters/kgdb_use_con
+#+end_example
+****** kgdbreboot
+指定调试器如何处理重启信息, 在sysfs中设置此项参数, 默认的值为0, 可以为 -1,1
+#+begin_example
+#忽略重启信息
+echo -1 > /sys/module/debug_core/parameters/kgdbreboot
+#发送重启信息到其他调试器终端
+echo 0 > /sys/module/debug_core/parameters/kgdbreboot
+#进入重启信息
+echo 1 > /sys/module/debug_core/parameters/kgdbreboot
+#+end_example
+****** nokaslr
+当内核使用了 KASLR 技术时, 需要在参数中加入此选项, 否则 GDB 会工作异常
+
+**** 使用 kgdb/ gdb
+1. 启动参数中包含如下信息
+#+begin_example
+console=ttyS0,115200 kgdboc=ttyS0,115200 kgdbwait nokaslr
+#+end_example
+2. 当参数中包含 kgdbwait 时,内核会主动等待调试器. 如果没有此参数, 那么需要如下操作以进入调试模式
+#+begin_example
+#有的时候设置了 kgdbwait 也不会等待,所以还需要使用下面的命令强制进入
+#在输出等待主机信息后, 需要退出当前的终端!
+#方法1(推荐)
+echo ttyS0 > /sys/module/kgdboc/parameters/kgdboc
+#方法2, 在终端中输入命令(失败)
+echo g > /proc/sysrq-trigger
+#方法3, 在终端中发送命令,比如在 minicom 中使用(失败)
+CTRL-A f g
+#方法4, 在远程终端登录时(失败)
+CTRL-] 然后 按下 ENTER g
+#+end_example
+3. 退出终端
+4. 在主机使用 gdb 连接,需要使用到 =vmlinux= 文件
+#+begin_example
+#使用串口连接
+% sudo gdb ./vmlinux
+(gdb) set serial baud 115200
+(gdb) target remote /dev/ttyUSB0
+
+#使用网口连接
+% gdb ./vmlinux
+(gdb) target remote 192.168.2.2:2012
+#+end_example
+5. 重定向输入输出
+  + 打开一个新的控制台,使用命令 =tty=,记住当前文件路径,比如 =/dev/pts/19=
+  + 在GDB中使用命令 =tty /dev/pts/19=, 这样就把输入输出定向到了新控制台
+6. 运行GDB
+  + 使用命令 =c= 即可
+  
+** 性能监控与调优工具
+*** 使用 top,vmstat,iostat,sysctl 等
+- top 命令用于显示处理器的活动状况.
+- vmstat 用于报告关于内核线程,虚拟内存,磁盘,陷阱和CPU活动的统计信息.
+- iostat 用于分析磁盘传输的闲忙状况.
+- netstat 用来监测网络信息的工具
+- sar 用于显示数据
+- sysctl 读取系统变量
+*** 使用OProfile,gprof 查看性能
+- OProfile
+帮助用户识别模块的占用时间,循环的展开,高速缓存的使用率低,低效的类型转换和冗余操作,错误预测转移等问题.
+- gprof
+打印除程序运行中各个函数消耗的时间,还可以产生程序运行时的函数调用关系,调用次数.
+*** LTTng 进行内核跟踪
+跟踪系统详细的运行状态和流程,可以跟踪记录系统中的特定事件.
+*** LTP 压力测试
+*** Benchmark 评估系统

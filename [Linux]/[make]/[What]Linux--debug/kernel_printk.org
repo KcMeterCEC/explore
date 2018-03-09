@@ -1,0 +1,115 @@
+#+TITLE: [What]Linux内核调试之printk
+#+DATE:  <2018-03-08 Thu> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_printk.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+总结在Linux下使用串口打印调试信息。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* printk 基本使用
+printk() 函数用于打印内核的调试信息，同时会将这些信息输出到一个缓冲区中。
+#+begin_example
+可以通过 dmesg 命令查看内核打印缓冲区, 当使用 dmesg -c 则不仅会显示 __log_buf 还会清除该缓冲区的内容.也可以通过 cat /proc/kmsg 命令来一直显示内核信息.
+#+end_example
+** 信息缓冲区大小设置
+信息缓冲区的填写是一个环形队列的形式，所以如果消息太多以前的消息就会被覆盖掉，有的时候需要设置更大的缓冲区显示更多的信息。
+
+信息缓冲区代码位于 =kernel/printk/printk.c= 中：
+#+BEGIN_SRC c
+#define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
+static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN)
+#+END_SRC
+可以看出缓存的大小是 2 ^ CONFIG_LOG_BUF_SHIFT 个字节， =CONFIG_LOG_BUF_SHIFT= 的设置是由 =init/Kconfig= 来完成的，在Menuconfig中的路径为：
+#+begin_example
+General setup -> Kernel log buffer size(16 => 64KB, 17 => 128kB)
+#+end_example
+** 消息级别
+printk()定义了8个消息级别(0~7), *数值越低,级别越高*.
+
+在实际使用中，会有默认的消息级别打印， *只有低于消息级别的消息才会打印* 。
+#+BEGIN_SRC C
+#define KERN_SOH   "\001"  /*ASCII Start of header*/
+#define KERN_SOH_ASCII '\001'
+
+#define KERN_EMERG   KERN_SOH "0" //紧急事件,一般是系统崩溃之前提示的消息
+#define KERN_ALERT   KERN_SOH "1" //必须立即采取行动
+#define KERN_CRIT    KERN_SOH "2" //临界状态,通常涉及严重的硬件或软件操作失败
+#define KERN_ERR     KERN_SOH "3" //用于报告错误状态,设备驱动代码经常使用它报告硬件问题
+#define KERN_WARNING KERN_SOH "4" //对可能出现问题的情况进行警告,不会对系统造成严重的问题
+#define KERN_NOTICE  KERN_SOH "5" //有必要进行提示的正常情形,许多与安全攸关的情况用这个级别
+#define KERN_INFO    KERN_SOH "6" //提示性的信息,驱动程序使用它打印出一般信息
+#define KERN_DEBUG   KERN_SOH "7" //调试信息
+
+#define KERN_DEFAULT KERN_SOH "d" //默认级别
+#+END_SRC
+** 修改消息级别的方法
+*** 在menuconfig中修改
+对应的路径为：
+#+begin_example
+Kernel hacking -> printk and dmesg options -> Default message log level(1-7)
+#+end_example
+*** 在系统中修改 prink 文件:
+通过 =/proc/sys/kernel/printk= 文件可以调节 printk() 的输出等级,该文件的4个数值表示为:
+1. 控制台的日志级别:当前的打印级别,优先级高于该值(值越小,优先级越高)的消息将被打印至控制台
+2. 默认的消息日志级别: 将用该优先级来打印没有优先级前缀的消息,也就是直接写 =printk("xxx")= 而不带打印级别的情况下,会使用该打印级别
+3. 最低的控制台日志级别: 控制台日志级别可被设置的最小值(一般是1)
+4. 默认的控制台日志级别: 控制台日志级别的默认值
+
+使用如下命令打印所有信息:
+#+begin_example
+#echo 8 > /proc/sys/kernel/printk
+#+end_example
+*注意*:
+此文件并不控制内核消息进入 __log_buf 的门槛,因此无论消息级别是多少,都会进入 __log_buf 中,但是最终只有高于当前打印级别的内核消息才会从控制台打印.
+*** 修改启动参数
+通过在 bootargs 中设置 =ignore_loglevel= 来忽略打印级别.
+在系统启动后,也可以通过写 =/sys/module/printk/parameters/ignore_loglevel= 文件来动态设置是否忽略打印级别.
+* 调试信息的输出
+- pr_xxx(): 位于 =/include/linux/printk.h=
+通常使用封装了 printk() 的宏,来显示调试信息.比如 pr_debug(),pr_info().
+使用 pr_xxx() API的好处是,可以在文件最开头通过 pr_fmt() 定义一个打印格式.
+#+BEGIN_SRC C
+//打印消息头带有 "[driver] watchdog:"前缀
+#define pr_fmt(fmt) "[driver] watchdog:" fmt
+#+END_SRC
+- dev_xxx(): 位于 =include/linux/device.h= 
+使用dec_xxx()打印的时候,设备名称会被自动打印到打印消息的前面:
+** 使用规则
+- 能使用 =dev_xxx()= 的时候就尽量使用它，因为它可以打印出设备的名称。
+  + 这在一个驱动对应多个设备，而某个设备出问题的情况下比较好排查。
+- 在不能使用 =dev_xxx()= 的场合才使用 =pr_xxx()= 
+  + 为了明确信息是由 =pr_xxx()= 输出的信息，建议在信息头中加上标识符。
+    + 驱动中调试加上 [driver]
+    + 内存中调试加上 [mem]
+** 默认调试信息输出
+内核默认有很多使用 =pr_debug()/dev_dbg()= 的输出,但需要满足如下条件:
+1. 开启了 DEBUG 宏
+2. kernel printk 的默认日志级别大于7
+*** 开启DEBUG
+- 方法1
+在要输出信息的文件开头加上宏定义 =#define DEBUG=
+- 方法2
+在编译内核的时候传入参数 KCFLAGS=-DDEBUG 打开全局输出
+* 早期信息的打印
+** 使能
+为了能够在控制台驱动初始化之前就打印信息,需要在menuconfig中设置:
+- 选择 Kernel low-level debug
+#+begin_example
+Kernel hacking -> Kernel low-level debugging functions(read help!)
+#+end_example
+- 选择 Early printk
+#+begin_example
+Kernel hacking -> Early printk
+#+end_example
+- 在 bootargs 中添加 earlyprintk 字符串
+** 使用
+#+BEGIN_SRC c
+#include <asm/early_printk.h>
+
+early_printk("Hello world\n");
+#+END_SRC
