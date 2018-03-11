@@ -1,0 +1,41 @@
+#+TITLE: [What]GDB 使用 DDD 
+#+DATE:<2018-03-09 Fri> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, gdb
+#+NAME: <linux_debug_gdb_ddd.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+当gdb与ddd联合使用时，已经能够满足很多要求了.
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 使用DDD前的准备
+** 安装
+简单粗暴：
+#+begin_example
+sudo apt install ddd
+#+end_example
+** 编译及启动
+和 gdb 一样，编译生成的目标文件需要包含调试信息。
+#+begin_example
+gcc -g hello.c -o hello.o 
+#+end_example
+启动 ddd 的同时也启动了 gdb
+#+begin_example
+ddd ./hello.o
+#+end_example
+** 设置
+- 默认源码显示区没有行号，使用快捷键 =ALT+n= 即可显示。 
+- 使用 =ALT+9= 将输入和输出重定向到新窗口。
+* 使用过程中的问题
+** waiting until GDB gets ready 
+*** 描述
+窗口下方状态栏出现此提示时，ddd将无法运行。
+*** 解决
+#+begin_example
+# 打开配置文件
+vim ~/.ddd/init 
+# 删除行 "set extended-prompt" not set\n \
+#+end_example

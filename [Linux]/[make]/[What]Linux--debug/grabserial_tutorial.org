@@ -1,0 +1,61 @@
+#+TITLE: [What]使用Grabserial来检测代码运行时间
+#+DATE:  <2018-03-10 Sat> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, usage
+#+NAME: <linux_debug_usage_grabserial_tutorial.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+[[https://elinux.org/Grabserial][Grabserial]] 是一个串口监视工具，其最大的特色在于：可以监视每一行串口输出的时间和相对上一行串口输出的时间差。
+
+基础此功能，我们可以推导出使用此工具可以完成以下调试工作：
+1. 检查系统启动的完整时间(Linux,RT-thread,...)
+2. 检查特定一段代码的运行时间(比如调试应用程序的算法效率)
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 安装
+#+begin_example
+# 拷贝库
+git clone https://github.com/tbird20d/grabserial
+cd grabserial
+# 安装
+sudo python setup.py install
+#+end_example
+* 使用
+grabserial 的默认配置为：
+- 端口号： /dev/ttyS0
+- 波特率： 115200
+- 8位数据位且无停止位
+所以一般情况下在传输协议上的设置只需要设置端口号即可。
+
+其输出格式为： [绝对时间][相对上一行的时间] 串口内容
+** 持续捕捉输出
+#+begin_example
+# -v 显示详细信息
+# -d 设置端口
+# -t 显示每一行的时间
+grabserial -v -d /dev/ttyUSB0 -t
+#+end_example
+使用上面的命令 grabserial 将会一直捕捉标准输出，使用 =CTRL+C= 退出。
+** 捕捉系统的启动时间
+#+begin_example
+# -v 显示详细信息
+# -d 设置端口
+# -t 显示每一行的时间
+# -e 持续捕捉多少秒
+# -m 当匹配到指定字符串后，清零时间重新计时(字符串使用正则表达式)
+grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "^Linux version.*"
+#+end_example
+** 捕捉两段特定输出之间的时间差
+*注意：* 此命令需要字符串输出在同一行
+#+begin_example
+# -v 显示详细信息
+# -d 设置端口
+# -t 显示每一行的时间
+# -i 一行中的停止字符串(字符串使用正则表达式)
+# 此行命令用户捕捉Linux内核的解压缩时间
+grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "Uncompressing Linux" -i "done,"
+#+end_example
+

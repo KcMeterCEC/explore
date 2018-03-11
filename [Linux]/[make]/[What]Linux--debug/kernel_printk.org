@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-总结在Linux下使用串口打印调试信息。
+总结在Linux内核下使用串口打印调试信息。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML

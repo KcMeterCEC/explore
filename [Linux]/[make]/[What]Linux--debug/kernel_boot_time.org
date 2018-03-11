@@ -1,0 +1,36 @@
+#+TITLE: [What]Linux内核调试之启动过程
+#+DATE:  <2018-03-11 Sun> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_boot_time.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+通过串口打印以及进行终端捕捉能够比较深入的了解Linux在启动过程中各个步骤所花费的时间。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 准备
+按照以下步骤即可：
+- 在bootargs 中加入字符串 
+#+begin_example
+#1. 所有级别信息都打印
+#2. 使能早期打印
+#3. 打印初始化调用细节以及消耗时间(在确定初始化调用时间后需要去掉此项,避免此部分调试信息加大开机时间)
+loglevel=8 earlyprintk initcall_debug
+#+end_example
+- 在menuconfig中 [[https://kcmetercec.github.io/2018/03/08/linux_debug_kernel_printk/][使能早期打印]]
+- 使用 [[https://kcmetercec.github.io/2018/03/10/linux_debug_usage_grabserial_tutorial/][Grabserial 来显示时间]]
+#+begin_example
+grabserial -v -d /dev/ttyUSB0 -e 60 -t -m "Booting Linux on physical CPU*"
+#+end_example
+* 提高开机速度
+在了解到各个部分的开机时间后，有下面这些通用的方法可以提高Linux的开机速度。
+** bootargs 设置
+*** 取消不必要的串口输出
+printk的发送会比较占用时间，所以可以取消一些不重要的输出：
+- 在menuconfig中取消 earlyprintk 宏，并且在 bootargs 中也取消此字符串
+- 在 bootargs 中取消 loglevel=8 字符串，用 quiet 代替。
+  + quiet 会让 kernel 设置为只有警告以上的信息才会打印(loglevel=4)
+

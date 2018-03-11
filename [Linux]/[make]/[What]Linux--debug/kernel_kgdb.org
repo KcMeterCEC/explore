@@ -1,0 +1,142 @@
+#+TITLE: [What]Linux内核调试之Kgdb
+#+DATE:  <2018-03-09 Fri> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_kgdb.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+总结在Linux内核下使用 kgdb 调试内核。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+参考链接 : [[https://www.kernel.org/doc/html/latest/dev-tools/kgdb.html][内核说明文档]]
+
+kernel 具有 =kdb,kgdb= 两个调试前端, 并且这两个还可以动态的切换.
+
+kdb 是一个具有 shell 风格的简易调试工具, 具有查看内存,寄存器,设置断点等等功能. *在使用 kdb 之前,必须先使能 kgdb*.
+
+kgdb 是源码级别的调试工具, 与主机的 gdb 联合调试.
+
+* 准备工作
+** kgdb内核配置
+1. 在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger=,使能 kgdb
+2. 在 menuconfig 中选中 =Kernel hacking -> Compile-time checks and compiler options -> Compile the kernel with debug info=, 生成调试信息.
+3. 检查最后的 config ,关闭选项 =CONFIG_STRICT_KERNEL_RWX=. 这个选项会使得运行周边内存为只读状态.
+4. 使能串口或者网口驱动,使得主机可以连接嵌入式板.
+
+使用串口连接的配置如下:
+#+begin_example
+# CONFIG_STRICT_KERNEL_RWX is not set
+CONFIG_FRAME_POINTER=y
+CONFIG_KGDB=y
+CONFIG_KGDB_SERIAL_CONSOLE=y
+CONFIG_DEBUG_INFO=y
+#+end_example
+** kdb 内核配置
+kdb 配置要在 =kgdb内核配置= 的基础上继续进行如下配置:
+1. 在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger -> KGDB_KDB: include kdb frontend for kgdb= 使能 kdb
+2. 当需要使用键盘与 kdb 交互时, 需要在 menuconfig 中选中 =Kernel hacking -> kernel debugging -> KGDB: kernel debugger -> KGDB_KDB: keyboard as input device= 使能键盘
+最终在 config 文件中的配置如下:
+#+begin_example
+#CONFIG_STRICT_KERNEL_RWX is not set
+CONFIG_FRAME_POINTER=y
+CONFIG_KGDB=y
+CONFIG_SERIAL_CONSOLE=y
+CONFIG_DEBUG_INFO=y
+CONFIG_KGDB_KDB=y
+CONFIG_KDB_KEYBOARD=y
+#+end_example
+** 启动参数设置
+需要在设备树或者u-boot传递参数中加入一些启动参数, 让目标板与主机的GDB同步.
+*** kgdboc(kgdb over console)
+此参数配置了主机与目标板的交互方式.
+#+begin_example
+kgdboc=[kms][[,]kdb][[,]serial_device][,baud]
+#+end_example
+- kms : Kernel Mode Setting , 当具有视频驱动时, 可以进入到图形终端调试.
+- kbd : Keyboard 
+#+begin_example
+#通过串口连接
+kgdboc=<tty-device>,[baud]  ; kgdboc=ttyS0,115200
+#通过串口和键盘连接
+kgdboc=kbd,<serial_device>,[baud] ; kgdboc=kbd,ttyS0,115200
+#通过串口和键盘连接并且打开KMS功能
+kgdboc=kms,kbd,ttyS0,115200
+#如果需要在启动阶段的时候也进入调试模式,那么需要加上 kgdbwait
+kgdboc=ttyS0,115200 kgdbwait
+
+
+#在运行期间可以使能或关闭 kgdboc
+#enable 
+echo ttyS0 > /sys/module/kgdboc/parameters/kgdboc
+#disable
+echo "" > /sys/module/kgdboc/paramters/kgdboc 
+#+end_example
+
+使用顺序:
+1. 先使用串口终端与目标板连接,然后内核启动时会输出信息,代表它正在等待主机的 gdb.
+2. 关闭终端, 然后启动 gdb 连接目标机.
+3. 如果想要中断目标机系统并且强制进入调试模式, 需要先后发送 =Sysrq= , =g= 信息,然后再断开终端启动 gdb.
+4. 停止调试模式, 需要在终端中发送 =SysRq-G= 命令.
+*** kgdbwait
+如果使用了此参数, 在启动内核时, 内核会等待 gdb 的连接
+*** kgdbcon
+kgdbcon 使得 gdb 可以查看 =printk()= 内部参数.
+
+注意: *此功能不能在启动参数中使用!*
+#+begin_example
+#在内核命令行中使能 kgdbcon
+kgdbcon
+#在sysfs 中使能
+echo 1 > /sys/module/kgdb/parameters/kgdb_use_con
+#+end_example
+*** kgdbreboot
+指定调试器如何处理重启信息, 在sysfs中设置此项参数, 默认的值为0, 可以为 -1,1
+#+begin_example
+#忽略重启信息
+echo -1 > /sys/module/debug_core/parameters/kgdbreboot
+#发送重启信息到其他调试器终端
+echo 0 > /sys/module/debug_core/parameters/kgdbreboot
+#进入重启信息
+echo 1 > /sys/module/debug_core/parameters/kgdbreboot
+#+end_example
+*** nokaslr
+当内核使用了 KASLR 技术时, 需要在参数中加入此选项, 否则 GDB 会工作异常
+* 使用 kgdb/ gdb
+1. 启动参数中包含如下信息
+#+begin_example
+console=ttyS0,115200 kgdboc=ttyS0,115200 kgdbwait nokaslr
+#+end_example
+2. 当参数中包含 kgdbwait 时,内核会主动等待调试器. 如果没有此参数, 那么需要如下操作以进入调试模式
+#+begin_example
+#有的时候设置了 kgdbwait 也不会等待,所以还需要使用下面的命令强制进入
+#在输出等待主机信息后, 需要退出当前的终端!
+#方法1(推荐)
+echo ttyS0 > /sys/module/kgdboc/parameters/kgdboc
+#方法2, 在终端中输入命令
+echo g > /proc/sysrq-trigger
+#方法3, 在终端中发送命令,比如在 minicom 中使用
+CTRL-A f g
+#方法4, 在远程终端登录时
+CTRL-] 然后 按下 ENTER g
+#+end_example
+3. 退出终端
+4. 在主机使用 gdb 连接,需要使用到 =vmlinux= 文件
+#+begin_example
+#使用串口连接
+% sudo gdb ./vmlinux
+(gdb) set serial baud 115200
+(gdb) target remote /dev/ttyUSB0
+
+#使用网口连接
+% gdb ./vmlinux
+(gdb) target remote 192.168.2.2:2012
+#+end_example
+5. 重定向输入输出
+  + 打开一个新的控制台,使用命令 =tty=,记住当前文件路径,比如 =/dev/pts/19=
+  + 在GDB中使用命令 =tty /dev/pts/19=, 这样就把输入输出定向到了新控制台
+6. 运行GDB
+  + 使用命令 =c= 即可
+  
