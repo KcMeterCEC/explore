@@ -31,12 +31,14 @@ grabserial 的默认配置为：
 所以一般情况下在传输协议上的设置只需要设置端口号即可。
 
 其输出格式为： [绝对时间][相对上一行的时间] 串口内容
+
+*以下命令都比较长，建议常用的命令可以使用 alias命令封装一次。*
 ** 持续捕捉输出
 #+begin_example
 # -v 显示详细信息
 # -d 设置端口
 # -t 显示每一行的时间
-grabserial -v -d /dev/ttyUSB0 -t
+sudo grabserial -v -d /dev/ttyUSB0 -t
 #+end_example
 使用上面的命令 grabserial 将会一直捕捉标准输出，使用 =CTRL+C= 退出。
 ** 捕捉系统的启动时间
@@ -46,7 +48,7 @@ grabserial -v -d /dev/ttyUSB0 -t
 # -t 显示每一行的时间
 # -e 持续捕捉多少秒
 # -m 当匹配到指定字符串后，清零时间重新计时(字符串使用正则表达式)
-grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "^Linux version.*"
+sudo grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "^Linux version.*"
 #+end_example
 ** 捕捉两段特定输出之间的时间差
 *注意：* 此命令需要字符串输出在同一行
@@ -56,6 +58,6 @@ grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "^Linux version.*"
 # -t 显示每一行的时间
 # -i 一行中的停止字符串(字符串使用正则表达式)
 # 此行命令用户捕捉Linux内核的解压缩时间
-grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "Uncompressing Linux" -i "done,"
+sudo grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "Uncompressing Linux" -i "done,"
 #+end_example
 

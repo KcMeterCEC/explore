@@ -1,0 +1,367 @@
+#+TITLE: [What]linux -> 内核中断基础
+#+DATE:  <2018-03-12 Mon> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, kernel, irq
+#+NAME: <linux_kernel_irq_tutorial.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理内核中断的使用方式。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 概览
+ARM 中具有不同的工作模式, 有些模式又称为异常,而中断是属于异常中的一种.
+异常具有异常向量表,而具体的中断也具有中断向量表.
+而这三者都是与 ARM 内部的 程序状态寄存器CPSR(Current Program Status Register)有关.
+[[./arm_cpsr.jpg]]
+** 工作模式
+ARM 体系的 CPU 有以下 7 种工作模式.
+- 用户模式 (usr): ARM 处理器正常的程序执行状态
+- 快速中断模式 (fiq) : 用于高速数据传输或通道处理.
+- 中断模式 (irq): 用于通用的中断处理
+- 管理模式 (svc): 操作系统使用的保护模式
+- 数据访问终止模式 (abt) : 当数据或指令终止时进入该模式,可以用于虚拟存储及存储保护.
+- 系统模式(sys): 运行具有特权的操作系统任务
+- 未定义指令中止模式 (und):当未定义指令进入该模式,可用于支持硬件协处理器的软件仿真.
+
+工作模式的切换,是通过 CPSR 来完成的. 可以通过软件来进行模式的切换, 或者发生各类中断或异常时 CPU 自动进入相应的模式. 除用户模式外, 其他 6 种工作模式都属于特权模式.
+
+大多数程序运行于用户模式,进入特权模式是为了处理中断,异常,或者访问被保护的系统资源.
+
+另外, ARM 体系的 CPU 有以下两种工作状态.
+- ARM 状态: 此时处理器执行32位的字对齐的 ARM 指令.
+  + 默认处于这种模式
+- Thumb 状态: 此时处理器执行16位的半字对齐的 Thumb 指令.
+
+各种模式下对应的寄存器如下图, 其中带灰色三角的表示在对应模式下具有副本寄存器.
+[[./arm_modeReg.jpg]]
+
+*注意* : 用户模式和系统模式使用同一个寄存器组.
+
+图中 R0 ~ R15 可以直接访问, 这些寄存器除R15外都是通用寄存器,即它们即可以用于保存数据也可以用于保存地址.另外, R13 ~ R15稍有特殊.
+- R13 又被称为栈指针寄存器,通常被用于保存栈指针. 
+- R14又被称为程序连接寄存器(subroutine Link Register) 或连接寄存器, 当执行 BL 子程序调用指令时, R14 中得到 R15(程序计数器 PC)的备份.
+  + 当发生中断或异常时, 对应模式下的 R14 中保存 R15返回值.
+
+快速中断模式有 7 个备份寄存器 R8 ~ R14 , 这使得进入快速中断模式执行很大部分程序时,如果 R0 ~ R7没有被改变,那就不需要保存任何寄存器,实现快速切换.
+
+每个模式都具有独有的 R13 , R14 ,这样可以令每个模式拥有自己的栈指针寄存器和连接寄存器.
+
+除 CPSR 外, 除 "用户/系统模式" 外的其他模式具有 程序状态保存寄存器 SPSR(Saved Process Status Registers).当切换进入这些工作模式时, 在 SPSR 中保存前一个工作模式的 CPSR 值,
+这样当返回前一个工作模式时,可以将 SPSR 的值恢复到 CPSR中.
+
+** 异常类型
+ARM 处理器支持 7 种异常情况：复位、未定义指令、软件中断、指令预取中止、数据中止、中断请求（IRQ）和快速中断请求（FIQ）。
+
+| 异常中断名称                        | 含义                                                                                                                                                                                  |
+|-------------------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 复位（RESET）                       | 当处理器的复位引脚有效时，系统产生复位异常中断，程序跳转到复位异常中断程序处执行。复位异常中断通常用在下面两种情况：1、系统加电时和系统复位时 2、跳转到复位中断向量处执行，称为软复位 |
+| 数据访问中止（Data Abort）          | 如果数据访问指令的目标地址不存在，或者该地址不允许当前指令访问，处理器产生数据访问中止异常中断                                                                                        |
+| 快速中断请求（FIQ）                 | 当处理器的外部快速中断请求引脚有效，而且 CPSR 寄存器的 F 控制位被清除时，处理器产生外部中断请求异常中断                                                                               |
+| 外部中断请求（IRQ）                 | 当处理器的外部中断请求引脚有效，而且 CPSR 寄存器的 I 控制位被清除时，处理器产生外部中断请求异常中断。系统中各外设通常通过该异常中断请求处理器服务                                     |
+| 预取指令中止（Prefech Abort）       | 如果处理器预取指令的地址不存在，或者该地址不允许当前指令访问，当该被预取的指令执行时，处理器产生指令预取中止异常中断                                                                  |
+| 软件中断（software interrupt SWI）  | 这是一个用户定义的中断指令，可用于用户模式下的程序调用特权操作指令。在实时操作系统中，可以通过该机制实现系统功能调用                                                                  |
+| 未定义指令（undefined instruction） | 当 ARM 处理器或者是系统中的写处理器认为当前指令未定义时，产生未定义的指令异常中断，可以通过该异常中断机制仿真浮点向量运算                                                             |
+
+** 异常类型与工作模式的对比
+除开二者所共有的 FIQ , IRQ, ABT(数据终止和指令终止), undefined instruction, 还剩下 复位,软件中断 和 用户模式 , 管理模式, 系统模式.其中用户模式属于正常工作模式,系统模式需要用户手动切换.
+复位和软件中断都属于是管理模式.软件中断一般由应用程序自己调用产生,用于用于程序向系统申请访问硬件资源.
+** 工作流程
+*** 进入异常
+综上所述,当一个异常发生时,将由CPU *强制* 切换进入相应的工作模式,这时 CPU 将 *自动* 完成如下的事情:
+1. 在异常工作模式的连接寄存器 R14 中保存前一个工作模式的 *下一条指令*, 也就是返回异常后的下一条指令地址.对于 ARM 状态,这个值是当前 PC 值加 4 或者加 8.(因为 CPU 的流水线而决定的, 也就是在译码和执行的时间, PC 值也在增加)
+2. 将 CPSR 的值复制到异常模式的 SPSR.
+3. 将 CPSR 的工作模式位设置为当前异常对应的工作模式, 并且禁止所有 IRQ 中断, 当进入 FIQ 快速中断模式时禁止 FIQ 中断.
+4. 令 PC 值等于这个异常模式在异常向量表中的地址, 也就是跳转到异常向量表中执行相应指令.
+
+除此之外, *在进入异常后* 还需要软件来 *主动* 完成的事有:
+1. 保存当前共用寄存器的值(包括 lr), 到当前模式的栈内存中
+2. 进入异常处理函数,进行相应的处理
+*** 退出异常
+从异常工作模式退出回到之前的工作模式时, 需要软件 *主动* 来完成如下事情:
+1. 将栈里保存的值读回给共享寄存器
+2. 将连接寄存器的值减去一个适当的值后, 赋值给 PC 寄存器.
+3. 将 SPSR 的值赋值给 CPSR
+
+整体流程如下图所示:
+
+[[./arm_isr.jpg]]
+** 异常向量表
+当异常中断发生时，程序计数器 PC 所指的位置对于各种不同的异常中断是不同的，同样，返回地址对于各种不同的异常中断也是不同的。例外的是，复位异常中断处理程序是不需要返回， *因为整个应用系统就是从复位异常中断处理程序处开始执行的* 。
+
+中断向量表指定了各异常中断及处理程序的对应关系，它通常放在存储地址的低端。在 ARM 体系中，异常中断向量表的大小为32字节。其中每个异常中断占据4字节大小，保留了4个字节空间。也就是说，正好有7个中断处理程序地址。
+
+每个异常中断对应的中断向量表的4个字节的空间存放了一个跳转指令或者一个向 PC 寄存器中赋值的数据访问指令。通过这两种指令，程序将跳转到相应的异常中断处理程序处执行。
+
+当几个异常中断同时发生时，就必须按照一定的次序来处理这些异常中断。在 ARM 中通过给各异常中断赋予一定的优先级来实现这种处理次序。当然，有些异常中断是不可能同时发生的，如指令预取中止异常中断和软中断（SWI）异常中断是由同一条指令的执行触发的，是不可能同时发生的。处理器执行某个特定的异常中断的过程，称为处理器处于特定的中断模式。
+
+| 中断向量地址 | 异常中断类型    | 异常中断模式    | 优先级（6 最低） |
+|--------------+-----------------+-----------------+------------------|
+|         0x00 | 复位            | 管理模式（SVC） |                1 |
+|         0x04 | 未定义指令      | Undef           |                6 |
+|         0x08 | 软件中断（SWI） | 管理模式（SVC） |                6 |
+|         0x0c | 指令预取中止    | 中止模式        |                5 |
+|         0x10 | 数据访问中止    | 中止模式        |                2 |
+|         0x14 | 保留            | 未使用          |           未使用 |
+|         0x18 | IRQ             | IRQ模式         |                4 |
+|         0x1c | FIQ             | FIQ模式         |                3 |
+
+对于某些构架，中断向量表可以设置为高地址还是低地址， 比如在 zynq 中通过设置CP15来实现。
+** 程序中的中断处理过程
+ARM 处理器相应中断的时候，总是从固定的地址（一般是指中断向量表）开始，而在高级语言环境下开发中断服务程序时，无法控制固定地址开始的跳转流程。
+为了使得上层应用程序与硬件中断跳转联系起来，需要编写一段中间的服务程序来进行连接。这样的服务程序常被称为中断解析程序。
+
+每个异常中断对应一个4字节的空间，正好放置一条跳转指令或者向 PC 寄存器赋值的数据访问指令。理论上可以通过这两种指令直接使得程序跳转到对应的中断处理程序中去。但实际上由于函数地址值为未知和其他一些问题，并不这么做。
+
+发生异常后，中断源请求中断，PC 自动跳转到中断向量表中固定地址执行。中断向量表中存放一条跳转指令，跳转到用户自定义地址（解析程序）继续执行。在解析程序中，将会和异常服务程序连接起来。
+对于 IRQ 又会有一个中断向量表,对于请求的各种不同的中断.
+
+一般在硬件启动后,会有汇编代码来提前设置好各种模式的栈。
+
+[[./interrupt_IRQ.jpg]]
+* Linux内核中的中断与时钟
+** 概念
+*** 中断类型
+- 根据中断的来源分为内部和外部中断，比如操作系统从用户态切换到内核态需要借助软件中断
+- 根据中断是否可以屏蔽分为可屏蔽中断和不可屏蔽中断(NMI)
+- 根据中断入口跳转方法的不同，中断分为向量中断和非向量中断，向量中断由硬件提供中断服务程序入口地址，非向量中断由软件提供中断服务程序入口地址
+
+ARM 多核处理器都是通过GIC（Generic Interrupt Controller）来控制中断:
+- 每个处理器都有其私有的中断PPI(Private Peripheral Interrupt)
+- 处理器之间，用户态与内核态之间通信及请求是通过软件中断完成SGI(Software Generated Interrupt).
+- 多个CPU共享外设中断SPI(Shared Peripheral Interrupt)
+  + linux 中使用函数 =extern int irq_set_affinity(unsigned int irq, const struct cpumask *m);= 来将外设中断绑定到固定CPU核去
+#+BEGIN_SRC c
+///默认情况下，中断都是在CPU0上产生的。
+///将中断irq设定到CPU i 上去
+irq_set_affinity(irq, cpumask_of(i));
+#+END_SRC
+*** 中断处理程序架构
+为了满足中断处理时间尽量短的要求，Linux将中断处理程序分为顶半(Top Half)处理和底半(Bottom Half)处理两部分(优秀的 RT-thread 也是这样做的)。
+- 顶半部分用于完成尽量少的比较紧急的功能，往往只是简单的读取中断寄存器状态，并在清除中断标志后就将底半处理程序挂到设备的底半执行队列中去。
+- 底半部分几乎做了中断处理程序所有的事情， *而且可以被新中断打断*.相对来说处理并不是很紧急且相对比较耗时的工作。
+
+*注意*: 如果整个中断处理的工作本来就很少，那么就完全可以直接在顶半部分完成。
+
+查看 =/proc/interrupts= 文件可以获得系统中中断的统计信息，并能统计出每一个中断号上的中断在每个CPU上发生的次数。
+** 中断编程
+*** 申请和释放中断
+要先申请中断才能够使用，并且在不使用后需要释放中断。
+#+BEGIN_SRC c
+typedef int irqreturn_t;
+typedef irqreturn_t (*irq_handler_t)(int, void *);
+/**
+ ,* @brief 申请一个中断
+ ,* @param irq: 要申请的硬件中断号
+ ,* @param handler: 中断处理的顶半函数
+ ,* @param flags: 中断的触发方式及处理方式
+ ,*        + IRQF_TRIGGER_RISING
+ ,*        + IRQF_TRIGGER_FAILING
+ ,*        + IRQF_TRIGGER_HIGH
+ ,*        + IRQF_TRIGGER_LOW
+ ,*        + IRQF_SHARED : 多个设备共享中断
+ ,* @param dev: 要传递给中断服务程序的私有数据,一般为设备的设备结构体地址或NULL
+ ,* @retval
+ ,*        + 0 成功
+ ,*        + -EINVAL : 中断号无效或处理函数指针为NULL
+ ,*        + -EBUSY : 中断已经被占用且不能共享
+ ,*/
+int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+
+/**
+ ,* @brief 此函数会在合适的时候自动释放中断资源
+ ,*/
+int devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+
+/**
+ ,* @brief 在模块卸载前自动释放
+ ,* @note 在实际使用时，如果在驱动卸载时不使用此功能，那么在驱动重新装载就会
+ ,* 由于申请不到中断资源而进入 Oops，原因不明....
+ ,*/
+void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+
+/**
+ ,* @brief 释放中断
+ ,*/
+void free_irq(unsigned int irq, void *dev_id);
+#+END_SRC
+*** 使能和屏蔽中断
+在申请了中断资源后，便可以使能及失能中断。
+#+BEGIN_SRC c
+
+/**
+ ,* @brief 使能中断
+ ,*/
+void enable_irq(int irq);
+/**
+ ,* @brief 等待目前的中断处理完成后关闭中断
+ ,* @note: 不能在中断的顶半部分调用此函数，因为它会一直等待底半部分，而底半还没有执行，就会卡死
+ ,*/
+void disable_irq(int irq);
+/**
+ ,* @brief 给中断处理发送消息，处理完成后自动关闭，此函数会立即返回
+ ,*/
+void disable_irq_nosync(int irq);
+
+//关闭本CPU内的所有中断，并保存当前的中断状态
+#define local_irq_save(flags) ...
+//根据关闭前的状态恢复中断
+#define local_irq_restore(flags) ...
+
+//关闭本CPU内所有中断
+void local_irq_disable(void);
+//打开本CPU内的所有中断
+void local_irq_enable(void);
+
+#+END_SRC
+*** 底半处理机制
+Linux 实现底半部的机制主要有 tasklet、工作队列、软中断和线程化irq.
+- *此处软中断指的是由软件模拟的中断机制，而不是ARM中的由软件触发的硬件中断！*.
+- 软中断和tasklet运行于软中断上下文，仍然属于原子上下文的一种，而工作队列运行于进程上下文。
+*因此，在软中断和takelet处理函数中不允许睡眠，而在工作队列处理函数中允许睡眠*.
+- =local_bh_disable() and local_bh_enable()= 是内核中用于禁止和使能的软中断及tasklet底半部机制的函数。
+
+*注意*: 软中断以及基于软中断的tasklet如果在某段时间大量出现的话,内核会把后续软中断放入 ksoftirqd 内核线程中执行。
+**** tasklet
+tasklet 的执行上下文是软中断，执行时机通常是顶半部返回的时候。只需要定义 tasklet 及其处理函数，并将两者关联即可。
+#+BEGIN_SRC c
+/**
+ ,* @brief 定义一个tasklet结构 my_tasklet, 与 my_tasklet_func(data) 函数关联
+ ,* 传递给 my_tasklet_func 的参数就是 data
+ ,*/
+void my_tasklet_func(unsigned long);
+DECLARE_TASKLET(my_tasklet, my_tasklet_func, data);
+
+//启动底半处理机制，此函数在顶半处理中使用
+tasklet_schedule(&my_tasklet);
+
+#+END_SRC
+使用tasklet 的整体驱动模板
+#+BEGIN_SRC c
+void xxx_do_task_let(unsigned long);
+DECLARE_TASKLET(xxx_tasklet, xxx_do_task_let, 0);
+
+void xxx_do_task_let(unsigned long)
+{
+        ...
+}
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        tasklet_schedule(&xxx_tasklet);
+        ...
+        return IRQ_HANDLED;
+}
+int __init xxx_init(void)
+{
+        ...
+        result = request_irq(xxx_irq, xxx_interrupt, 0, "xxx", NULL);
+
+}
+
+void __exit xxx_exit(void)
+{
+        ...
+        free_irq(xxx_irq, xxx_interrupt);
+        ...
+}
+
+#+END_SRC
+**** 工作队列
+工作队列的执行上下文是内核线程，因此 *可以调度和睡眠*.
+#+BEGIN_SRC c
+/**
+ ,* 定义数据结构及操作函数
+ ,*/
+struct work_struct my_wq;
+void my_wq_func(struct work_struct *work);
+INIT_WORK(&my_wq, my_wq_func);
+//启动
+schedule_work(&my_wq);
+#+END_SRC
+队列处理模板
+#+BEGIN_SRC c
+struct work_struct xxx_wq;
+void xxx_do_work(struct work_struct *work);
+
+void xxx_do_work(struct work_struct *work)
+{
+        ...
+}
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        schdule_work(&xxx_wq);
+        ...
+        return IRQ_HANDLED;
+}
+int xxx_init(void)
+{
+        ...
+        result = request_irq(xxx_irq, xxx_interrupt, 0,  "xxx", NULL);
+        ...
+//与tasklet 不同之处
+        INIT_WORK(&xxx_wq, xxx_do_work);
+        ...
+}
+void xxx_exit(void)
+{
+        ...
+        freq_irq(xxx_irq, xxx_interrupt);
+        ...
+}
+#+END_SRC
+**** 软中断(不建议使用)
+软中断的执行时机通常是顶半部分返回的时候，tasklet是基于软中断实现的，因此也运行于软中断上下文。
+
+用 =softirq_action= 结构体表示一个软中断，使用 =open_softirq()= 注册软中断对应的处理函数， =raise_softirq()= 触发一个软中断。
+#+BEGIN_SRC c
+void open_softirq(int nr, void (*action)(struct softirq_action *));
+void raise_softirq(unsigned int nr);
+#+END_SRC
+**** threaded_irq
+内核中除了可以通过 =request_irq(),devm_request_irq()= 申请中断外，还可以通过下面函数申请：
+#+BEGIN_SRC c
+/**
+ ,* @brief 相比 request_irq() 内核会为相应的中断号分配一个对应的内核线程
+ ,* @brief 如果中断处理函数 handler() 返回值是 IRQ_WAKE_THREAD ,内核会调度对应的线程执行 thread_fn 函数
+ ,* @note 支持flags 中设置 IRQF_ONESHOT,内核会自动帮助我们在中断上下文中屏蔽对应的中断号，而在内核调度thread_fn 执行后，重新使能该中断号
+ ,* 当 handler 为NULL时， 内核默认使用 irq_default_primary_handler() 代替 handler() 并使用 IRQF_ONESHOT
+ ,*/
+int request_threaded_irq(unsigned int irq, irq_handler_t handler, irq_handler_t thread_fn,
+                         unsigned long flags, const char *name, void *dev);
+int devm_request_threaded_irq(struct device *dev,unsigned int irq, irq_handler_t handler, irq_handler_t thread_fn,unsigned long flags, const char *name, void *dev);
+#+END_SRC
+*** 中断共享
+在多个设备共享一根硬件中断线的情况下，需要使用中断共享的方式：
+- 共享中断的多个设备在申请中断的时候，都应该使用 =IRQF_SHARED= 标志，而且一个设备以 =IRQF_SHARED= 申请某中断成功的前提是该中断未被申请或之前申请标志也是 =IRQF_SHARED=
+- =request_irq()= 的参数 =void *dev_id= 应该使用当前设备的结构体地址
+- 在中断到来时，会遍历执行共享此中断的所有中断处理程序，直到某一个函数返回 IRQ_HANDLED .在中断处理顶半部分中，应该根据硬件寄存器中的信息比对传入的 =dev_id= 是否一致，不一致就返回 =IRQ_NONE=.
+
+#+BEGIN_SRC c
+irqreturn_t xxx_interrupt(int irq, void *dev_id)
+{
+        ...
+        int status = read_int_status();// 获取中断源状态
+        if(!is_myint(dev_id, status))
+                return IRQ_NONE;
+
+        // 中断匹配，执行底半部分
+        return IRQ_HANDLED;
+}
+int xxx_init(void)
+{
+        ...
+        result = request_irq(sh_irq, xxx_interrupt, IRQF_SHARED, "xxx", xxx_dev);
+        ...
+}
+
+void xxx_exit(void)
+{
+        ...
+        free_irq(xxx_irq, xxx_interrupt);
+        ..
+}
+#+END_SRC
