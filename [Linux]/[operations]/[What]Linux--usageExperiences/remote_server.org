@@ -1,0 +1,223 @@
+#+TITLE: [What]Linux基本服务器搭建
+#+DATE:  <2018-03-14 Wed> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, remote
+#+NAME: <linux_operations_remote_server.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+一些最基本的服务器搭建，以提高效率。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 为局域网服务器搭建一个git服务器
+** gitolite (轻量级的服务器)
+此git服务器可以为每个项目指定哪些人具有读写权限,哪些人具有只读权限.
+*** 服务器端
+- 设定服务器为固定IP地址
+- 为git服务器新建一个用户,比如 git
+#+begin_example
+sudo adduser git
+#+end_example 
+- 切换到git用户,在 *HOME* 目录下下载代码,并安装
+#+begin_example
+su git
+git clone https://github.com/sitaramc/gitolite
+mkdir bin
+cd gitolite
+./install -to ~/bin
+#+end_example
+- 创建公钥并指定,此时gitolite 会自动新建一个库
+#+begin_example
+ssh-keygen
+cd ~/bin
+gitolite setup -pk ~/.ssh/id_rsa.pub
+#+end_example
+- 克隆库,此时在 gitolite-admin 文件夹下有 =conf/gitolite.conf= 用于配置权限, =keydir= 用于保存用户公钥
+#+begin_example
+cd ~
+git clone git@localhost:gitolite-admin
+#+end_example
+- 为项目设置 conf文件,比如项目名称为 foo, 参与者有 alice,bob,carol,其中carol仅有只读权限
+#+begin_example
+repo foo
+    RW+     = alice bob 
+    R       = carol 
+#+end_example
+- 将参与者的公钥拷贝进 keydir 文件夹,名字要相对应. =alice.pub, bob.pub, carol.pub=
+- 提交更改,在提交更改后,gitolite会自动在 =~/repositories=文件夹中新建库文件,并修改 =~/.ssh/authorized_keys=
+#+begin_example
+git add .
+git commit -m "added foo, gave access to alice,bob,carol"
+git push
+#+end_example
+*** 客户端
+- 克隆项目,<host_ip> 为主机地址, <reponame> 为库文件名 
+#+begin_example
+git clone git@<host_ip>:<reponame>
+#+end_example
+
+如果此命令运行失败,则有可能是 ssh还没有更新生成的公钥, 使用 =ssh-add= 命令即可.
+*** 与github同步
+使用本地服务器做中转, 然后每隔一段时间提交到github.
+1. 使用正常步骤建立库和加入开发人员
+2. 在服务器本地 clone 一次本地库, 然后 *将github库加入remote,再clone一次github库*.最后提交至本地库
+3. 其他用户通过正常操作 clone,push,pull
+4. 需要向github提交时, *需要在服务器本地库pull一次以更新, 然后再push至github上去*.
+** gitlab (网页通信的服务器, 类似于github)
+*** 使用docker
+最简单粗暴的做法，参考 [[https://docs.gitlab.com/omnibus/docker/][documentation]]
+
+*需要注意, docker 环境中使用的 SSH端口是 22.所以目前系统所使用的端口需要更改端口号!*
+*** 手动安装及配置
+1. 基本安装
+#+begin_example
+#安装必要的库
+sudo apt install -y curl openssh-server ca-certificates
+#增加安装包并安装
+curl -sS https://packages.gitlab.com/install/repositories/gitlab/gitlab-ce/script.deb.sh | sudo bash
+sudo apt install gitlab-ce
+#启动
+sudo gitlab-ctl reconfigure 
+#+end_example
+2. 配置
+需要编辑文件 =/etc/gitlab/gitlab.rb=
+- 修改服务器的IP地址,比如 external_url 'http://192.168.1.2'
+- 确认服务器用户名及组, 默认为 =git=.
+#+begin_example
+user['username'] = "git"
+user['group'] = "git"
+#+end_example
+- 指定库的存放 *文件夹*, 默认为 =/var/opt/gitlab/git-data/= 中的 =repositories= 文件夹中
+在不需要运行版本库的情况下, 其实使用默认的位置即可
+#+begin_example
+git_data_dirs({
+  "default" => {
+   "path" => "/home/git/gitlab-data",
+   "failure_count_threshold" => 10,
+   "failure_wait_time" => 30,
+   "failure_reset_time" => 1800,
+   "storage_timeout" => 5
+  }
+})
+#+end_example
+*** 使用
+使用浏览器登录 : root@local.host , 默认用户名是 =root= , 密码是 =5iveL!fe=.
+
+gitlab 可以新建一个组, 然后将用户添加进这个组, 并且还可以为每个用户添加不能的权限.
+
+对于权限不够的用户, 可以 fork 一个库, 然后向主库提交一个合并请求.
+*** 停止
+#+begin_example
+sudo gitlab-ctl stop
+#关闭开机启动
+sudo systemctl disable gitlab-runsvdir.service
+#+end_example
+* 搭建局域网代码查看服务器(OpenGrok)
+** 使用 docker
+最简易的办法 ： [[https://hub.docker.com/r/itszero/opengrok][opengrok docker]]
+** 准备工作
+*** 安装JDK1.8或更新版本
+- 安装openjdk
+#+begin_example
+sudo apt install openjdk-8-jdk
+#+end_example
+- 如果要安装官方版本则需要到[[www.oracle.com][Oracle]]安装 =jdk-8u144-linux-64.tar.gz=.
+#+begin_example
+#解压文件
+tar -zxf jdk-8u144-linux-64.tar.gz
+#修改名称
+mv jdk1.8.0_144 jdk
+#将文件放在 /usr/local/ 便于管理
+sudo cp -R jdk /usr/local/java/
+#设置环境变量
+#编辑文件
+sudo vim /etc/environment
+#输入内容
+# JAVA_HOME=/usr/local/java/jdk
+# CLASSPATH=.:${JAVA_HOME}/lib:${JAVA_HOME}/jre/lib
+# JRE_HOME=${JAVA_HOME}/jre
+# 在{PATH}中加入 :${JAVA_HOME}/bin:${JRE_HOME}/bin
+
+#设置
+sudo update-alternatives --install "/usr/bin/java" "java" "/usr/local/java/jdk/bin/java" 300
+sudo update-alternatives --install "/usr/bin/javac" "javac" "/usr/local/java/jdk/bin/javac" 300
+sudo update-alternatives --install "/usr/bin/javaws" "javaws" "/usr/local/java/jdk/bin/javaws" 300
+
+#重启linux
+#+end_example
+*** 下载 opengrok
+在[[https://github.com/OpenGrok/OpenGrok/releases][OpenGrok下载]], 下载 =.tar.gz= 文件.
+*** 安装 universal-ctags
+#+begin_example
+git clone http://github.com/universal-ctags/ctags
+sudo apt install autoconf
+sudo apt install pkg-config
+cd ctags
+./autogen.sh
+./configure --prefix=/usr/local
+make
+sudo make install
+#+end_example
+*** 安装 Tomcat
+- 下载二进制版本的 [[tomcat.apache.org/download-90.cgi][Tomcat]]
+- 配置
+#+begin_example
+#解压文件
+tar -zxf apache-tomcat-9.0.0.M26.tar.gz
+#修改名称
+mv apache-tomcat-9.0.0.M26.tar.gz tomcat
+#将文件放在 /usr/local/ 便于管理
+sudo cp -R tomcat /usr/local/
+#设置环境变量
+sudo vim /etc/environment
+#输入内容
+# CATALINA_HOME=/usr/local/tomcat
+# 在 PATH 中加入 :${CATALINA_HOME}/bin
+#设置变量
+sudo /usr/local/tomcat/bin/setclasspath.sh
+#+end_example
+- 运行
+#+begin_example
+#启动, 然后可以通过 http://localhost:8080 访问
+sudo /usr/local/tomcat/bin/startup.sh
+#停止
+sudo /usr/local/tomcat/bin/shutdown.sh
+
+#如果当前已经有其他服务器启用了, 那么需要修改端口
+cd /usr/local/tomcat/conf
+sudo vim server.xml
+#找到 "Connector port",修改,重启
+#+end_example
+*** 安装 opengrok
+#+begin_example
+#解压
+tar -zxf opengrok-1.1-rc13.tar.gz
+#重命名
+mv opengrok-1.1-rc13 opengrok
+#移动到 /usr/local
+sudo cp -R opengrok /usr/local/
+#指定 tomcat 和 opengrok位置
+sudo vim /etc/environment
+OPENGROK_TOMCAT_BASE=/usr/local/tomcat/
+OPENGROK_PATH=/usr/local/opengrok
+#加入PATH
+:${OPENGROK_PATH}/bin
+#+end_example
+** 开始部署
+opengrok 通过配置XML文件来达到索引源代码的目的, *将需要阅读的代码放入同一个文件夹, 此文件夹下的每个子文件夹就是一个子项目*.
+详细参考: [[https://github.com/OpenGrok/OpenGrok/wiki/How-to-install-OpenGrok][How-to-install-OpenGrok]]
+*** 启动服务
+#+begin_example
+sudo OpenGrok deploy
+#+end_example
+*** 创建索引
+#+begin_example
+sudo OpenGrok index <所有项目代码根目录>
+#+end_example
+*** 登录服务
+登录地址为: =http://YOUR_WEBAPP_SERVER:WEBAPPSRV_PORT/source=
+* 搭建项目管理服务器
+*** 简易版本服务器(libreplan)
+此版本提供了 [[https://hub.docker.com/r/libreplan/libreplan][docker image]] , 只需要按照说明步骤部属即可.

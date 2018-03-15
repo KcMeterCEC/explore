@@ -1,8 +1,19 @@
-* [What] Linux --> remote
+#+TITLE: [What]Linux远程基本操作
+#+DATE:  <2018-03-14 Wed> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, remote
+#+NAME: <linux_operations_remote_usage.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-** 远程桌面
+整理远程访问Linux主机(Ubuntu)的一些方式。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 远程桌面操控
 一台 windows 一台linux，经常切换鼠标键盘太过麻烦，通过远程桌面就能解决此问题。
-*** 共享桌面
+** 共享桌面
 在远程操作的效果会实时显示在 linux 主机上，也就是直接映射的关系，类似于 QQ 的远程协助桌面， *与多用户桌面不一样！*
 - 在 ubuntu dash 下输入 "desktop sharing"，并启动应用
 - 设置 desktop sharing 允许远程访问
@@ -13,7 +24,7 @@ sudo apt-get install dconf-editor
 - 打开dconf-editor 进入 org->gnome->desktop->remote-access 取消 "requre-encryption" 
 - windows 下安装 [[www.tightvnc.com/download.php][TightVNC]]
 - 在Windows下启动 vnc ，输入 ip 地址及密码连接
-*** 多用户桌面
+** 多用户桌面
 可以实现多个用户同时登录linux而相互不干扰.
 - 为了不影响到当前默认用户, 建议 *根据登录的人数对应的新建用户*
 - 安装必要的软件
@@ -37,17 +48,17 @@ Ctrl + R 启动命令行输入 "mstsc",
 依次输入服务器IP,用户名及密码,其他设置保持默认即可
 #+end_example
 
-- 解决windows无法使用Tab 补奇的问题
+- 解决windows无法使用Tab 补齐的问题
 #+begin_example
 编辑文件 "~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-keyboard-shortcuts.xml" 
 找到有 "switch_window_key" 这一行,
 修改此行为(其实就是将 type 属性改为 empty, 然后删除后面的属性即可):
 <property name="&lt;Super&gt;Tab"type="empty"/>
 #+end_example
-
-** 文件共享
-*** 直接共享
-**** smaba
+* 文件共享
+** 直接共享
+*** samba
+samba 通过网络共享文件，直接在windows下编辑即可。
 #+begin_example
 #安装
 sudo apt install samba
@@ -69,9 +80,8 @@ browseable = yes
 sudo smbpasswd -a cec
 #重新启动
 sudo systemctl restart smbd
-
 #+end_example
-**** 远程挂载
+*** 远程挂载
 在局域网下通过 linux 编辑 windows 下的文件，原因就是 vim 的强大编辑效率。
 - windows 设置相应的共享文件夹
 - ubuntu 新建挂载文件
@@ -80,7 +90,7 @@ sudo systemctl restart smbd
 #username --> windows 用户名 password --> windows 访问密码 ip --> Windows 地址  //192.168.11.153/f --> windows 共享文件夹 /home/cec/windowsShare/work --> linux 下的挂载点
 mount -t cifs -o username=kcmetercec,password=@0924Whb092,ip=192.168.11.153,file\_mode=0777,dir\_mode=0777 //192.168.11.153/f /home/cec/windowsShare/work
 #+end_example
-*** 文件传输
+** 文件传输
 通过网线进行文件传输, 使用的软件为: [[https://filezilla-project.org][FileZilla]]
 #+begin_example
 #安装FTP服务
@@ -91,8 +101,7 @@ sudo vim /etc/vsftpd.conf
 #重新启动
 sudo /etc/init.d/vsftpd restart
 #+end_example
-
-**** 更进一步的配置
+*** 更进一步的配置
 为了能够限制某些用户只能访问自己的home目录, 而一些用户可以全局访问,可以进行如下设置
 #+begin_example
 #限制用户只能访问限制的目录,默认就为HOME目录
@@ -104,8 +113,8 @@ chroot_list_enable=YES
 chroot_list_file=/etc/vsftpd.chroot_list
 #还可以设置 chroot_local_user=NO , 对应的 chroot_list文件中就表示仅仅只能访问限制目录的用户
 #+end_example
-** 远程终端
-*** ssh终端
+* 远程终端
+** ssh终端
 使用远程终端快速控制, 使用的软件为: [[www.putty.org][PuTTY]]
 #+begin_example
 sudo apt install openssh-server

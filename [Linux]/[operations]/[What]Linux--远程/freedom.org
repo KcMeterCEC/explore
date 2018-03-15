@@ -1,0 +1,78 @@
+#+TITLE: [What]Linux科学上网基本操作
+#+DATE:  <2018-03-14 Wed> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, enjoy
+#+NAME: <linux_operations_enjoy_usage.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+试了很多种科学上网的方法，还是自己租个VPS比较爽。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 服务端配置
+[[https://starorc.gitbooks.io/set-up-ss/content/][gitbook]] 已经说得很详细了
+* 客户端配置
+** 配置shadowsocks
+*** 安装
+#+begin_example
+sudo apt install python-pip
+sudo pip install --upgrade pip
+sudo pip install shadowsocks
+#+end_example
+*** 编辑配置文件
+- sudo vim /etc/shadowsocks.json
+#+begin_example
+{
+    "server":"*.*.*.*",
+    "server_port":****,
+    "local_address":"127.0.0.1",
+    "local_port":1080,
+    "password":"****",
+    "timeout":600,
+    "method":"****",
+    "fast_open":true,
+    "workers":1
+}
+#+end_example
+*** 启动服务
+#+begin_example
+sudo sslocal -c /etc/shadowsocks.json -d start
+#+end_example
+*注意：* 当启动服务时出现类似警告：
+#+begin_example
+method chacha20-ietf not supported
+#+end_example
+需要更新：
+#+begin_example
+sudo apt install libsodium-dev
+pip install --upgrade git+https://github.com/shadowsocks/shadowsocks.git@master
+#+end_example
+** 配置浏览器
+*** 安装浏览器
+#+begin_example
+sudo install chromium-browser
+#+end_example
+*** 配置插件
+插件使用 =SwitchyOmega_Chromium.crx= ，在载入插件后调用 =config= 配置，这些文件都位于 [[https://github.com/KcMeterCEC/tools/tree/master/linux_tool/freedom][github]] .
+*** 使用
+插件一般使用自动切换，对于个别网站加入各自队列即可。
+* 命令行端配置
+*** 安装
+#+begin_example
+git clone http://github.com/rofl0r/proxychains-ng.git
+cd proxychains-ng
+./configure --prefix=/usr --sysconfdir=/etc
+make
+sudo make install
+sudo make install-config
+#+end_example
+*** 配置
+- sudo vim /etc/proxychians.conf 
+  + 将最后一行改为 =socks5  127.0.0.1 1080=
+*** 使用
+在要终端连接的情况下，前面加上 =proxychains4= .
+#+begin_example
+proxychains4 ping www.google.com
+#+end_example

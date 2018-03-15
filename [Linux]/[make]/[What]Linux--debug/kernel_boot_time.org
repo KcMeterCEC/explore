@@ -34,3 +34,12 @@ printk的发送会比较占用时间，所以可以取消一些不重要的输�
 - 在 bootargs 中取消 loglevel=8 字符串，用 quiet 代替。
   + quiet 会让 kernel 设置为只有警告以上的信息才会打印(loglevel=4)
 
+*** 指定延迟校准值
+内核在每次启动的时候会校准延迟，比如 :
+#+begin_example
+Calibrating delay loop... 1332.01 BogoMIPS(lpj=6660096)
+#+end_example
+这个过程会消耗几百毫秒的时间，所以可以在bootargs中加上以下字符串，以跳过自动校准阶段：
+#+begin_example
+lpj=6660096
+#+end_example

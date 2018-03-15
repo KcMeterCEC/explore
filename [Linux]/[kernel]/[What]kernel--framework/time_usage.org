@@ -1,0 +1,172 @@
+#+TITLE: [What]linux -> 定时器与延时基础
+#+DATE:  <2018-03-14 Wed> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, kernel, time
+#+NAME: <linux_kernel_time_tutorial.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理内核中断的使用方式。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 内核定时器
+软件定时器是基于硬件定时器基础上实现的。
+
+内核在时钟中断发生后检测各定时器是否到期，到期后的定时器处理函数将作为软中断在底半部分执行。
+** 基本接口
+#+BEGIN_SRC c
+struct timer_list {
+        /*
+         ,* All fields that change during normal runtime grouped to the
+         ,* same cacheline
+         ,*/
+        struct hlist_node   entry;
+        unsigned long       expires;//!到期时间(jiffies)
+        void                (*function)(unsigned long); //! 定时器到期后的运行函数
+        unsigned long       data;//! 传入给运行函数的值
+        u32                 flags;
+        int                 slack;
+
+        #ifdef CONFIG_TIMER_STATS
+        int                 start_pid;
+        void                *start_site;
+        char                start_comm[16];
+        #endif
+        #ifdef CONFIG_LOCKDEP
+        struct lockdep_map  lockdep_map;
+        #endif
+};
+// 一个timer_list 结构体就代表一个软件定时器类
+struct timer_list my_timer;
+
+/**
+ ,* @brief 初始化定时器
+ ,*/
+//初始化 timer_list 的 entry 的 next 为NULL， 并给 base 指针赋值
+void init_timer(struct timer_list *timer);
+
+/**
+ ,* @brief 初始化定时器并赋值
+ ,*/
+TIMER_INITIALIZER(_function,_expires,_data)
+
+//定义并初始化一个软件定时器
+DEFINE_TIMER(_name, _function, _expires, _data)
+
+//初始化定时器并赋值
+setup_timer(timer, fn, data)
+
+/**
+ ,* 添加定时器到链表
+ ,*/
+void add_timer(struct timer_list *timer);
+
+/**
+ ,* 从链表删除一个定时器
+ ,*/
+int del_timer(struct timer_list *timer);
+
+/**
+ ,* 修改定时器的到期值
+ ,*/
+int mod_timer(struct timer_list *timer, unsigned long expires);
+
+#+END_SRC
+** 使用模板
+#+BEGIN_SRC c
+struct xxx_dev{
+        struct cdev dev;
+        ...
+        timer_list xxx_timer;
+};
+xxx_func1(...)
+{
+        struct xxx_dev *dev = filp->private_data;
+        ...
+        init_timer(&dev->xxx_timer);
+        dev->xxx_timer.function = &xxx_do_timer;
+        dev->xxx_timer.data = (unsigned long)dev;
+        dev->xxx_timer.expires = jiffies + delay;
+        add_timer(&dev->xxx_timer);
+        ...
+}
+xxx_func2(...)
+{
+        del_timer(&dev->xxx_timer);
+}
+static void xxx_do_timer(unsigned long arg)
+{
+        struct xxx_device *dev = (struct xxx_device *)arg;
+
+        //再次执行定时器
+        dev->xxx_timer.expires = jiffies + delay;
+        add_timer(&dev->xxx_timer);
+}
+#+END_SRC
+** 关于 jiffies
+linux 在 =include/linux/jiffies.h= 中提供了通过时间来转换出 jiffies 的功能。
+#+BEGIN_SRC c
+unsigned int jiffies_to_msecs(const unsigned long j);
+unsigned int jiffies_to_usecs(const unsigned long j);
+u64 jiffies_to_nsecs(const unsigned long j);
+
+unsigned long __msecs_to_jiffies(const unsigned int m);
+unsigned long _usecs_to_jiffies(const unsigned int u);
+unsigned long nsecs_to_jiffies(u64 n);
+#+END_SRC
+** 快捷使用
+linux 还封装了快捷定时机制，本质是使用工作队列和定时器实现。
+#+BEGIN_SRC c
+typedef void(*work_func_t)(struct work_struct *work);
+/**
+ ,* @brief 调度一个delayed_work 在指定的延时后执行,时间到了后 delayed_work 结构中的 work_func_t 成员函数执行
+ ,*/
+int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
+
+schedule_delayed_work(&work, msecs_to_jiffies(poll_interval));
+
+
+//取消delayed_work
+int cancel_delayed_work(struct delay_work *work);
+int cancel_delayed_work_sync(struct delay_work *work);
+#+END_SRC
+* 内核延时
+** 短延时
+#+BEGIN_SRC c
+/**
+ ,* @note: linux在开机时会运行一个循环延时校准，计算出lpj(Loops Per jiffy)，消耗时间几百毫秒
+ ,* 如果在 bootargs 中设置 lpj=xxx,则可以省略这个时间
+ ,*/
+//忙等待，根据CPU频率进行一定次数的循环
+void ndelay(unsigned long nsecs);
+void udelay(unsigned long usecs);
+void mdelay(unsigned long msecs);
+
+/**
+ ,* @note 一般忙等待使用到微秒已经足够，对于毫秒以及以上的延时使用睡眠函数
+ ,*/
+void usleep_range(unsigned long min, unsigned long max);
+void msleep(unsigned int millisecs);
+unsigned long msleep_interruptible(unsigned int millisecs);//可以被打断
+void ssleep(unsigned int seconds);
+#+END_SRC
+** 长延时
+内核中进行延时的一个很直观的方法是比较当前的 jiffies 和目标 jiffies
+#+BEGIN_SRC c
+// 延时100个jiffies
+unsigned long delay = jiffies + 100;
+while(time_before(jiffies,delay));
+
+//延时2秒
+unsigned long delay = jiffies + 2 * Hz;
+while(time_before(jiffies, delay));
+#+END_SRC
+** 睡着延时
+#+BEGIN_SRC c
+/**
+ ,* @brief 使当前任务休眠至指定的 jiffies 之后再被唤醒
+ ,*/
+signed long schedule_timeout(signed long timeout);
+#+END_SRC
