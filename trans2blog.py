@@ -24,7 +24,6 @@ def get_real_name(file_path, pwd_path):
                 name_file = re.search('<(.+)>',lines[i]).group(1)
                 blog_file = blog_source + name_file;
                 if os.path.exists(blog_file) == False or filecmp.cmp(file_path, blog_file) == False:
-                    print("%s \n ==> \n %s" %(file_path, blog_file))
                     sweep = 1
                 else:
                     break
@@ -40,9 +39,8 @@ def get_real_name(file_path, pwd_path):
         if sweep == 1:
             with open(name_file,'w') as f_new:
                 f_new.writelines(lines)
-            if os.path.exists(blog_file) == True and filecmp.cmp(name_file, blog_file) == True:
-                print("****cancel update*****\n")
-            else :
+            if os.path.exists(blog_file) == False or filecmp.cmp(name_file, blog_file) == False:
+                print("%s \n ==> \n %s" %(file_path, blog_file))
                 print("---------->update\n")
                 shutil.copy(name_file,"/home/cec/github/kcmetercec.github.io/hexo/source/_posts/")
             os.remove(name_file)
