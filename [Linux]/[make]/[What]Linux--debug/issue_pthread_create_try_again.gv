@@ -1,0 +1,14 @@
+digraph pic{
+    command[label = "接收命令"]
+    main_thread[shape=box, label="主线程分析命令"]
+    wait_finish[shape=box, label="主动退出上一次任务线程\n并新建线程"]
+    command -> main_thread -> wait_finish;
+
+    wait_finish -> command;
+
+    new_thread[shape=box, label="线程处理任务", color=green]
+    wait_finish -> new_thread;
+
+    exit_thread[shape=box, label="退出线程",color=green]
+    new_thread -> exit_thread;
+}
