@@ -32,4 +32,17 @@
 而是在这个处理的过程中所导致内存使用量不断增大而导致的内存泄漏。
 
 所以我应该来梳理整个流程，逐个排出是那个部分造成的内存泄漏。
+* 解决
+在实际排查中发现，确实是 =pthread_create()= 的内存没有被释放而造成的内存泄露，所以重点就放在Linux线程相关操作上。
+
+在查阅APUE时，对 =pthread_detach()= 有这么个描述：
+#+begin_example
+By default, a thread's termination status is retained until we call pthread_join for that thread.
+A thread's underlying storage can be reclaimed immediately on termination if the thread has been detached.
+#+end_example
+也就是说在线程使用了 =pthread_detach()= 后，如果它退出了则会立即释放其内存！
+
+所以：目前我的这种应用环境就是需要在 =pthread_create()= 之后加上 =pthread_detach()= , 让线程的内存能够及时释放掉。
+
+实测下来也确实如此。
 

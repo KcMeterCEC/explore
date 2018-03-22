@@ -1,0 +1,35 @@
+/**
+ * @brief 用于展示进程的状态
+ */
+digraph process_status{
+    graph[label="进程状态图"];
+    
+    create [label="新建"];
+    ready_a [label="活动就绪"];
+    ready_s [label="静止就绪"];
+
+    create -> ready_a[style=dotted, label="完成"];
+    create -> ready_s[style=dotted,label="等待资源"];
+
+    running [label="执行"];
+
+    ready_a -> running[label="调度"];
+    ready_a -> ready_s[label="挂起"];
+
+    ready_s -> ready_a[label="激活"];
+
+    block_a [label="活动阻塞"];
+    exit [label = "终止"];
+
+    running -> block_a[label="请求I/O"];
+    running -> exit[label="释放"];
+    running -> ready_s[label="挂起"];
+
+    block_s [label="静止阻塞"];
+
+    block_a -> ready_a[label="释放"];
+    block_a -> block_s[label="挂起"];
+
+    block_s -> block_a[label="激活"];
+    block_s -> ready_s[label="释放"];
+}

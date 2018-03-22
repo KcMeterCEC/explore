@@ -49,6 +49,7 @@ digraph pic{
 dot -Tjpg pic.gv -o pic.jpg
 #+end_example
 [[./hello.jpg]]
+
 ** 修改逻辑属性
 具体各个属性位于 [[https://graphviz.gitlab.io/_pages/doc/info/attrs.html][官方文档]]
 *** 节点(node)属性
