@@ -1,0 +1,46 @@
+/**
+ * @brief 用于展示读者写者问题
+ */
+digraph product_consumer{
+    graph[label="读者写者问题"];
+    
+    create [label="新建读互斥信号量、写互斥信号量、读计数器"];
+    create -> read_thread;
+    create -> write_thread;
+
+    read_thread[label="读者线程"];
+    read_rmutex[label="获取一个读信号量"];
+    read_rmutex_2[label="获取一个读信号量"];
+    read_count[label="计数器为0?"];
+    read_count_2[label="计数器为0?"];
+    read_count_add[label="读计数器加一"];
+    read_wait_wmutex[label="等待写信号量"];
+    read_release_rmutex[label="释放读信号量"];
+    read_release_rmutex_2[label="释放读信号量"];
+    read_operation[label="读取操作"];
+    read_count_sub[label="读计数器减一"];
+    read_release_wmutex[label="释放写信号量"];
+
+    read_thread -> read_rmutex;
+    read_rmutex -> read_count;
+    read_count -> read_wait_wmutex -> read_count_add;
+    read_count -> read_count_add;
+    read_count_add -> read_release_rmutex;
+    
+    read_release_rmutex -> read_operation
+
+    read_operation -> read_rmutex_2;
+    read_rmutex_2 -> read_count_sub;
+    read_count_sub -> read_count_2;
+    read_count_2 -> read_release_wmutex -> read_release_rmutex_2;
+    read_count_2 -> read_release_rmutex_2;
+
+    write_thread[label="写线程"];
+    write_operaton[label="写操作"];
+    write_wait_wmutex[label="等待写信号量"];
+    write_release_wmutex[label="释放写信号量"];
+
+    write_thread -> write_wait_wmutex;
+    write_wait_wmutex -> write_operaton;
+    write_operaton -> write_release_wmutex;
+}

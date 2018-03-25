@@ -1,0 +1,38 @@
+/**
+ * @brief 用于展示生产者消费者问题
+ */
+digraph product_consumer{
+    graph[label="生产者消费者问题"];
+    
+    node [shape=box];
+    create [label="新建空位信号量、满位信号量、互斥信号量"];
+    create -> product_thread;
+    create -> consumer_thread;
+
+    product_thread[label="生产者线程"];
+    product_entry[label="获取一个空位信号量"];
+    product_mutex[label="获取互斥量"];
+    product_operation[label="根据索引插入值并修改索引"];
+    product_release_mutex[label="释放互斥量"];
+    product_release_full[label="释放一个满位信号量"];
+
+    product_thread -> product_entry;
+    product_entry -> product_mutex;
+    product_mutex -> product_operation;
+    product_operation -> product_release_mutex;
+    product_release_mutex -> product_release_full;
+
+    consumer_thread[label="消费者线程"];
+    consumer_entry[label="获取一个满位信号量"];
+    consumer_mutex[label="获取互斥量"];
+    consumer_operation[label="根据索引读取值并修改索引"];
+    consumer_release_mutex[label="释放互斥量"];
+    consumer_release_empty[label="释放一个空位信号量"];
+
+    consumer_thread -> consumer_entry;
+    consumer_entry -> consumer_mutex;
+    consumer_mutex -> consumer_operation;
+    consumer_operation -> consumer_release_mutex;
+    consumer_release_mutex -> consumer_release_empty;
+
+}
