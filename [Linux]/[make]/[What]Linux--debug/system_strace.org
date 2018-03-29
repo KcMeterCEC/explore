@@ -1,0 +1,30 @@
+#+TITLE: [What]Linux驱动调试之strace
+#+DATE:  <2018-03-29 Thu> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_strace.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+strace 用于跟踪应用程序的系统调用，并打印出系统调用的结果。
+
+这在获取应用程序发送给文件系统操作函数进而推演出驱动接口的内容时特别有效，同时也可以查看其他系统调用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+- 直接打印系统调用
+#+begin_example
+# -tt 是为了打印时间戳
+# -T 是为了打印每次调用时间消耗
+strace -ttT <bin>
+#+end_example
+- 将系统调用保存在文件中
+#+begin_example
+strace -ttTo <filename> <bin>
+#+end_example
+- 捕捉正在运行的进程
+#+begin_example
+strace -ttTo <filename> -p <pid>
+#+end_example
+
