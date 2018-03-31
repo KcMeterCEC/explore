@@ -1,0 +1,16 @@
+digraph pmic_power_off{
+    graph[label="PMIC关机逻辑"];
+    
+    key_long_enough[label="按键关机请求?"];
+    notify_sys[shape=rectangle,label="通知系统"];
+    key_long_enough -> notify_sys[label="Y"];
+
+    is_prepared[shape=diamond,label="系统准备完毕?"];
+    wait[shape=rectangle,label="等待"];
+    notify_sys -> is_prepared;
+    is_prepared -> wait[label="N"];
+    wait -> is_prepared;
+
+    power_off[shape=rectangle,style=rounded,label="关闭系统硬件"];
+    is_prepared -> power_off[label="Y"];
+}

@@ -1,0 +1,31 @@
+#+TITLE: [What]Linux内核调试之lockup
+#+DATE:  <2018-03-29 Thu> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_lockup.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+当内核卡死没有响应的时候需要打开 Lockup 选项进行监视。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+内核打开Lockup选项在 menuconfig 中的路径为：
+#+begin_example
+Kernel hacking -> Debug Lockups and Hangs -> Detect Hard and Soft Lockups 
+#+end_example
+此选项一共打开了 =soft lockup= 和 =hard lockup= 两种检测机制。
+
+机制一旦触发就会打印类似Oops的信息，里面就提供了卡死的原因以及代码的位置。
+
+*注意：* 在打开这些选项后，如果系统卡死了需要等待一些时间才会有调试信息输出。
+
+* soft lockup
+=soft lockup= 是在内核开了一个高优先级的线程，每隔一段时间进行计数，而计数的检测是通过硬件定时器来完成的。
+
+当有代码卡死进程调度后，定时器检测到计数值 *超过20秒没有更新* 后便会打印出调试信息。
+* hard lockup 
+=hard lockup= 是内核使用了不可屏蔽中断，以检测是否有中断被卡死的情况。只要 *超过10秒没有更新* 后便会打印调试信息。
+
+

@@ -1,0 +1,46 @@
+#+TITLE: [What]嵌入式Linux的远程升级
+#+DATE:  <2018-03-30 Fri> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, remote
+#+NAME: <linux_operations_remote_update.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理嵌入式Linux远程升级的思路。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 总体流程
+总体流程如下图：
+
+[[./linux_remote_update.jpg]]
+
+* 客户机升级流程
+客户机在获取到升级包后的流程概览为：
+
+[[./device_update_overview.jpg]]
+
+** 升级细节
+对于嵌入式Linux而言，其升级代码一般位于系统之上而不是在u-boot中，因为这在后期的升级更为简便。
+
+但需要注意的是：
+#+begin_example
+如果在升级系统的过程中Linux硬盘数据被意外损坏(比如异常掉电)，这将导致系统无法重启进而不再具备升级的能力，
+并且客户也无法再使用设备了, 只有返厂......
+#+end_example
+
+为了解决这个问题，就需要:
+1. 一个备份系统，此系统的功能仅做升级使用：
+  + u-boot 判断系统校验错误，便从备份区从启动备份系统
+  + 备份系统为主分区烧写系统
+  + 备份系统自动重启
+2. 一个单独的分区存放系统日志和用户数据
+
+一般来讲u-boot的功能要做得足够简单，以保证其稳定性，但如果u-boot也有远程升级需求的话那就需要为u-boot再建立备份区。
+
+下面便是一个详细的启动流程：
+
+[[./linux_boot.jpg]]
+
+

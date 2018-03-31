@@ -1,0 +1,499 @@
+#+TITLE: [What]linux -> IIC client
+#+DATE:  <2018-03-29 Thu> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, IIC
+#+NAME: <linux_driver_iic_client.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考网站: [[www.wowotech.net][窝窝科技]]
+参考书籍: <<Linux设备驱动开发详解>>
+
+整理IIC客户端的使用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* I2C 驱动概览
+根据 [[https://kcmetercec.github.io/2018/03/05/linux_driver_overview_structure/][Linux设备驱动的软件构架思想]] 可以知道，对于I2C驱动而言，整体上分为以下几部分：
+1. I2C控制器驱动(platform driver)：也就是I2C的总线驱动，Linux已经提供了I2C类总线的接口，所以此驱动只需要满足这些接收的实现即可。
+2. I2C设备驱动：对应的是驱动具体的I2C设备，此驱动仅需要调用Linux提供的I2C类接口便可以控制I2C总线发出波形
+3. I2C控制器驱动对应的设备树(platform device)：包含控制器的地址，配置等信息
+4. I2C设备驱动对应的设备树：包含对应的控制器、设备的地址、配置等信息。
+
+以上部分便体现了 =总线设备驱动思想= 和 =控制驱动和设备驱动分离思想= 。
+
+在此基础上，可以想象出Linux必然为I2C驱动类进行了分层，将这类设备的共有操作提取到层中。我们作为Linux内核用户便可以尽量少的代码实现需求。
+
+** 实际架构
+Linux 的 I2C 体系结构分为3个组成部分:
+- I2C核心 : I2C核心提供了I2C总线驱动和设备驱动的注册和注销方法, I2C通信方法, 上层的与具体适配器无关的代码以及探测设备, 检测设备地址的上层代码等.
+- I2C总线驱动: 所谓的总线驱动也就是I2C控制器的驱动, 与之相关的有 =I2C控制器数据结构i2c_adapter=, =I2C控制器的算法数据结构i2c_algorithm=, =控制I2C控制器产生通信信号的函数=.
+  + 经由I2C总线驱动的代码, 我们可以控制I2C控制器以主机的方式产生开始位, 停止位, 读写操作, 以及以从机的方式被读写, 产生ACK, NACK等.
+  + I2C控制器一般是直接挂接在CPU总线上的, 所以其驱动也是 =platform_driver=.
+- I2C设备驱动: I2C设备也就是与控制器相连接的设备.与之相关的有 =i2c_driver=, =i2c_client= 数据结构, 以及对应的功能函数.
+
+在Linux用户空间中, I2C设备及驱动位于 =/sys/bus/i2c/= 文件夹下.
+
+在Linux源码中, i2c驱动目录具有如下结构:
+- i2c-core.c / i2c-core.h ： 实现了I2C的核心功能以及 =/proc/bus/i2c*= 的接口
+- i2c-dev.c ：实现了I2C控制器设备文件的功能, 每个I2C控制器都被分配一个设备.通过控制器访问设备时的主设备号位89, 次设备号为 0~255.
+  + 也就是说, 此文件提供了通用的接口, 应用层可以借用这些接口访问挂接在适配器上的I2C设备的存储空间和寄存器, 并控制设备的工作方式.
+  + 应用程序通过 =i2c-%d= (i2c-0, i2c-1,....)文件名并使用文件操作接口 open(), write(), read(), ioctl(), close() 等来访问这个设备.
+#+begin_example
+当然,使用此文件就需要在用户代码中设置好设备的操作地址, 具体寄存器操作.虽然说可以省事, 但没有实现很好的分层.
+#+end_example
+- busses:此文件夹包含了I2C控制器的驱动
+- algos : 实现了一些I2C控制器的通信方法.也就是I2C协议包生成的逻辑, 一般都是由硬件来实现.
+- i2c.h (include/linux/) : 提供对 =i2c_adapter, i2c_algorithm, i2c_driver, i2c_client= 数据结构的定义.
+
+总体的软件拓扑抽象层次如下图所示:
+
+[[./i2c_softTopology.jpg]]
+
+整个构架的软件层次如下图所示:
+
+[[./i2c_framework.jpg]]
+
+经过I2C framework 的抽象, consumer(client) 可以不用关心I2C总线的技术细节, 只需要通过简单的API, 就可以与 slave devices 进行数据交互.
+
+I2C core 使用 =i2c_adapter,i2c_algorithm= 抽象I2C控制器的功能, =i2c_driver, i2c_client= 抽象 I2C slave device 的功能.
+另外, 基于I2C协议, 通过 smbus 模块实现 SMBus的功能.
+
+[[./i2c_smbus.jpg]]
+
+I2C muxes 用于实现I2C BUS的多路复用功能, 实际使用较少.
+* 设备驱动的编写
+** 数据结构(include/linux/i2c.h)
+*** client
+I2C framework 使用 =struct i2c_client= 抽象 i2c slave device, =struct i2c_driver= 抽象 i2c slave driver:
+#+BEGIN_SRC c
+/**
+ ,* @brief struct i2c_client - represent an I2C slave device
+ ,* @param flags -> I2C_CLIENT_TEN 代表使用10位地址, I2C_CLIENT_PEC 使用SMBus 错误检查
+ ,* @param addr -> 设备的地址
+ ,* @param name -> 设备名称
+ ,* @param afapter -> 挂载的控制器
+ ,* @param detected -> 挂接同一总线上的设备链表
+ ,*/
+struct i2c_client{
+        unsigned short flags;
+        unsigned short addr;
+        char name[I2C_NAME_SIZE];
+        struct i2c_adapter *adapter;
+        struct device dev;
+        int irq;
+        struct list_head detected;
+#if IS_ENABLE(CONFIG_I2C_SLAVE)
+        i2c_slave_cb_t slave_cb;
+#endif
+};
+/**
+ ,* @brief struct i2c_driver - represent an I2C device driver
+ ,* @param class -> 表示此驱动支持哪种类型的I2C设备
+ ,* @param attach_afapter -> (此函数不再使用)
+ ,* @param probe -> 绑定设备的回调
+ ,* @param remove -> 卸载设备的回调
+ ,* @param shutdown -> 关闭设备的回调
+ ,* @param alert -> 警告
+ ,* @param command -> callback for bus-wide signaling(optional)
+ ,* @param id_table -> 列出此驱动支持的I2C设备, 总线驱动函数 i2c_device_match() 中会调用 i2c_match_id()
+ ,* 函数匹配用户定义的ID 和 驱动ID
+ ,* @param decetct -> 用于检测设备的回调
+ ,* @param address_list -> 已经挂载的I2C设备地址.
+ ,* @param clients: 链接所有已经挂载的设备
+ ,*/
+struct i2c_driver{
+        unsigned int class;
+        int (*attach_adapter)(struct i2c_adapter *) __deprecated;
+        int (*probe)(struct i2c_client *, const struct i2c_device_id *);
+        int (*remove)(struct i2c_client *);
+        void (*shutdown)(struct i2c_client *);
+        void (*alert)(struct i2c_client *, unsigned int data);
+        int (*command)(struct i2c_client *client, unsigned int cmd, void *arg);
+        struct device_driver driver;
+        const struct i2c_device_id *id_table;
+        int (*detect)(struct i2c_client *, struct i2c_board_info *);
+        const unsigned short *address_list;
+        struct list_head clients;
+};
+//得到i2c_driver 结构体地址
+#define to_i2c_driver(d) container_of(d, struct i2c_driver, driver)
+
+/**
+ ,* @brief 由kobj 得到i2c_client
+ ,*/
+static inline struct i2c_client *kobj_to_i2c_client(struct kobject *kobj)
+{
+        struct device * const dev = container_of(kobj, struct device, kobj);
+        return to_i2c_client(dev);
+}
+
+/**
+ ,* @brief 由i2c_client 得到对应的绑定数据
+ ,*/
+static inline void *i2c_get_clientdata(const struct i2c_client *dev)
+{
+        return dev_get_drvdata(&dev->dev);
+}
+
+/**
+ ,* @brief 绑定数据到 i2c_client
+ ,*/
+static inline void i2c_set_clientdata(struct i2c_client *dev, void *data)
+{
+        dev_set_drvdata(&dev->dev, data);
+}
+#+END_SRC
+*** provider 
+client 通过以 =i2c_msg= 为基本单位向 provider 发送传输请求， =i2c_adapter= 就代表一个控制器对象，
+=i2c_algorithm= 就是对应的操作方法。
+#+BEGIN_SRC c
+/**
+ ,* @brief struct i2c_msg - an I2C transaction segment beginning with START(用户空间也可以用)
+ ,* @param addr -> 从机地址,支持7位或者10位, 10位时需要使用 I2C_M_TEN标记,以及驱动返回 I2C_FUNC_10BIT_ADDR
+ ,* @param flags -> 标明此次传输标记,每个provider至少支持 I2C_M_RD , 其余的支持需要使用 i2c_check_functionality() 来获取
+ ,* @param len -> 读取或者写入的字节数
+ ,* @param buf -> 读写缓存
+ ,* @note 位于 include/uapi/linux/i2c.h
+ ,*/
+
+struct i2c_msg{
+        __u16 addr;
+        __u16 flags;
+#define I2C_M_TEN          0x0010   /// this is a ten bit chip address
+#define I2C_M_RD           0x0001   /// read data, from slave to master
+#define I2C_M_STOP         0x8000   /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_NOSTART      0x4000   /// if I2C_FUNC_NOSTART
+#define I2C_M_REV_DIR_ADDR 0x2000   /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_IGNORE_NAK   0x1000   /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_NO_RD_ACK    0x0800   /// if I2C_FUNC_PROTOCOL_MANGLING
+#define I2C_M_RECV_LEN     0x0400   /// length will be first received byte
+        __u16 len;
+        __u8 *buf;
+};
+/**
+ ,* @brief struct i2c_algorithm - represent I2C transfer method(对应一套通信协议)
+ ,* @param master_xfer -> I2C传输函数
+ ,* @param smbus_xfer -> smbus传输函数
+ ,* @param functionality -> 返回 algorithm/adapter 所支持的功能, I2C_FUNC_XXX
+ ,* @param reg_slave / unreg_slave -> 注册及注销从设备
+ ,* @note 关于 master_xfer 的错误返回说明文件位于 Documentation/i2c/fault-codes
+ ,*/
+struct i2c_algorithm{
+        int (*master_xfer)(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
+        int (*smbus_xfer)(struct i2c_adapter *adap, u16 addr, unsigned short flags,
+                          char read_write, u8 command, int size, union i2c_smbus_data *data);
+        u32 (*functionality)(struct i2c_adapter *);
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+        int (*reg_slave)(struct i2c_client *client);
+        int (*unreg_slave)(struct i2c_client *client);
+#endif
+};
+/**
+ ,* @brief i2c_adapter is the structure used to identify a physical i2c bus along with
+ ,* the access algorithms necessary to access it.(代表控制器)
+ ,* @param class -> 此驱动所支持的设备类型(I2C_CLASS_HWMON, I2C_CLASS_DDC....)
+ ,* @param timeout -> 当重试超过一定时间(jiffies), 停止重试
+ ,* @param retries -> 设定当传输失败时, 重试传输的次数
+ ,* @param nr -> 此控制器的ID, 一般由设备树解析.
+ ,*/
+struct i2c_adapter{
+        struct module *owner;
+        unsigned int class;
+        const struct i2c_algorithm *algo;
+        void *algo_data;
+        
+        struct rt_mutex bus_lock;
+        
+        int timeout;
+        int retries;
+        struct device dev;
+        
+        int nr;
+        char name[48];
+        struct completion dev_released;
+        struct mutex userspace_clients_lock;
+        struct list_head userspace_clients;
+        
+        struct i2c_bus_recovery_info *bus_recovery_info;
+        const struct i2c_adapter_quirks *quirks;
+};
+
+/// 由设备获取其绑定的 adapter
+#define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+#+END_SRC
+
+** 函数接口
+#+BEGIN_SRC c
+/**
+ ,* @brief 通过设备树获取对应的 client 或者 adapter
+ ,* @note 使用此函数后, 必须调用 put_device() 来解除引用计数.
+ ,*/
+extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
+extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
+
+/**
+ ,* @brief 进行一次消息传输
+ ,* @note: count的值不能大于65535，因为 msg.len 是 u16 类型
+ ,*/
+extern int i2c_master_send(const struct i2c_client *client, const char *buf, int count);
+extern int i2c_master_recv(const struct i2c_client *client, char *buf, int count);
+
+/**
+ ,* @brief 进行多次消息传输
+ ,*/
+extern int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
+/// unclocked flavor
+extern int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num);
+#+END_SRC
+** 编写流程
+I2C总线上的设备有两种形态, 一种是设备全部使用I2C与系统通信, 一种是设备的I2C仅仅用于一部分, 还有另外一部分接口.
+
+第二种形式的连接, 需要看哪个通信为主就以哪个为主要考虑驱动.
+
+比如第一种形式, 设备树节点就是I2C总线的一个子节点:
+#+begin_example
+&i2c1{
+    clocl-frequency = <100000>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&pinctrl_i2c1>;
+    status = "okay"
+    ....
+    pmic: pf0100@08{
+          compatible = "fsl, pfuze100";
+    };
+};
+#+end_example
+
+第二种形式, I2C仅仅是它的一个子功能
+#+begin_example
+&hdmi{
+    ddc-i2c-bus = <&i2c2>;
+    status = "okay";
+};
+#+end_example
+
+*** 形式1的编写步骤(drivers/misc/eeprom/at24.c  drivers/regulator/fpuze100-regulator.c)
+- 根据设备的硬件连接, 设置其设备树.
+#+begin_example
+&i2c1{
+  keyboard@34{
+    compatible = "ti, tca8418";
+    reg = <0x34>;
+  };
+};
+#+end_example
+- 定义一个 =struct i2c_driver= 类型变量, 并调用 module_i2c_driver 将其注册到 I2C core 中。
+  + 该变量包含应该包含的DTS中的 compatible 字段相同的 of_match_table, 以及一个 probe接口.( =module_i2c_driver= 是一个宏, 自动完成了 =xxx_init, xxx_exit= 函数)
+  + 为了匹配不同的设备，可以在 =i2c_device_id= 中加入 =设备名称,设备ID= 来对应不同的设备。（在probe 函数中的 id 参数可以读取 id->driver_data 来区分不同设备）
+    + 此device_id 只有在 of_match_table 匹配失败时才使用
+- 在 adapter 注册时, 会自动为它的 slave device 创建 =struct i2c_client= 结构, 并匹配 =struct i2c_driver= 变量, 调用对应的 probe接口.
+- i2c_driver 的 probe 接口的输入参数是 =struct i2c_client= 类型指针, 可以调用 =i2c_master_send/i2c_master_recv= 接口进行简单的I2C传输.
+  + 同时也可以通过该指针获得所属的 i2c_adapter 指针, 然后通过 i2c_transfer 接口进行更为复杂的 read, write 操作.(参考 =drivers/base/regmap/regmap-i2c.c= 中的 regmap_i2c_read 接口).
+- 实现I2C设备所对应类型的具体驱动. i2c slave driver  只是实现设备与总线的挂接, 而如果此设备驱动兼容多种真实设备, 那就需要为对应的设备实现对应的 =read(), write(), ioctl()= 函数.一般来讲,通过misc框架新建一个字符设备驱动即可.
+
+#+BEGIN_SRC c
+/*  keyboard.c - The simplest kernel module.
+ ,*/
+#define pr_fmt(fmt)     "[driver] keyboard:" fmt
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/io.h>
+#include <linux/interrupt.h>
+#include <linux/device.h>
+#include <linux/miscdevice.h>
+#include <linux/cdev.h>
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/poll.h>
+#include <linux/fs.h>
+#include <linux/platform_device.h>
+#include <linux/ioctl.h>
+#include <linux/i2c.h>
+
+#include <linux/of_address.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
+
+/* Standard module information, edit as appropriate */
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("kcl");
+MODULE_DESCRIPTION("keyboard - loadable module template generated by petalinux-create -t modules");
+MODULE_VERSION("ver1.0");
+
+#define DRIVER_NAME "keyboard"
+#define USE_DIRECT_RW
+
+struct keyboard_dev
+{
+        struct miscdevice       str_miscDev;
+        struct i2c_client       *pstr_client;
+};
+
+static int keyboard_open(struct inode *pstr_inode, struct file *pstr_file)
+{
+        int ret = 0;
+        return ret;
+}
+static int keyboard_release(struct inode *pstr_inode, struct file *pstr_file)
+{
+        int ret = 0;
+        return ret;
+}
+static ssize_t keyboard_read(struct file *pstr_file, char __user *buf, size_t count, loff_t *ppos)
+{
+        ssize_t ret = 0;
+        struct keyboard_dev *pstr_keyboard = container_of(pstr_file->private_data, struct keyboard_dev,
+                                                          str_miscDev);
+        struct i2c_client *pstr_client = pstr_keyboard->pstr_client;
+        uint8_t u8_data = 0;
+        uint8_t u8_rdCnt = 0;
+        uint8_t pu8_rdBuf[10];
+
+
+        u8_data = 0x03;
+        if(i2c_master_send(pstr_client, &u8_data, 1) != 1)
+        {
+                pr_info("wirte reg -> %x error!\n", u8_data);
+                goto out;
+        }
+        if(i2c_master_recv(pstr_client, &u8_data, 1) != 1)
+        {
+                pr_info("read reg -> %x error!\n", u8_data);
+                goto out;
+        }
+        u8_rdCnt = u8_data;
+        if(u8_rdCnt)
+        {
+                /// read event count register
+                u8_data = 0x04;
+                if(i2c_master_send(pstr_client, &u8_data, 1) != 1)
+                {
+                        pr_info("wirte reg -> %x error!\n", u8_data);
+                        goto out;
+                }
+                if((ret = i2c_master_recv(pstr_client, pu8_rdBuf, u8_rdCnt)) != u8_rdCnt)
+                {
+                        pr_info("read reg -> %x error!\n", u8_data);
+                        goto out;
+                }
+                /// reset status register
+                u8_data = 0x01;
+                if(i2c_master_send(pstr_client, &u8_data, 1) != 1)
+                {
+                        pr_info("wirte reg -> %x error!\n", u8_data);
+                        goto out;
+                }
+                /// copy to user space
+                if(copy_to_user(buf, pu8_rdBuf, u8_rdCnt))
+                {
+                        pr_info("can not copy to user space!\n");
+                }
+        }
+out:
+        return ret;
+}
+static const struct file_operations keyboard_fops =
+{
+        .owner = THIS_MODULE,
+        .read = keyboard_read,
+        .open = keyboard_open,
+        .release = keyboard_release,
+};
+
+
+static int keyboard_probe(struct i2c_client *client, const struct i2c_device_id *id)
+{
+        int rc = 0;
+        uint8_t i = 0;
+        struct keyboard_dev     *pstr_keyboard;
+
+        pstr_keyboard = (struct keyboard_dev *)devm_kzalloc(&client->dev, sizeof(struct keyboard_dev),
+                                                            GFP_KERNEL);
+        if(pstr_keyboard == NULL)
+        {
+                pr_err("can not malloc keyboard data!\n");
+                rc = -1;
+                goto out;
+        }
+        pstr_keyboard->pstr_client = client;
+        pstr_keyboard->str_miscDev.minor = MISC_DYNAMIC_MINOR;
+        pstr_keyboard->str_miscDev.name = DRIVER_NAME;
+        pstr_keyboard->str_miscDev.fops = &keyboard_fops;
+        rc = misc_register(&pstr_keyboard->str_miscDev);
+
+        pr_info("probing !address -> %x\n", client->addr);
+
+        /// initialize chip
+            uint8_t pu8_wr[4][2] =
+            {
+                    {0x1d, 0x3e},
+                    {0x1e, 0x3f},
+                    {0x1f, 0x00},
+                    {0x01, 0x11},
+            };
+            for(i = 0; i < 4; i++)
+            {
+                    if(i2c_master_send(client, pu8_wr[i], 2) != 2)
+                    {
+                            pr_err("can not write data to keyboard chip! reg -> %x, data -> %x\n",
+                                   pu8_wr[i][0], pu8_wr[i][1]);
+                            rc = -1;
+                            goto out;
+                    }
+            }
+
+out:
+            return rc;
+}
+
+static int keyboard_remove(struct i2c_client * client)
+{
+        struct keyboard_dev     *pstr_keyboard;
+
+        pstr_keyboard = container_of(client, struct keyboard_dev, pstr_client);
+        pr_info("keyboard addr = %p\n", pstr_keyboard);
+        //! It will cause Oops, because list_del(&misc->list) deal NULL pointer
+        //! But I don't know why....
+        //misc_deregister(&pstr_keyboard->str_miscDev);
+
+        return 0;
+}
+static struct i2c_device_id keyboard_ids[] = {
+        {"tca8418", 0},
+        {},
+};
+MODULE_DEVICE_TABLE(i2c, keyboard_ids);
+
+static struct of_device_id keyboard_dt_ids[] = {
+        {.compatible = "ti, tca8418",},
+        {},
+};
+MODULE_DEVICE_TABLE(of, keyboard_dt_ids);
+static struct i2c_driver keyboard_driver = {
+        .driver = {
+                .name = DRIVER_NAME,
+                .of_match_table = keyboard_dt_ids,
+        },
+        .probe = keyboard_probe,
+        .remove = keyboard_remove,
+        .id_table = keyboard_ids,
+};
+static int __init keyboard_init(void)
+{
+        pr_info("module init\n");
+        return i2c_add_driver(&keyboard_driver);
+}
+
+static void __exit keyboard_exit(void)
+{
+        pr_info("module exit\n");
+        i2c_del_driver(&keyboard_driver);
+}
+
+module_init(keyboard_init);
+module_exit(keyboard_exit);
+#+END_SRC

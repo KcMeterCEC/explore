@@ -1,0 +1,11 @@
+#+TITLE: [What] vim 问题: 无法语法高亮
+#+DATE: <2018-03-30 Fri> 
+#+TAGS: vim
+#+LAYOUT: post
+#+CATEGORIES: editer, vim
+#+NAME: <editer_vim_issue_highlight.org>
+
+- 描述
+在偶然的某个时间打开以前打开过的文件后, 无法语法高亮了.
+- 解决
+将 =~/.vimviews/= 文件夹下清空即可.

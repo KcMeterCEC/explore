@@ -28,6 +28,12 @@ arm-linux-gnueabihf-objdump -d -S file.o
 ** Oops 与 Panic
 Panic 属于 Oops 的一种，内核发现异常会抛出Oops，但错误不严重的情况下内核还会继续运行。如果严重则会抛出 Panic，此时内核便会停止运行。
 
+但为了便于调试，一般需要做如下操作：
+#+begin_example
+echo 1 > /proc/sys/kernel/panic_on_oops
+#+end_example
+这是为了内核无论是出现Oops还是Panic都要停止内核运行，以便正确并及时的捕捉错误的位置。
+
 * 显示使用 BUG_ON() 和 WARN_ON()
 BUG_ON() 和 WARN_ON() 是内核提供的警告宏。
 

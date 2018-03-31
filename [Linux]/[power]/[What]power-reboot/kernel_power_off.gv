@@ -1,0 +1,42 @@
+digraph kernel_power_off{
+    graph[label="kernel关机顺序"];
+
+    cmd_poweroff[label="用户空间命令 poweroff"];
+    syscall_reboot[shape=rectangle, label="系统调用 SYSCALL_DEFINE4(reboot,....)"];
+    check[shape=rectangle, label="必要的基本检查"];
+
+    cmd_poweroff -> syscall_reboot;
+    syscall_reboot -> check;
+
+    have_pm_func[shape=diamond,label="具有函数 pm_power_off 实体?"];
+    check -> have_pm_func;
+
+    do_halt[shape=rectangle,style=rounded,label="执行挂起流程"];
+    have_pm_func -> do_halt[label="N"];
+    kernel_power_off[shape=rectangle,label="进入函数 kernel_power_off()"];
+    have_pm_func -> kernel_power_off[label="Y"];
+
+    shutdown_prepare[shape=rectangle,label="1. 发送关机通知\n2.禁止User mode helper\n3.关闭设备"];
+    kernel_power_off -> shutdown_prepare;
+
+    pm_power_off_prepare[shape=rectangle,label="如果存在 pm_power_off_prepare 实体则调用"];
+    shutdown_prepare -> pm_power_off_prepare;
+
+    migrate_to_reboot_cpu[shape=rectangle,label="将进程都移到一个CPU上"];
+    pm_power_off_prepare -> migrate_to_reboot_cpu;
+
+    syscore_shutdown[shape=rectangle, label="关闭系统核心组件"];
+    migrate_to_reboot_cpu -> syscore_shutdown;
+
+    print[shape=rectangle, label="打印 Power down"];
+    syscore_shutdown -> print;
+
+    machine_power_off[shape=rectangle, label="进入SOC相关代码执行"];
+    print -> machine_power_off;
+
+    pm_power_off[shape=rectangle, label="执行 pm_power_off()"];
+    machine_power_off -> pm_power_off;
+
+    do_exit[shape=rectangle,style=rounded,label="如果关机失败,\n进入函数 do_exit() 进行异常处理"];
+    pm_power_off -> do_exit;
+}

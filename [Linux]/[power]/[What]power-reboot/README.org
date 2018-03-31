@@ -1,0 +1,96 @@
+#+TITLE: [What]linux -> poweroff应用
+#+DATE:  <2018-03-29 Thu> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, power, basic
+#+NAME: <linux_power_basic_poweroff.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考网站: [[www.wowotech.net][窝窝科技]]
+
+整理如何为系统的关机提供接口。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 硬件描述
+一般的手持设备，都具有一个电源管理芯片(PMIC)以掌控整个硬件系统的电源。
+通常SOC通过IIC与PMIC通信来获取硬件电源信息和发送电源关闭请求。
+
+[[./power_hardware.jpg]]
+
+* 开关机逻辑
+一般来讲电源按钮是由PMIC来检测的，这样才能避免当系统死掉后，用户可以通过长按一段时间而强行关机。
+
+下面以PMIC的视角来展示开关机逻辑图。
+** 开机逻辑
+开机逻辑过程中，基本上都是由PMIC来处理的。
+
+[[./pmic_power_on.jpg]]
+
+** 关机逻辑
+关机逻辑过程中，PMIC需要与SOC交互避免数据丢失。
+
+[[./pm_power_off.jpg]]
+
+由上图可以看出为了实现系统关机，Linux需要具备：
+1. 能主动获取关机请求
+2. 能向PMIC发送关机命令
+* Linux 主动获取关机请求
+为了能够主动获取关机请求，Linux需要具备：
+1. IIC总线控制器驱动
+2. PMIC设备驱动，并读取内容
+
+此部分就是IIC设备驱动的编写。
+* Linux 向PMIC发送关机命令
+在Linux具备总线控制器驱动的情况下，就需要搞明白：关机命令应该在什么时候发送？
+
+这就需要了解Linux的关机流程。
+** Linux关机流程
+查看 [[http://www.wowotech.net/pm_subsystem/reboot.html][窝窝科技]] 的文章可以单独罗列出其关机操作流程如下(kernel/reboot.c)。
+
+[[./kernel_power_off.jpg]]
+
+由此图可知，我们需要：
+1. 实现 =pm_powr_off= 实体来达到向PMIC发送关机命令的目的。
+2. 不要进入 =do_exit()= 函数。
+
+这个 =pm_power_off= 实体在 IIC 设备驱动中实现即可。
+** 添加发送关机命令代码
+*** pm_power_off 的引用
+在 =arch/arm/kernel/reboot.c= 中有如下代码：
+#+BEGIN_SRC c
+void (*pm_power_off)(void);
+EXPORT_SYMBOL(pm_power_off);
+#+END_SRC
+由此可见这是一个全局符号，仅需要在 IIC 设备驱动中直接赋值即可。
+*** 实现
+为了使 =pm_power_off= 能被直接使用，我们需要保存内部全局变量，以让函数直接使用，比如在 =drivers/regulator/act8865-regulator.c= 中有如下代码。
+#+BEGIN_SRC c
+static struct i2c_client *act8865_i2c_client;
+static void act8865_power_off(void)
+{
+        struct act8865 *act8865;
+
+        act8865 = i2c_get_clientdata(act8865_i2c_client);
+        regmap_write(act8865->regmap, act8865->off_reg, act8865->off_mask);
+        while (1);
+}
+
+static int act8865_pmic_probe(struct i2c_client *client,
+                              const struct i2c_device_id *i2c_id)
+{
+        .......
+    if (of_device_is_system_power_controller(dev->of_node)) {
+            if (!pm_power_off && (off_reg > 0)) {
+                    act8865_i2c_client = client;
+                    act8865->off_reg = off_reg;
+                    act8865->off_mask = off_mask;
+                    pm_power_off = act8865_power_off;
+            } else {
+                    dev_err(dev, "Failed to set poweroff capability, already defined\n");
+            }
+    }
+    ....
+}
+#+END_SRC

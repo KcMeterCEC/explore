@@ -1,0 +1,24 @@
+digraph sys_boot{
+    graph[label="系统启动流程"];
+
+    reboot[shape=rectangle,style=rounded,label="重启"];
+    fsbl_boot[shape=rectangle,label="进入FSBL"];
+    uboot_right[shape=diamond,label="u-boot检验通过?"];
+    reboot -> fsbl_boot -> uboot_right;
+    
+    uboot_run[shape=rectangle,label="进入主u-boot"];
+    uboot_right -> uboot_run[label="Y"];
+    
+    uboot_update[shape=rectangle,label="进入备份u-boot进行还原"];
+    uboot_right -> uboot_update[label="N"];
+    uboot_update -> reboot;
+    
+    kernel_right[shape=diamond,label="系统校验通过?"];
+    uboot_run -> kernel_right;
+    kernel_run[shape=rectangle,style=rounded,label="进入主系统"];
+    kernel_right -> kernel_run[label="Y"];
+
+    kernel_update[shape=rectangle,label="进入备份系统进行还原"];
+    kernel_right -> kernel_update[label="N"];
+    kernel_update -> reboot;
+}

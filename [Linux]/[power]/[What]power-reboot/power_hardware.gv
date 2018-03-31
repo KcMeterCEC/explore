@@ -1,0 +1,12 @@
+/**
+ * @brief 阐述一般系统的电源硬件
+ */
+digraph pw_hd{
+    graph[label="系统电源硬件连接"];
+
+    node[shape=box];
+    pmic -> soc [arrowhead=none,label="IIC"];
+    pmic -> device1;
+    pmic -> device2;
+    pmic -> device3;
+}

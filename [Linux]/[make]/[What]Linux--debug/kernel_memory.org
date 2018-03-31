@@ -1,0 +1,38 @@
+#+TITLE: [What]Linux内核调试之memory
+#+DATE:  <2018-03-29 Thu> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_memory.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+在内核开发中比较容易犯的错误就有内存没有释放，重复释放，越界访问等，所有打开相关内存调试是很有必要的。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+需要打开以下几个选项：
+* Kernel memory leak detector 
+#+begin_example
+Kernel hacking -> Memory Debugging -> Kernel memory leak detector
+#+end_example
+相关文档说明位于 =Documentation/kmemleak.txt= 
+
+打开此选项后，如果有内存泄露的位置，内核会记录信息于 =/sys/kernel/debug/kmemleak= 。
+
+查看此文件便可找到内存泄露可能存在的位置。
+* Enable SLUB debugging support 
+#+begin_example
+General setup -> Enable SLUB debugging support 
+#+end_example
+此选项依赖于：
+#+begin_example
+General setup -> Choose SLAB allocator -> SLUB
+#+end_example
+然后打开选项：
+#+begin_example
+Kernel hacking -> Memory Debugging -> SLUB debugging on by default
+#+end_example
+
+打开此选项后如果有内存重复释放等操作则会打印调试信息。
+

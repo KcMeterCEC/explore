@@ -1,0 +1,84 @@
+#+TITLE: [What]linux -> RTC client
+#+DATE:  <2018-03-30 Fri> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, RTC
+#+NAME: <linux_driver_RTC_client.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考书籍: <<Linux设备驱动开发详解>>
+
+整理RTC客户端的使用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* RTC 驱动概览
+根据 [[https://kcmetercec.github.io/2018/03/05/linux_driver_overview_structure/][Linux设备驱动的软件构架思想]] 可以知道，对于RTC驱动而言，整体上分为以下几部分：
+** 几种硬件情况
+*** SOC 内置 RTC
+1. RTC控制器驱动(platform driver)：SOC内置RTC的控制器驱动
+2. RTC控制器驱动对应的设备树(platform device)：包含控制器的地址，配置等信息
+*** SOC 外置 RTC
+如果SOC没有内置RTC，那么就是由协议来驱动外部芯片来获取时间，那么就需要以下几个部分：
+1. RTC芯片协议控制器驱动(platform driver): 用于产生协议波形
+2. RTC设备驱动：对应的是驱动具体的RTC设备，此驱动仅需要调用Linux提供协议接口便可以控制协议总线发出波形
+3. 协议控制器的设备树(platform device): 控制器地址，配置等信息
+4. RTC设备驱动对应的设备树：包含对应的控制器、设备的地址、配置等信息。
+*** 分层
+以上部分便体现了 =总线设备驱动思想= 和 =控制驱动和设备驱动分离思想= 。
+
+在此基础上，可以想象出Linux必然为RTC驱动类进行了分层，将这类设备的共有操作提取到层中。我们作为Linux内核用户便可以尽量少的代码实现需求。
+
+** 实际架构
+文件 =drivers/rtc/rtc-dev.c= 已经实现了RTC类字符设备的一些操作，比如 =open(),read(),ioctl()= 等。
+
+并且RTC核心层为下层提供了一些了函数以实现基本的操作:
+- =devm_rtc_device_register= 向核心层注册设备
+- =rtc_class_ops= 向核心层提交操作方法
+* RTC client驱动的实现
+** 数据结构
+#+BEGIN_SRC c
+/**
+ ,* @brief : RTC 底层操作接口
+ ,*/
+struct rtc_class_ops {
+        int (*open)(struct device *);
+        void (*release)(struct device *);
+        int (*ioctl)(struct device *, unsigned int, unsigned long);
+        int (*read_time)(struct device *, struct rtc_time *);
+        int (*set_time)(struct device *, struct rtc_time *);
+        int (*read_alarm)(struct device *, struct rtc_wkalrm *);
+        int (*set_alarm)(struct device *, struct rtc_wkalrm *);
+        int (*proc)(struct device *, struct seq_file *);
+        int (*set_mmss64)(struct device *, time64_t secs);
+        int (*set_mmss)(struct device *, unsigned long secs);
+        int (*read_callback)(struct device *, int data);
+        int (*alarm_irq_enable)(struct device *, unsigned int enabled);
+};
+#+END_SRC
+** 操作函数
+#+BEGIN_SRC c
+extern struct rtc_device *rtc_device_register(const char *name,
+                                              struct device *dev,
+                                              const struct rtc_class_ops *ops,
+                                              struct module *owner);
+extern struct rtc_device *devm_rtc_device_register(struct device *dev,
+                                                   const char *name,
+                                                   const struct rtc_class_ops *ops,
+                                                   struct module *owner);
+extern void rtc_device_unregister(struct rtc_device *rtc);
+extern void devm_rtc_device_unregister(struct device *dev,
+                                       struct rtc_device *rtc);
+#+END_SRC
+** 实现
+对于SOC内置的RTC来说，直接在驱动中实现接口即可（参考 drivers/rtc/rtc-s3c.c)。
+
+对于协议驱动外设RTC来说，我们需要实现：
+1. 设备驱动程序：通过统一的协议接口控制外设
+2. 设备对应的设备树节点：以实现驱动的挂载
+
+需要注意的是：
+1. Linux在启动时会读取硬件时钟(设备时钟)，而后便用软件来计算时间增加。如果驱动在这之后才加载，那么系统时间便不会自动更新。
+  + 此时使用命令 =hwclock -s= 来更新系统时钟
+  + 同时在设置了系统时钟后，也需要使用 =hwclock -w= 来更新硬件时钟

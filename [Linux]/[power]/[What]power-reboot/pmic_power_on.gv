@@ -1,0 +1,27 @@
+digraph pw_on{
+    graph[label="PMIC开机逻辑"];
+
+    wake_up[label="被按键或充电唤醒"];
+    is_charge[shape=diamond, label="是否充电唤醒?"];
+    dis_charge[shape=rectangle,label="充电指示"];
+    is_long_enough[shape=diamond,label="按键达到阀值?"];
+    is_key_long_enough[shape=diamond,label="按键达到阀值?"];
+    wake_up -> is_charge;
+    is_charge -> dis_charge[label="Y"];
+    is_charge -> is_long_enough[label="N"];
+
+    dis_charge -> is_key_long_enough;
+
+    is_un_charge[shape=diamond,label="拔下电源?"];
+    pw_on_sys[shape=rectangle,style=rounded,label="启动系统"];
+    is_key_long_enough -> is_un_charge[label="N"];
+    is_key_long_enough -> pw_on_sys[label="Y"];
+
+    sleep[shape=rectangle,style=rounded,label="睡眠"];
+    is_un_charge -> dis_charge[label="N"];
+    is_un_charge -> sleep[label="Y"];
+
+
+    is_long_enough -> sleep[label="N"];
+    is_long_enough -> pw_on_sys[label="Y"];
+}

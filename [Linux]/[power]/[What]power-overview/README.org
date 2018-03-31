@@ -1,0 +1,15 @@
+#+TITLE: [What]linux -> 电源管理架构
+#+DATE:  <2018-03-27 Tue> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, power, overview
+#+NAMA: <linux_power_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考： =Linux设备驱动开发详解=
+
+理解电源管理架构。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML

@@ -1,0 +1,16 @@
+digraph remote_update{
+    graph[label="远程升级总体流程"];
+
+    package[shape=rectangle,style=rounded,label="生产商将代码按照一定的数据结构打包"];
+    code[shape=rectangle,label="将打包后的文件进行加密并生成校验码"];
+    package -> code;
+
+    send[shape=rectangle,label="通过各种接收发送至客户机"];
+    code -> send;
+
+    decode[shape=rectangle,label="客户机校验通过后解码文件"];
+    send -> decode;
+
+    update[shape=rectangle,style=rounded,label="将数据结构拆开，根据不同部分进行各自升级"];
+    decode -> update;
+}

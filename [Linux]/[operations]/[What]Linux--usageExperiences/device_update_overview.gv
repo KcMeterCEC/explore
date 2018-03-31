@@ -1,0 +1,23 @@
+digraph device_update{
+    graph[label="客户机升级概览"];
+
+    decode[shape=diamond,label="校验通过?"];
+    unpack[shape=rectangle,label="解包"];
+    warning[shape=rectangle,style=rounded,label="发出警告"];
+    decode -> unpack[label="Y"];
+    decode -> warning[label="N"];
+
+    get_a_bin[shape=rectangle,label="获取一个升级包"];
+    unpack -> get_a_bin;
+
+    is_new[shape=diamond,label="版本是否\n新于本地版本?"];
+    get_a_bin -> is_new;
+
+    notify[shape=rectangle,style=rounded,label="给出提示"];
+    is_new -> notify[label="N"];
+    update[shape=rectangle,style=rounded,label="进行升级"];
+    is_new -> update[label="Y"];
+
+    update -> get_a_bin;
+    notify -> get_a_bin;
+}
