@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-参考书籍: <<Linux设备驱动开发详解>>
+参考书籍: =Linux设备驱动开发详解=
 
 整理RTC客户端的使用。
 #+BEGIN_HTML

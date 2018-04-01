@@ -31,7 +31,7 @@
 ** 关机逻辑
 关机逻辑过程中，PMIC需要与SOC交互避免数据丢失。
 
-[[./pm_power_off.jpg]]
+[[./pmic_power_off.jpg]]
 
 由上图可以看出为了实现系统关机，Linux需要具备：
 1. 能主动获取关机请求

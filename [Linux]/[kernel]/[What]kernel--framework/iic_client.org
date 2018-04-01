@@ -8,7 +8,8 @@
 #+OPTIONS: ^:{}
 
 参考网站: [[www.wowotech.net][窝窝科技]]
-参考书籍: <<Linux设备驱动开发详解>>
+
+参考书籍: =Linux设备驱动开发详解=
 
 整理IIC客户端的使用。
 #+BEGIN_HTML
@@ -49,7 +50,7 @@ Linux 的 I2C 体系结构分为3个组成部分:
 
 总体的软件拓扑抽象层次如下图所示:
 
-[[./i2c_softTopology.jpg]]
+[[./i2c_softTopolog.jpg]]
 
 整个构架的软件层次如下图所示:
 

@@ -1,0 +1,50 @@
+#+TITLE: [What] graphviz 节点属性
+#+DATE:<2018-04-01 Sun> 
+#+TAGS: graphviz
+#+LAYOUT: post
+#+CATEGORIES: editer, graphviz
+#+NAME: <editer_graphviz_node.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+整理Node的相关属性。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 形状
+** 基本几何形状
+node 的基本形状使用语法:
+#+begin_example
+shape=<shape name>
+#+end_example
+其中 =shape name= 可以使用以下这些名称：
+[[./node_shape_basic1.jpg]]
+
+[[./node_shape_basic2.jpg]]
+
+** 形状的调整
+在基本形状的基础之上，可以改变它的一些属性。
+- 设置有几层轮廓
+#+begin_example
+peripheries=<number of boundary>
+#+end_example
+- 顺时针旋转: 不同的形状效果不一样，需要实测
+#+begin_example
+orientation=<degrees>
+#+end_example
+- 轮廓的颜色
+#+begin_example
+color=<color>
+#+end_example
+- 显示风格: 
+  + filled : 以填充的方式显示, 如果想让填充的颜色与轮廓不一致，可以在后面跟上 fillcolor=<color> 
+  + invisible: 不可见
+  + diagonals: 边角线
+  + rounded: 轮廓是圆角
+  + dashed: 轮廓以短横虚线的方式绘制
+  + dotted: 轮廓以点虚线方式绘制 
+  + bold: 以粗线绘制
+#+begin_example
+style=<apperarance>  or style="<apperarance1>,<apperarance2>"
+#+end_example
+
