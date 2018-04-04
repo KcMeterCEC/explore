@@ -1,0 +1,40 @@
+#+TITLE: [What]compiler -> msvc属性
+#+DATE:  <2018-04-02 Mon> 
+#+TAGS: compiler
+#+LAYOUT: post 
+#+CATEGORIES: program,compiler
+#+NAME: <program_compiler_msvc_attribute.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理msvc属性设置，避免遗忘。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 数据结构
+** 结构体非对齐
+在两个系统进行通信发送数据时，经常会要以结构体非对齐方式，以保证数据对应的情况下减小发送带宽。
+
+使用 =pack= 来设置编译器对齐，相比gcc略麻烦。
+#+BEGIN_SRC c
+#define PACK( __Declaration__ ) __pragma( pack(push, 1) ) __Declaration__ __pragma( pack(pop) )
+
+PACK(
+        struct myStruct
+        {
+            int a;
+            int b;
+        }
+     );
+PACK(
+        typedef struct
+        {
+            int x;
+        }
+     ) MyStruct;
+#+END_SRC
+为了能与gcc统一，使用以下方式来包含一次gcc
+#+BEGIN_SRC c
+#define PACK( __Declaration__ ) __Declaration__ __attribute__((__packed__))
+#+END_SRC
+

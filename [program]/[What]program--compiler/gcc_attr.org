@@ -1,0 +1,26 @@
+#+TITLE: [What]compiler -> gcc 常用属性
+#+DATE:  <2018-04-02 Mon> 
+#+TAGS: compiler
+#+LAYOUT: post 
+#+CATEGORIES: program,compiler
+#+NAME: <program_compiler_gcc_attribute.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理gcc下的attribute，避免遗忘。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 数据结构
+** 结构体非对齐
+在两个系统进行通信发送数据时，经常会要以结构体非对齐方式，以保证数据对应的情况下减小发送带宽。
+
+使用 =__packed= 来强制编译器不使用对齐。
+#+BEGIN_SRC c
+typedef struct __attribute__((__packed__))
+{
+        uint8_t cmd;
+        uint8_t data;
+}cmd_normal;
+#+END_SRC
+

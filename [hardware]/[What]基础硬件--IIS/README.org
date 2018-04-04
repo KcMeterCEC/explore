@@ -1,0 +1,29 @@
+#+TITLE: [What] IIS 基本时序
+#+DATE: <2018-04-04 Wed> 
+#+TAGS: hardware
+#+LAYOUT: post
+#+CATEGORIES: hardware, basic
+#+NAME: <hardware_basic_iis.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考： =i2s bus specification=
+
+整理I2S协议时序，便于硬件排查。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+I2S总线主要用于传输音频数据，关于其他的控制信号则需要走其他协议。
+
+[[./iis_interface.jpg]]
+
+* 硬件连接说明
+- I2S 由时钟(SCK)、数据(SD)、声道选择(WS) 3线组成
+- 在一般场景下都是由发射机(主机)发送信号到接收机(从机)
+- 也可以由接收机(主机)生成时钟和声道选择信号，从发射机(从机)中读取数据。
+- 当硬件中有多个发射机和接收机时，需要一个控制器(主机)来控制收发芯片(从机)之间的通信。
+* 时序说明
+- 时钟(SCK)下降沿数据改变，上升沿数据稳定让接收机读取
+- 数据(SD)位序为MSB
+- 通道选择(WS)为0表示左声道，1表示右声道，左右声道的字节数可以不一致，时钟上升沿有效
+  + *WS的切换要先于数据切换一个时钟* ，以告知接收机切换。

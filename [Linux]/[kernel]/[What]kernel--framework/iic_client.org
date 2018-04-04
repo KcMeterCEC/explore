@@ -498,3 +498,27 @@ static void __exit keyboard_exit(void)
 module_init(keyboard_init);
 module_exit(keyboard_exit);
 #+END_SRC
+*** 形式2的编写步骤
+- 根据主功能编写其设备树节点，并在节点中标明子节点名：
+#+begin_example
+&hdmi{
+    ddc-i2c-bus = <&i2c2>;
+    status = "okay";
+};
+#+end_example
+- 编写主功能的设备驱动
+- 在设备驱动中获取i2c adapter 节点,使用i2c提供的接口操作
+#+BEGIN_SRC c
+/* drivers/gpu/drm/panel/panel-simple.c */
+
+ddc = of_parse_phandle(dev->of_node, "ddc-i2c-bus", 0); 
+if (ddc) { 
+        panel->ddc = of_find_i2c_adapter_by_node(ddc); 
+        of_node_put(ddc);
+
+        if (!panel->ddc) { 
+                err = -EPROBE_DEFER; 
+                goto free_backlight; 
+        } 
+}
+#+END_SRC

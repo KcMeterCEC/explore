@@ -1,0 +1,67 @@
+#+TITLE: [What]Qt 多语言支持
+#+DATE:  <2018-04-03 Tue> 
+#+TAGS: Qt
+#+LAYOUT: post 
+#+CATEGORIES: Qt, assist
+#+NAME: <Qt_assist_language.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+通过Qt的辅助工具完成对应用程序多语言的支持。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 准备工作
+- 字符串统一使用 =QString= 类型，因为此此类型支持 Unicode 编码。
+- 为了能够使应用程序中的显示字符串能够被翻译，需要使用 =tr()= 函数包含字符串。
+#+BEGIN_SRC c++
+error->showMessage(tr("File should have at least one!"));
+//or
+error->showMessage(QCoreApplication::translate("File should have at least one!"));
+#+END_SRC
+* 操作流程
+** 指定对应语言的 =ts= 文件
+在工程配置文件 =xxx.pro= 中加入一个 =ts= 类型的文件名，代表一种语言。
+#+begin_example
+TRANSLATIONS = zh_CN.ts
+#+end_example
+** 使用 =lupdate= 生成 =ts= 文件
+每当代码中有新字符串时，都要使用此操作来更新一次 =ts= 文件, 文件位于工程目录下。
+
+在 Qt 软件界面中：
+#+begin_example
+工具(T) -> 外部(E) -> Qt 预言家 -> 更新翻译(lupdate)
+#+end_example
+** 使用 =Linguist= 翻译
+此工具通过读取 =ts= 文件来翻译，其路径在系统开始菜单中的Qt目录下。
+
+- 启动工具后打开生成的 =ts= 文件。
+- 在翻译区写下译文后按下 =Ctrl + Return= 表示此条目已经翻译完成
+** 使用 =lrelease= 生成 =qm= 文件
+在 Qt 软件界面中：
+#+begin_example
+工具(T) -> 外部(E) -> Qt 预言家 -> 发布翻译(lrelease)
+#+end_example
+** 载入 =qm= 文件
+在 =main.cpp= 文件中 =QApplication a(argc, argv)= 下添加 =qm= 文件载入代码：
+#+BEGIN_SRC c++
+#include "mainwindow.h"
+#include <QApplication>
+#include <QTranslator>
+
+int main(int argc, char *argv[])
+{
+        QApplication a(argc, argv);
+
+        QTranslator translator;
+        translator.load("../bin_make/zh_CN.qm");
+        a.installTranslator(&translator);
+
+        MainWindow w;
+        w.show();
+
+        return a.exec();
+}
+#+END_SRC
+
+

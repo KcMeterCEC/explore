@@ -1,0 +1,118 @@
+#+TITLE: [What]Qt 下的调试信息输出
+#+DATE:  <2018-04-03 Tue> 
+#+TAGS: Qt
+#+LAYOUT: post 
+#+CATEGORIES: Qt, debug
+#+NAME: <Qt_debug_message.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理在Qt环境下的调试信息输出。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 调试信息输出
+在使用Qt调试时，需要包含头文件 =#include <qDebug>= 。
+
+** 附加信息
+默认情况下，调试信息的输出是不包含附加信息的(比如文件、行数等)，
+如果想要增加附加信息，使用 =void qSetMessagePattern(const QString &pattern)= 方法来定制输出格式。
+- 也可以使用设置环境 =QT_MESSAGE_PATTERN= 的方式来设置，如果两个都设置了则 *环境变量优先级最高*
+
+其中 =pattern= 中可以有以下内容：
+| 占位符                                  | 说明                                     |
+|-----------------------------------------+------------------------------------------|
+| %{appname}                              | 应用名称                                 |
+| %{category}                             | 信息的类型                               |
+| %{file}                                 | 文件路径                                 |
+| %{function}                             | 方法名                                   |
+| %{line}                                 | 行号                                     |
+| %{message}                              | 实际的消息内容                           |
+| %{pid}                                  | 进程ID                                   |
+| %{threadid}                             | 线程ID                                   |
+| %{qthreadptr}                           | 当前线程指针                             |
+| %{type}                                 | 调试信息名称                             |
+| %{time process}                         | 消息输出时的时间(相对程序启动后的秒)     |
+| %{time boot}                            | 消息输出时的时间(相对系统启动后的秒)     |
+| %{time [format]}                        | 消息输出时的系统时间(format)             |
+| %{backtrace [depth=N] [separator="..."} | 打印调用栈,默认深度为5，默认分隔符为竖线 |
+#+BEGIN_SRC c++
+#include <qDebug>
+....
+{
+        qSetMessagePattern("%{appname} %{file} %{function} %{message}");
+        qDebug() << "This is qDebug() output";
+}
+...
+#+END_SRC
+** qDebug(const char *message,...) : 用户定制消息输出
+- 可以定义宏 =QT_NO_DEBUG_OUTPUT= 来关闭此输出。
+#+BEGIN_SRC c++
+// c printf() style
+qDebug("Items in list: %d\n", myList.size());
+// cout style output a newline at the end
+qDebug() << "Brush:" << myQBrush << "Other value:" << i;
+#+END_SRC
+** qInfo() : 普通消息输出
+- 可以定义宏 =QT_NO_INFO_OUTPUT= 来关闭此输出。
+#+BEGIN_SRC c++
+// c printf() style
+qInfo("Items in list: %d\n", myList.size());
+// cout style output a newline at the end
+qInfo() << "Brush:" << myQBrush << "Other value:" << i;
+#+END_SRC
+** qWarning() : 警告信息输出
+- 可以定义宏 =QT_NO_WARNING_OUTPUT= 来关闭此输出
+- 当使用环境变量 =QT_FATAL_WARNINGS= 时，qWarning() 会导致程序退出。
+#+BEGIN_SRC c++
+//c printf() style
+void f(int c)
+{
+        if (c > 200)
+                qWarning("f: bad argument, c == %d\n", c);
+}
+//cout style output a newline at the eng
+qWarning() << "Brush:" << myQBrush << "Other value:"
+<< i;
+#+END_SRC
+** qCritical() : 错误信息输出
+- 当使用环境变量 =QT_FATAL_CRITICALS= 时，qCritical() 会导致程序退出。
+#+BEGIN_SRC c++
+// c printf() style
+void load(const QString &fileName)
+{
+        QFile file(fileName);
+        if (!file.exists())
+                qCritical("File '%s' does not exist!", qUtf8Printable(fileName));
+}
+
+// cout
+qCritical() << "Brush:" << myQBrush << "Other
+  value:" << i;
+#+END_SRC
+** qFatal() : 灾难信息输出
+- 当使用此消息时，程序会强行退出并给出警告窗口
+- *仅支持 c printf() 风格*
+#+BEGIN_SRC c++
+int divide(int a, int b)
+{
+        if (b == 0)                                // program error
+                qFatal("divide: cannot divide by zero");
+        return a / b;
+}
+#+END_SRC
+* 断言
+Qt 提供多种断言来判断代码的漏洞,可以使用宏 =QT_NO_DEBUG= 来关闭这些断言。
+
+- Q_ASSERT(cond): 当 cond 为假则输出错误
+- Q_ASSERT_X(cond,where,what): 当 cond 为假则在输出中包含位置 =where= 以及内容 =what=
+- Q_CHECK_PTR(ptr): 当指针为空则输出错误
+#+BEGIN_SRC c++
+char *alloc(int size)
+{
+        Q_ASSERT(size > 0);
+        char *ptr = new char[size];
+        Q_CHECK_PTR(ptr);
+        return ptr;
+}
+#+END_SRC

@@ -1,20 +1,32 @@
-* [What]Linux --> command
-** 基本使用
-*** 查看历史命令
+#+TITLE: [What]Linux 常用命令
+#+DATE:  <2018-04-03 Tue> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, command
+#+NAME: <linux_operations_command_basic.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理一些常用的命令，便于查阅。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 基本使用
+** 查看历史命令
 linux 中使用 =history= 命令来存储历史命令.使用 =!= 执行指定序列号的命令.
 
 默认只存储1000条, 可以通过修改环境变量 =HISTSIZE= 来修改.
 
-**** history <opt> <display number>
+*** history <opt> <display number>
 - -c:清空当前历史命令
 - -a:将历史命令缓冲区中的命令写入历史命令文件中
 - -r:将历史命令文件中的命令读入当前历史命令缓冲区中
 - -w:将 *当前* 历史命令缓冲区命令写入历史命令文件中
-*** 打包/压缩命令
+** 打包/压缩命令
 - 打包 : 将一大堆文件或目录组合为一个总的文件
 - 压缩 : 将一个大文件通过压缩算法变成一个小文件
 如果要压缩一大堆文件, 则需要先打包再压缩.
-**** tar [opt] [par]
+*** tar [opt] [par]
 - 打包及压缩
 #+begin_example
 #打包文件但不压缩
@@ -43,8 +55,8 @@ tar -jxvf file.tar.bz2
 tar -zxvf file.tar.gz  file1
 #+end_example
 
-*** 查看文件大小
-**** du <opt> <file>
+** 查看文件大小
+*** du <opt> <file>
 - 显示当前目录下的文件及文件夹占用
 #+begin_example
 du -h
@@ -57,9 +69,16 @@ du -h file
 #+begin_example
 du -sh
 #+end_example
-
-*** 搜寻文件
-**** find <opt> <par>
+** 查看文件内容
+*** od <opt> <file> (查看原始内容)
+#+begin_example
+#以num字节组合在一起的方式显示16进制文件内容
+od -t x<num> <file>
+#在上面命令的基础上显示字符
+od -t x<num> -c <file>
+#+end_example
+** 搜寻文件
+*** find <opt> <par>
 #+begin_example
 #列出当前目录下的所有文件和文件夹
 find .
@@ -71,8 +90,8 @@ find /home/cec -name "*.txt" -o -name "*.html"
 find /home/cec ! -name "*.txt"
 #+end_example
 
-*** 搜寻字符串
-**** grep
+** 搜寻字符串
+*** grep
 #+begin_example
 #搜寻文件包含的字符串
 grep "string" file_name
@@ -83,8 +102,8 @@ grep -v "string" file_name
 #递归搜索字符串
 grep "text" . -r -n
 #+end_example
-*** 包管理
-**** apt
+** 包管理
+*** apt
 apt 是 apt-get 命令的一个子集, 提供了作为大多数用户常用的简洁命令方式.
 
 apt 命令从 =/etc/atp/source.list= 文件中获取软件安装源(一般都不是最新的软件包).到本地做了备份.
@@ -135,21 +154,18 @@ apt list --all-versions
 
 #移除系统不需要的软件
 suao apt autoremove
-
-
-
 #+end_example
 
-*** 文件同步
-**** rsync
+** 文件同步
+*** rsync
 相对于 =cp= 命令, =rsync= 是同步文件的不同部分, 所以其执行速度会比较快.
 #+begin_example
 #同步本地文件,加上 "--exclude" 用于排除部分文件
 rsync -av --progress [sourcefolder] [distinationfolder] --exclude [thefoldertoexclude]
 #+end_example
-** 网络命令
-*** 文件下载
-**** 快速文件下载器 --> axel [url]
+* 网络命令
+** 文件下载
+*** 快速文件下载器 --> axel [url]
 [[https://github.com/eribertomota/axel][axel]] 是命令行下使用的快速下载器,支持 HTTP,HTTPS,FTP,FTPS协议下载.
 
 *注意*:对于需要输入帐号密码才能进入的下载网址,可能会返回错误 =HTTP/1.0 403 Forbideen=
@@ -159,7 +175,7 @@ sudo apt install axel
 #useage, x is maximum speed(bytes per second), y is maximum number of connections
 axel -s x -n y url1 [url2] [url...]
 #+end_example
-**** wget
+*** wget
 wget 用于稳定下载，还可以断点续传。
 #+begin_example
 #下载单个文件
@@ -184,8 +200,8 @@ wget -i filelist.txt
 wget ftp-url #匿名
 wget --ftp-user=USERNAME --ftp-password=PASSWORD url #登录下载
 #+end_example
-*** 网络监控
-**** 网速查看 nethogs
+** 网络监控
+*** 网速查看 nethogs
 nethogs 用于查看哪些进程消耗了多少网络带宽
 #+begin_example
 #install
@@ -193,5 +209,5 @@ sudo apt install nethogs
 #run
 sudo nethogs
 #+end_example
-**** 局域网扫瞄 nmap
+*** 局域网扫瞄 nmap
 - nmap -sP 192.168.11.0/24 : 扫瞄局域网中已经连接的设备IP

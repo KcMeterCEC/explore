@@ -306,7 +306,7 @@ vim 会话存放所有跟编辑相关的信息, 包括文件列表,窗口布局,
 
 | 操作                          | 说明                                        |
 |-------------------------------+---------------------------------------------|
-| :set fileformats=unix,dos,mac | VIM 先尝试使用UNIX格式,其实再用 MS-DOS 格式 |
+| :set fileformats=unix,dos,mac | VIM 先尝试使用UNIX格式,其次再用 MS-DOS 格式 |
 | :set fileformat?              | 显示当前文件格式                            |
 | :edit ++ff=unix file.txt      | 强制以 UNIX 格式打开文件 file.txt           |
 | :set fileformat=unix          | 将当前文件转换为 UNIX 格式                  |
