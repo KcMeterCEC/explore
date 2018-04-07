@@ -1,0 +1,302 @@
+#+TITLE: [What]Linux ALSA库操作
+#+DATE:  <2018-04-04 Wed> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, ALSA
+#+NAME: <linux_operations_alsa_basic.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考链接: [[http://equalarea.com/paul/alsa-audio.html][tutorial]]
+
+Advanced Linux Sound Architecture(ALSA) 的应用层操作。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+[[https://www.alsa-project.org/main/index.php/Main_Page][ALSA]] 是Linux系统所使用的音频处理框架，底层硬件均以被抽象为声卡，上层通过统一的API调用。
+* 音频相关的基本概念
+音频硬件芯片一般都具有发送和接收缓冲区，为此就有两个概念：
+- 接收延迟(input latency)：当接收缓冲区满后，芯片通过中断来通知系统，在缓冲区由空到满到最后系统响应时间称为接收延迟
+- 发送延迟(output latency)：系统发送数据到芯片缓存到最后真正产生信号的延时称为发送延迟
+
+Pluse code modulation(PCM)：简单点理解就是使用AD将模拟转数字而得到的信号。
+- 与信号有关的参数有采样的位数和采样的速率。
+  + 采样位数越高可以反应的幅度越精细，动态范围越大
+  + 人耳的频率范围是20Hz～20kHz，根据奈奎斯特定理，采样频率要高于输入信号的2倍才能还原波形。常用的有8k,11.025k,22.05k,16k,37.8k,44.1k,48k等
+* 准备工作
+** 发现声卡
+首先确认是否具有声卡设备，可以通过 =cat /proc/asound/cards= 来查看里面是否具有声卡描述。
+** 安装上层应用库
+在 [[https://www.alsa-project.org/main/index.php/Download][下载地址]] 下载对应的库：
+#+begin_example
+tar -xjf alsa-lib-1.1.6.tar.bz2 
+#+end_example
+安装(默认安装路径为 =/usr/lib, /usr/include/alsa/= )
+#+begin_example
+./configure
+sudo make install
+#+end_example
+** 声卡测试
+- 下载一个 wav 文件，然后使用 =aplay= 进行输出测试
+  + 使用 =aplay -l= 可以查看当前支持输出的设备
+#+begin_example
+aplay -vv file.wav
+#+end_example
+- 使用命令 =arecord= 来测试麦克风，并通过 =aplay= 来验证
+  + 使用 =arecord -l= 可以查看当前支持输入的设备
+#+begin_example
+arecord -vv -fdat output.wav
+#+end_example
+** 程序中的声卡名的确定
+*** 接受源
+通过命令 =arecoed -l= 就可以发现所有的接受流
+
+#+begin_example
+List of CAPTURE Hardware Devices 
+card 1: PCH [HDA Intel PCH], device 0: VT1802 Analog [VT1802 Analog]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+#+end_example
+
+如上所示，其对应的设备号是 "card1 -> device 0"，在实际编程时，给函数的 "name" 参数则为 "hw:1,0"
+*** 发送源
+通过命令 =aplay -l= 就可以发现所有的输出流
+#+begin_example
+List of PLAYBACK Hardware Devices
+card 0: HDMI [HDA Intel HDMI], device 3: HDMI 0 [HDMI 0]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: HDMI [HDA Intel HDMI], device 8: HDMI 2 [HDMI 2]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: HDMI [HDA Intel HDMI], device 9: HDMI 3 [HDMI 3]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 0: HDMI [HDA Intel HDMI], device 10: HDMI 4 [HDMI 4]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: PCH [HDA Intel PCH], device 0: VT1802 Analog [VT1802 Analog]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: PCH [HDA Intel PCH], device 2: VT1802 Alt Analog [VT1802 Alt Analog]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+#+end_example
+与接受流一样，其在编程所对应的名称有：
+- hw:0,3
+- hw:0,7
+- hw:0,8
+- hw:0,9
+- hw:0,10
+- hw:1,0
+- hw:1,2
+* 典型的应用处理流程
+#+BEGIN_SRC c
+open_the_device();
+set_the_parameters_of_the_device();
+while (!done) {
+        /* one or both of these */
+        receive_audio_data_from_the_device();
+        deliver_audio_data_to_the_device();
+}
+close_the_device();
+#+END_SRC
+* 发送音频示例
+使用此代码运行后将会听到一段噪音输出
+** 编码
+#+BEGIN_SRC c
+// file:send.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <alsa/asoundlib.h> //包含库头文件
+
+main (int argc, char *argv[])
+{
+        int i;
+        int err;
+        short buf[128];
+        snd_pcm_t *playback_handle; //PCM流 句柄
+        snd_pcm_hw_params_t *hw_params;//PCM流设置参数
+
+        //以输出流的方式打开
+        if ((err = snd_pcm_open (&playback_handle, argv[1], SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+                fprintf (stderr, "cannot open audio device %s (%s)\n",
+                         argv[1],
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        //申请参数结构内存
+        if ((err = snd_pcm_hw_params_malloc (&hw_params)) < 0) {
+                fprintf (stderr, "cannot allocate hardware parameter structure (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        //获取目前的参数
+        if ((err = snd_pcm_hw_params_any (playback_handle, hw_params)) < 0) {
+                fprintf (stderr, "cannot initialize hardware parameter structure (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        //左右声道交替采样
+        if ((err = snd_pcm_hw_params_set_access (playback_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
+                fprintf (stderr, "cannot set access type (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        //16位pcm,小端模式
+        if ((err = snd_pcm_hw_params_set_format (playback_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
+                fprintf (stderr, "cannot set sample format (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        //采样数据 44.1k
+        unsigned int rate = 44100;
+        if ((err = snd_pcm_hw_params_set_rate_near (playback_handle, hw_params, &rate, 0)) < 0) {
+                fprintf (stderr, "cannot set sample rate (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        //双通道输出
+        if ((err = snd_pcm_hw_params_set_channels (playback_handle, hw_params, 2)) < 0) {
+                fprintf (stderr, "cannot set channel count (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        //将参数应用于硬件
+        if ((err = snd_pcm_hw_params (playback_handle, hw_params)) < 0) {
+                fprintf (stderr, "cannot set parameters (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        //释放参数缓存
+        snd_pcm_hw_params_free (hw_params);
+
+        //获取设备权限
+        if ((err = snd_pcm_prepare (playback_handle)) < 0) {
+                fprintf (stderr, "cannot prepare audio interface for use (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        //发送数据流
+        for (i = 0; i < 1000; ++i) {
+                if ((err = snd_pcm_writei (playback_handle, buf, 128)) != 128) {
+                        fprintf (stderr, "write to audio interface failed (%s)\n",
+                                 snd_strerror (err));
+                        exit (1);
+                }
+        }
+
+        //关闭设备
+        snd_pcm_close (playback_handle);
+        exit (0);
+}
+#+END_SRC
+** 编译
+#+begin_example
+gcc send.c -lasound
+#+end_example
+** 运行
+#+begin_example
+./a.bout hw:1,0
+#+end_example
+* 录音示例
+使用此代码运行后，将会录取一段音频到缓存中。
+** 编码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <stdlib.h>
+#include <alsa/asoundlib.h>
+
+main (int argc, char *argv[])
+{
+        int i;
+        int err;
+        short buf[128];
+        snd_pcm_t *capture_handle;
+        snd_pcm_hw_params_t *hw_params;
+
+        if ((err = snd_pcm_open (&capture_handle, argv[1], SND_PCM_STREAM_CAPTURE, 0)) < 0) {
+                fprintf (stderr, "cannot open audio device %s (%s)\n",
+                         argv[1],
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params_malloc (&hw_params)) < 0) {
+                fprintf (stderr, "cannot allocate hardware parameter structure (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params_any (capture_handle, hw_params)) < 0) {
+                fprintf (stderr, "cannot initialize hardware parameter structure (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params_set_access (capture_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
+                fprintf (stderr, "cannot set access type (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params_set_format (capture_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
+                fprintf (stderr, "cannot set sample format (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+        unsigned int rate = 44100;
+        if ((err = snd_pcm_hw_params_set_rate_near (capture_handle, hw_params, &rate, 0)) < 0) {
+                fprintf (stderr, "cannot set sample rate (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params_set_channels (capture_handle, hw_params, 2)) < 0) {
+                fprintf (stderr, "cannot set channel count (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        if ((err = snd_pcm_hw_params (capture_handle, hw_params)) < 0) {
+                fprintf (stderr, "cannot set parameters (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        snd_pcm_hw_params_free (hw_params);
+
+        if ((err = snd_pcm_prepare (capture_handle)) < 0) {
+                fprintf (stderr, "cannot prepare audio interface for use (%s)\n",
+                         snd_strerror (err));
+                exit (1);
+        }
+
+        for (i = 0; i < 10; ++i) {
+                if ((err = snd_pcm_readi (capture_handle, buf, 128)) != 128) {
+                        fprintf (stderr, "read from audio interface failed (%s)\n",
+                                 snd_strerror (err));
+                        exit (1);
+                }
+        }
+
+        snd_pcm_close (capture_handle);
+        exit (0);
+}
+#+END_SRC
+** 编译
+#+begin_example
+gcc receiver.c -o receive -lasound
+#+end_example
+** 运行
+#+begin_example
+./receive hw:1,0
+#+end_example
+
