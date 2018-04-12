@@ -563,5 +563,82 @@ int delete(long key)
 }
 #+END_SRC
 * 信号量
+目前来说信号量更多的被用于同步。
+
+与信号量相关操作函数:
+#+BEGIN_SRC c
+//定义信号量
+struct semaphore sem;
+
+//初始化信号量
+void sema_init(struct semaphore *sem, int val);
+
+/**
+ ,* @brief 获取信号量
+ ,* @note 如果获取失败则会睡眠等待，所以不能在中断上下文中调用
+ ,*/
+void down(struct semaphore *sem);
+
+/**
+ ,* @brief 获取信号量
+ ,* @note 此函数导致的睡眠可以被信号打断，并返回负数
+ ,*
+ ,* if(down_interruptible(&sem)
+ ,*   return -ERESTARTSYS;
+ ,*
+ ,*/
+int dowm_interruptible(struct semaphore *sem);
+
+//超时获取不到信号量则自动退出
+int down_timeout(struct semaphore *sem, long jiffies);
+
+//非阻塞形式获取信号量，可以在中断上下文使用
+int dowm_trylock(struct semaphore *sem);
+
+//释放信号量
+void up(struct semaphore *sem);
+#+END_SRC
 * 互斥体
+互斥量更适合用于互斥，因为它可以被同一个进程重复获取而不导致睡眠。
+
+相关函数:
+#+BEGIN_SRC c
+//定义并初始化
+struct mutex my_mutex;
+mutex_init(&my_mutex);
+
+//获取互斥量
+void mutex_lock(struct mutex *lock);
+int mutex_lock_interruptible(struct mutex *lock);
+int mutex_trylock(struct mutex *lock);
+
+//释放互斥量
+void mutex_unlock(struct mutex *lock);
+#+END_SRC
+自旋锁和互斥体选用的3项原则：
+1. 若临界区比较小宜使用自旋锁，否则使用互斥体。
+  + 互斥体依赖于自旋锁，且互斥体引起阻塞后会执行进程切换操作，耗时相对较多。
+2. 如果临界区包含可能引起阻塞的代码，只能使用互斥体。
+  + 如果使用自旋锁，临界区阻塞后切换到另一个进程。而另一个进程也在获取本自旋锁，就会一直死等下去。
+3. 如果临界区在中断或软中断中使用，那么应该使用自旋锁。
+  + 如果使用互斥体，则应该使用 =mutex_trylock()= 的方式。
 * 完成量
+完成量用于一个执行单元等待另一个执行单元执行完某事。
+
+操作函数:
+#+BEGIN_SRC c
+//定义完成量
+struct completion my_completion;
+
+//赋值完成量为0
+init_completion(&my_completion);
+reinit_completion(&my_completion);
+
+//等待完成量
+void wait_for_completion(struct completion *c);
+
+//唤醒一个完成量
+void complete(struct completion *c);
+//唤醒所有完成量
+void complete_all(struct completion *c);
+#+END_SRC

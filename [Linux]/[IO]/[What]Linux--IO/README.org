@@ -3,7 +3,7 @@
 #+TAGS: memory
 #+LAYOUT: post 
 #+CATEGORIES: linux, memory, overview
-#+NAME: <linux_memory_overview_usage.org>
+#+NAMA: <linux_memory_overview_usage.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
