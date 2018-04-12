@@ -31,11 +31,39 @@ Pluse code modulation(PCM)：简单点理解就是使用AD将模拟转数字而�
 #+begin_example
 tar -xjf alsa-lib-1.1.6.tar.bz2 
 #+end_example
+*** 安装在PC
 安装(默认安装路径为 =/usr/lib, /usr/include/alsa/= )
 #+begin_example
 ./configure
 sudo make install
 #+end_example
+*** 交叉编译
+一般交叉编译需要安装 =alsa-lib= 以及 =alsa-utils= ，一个是库一个是工具。
+安装的顺序为： *先编译安装 alsa-lib,然后才是 alsa-utils*.
+
+#+begin_example
+#编译及安装库
+#其中 CC 指定编译器,host 指定目标机系统 
+CC=arm-linux-gnueabihf-gcc ./configure --host=arm-linux 
+
+make
+#DESTDIR 指定在主机上的安装路径
+make install DESTDIR=/home/cec/Downloads/alsa-utils-1.1.6/test
+
+#编译及安装工具
+#工具的安装需要为其指定库的路径
+#依次为主机库路径,主机头文件路径,编译器,目标机系统,取消部分安装包
+#如果不取消 alsamixer 和 xmlto 那么还需要 libcurses 和 ncurses 库
+LDFLAGS=-L/home/cec/Downloads/alsa-utils-1.1.6/test/lib CPPFLAGS=-I/home/cec/Downloads/alsa-utils-1.1.6/test/include CC=arm-linux-gnueabihf-gcc ./configure --host=arm-linux --disable-alsamixer --disable-xmlto
+
+make
+make install DESTDIR=/home/cec/Downloads/alsa-utils-1.1.6/test
+#+end_example
+需要注意的是：
+1. 默认库的安装位置是在 =/usr= 目录下，所有需要将生成的文件拷贝到目标机的 =/usr= 目录下
+2. 生成的文件夹 =share= 所存在的路径 *需要与其在主机上安装的路径一致* 
+  + 比如这里是 =/home/cec/Downloads/alsa-utils-1.1.6/test= 那么目标机上也需要创建这个文件夹以存放 share目录
+    + 试过其他方法(--with-configdir 等)都没法优雅地解决这个问题
 ** 声卡测试
 - 下载一个 wav 文件，然后使用 =aplay= 进行输出测试
   + 使用 =aplay -l= 可以查看当前支持输出的设备

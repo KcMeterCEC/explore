@@ -1,0 +1,111 @@
+#+TITLE: [What]linux -> ALSA 驱动手册
+#+DATE:  <2018-04-10 Tue> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, ALSA
+#+NAME: <linux_driver_ALSA_manual.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考文档: =writing an alsa driver=
+
+参考官方文档，整理驱动编写细则。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 驱动PCM流的操作
+结构体 =snd_pcm_ops= 指定了PCM流的操作方式，ALSA以回调的方式操作这些方法。
+
+#+BEGIN_SRC c
+struct snd_pcm_ops {
+int (*open)(struct snd_pcm_substream *substream);
+int (*close)(struct snd_pcm_substream *substream);
+int (*ioctl)(struct snd_pcm_substream * substream,
+     unsigned int cmd, void *arg);
+int (*hw_params)(struct snd_pcm_substream *substream,
+ struct snd_pcm_hw_params *params);
+int (*hw_free)(struct snd_pcm_substream *substream);
+int (*prepare)(struct snd_pcm_substream *substream);
+int (*trigger)(struct snd_pcm_substream *substream, int cmd);
+snd_pcm_uframes_t (*pointer)(struct snd_pcm_substream *substream);
+int (*get_time_info)(struct snd_pcm_substream *substream,
+struct timespec *system_ts, struct timespec *audio_ts,
+struct snd_pcm_audio_tstamp_config *audio_tstamp_config,
+struct snd_pcm_audio_tstamp_report *audio_tstamp_report);
+int (*copy)(struct snd_pcm_substream *substream, int channel,
+    snd_pcm_uframes_t pos,
+    void __user *buf, snd_pcm_uframes_t count);
+int (*silence)(struct snd_pcm_substream *substream, int channel, 
+       snd_pcm_uframes_t pos, snd_pcm_uframes_t count);
+struct page *(*page)(struct snd_pcm_substream *substream,
+     unsigned long offset);
+int (*mmap)(struct snd_pcm_substream *substream, struct vm_area_struct *vma);
+int (*ack)(struct snd_pcm_substream *substream);
+};
+#+END_SRC
+** 统一操作方法
+这些方法中都具有入口参数 =struct snd_pcm_substream= ,通过此结构体就可以获取ALSA当前所操作流的很多信息。
+*** 私有数据的存取
+在编写PCM流驱动时，一般是platform驱动(用于控制I2S控制器和DMA引擎客户端操作)。
+于此同时一般会定义私有数据，所有需要保存这些数据指针以便调用。
+
+注意：在machine driver中需要初始化platform_of_node(获取devicetree中的节点)，以传递platform device地址。
+
+比如:
+#+BEGIN_SRC c
+static int axi_i2s_probe(struct platform_device *pdev)
+{
+        struct axi_i2s *i2s;
+        int rc = 0;
+
+        i2s = devm_kzalloc(&pdev->dev, sizeof(struct axi_i2s), GFP_KERNEL);
+        if(i2s == NULL)
+        {
+                dev_err(&pdev->dev, "alloc memory failed!\n");
+                rc = -ENOMEM;
+                goto quick_out;
+        }
+        
+        //保存数据地址
+        dev_set_drvdata(&pdev->dev, i2s);
+
+quick_out:
+        return rc;
+}
+
+static int i2s_pcm_trigger(struct snd_pcm_substream *ss, int cmd)
+{
+        //machine platform 驱动的设备地址
+        struct device *card_dev = ss->pcm->card->dev;
+        struct snd_soc_card *soc_card = card_dev->driver_data;
+        struct device_node *platform_node = soc_card->dai_link->platform_of_node;
+        //这个才是当前平台设备地址
+        struct device *dev = &of_find_device_by_node(platform_node)->dev;
+        //获取数据地址
+        struct axi_i2s *i2s = dev_get_drvdata(dev);
+        ...
+}
+#+END_SRC
+*** 流方向的判断
+需要明确的是：一个PCM流具备输入流和输出流两个方向，所以在这些方法中都需要判断流的方向，以确定操作哪个DMA通道。
+#+BEGIN_SRC c
+static int i2s_pcm_trigger(struct snd_pcm_substream *ss, int cmd)
+{
+...
+    //播放流
+    if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+    {
+            //申请dma发送通道
+    }
+    else//录音流
+    {
+            //申请dma接收通道
+    }
+...
+}
+#+END_SRC
+** open callback
+当上层打开一个PCM子流时, open() 方法会被调用，此方法主要有以下作用：
+1. 向上层反应此子流的信息参数
+2. 为此子流设置一个私有数据并保存
+3. 硬件的相关约束设置

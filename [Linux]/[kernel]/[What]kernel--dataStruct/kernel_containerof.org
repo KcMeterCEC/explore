@@ -1,0 +1,54 @@
+#+TITLE: [What]linux -> container_of
+#+DATE:  <2018-04-12 Thu> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, kernel, data_structure
+#+NAME: <linux_kernel_data_structure_containerof.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+分析内核中的 =container_of= 宏。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+在文件 =include/linux/kernel.h= 中定义了 container_of 宏:
+
+功能是: 通过 =ptr= 反推出包含它结构体的地址.
+* 使用
+#+BEGIN_SRC c
+typedef struct
+{
+        int a;
+        int b;
+        int c;
+}numStr;
+
+
+numStr str_num;
+
+/**
+ ,* @note: 注意第一个参数是地址!
+ ,*/
+numStr *pstr_num = container_of(&str_num.b, numStr, b);
+#+END_SRC
+* 分析
+#+BEGIN_SRC c
+/**
+ ,* @brief:    container_of - cast a member of a structure out to the containing structure
+ ,* @ptr:      the pointer to the member
+ ,* @type:     the type of the container struct this is embedded in
+ ,* @memver:   the name of the member within the struct
+ ,*/
+
+#define container_of(ptr, type, member) ({      \
+        const typeof(((type *)0)->member) *__mptr = (ptr);
+        (type *)((char *)__mptr - offsetof(type, member));})
+
+#define offsetof(TYPE,MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#+END_SRC
+
+- const typeof(((type *)0)->member) *__mptr = (ptr); 
+  + 创建了一个指向 =member= 成员的指针, 然后将现有的 =ptr= 地址赋值给 =__mptr=, 也就是说目前 =__mptr= 表示了 =ptr= 的实际地址.
+
+- (type *)((char *)__mptr - offsetof(type, member)); 
+  + =offsetof= 计算出 =member= 成员在结构体 =type= 中偏移的字节数, 然后通过现有的 =__mptr= 与字节偏移作差值,便得出了 =ptr= 所在的结构体的地址.
