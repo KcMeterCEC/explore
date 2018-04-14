@@ -1,9 +1,18 @@
-* [What] --> device tree
+#+TITLE: [What]linux -> 设备树基本操作
+#+DATE:  <2018-04-14 Sat> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, devicetree
+#+NAME: <linux_driver_devicetree_basic.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-- [[#设备树的组成和结构][设备树的组成和结构]]
-- [[#常用API][常用API]]
-- [[#用户空间访问][用户空间访问]]
+参考书籍: =Linux设备驱动开发详解=
 
+设备树的基本操作
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
 设备树将板级信息通过文本文件的形式与内核分离开来,达到灵活配置的目的,而不用修改相应的驱动代码.
 
 设备树由一系列被命名的节点(Node)和属性(Property)组成,而节点本身可以包含子节点.所谓的属性,其实就是成对出现的名称和值.
@@ -17,12 +26,12 @@
 - 时钟控制器和时钟使用情况
 它基本上就是画一棵电路板上CPU,总线,设备组成的树, *Bootloader会将这棵树传递给内核*,然后内核可以识别这棵树,并根据它展开出linux内核中
 的 platform_device, i2c_client, spi_device等设备,而这些设备用到的内存,IRQ等资源,也被传递给了内核,内核会将这些资源绑定给展开的相应设备.
-** 设备树的组成和结构
-*** DTS,DTC和DTB
-**** DTS(Device Tree Source)
+* 设备树的组成和结构
+** DTS,DTC和DTB
+*** DTS(Device Tree Source)
 =.dts= 是一种ASCII文本格式的设备树描述,易于阅读.对于ARM而言,一般放在 =arch/arm/boot/dts/= 中.
 
-由于同一个SOC可以应用与许多不同的设备,所以需要提炼出SOC公用的部分,使用 =.dtsi= 文件,类似于C语言的头文件.并且此文件也可以包含其他的 .dtsi 文件.
+由于同一个SOC可以应用于许多不同的设备,所以需要提炼出SOC公用的部分,使用 =.dtsi= 文件,类似于C语言的头文件.并且此文件也可以包含其他的 .dtsi 文件.
 比如几乎所有的 ARM SOC 的 .dtsi 文件都引用了 =skeleton.dtsi= 文件.
 包含格式:
 #+begin_example
@@ -137,23 +146,23 @@ SPI控制器(位于0x10170000),中断控制器(位于0x10140000)和一个外部�
 };
 #+end_example
 
-**** DTC(Device Tree Compiler)
+*** DTC(Device Tree Compiler)
 DTC是将 .dts 文件编译为 .dtb 的工具.其源代码位于 =scripts/dtc=,在内核使能了设备树的情况下,
 此工具会被编译出来.DTC 也可以在ubuntu中安装 =sudo apt install device-tree-compiler=.
 
 也可以单独编译设备树: =make dtbs=,或者反编译: =./scripts/dtc/dtc -I dtb -O dts -o xxx.dts /arch/arm/boot/dts/xxx.dtb=
 
-**** DTB(Device Tree Blob)
+*** DTB(Device Tree Blob)
 .dtb文件是由.dts文件通过DTC工具编译过来的,此文件可以被linux内核和u-boot识别.
 此文件可以与内核镜像单独存放,也可以与内核镜像打包.编译内核时,使能 =CONFIG_ARM_APPENDED_DTB= 便可以打包.
-**** 绑定(Binding)
+*** 绑定(Binding)
 设备树的说明文档位于 =Documentation/devicetree/bindings=.
-*Linux内核下的 =scripts/checkpath.pl= 会运行一个检查,如果游人在设备树中新添加了 compatible 字符串,而没有添加相应的文档进行解释, checkpatch 程序会报出警告 =UNDOCUMENTED_DT_STRINGDT compatible string xxx
+*Linux内核下的 =scripts/checkpath.pl= 会运行一个检查,如果有人在设备树中新添加了 compatible 字符串,而没有添加相应的文档进行解释, checkpatch 程序会报出警告 =UNDOCUMENTED_DT_STRINGDT compatible string xxx
 apperars un-documented*.
-**** Bootloader
+*** Bootloader
 在u-boot中使能设备树使用: =CONFIG_OF_LIBFDT=
 
-*** 根节点兼容性
+** 根节点兼容性
 前面的根节点兼容性为 :  compatible = "acme,coyotes-revenge";定义了整个系统的名称,它的组织形式为: <manufacturer>,<model>.
 
 Linux内核通过此兼容性来判断启动的是哪类设备,此属性译本包括两个及以上的兼容性字符串,*首个兼容性字符串是板子级别的名称,后面一个兼容性是芯片级别(或者芯片系列级别)的名字.
@@ -182,7 +191,7 @@ static int exynos_cpufreq_probe(struct platform_device *pdev)
         ...
 }
 #+END_SRC
-*** 设备节点兼容性
+** 设备节点兼容性
 设备兼容属性用于驱动和设备绑定,第一个字符串表示节点代表的确切设备,形式为: "<manufacturer>,<model>",后面的字符串表明可以兼容的其他设备.
 比如: compatible = "arm,vexpress-flash", "cfi-flash"; *设备节点的兼容性和根节点的兼容性是类似的,都是从具体到抽象*.
 
@@ -229,19 +238,52 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
 #+END_SRC
 通过这种方法,驱动可以把与某个设备兼容的私有数据寻找出来,体现了一种面向对象的设计思想,避免了大量的 if,else.
 
-*** 设备节点及lable命名
+** 设备节点及lable命名
 [[https://www.power.org][命名规范]]
 节点命名的格式: <name>[@<unit-address>]; <>中的内容是必选,[]中作为可选.
 - <name> 为ASCII 字符串,多个同类设备节点的name可以一样,但unit-address要不一样.
 - @<unit-address> 为设备的起始地址.也经常在对应节点的 reg 属性中给出.对于挂在内存空间的设备,此地址直接代表在内存中的地址.
 对于挂在I2C总线上的外设,@后面一般跟的是从设备的I2C地址.
 
-可以给设备节点添加 label,之后可以通过 &label 的形式访问这个label.
+可以给设备节点添加 label,之后可以通过 &label 的形式访问这个节点以获取该节点的设备地址.
+- 比如在音频machine 驱动中的，设备树中节点定义
+#+begin_example
+audio_speaker{
+    compatible = "zynq, audio_speaker";
+    audio-codec = <&ssm2518_label>;
+    cpu-dai = <&audio_i2s_label>;
+};
+#+end_example
+- 为了能够获取codec和platform节点，在machine driver 的 probe 函数中需要如下操作:
+#+BEGIN_SRC c
+static int audio_speaker_probe(struct platform_device *pdev)
+{
+        int rc = 0;
+
+        .....
+        struct device_node *of_node = pdev->dev.of_node;
+        if(of_node == NULL)
+        {
+                return -ENXIO;
+        }
+        //获取设备树节点
+        audio_speaker_link.codec_of_node = of_parse_phandle(of_node, "audio-codec" , 0);
+        audio_speaker_link.cpu_of_node = of_parse_phandle(of_node, "cpu-dai" , 0);
+
+        //得到设备
+        struct device *codec_dev = &of_find_device_by_node(
+                audio_speaker_link.codec_of_node)->dev;
+
+        struct device *cpu_dev = &of_find_device_by_node(
+                audio_speaker_link.cpu_of_node)->dev;
+}
+#+END_SRC
+
 
 同时设备树支持C语言的预处理过程,所以设备树中可以包含头文件并使用宏定义.
 
-*** 地址编码
-**** address-cells,size-cells
+** 地址编码
+*** address-cells,size-cells
 #+begin_example
 #address-cells = <num>;
 #size-cells = <num>;
@@ -250,11 +292,11 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
 *注意*:
 在当前节点下所设置的这两个属性, *只影响到子节点*.
 
-**** reg
+*** reg
 - 格式: reg = <address1 length1 [address2 length2] [address3 length3] ..>;
 其中 address length 代表设备的起始地址及其使用范围.
 address 为一个或多个的32位整型(即 cell),length则意味着从 address 到 address+length-1.
-**** ranges
+*** ranges
 如果设备经过总线桥与CPU连接,其 address 往往需要经过转换才能对应CPU的内存映射.
 如之前的 external-bus 所示:
 #+begin_example
@@ -268,7 +310,7 @@ ranges 是地址转换表,其中的每个项目是一个子地址,父地址以�
 对于本例而言,子地址空间的 #address-cells = 2,父地址空间的 #address-cells = 1,因此 0 0 0x10100000 0x10000
 的前2个cell为 external-bus 桥后external-bus上片选0偏移为0,第3个cell表示external-bus上片选0偏移0的地址空间被映射到CPU
 的本地总线的 0x10100000 位置,第4个cell表示映射的大小为0x10000.
-*** 中断连接
+** 中断连接
 对于中断控制器而言,它提供如下属性:
 - interrupt-controller 此属性为空,中断控制器应该加上此属性表明自己的身份
 - #interrupt-cells = <num> 与#address-cells 和 #size-cells 相似,表明连接此中断控制器的设备的中断属性的cell大小
@@ -299,8 +341,8 @@ fsl_edma_irq_init(struct platform_device *pdev,struct fsl_edma_engine *fsl_edma)
 }
 
 #+END_SRC
-*** GPIO,时钟,pinmux连接
-**** GPIO
+** GPIO,时钟,pinmux连接
+*** GPIO
 对于CPIO控制器而言,其对应的设备节点需要声明 =gpio-controller= 属性,并设置 =#gpio-cells= 大小.
 #gpio-cells 中第一个cell为GPIO号,第2个为GPIO极性.
 #+begin_example
@@ -338,7 +380,7 @@ cd_gpio = of_get_named_gpio(np, "cd-gpios", 0);
 wp_gpio = of_get_named_gpio(np, "wp-gpios", 0);
 power_gpio = of_get_named_gpio(np, "power-gpios", 0);
 #+END_SRC
-**** 时钟
+*** 时钟
 与GPIO类似,时钟控制器的节点被使用时钟的模块引用:
 #+begin_example
 clocks = <&clks 138>,<&clks 140>,<&clks 141>;//数字与相应时钟驱动中的CLK表的顺序对应
@@ -349,14 +391,14 @@ clock-names = "uart","general","noc";
 devm_clk_get(&pdev-dev, "general");
 #+END_SRC
 CLK表作为宏定义到了 =arch/arm/boot/dts/include/dt-bindings/clock= 中,所以设备树也可以使用宏来引用.
-** 常用API
-*** 寻找节点
+* 常用API
+** 寻找节点
 #+BEGIN_SRC C
 //一般from和type为NULL,查找与compatible匹配的节点
 struct device_node *of_find_compatible_node(struct device_node *from, const char *type,
                                             const char *compatible);
 #+END_SRC
-*** 读取属性
+** 读取属性
 #+BEGIN_SRC C
 //从节点np处获取propname属性的值并存储于缓存 out_values
 int of_property_read_u8_array(const struct device_node *np,const char *propname,
@@ -387,7 +429,7 @@ int of_property_read_string_indec(struct device_node *np, const char *propname,
 //获取bool值,属性存在返回true
 static inline bool of_property_read_bool(const struct device_node *np, const char *propname);
 #+END_SRC
-*** 内存映射
+** 内存映射
 #+BEGIN_SRC C
 //通过设备节点进行设备的内存映射,可以代替 ioremap()
 void __iomem *of_iomap(struct device_node *node, int index);
@@ -395,12 +437,12 @@ void __iomem *of_iomap(struct device_node *node, int index);
 //通过设备节点获取对应内存的资源
 int of_address_to_resource(struct device_node *dev,int index, struct resource *r);
 #+END_SRC
-*** 解析中断
+** 解析中断
 #+BEGIN_SRC C
 //通过设备树获得设备中断号
 unsigned int irq_of_parse_and_map(struct device_node *dev, int index);
 #+END_SRC
-*** 获取节点对应的 platform_device
+** 获取节点对应的 platform_device
 #+BEGIN_SRC C
 struct platform_device *of_find_device_by_node(struct device_node *np);
 //获取 platform_device 对应的节点
@@ -409,7 +451,7 @@ static int sirfsoc_dma_probe(struct platform_device *op)
         struct device_node *dn = op->dev.of_node;
 }
 #+END_SRC
-** 用户空间访问
+* 用户空间访问
 为了能够验证设备树的加载实际情况，可以查看 =/sys/firmware/devicetree/base/= 文件夹下的树形结构。
 
 同时在 =/sys/bus/*/devices/**/= 下的 =of_node= 文件会产生一个与设备树文件的符号链接，并且当此设备与对应的驱动绑定后，会有一个 =driver= 文件的符号链接指向驱动文件

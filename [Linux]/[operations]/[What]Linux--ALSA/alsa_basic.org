@@ -61,9 +61,7 @@ make install DESTDIR=/home/cec/Downloads/alsa-utils-1.1.6/test
 #+end_example
 需要注意的是：
 1. 默认库的安装位置是在 =/usr= 目录下，所有需要将生成的文件拷贝到目标机的 =/usr= 目录下
-2. 生成的文件夹 =share= 所存在的路径 *需要与其在主机上安装的路径一致* 
-  + 比如这里是 =/home/cec/Downloads/alsa-utils-1.1.6/test= 那么目标机上也需要创建这个文件夹以存放 share目录
-    + 试过其他方法(--with-configdir 等)都没法优雅地解决这个问题
+2. 如果想要改变在目标机的路径，那么需要修改 =--prefix= 参数。
 ** 声卡测试
 - 下载一个 wav 文件，然后使用 =aplay= 进行输出测试
   + 使用 =aplay -l= 可以查看当前支持输出的设备
