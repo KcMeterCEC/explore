@@ -69,6 +69,13 @@ Kernel hacking -> printk and dmesg options -> Default message log level(1-7)
 *** 修改启动参数
 通过在 bootargs 中设置 =ignore_loglevel= 来忽略打印级别.
 在系统启动后,也可以通过写 =/sys/module/printk/parameters/ignore_loglevel= 文件来动态设置是否忽略打印级别.
+** 带时间戳的输出
+在 menuconfig 中使能printk带时间戳输出，有助于判断代码执行时间。
+
+路径:
+#+begin_example
+Kernel hacking -> printk and dmesg options -> Show timing information on printks
+#+end_example
 * 调试信息的输出
 - pr_xxx(): 位于 =/include/linux/printk.h=
 通常使用封装了 printk() 的宏,来显示调试信息.比如 pr_debug(),pr_info().
@@ -113,3 +120,53 @@ Kernel hacking -> Early printk
 
 early_printk("Hello world\n");
 #+END_SRC
+* 与用户空间顺序输出
+当用户空间在使用 =printf= 的同时内核在使用 =printk= 时会造成两个输出相互干扰，与照成竞态的效果一样。
+
+内核为用户空间提供了设备文件 =/dev/ttyprink= 以让用户空间的log可以在内核中打印，打印的Log前会加上 =[U]= 标识，
+这样便不会造成二者干扰了。
+
+如下用户空间代码:
+#+BEGIN_SRC c
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+
+int fd = 0;
+
+void kernel_write(const char *fmt, ...)
+{
+        va_list ap;
+        char buf[256];
+        int n;
+
+        va_start(ap, fmt);
+        n = vsnprintf(buf, 256, fmt, ap);
+        va_end(ap);
+        write(fd, buf, n);
+}
+
+int main(int argc, char *argv[])
+{
+        fd = open("/dev/ttyprintk", O_WRONLY);
+        if(fd < 0)
+        {
+                printf("open file failed!\n");
+                return 1;
+        }
+
+        kernel_write("The ttyprintk index is %d\n", fd);
+
+        close(fd);
+        return 0;
+}
+#+END_SRC
+输出为:
+#+begin_example
+[U] The ttyprintk index is 3
+#+end_example

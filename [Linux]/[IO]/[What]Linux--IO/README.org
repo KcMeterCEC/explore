@@ -97,7 +97,7 @@ static ssize_t xxx_write(struct file *file, const char *buffer, size_t count, lo
                         schedule();
                         ///如果是因为信号唤醒
                         if(signal_pending(current)){
-                                ret = -ERSTARTSYS;
+                                ret = -ERESTARTSYS;
                                 goto out;
                                 }
                 }

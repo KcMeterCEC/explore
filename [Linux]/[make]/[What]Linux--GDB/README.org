@@ -100,3 +100,18 @@ show args
 
 
 
+* 捕捉 core dump
+在用户空间捕捉core dump之前，用户需要在当前shell使用命令使程序崩溃后产生 =core= 文件:
+#+begin_example
+ulimit -c unlimited
+#+end_example
+
+然后当程序运行出现 =Segmentation fault (core dumped)= 提示后，便会在当前目录下生成 =core= 文件。
+
+gdb 使用如下方式载入 core 文件分析出错位置:
+#+begin_example
+gdb [exec file name] [core file]
+#+end_example
+比如 =gdb ./a.out core= 
+
+在 gdb 载入 core 文件以后就获得了当时崩溃的环境，于是可以查看当时的调用栈，寄存器状态等等信息。
