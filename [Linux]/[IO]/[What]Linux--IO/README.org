@@ -20,6 +20,10 @@
   + 在 =xxx_read(),xxx_write()= 中可以根据资源是否可用和用户标志来选择是否阻塞用户进程
 ** 阻塞的实现
 队列属于linux内核中的基础数据结构，与进程调度机制紧密结合，可以用来同步对系统资源的访问，信号量也是依赖等待队列实现的。
+#+begin_example
+当一个进程或线程仅有简单一个的读写操作时，使用简单的阻塞可以满足要求。
+但当需要处理多个I/O操作时在同一个线程时，使用阻塞就不合适，因为其中一个阻塞那么其他操作便捕捉不到了。
+#+end_example
 *** 操作
 - 定义及初始化“等待队列头部”
 #+BEGIN_SRC c
@@ -92,11 +96,12 @@ static ssize_t xxx_write(struct file *file, const char *buffer, size_t count, lo
                                 goto out;
                         }
                         ///改变进程状态
-                        __set_current_seate(TASK_INTERRUPTIBLE);
+                        __set_current_state(TASK_INTERRUPTIBLE);
                         ///调度其他进程执行
                         schedule();
                         ///如果是因为信号唤醒
                         if(signal_pending(current)){
+                                //向应用空间将接收到 EINTR 错误返回(errno)
                                 ret = -ERESTARTSYS;
                                 goto out;
                                 }

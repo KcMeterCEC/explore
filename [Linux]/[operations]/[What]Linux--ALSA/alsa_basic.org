@@ -131,21 +131,42 @@ while (!done) {
 close_the_device();
 #+END_SRC
 * 发送音频示例
-使用此代码运行后将会听到一段噪音输出
+使用此代码运行后将会听到一段音输出
 ** 编码
+*注意：*
+1. 发送的数据都是以fream为单位
+2. 发送缓存大小(buufer size)和段的大小(period size)必须设置
 #+BEGIN_SRC c
 // file:send.c
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
 #include <alsa/asoundlib.h> //包含库头文件
+
+#define PLAY_BUF_SIZE (10240) //frame 个数
+
+#define PI  (3.141592653) 
 
 main (int argc, char *argv[])
 {
         int i;
         int err;
-        short buf[128];
         snd_pcm_t *playback_handle; //PCM流 句柄
         snd_pcm_hw_params_t *hw_params;//PCM流设置参数
+        
+        int16_t *short_buf = (int16_t *)malloc(PLAY_BUF_SIZE * sizeof(int16_t) * 2);
+        float f = 600.0f; 
+        unsigned int rate = 44100;
+        double temp = 2 * PI * f / (double)rate;
+        for(uint32_t i = 0; i < PLAT_BUF_SIZE; i++)
+        {
+          int16_t temp1 = cos(i * temp) * 10000;
+          int16_t temp2 = sin(i * temp) * 10000;
+          short_buf[2 * i] = temp1;
+          short_buf[2 * i + 1] = temp2;
+        }
+
 
         //以输出流的方式打开
         if ((err = snd_pcm_open (&playback_handle, argv[1], SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
@@ -182,11 +203,25 @@ main (int argc, char *argv[])
                 exit (1);
         }
         //采样数据 44.1k
-        unsigned int rate = 44100;
+        rate = 44100;
         if ((err = snd_pcm_hw_params_set_rate_near (playback_handle, hw_params, &rate, 0)) < 0) {
                 fprintf (stderr, "cannot set sample rate (%s)\n",
                          snd_strerror (err));
                 exit (1);
+        }
+        int frames = 128; //一个段包含多少个frame
+        int dir = 0;
+        if((err = snd_pcm_hw_params_set_period_size_near(playback_handle, hw_params, &frames, &dir)) < 0)
+        {
+            fprintf(stderr, "Cannot set period size (%s)\n", snd_strerr(err));
+             exit (1);
+        }
+        int buffer_size = 1024; //一个缓存包含多个frame
+
+        if((err = snd_pcm_hw_params_set_buffer_size_near(playback_handle, hw_params, &buffer_size, &dir)) < 0)
+        {
+            fprintf(stderr, "Cannot set buffer size (%s)\n", snd_strerr(err));
+             exit (1);
         }
         //双通道输出
         if ((err = snd_pcm_hw_params_set_channels (playback_handle, hw_params, 2)) < 0) {
@@ -211,22 +246,23 @@ main (int argc, char *argv[])
         }
 
         //发送数据流
-        for (i = 0; i < 1000; ++i) {
-                if ((err = snd_pcm_writei (playback_handle, buf, 128)) != 128) {
-                        fprintf (stderr, "write to audio interface failed (%s)\n",
-                                 snd_strerror (err));
-                        exit (1);
-                }
+        if ((err = snd_pcm_writei (playback_handle, short_buf, PLAT_BUF_SIZE)) != PLAT_BUF_SIZE) {
+                fprintf (stderr, "write to audio interface failed (%s)\n",
+                            snd_strerror (err));
+                exit (1);
         }
+        //等待数据发送完成
+        snd_pcm_drain(playback_handle);
 
         //关闭设备
         snd_pcm_close (playback_handle);
+        free(short_buf);
         exit (0);
 }
 #+END_SRC
 ** 编译
 #+begin_example
-gcc send.c -lasound
+gcc send.c -lasound -lm
 #+end_example
 ** 运行
 #+begin_example

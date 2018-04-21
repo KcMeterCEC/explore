@@ -13,6 +13,56 @@
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* snd_pcm_hardware 填充
+此结构体的填充与硬件息息相关，需要了解ALSA的数据发送流程。
+
+** 数据结构
+- 首先ALSA的缓存(buffer)数据是一个环形队列，ALSA将队列分为一个个小段(period)
+- 一个小段中包含了N个frame数据
+- 一个frame数据代表一次采样的值
+  + 比如一个16位双声道，那么一个frame就是 16bit / 8 × 2 = 4byte
+
+*需要注意的是：*
+1. 上层编程都是以一个frame为单位
+2. 驱动提供的这个数据是一个范围限定，真正的具体设置需要在应用层指定!
+** 流程
+在播放时，ALSA先将缓存(buffer)发送给驱动，驱动每完成一个小段(period)便会主动通知上层，
+这样ALSA就将空闲的段填充新的数据。
+
+在录音时，方向相反，当驱动每完成一个小段，上层需要及时的读走。
+
+在这个过程中驱动DMA是一直循环的依次发送一个小段给I2S控制器(或从I2S读取一小段)。
+** 结构体描述
+现在再来看结构体定义及描述就清楚了。
+#+BEGIN_SRC c
+/*
+ ,*  Hardware (lowlevel) section
+ ,*/
+
+struct snd_pcm_hardware {
+        unsigned int info;/* SNDRV_PCM_INFO_* */
+        u64 formats;/* SNDRV_PCM_FMTBIT_* */
+        unsigned int rates;/* SNDRV_PCM_RATE_* */
+        unsigned int rate_min;/* min rate */
+        unsigned int rate_max;/* max rate */
+        unsigned int channels_min;/* min channels */
+        unsigned int channels_max;/* max channels */
+        size_t buffer_bytes_max;/* 缓存数据支持的最大字节大小 */
+        size_t period_bytes_min;/* 一个段的最小字节大小 */
+        size_t period_bytes_max;/* 一个段的最大字节大小 */
+        unsigned int periods_min;/* 缓存包含的最小段个数 */
+        unsigned int periods_max;/* 缓存包含的最大段个数 */
+        size_t fifo_size;/* fifo size in bytes */
+};
+#+END_SRC
+其中 buffer_bytes_max = period_bytes_max * periods_max;
+
+*这里有一个疑问* ： 假设音频速率是44.1KHz，当我将 period_bytes_max 设得比较大时，
+数据传输速率就远远高于 44.1KHz ，目前还不知道为什么。。。
+** 值的选定
+此值需要根据DMA的处理能力，也就是一次处理一段的字节数来定，如果值设得太小就会出现 Overrun 或 underrun.
+- Overrun: 录音时如果上层没有及时读取一个段数据，那么就会被覆盖。
+- underrun: 播放时如果上层没有及时的填充空段，那么缓存数据将为空。
 * 驱动PCM流的操作
 结构体 =snd_pcm_ops= 指定了PCM流的操作方式，ALSA以回调的方式操作这些方法。
 

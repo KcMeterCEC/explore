@@ -457,6 +457,14 @@ static int wm8974_mute(struct snd_soc_dai *dai, int mute)
 #+END_SRC
 ** 实例
 参考 [[https://elixir.bootlin.com/linux/v4.4/source/sound/soc/codecs/ssm2518.c][/sound/soc/codecs/ssm2518.c]]
+** 设备树
+#+begin_example
+ssm2518_label: ssm2518@34{
+            compatible = "adi,ssm2518";
+            reg = <0x34>;
+            gpios = <&gpio 5 0>;
+            };
+#+end_example
 * 平台驱动
 平台驱动主要由DMA操作和DAI接口操作组成,分别用于产生数据流和告知上层平台接口的能力。
 ** DMA 操作
@@ -527,23 +535,28 @@ struct snd_soc_platform_driver {
 #+END_SRC
 ** DAI接口
 与音频芯片类似，只是它描述的是CPU这边的DAI接口说明。
-** 实例(axi-i2s.c)
+** 实例
 #+BEGIN_SRC c
-/*
- ,* Copyright (C) 2012-2013, Analog Devices Inc.
- ,* Author: Lars-Peter Clausen <lars@metafoo.de>
- ,*
- ,* Licensed under the GPL-2.
+/*  axi-i2s.c - The simplest kernel module.
  ,*/
 
-#include <linux/clk.h>
-#include <linux/init.h>
+#define pr_fmt(fmt)     "[driver] i2s:"fmt
+
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>
-#include <linux/of.h>
-#include <linux/platform_device.h>
-#include <linux/regmap.h>
 #include <linux/slab.h>
+#include <linux/io.h>
+#include <linux/interrupt.h>
+#include <linux/dmaengine.h>
+#include <linux/dma-mapping.h>
+#include <linux/spinlock.h>
+
+#include <linux/platform_device.h>
+#include <linux/of_address.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
+#include <asm-generic/io.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -551,48 +564,69 @@ struct snd_soc_platform_driver {
 #include <sound/soc.h>
 #include <sound/dmaengine_pcm.h>
 
-#define AXI_I2S_REG_RESET0x00
-#define AXI_I2S_REG_CTRL0x04
-#define AXI_I2S_REG_CLK_CTRL0x08
-#define AXI_I2S_REG_STATUS0x10
 
-#define AXI_I2S_REG_RX_FIFO0x28
-#define AXI_I2S_REG_TX_FIFO0x2C
+/* Standard module information, edit as appropriate */
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("KCL.");
+MODULE_DESCRIPTION("axi-i2s - it's used for pl i2s to audio");
 
-#define AXI_I2S_RESET_GLOBALBIT(0)
-#define AXI_I2S_RESET_TX_FIFOBIT(1)
-#define AXI_I2S_RESET_RX_FIFOBIT(2)
+#define DRIVER_NAME "axi-i2s"
+//1 -> sg mode ; 0 -> circular mode
+#define DMA_SG_MODE 1
 
-#define AXI_I2S_CTRL_TX_ENBIT(0)
-#define AXI_I2S_CTRL_RX_ENBIT(1)
+#define DMA_SELF_BUFFER 1
 
-/* The frame size is configurable, but for now we always set it 64 bit */
-#define AXI_I2S_BITS_PER_FRAME 64
+#define DEBUG_VALUE_CHECK 0
 
-struct axi_i2s {
-        struct regmap *regmap;
-        struct clk *clk;
-        struct clk *clk_ref;
 
-        struct snd_soc_dai_driver dai_driver;
 
-        struct snd_dmaengine_dai_dma_data capture_dma_data;
-        struct snd_dmaengine_dai_dma_data playback_dma_data;
-
-        struct snd_ratnum ratnum;
-        struct snd_pcm_hw_constraint_ratnums rate_constraints;
+struct i2s_dma{
+        struct dma_chan                 *channel;
+        struct dma_async_tx_descriptor  *tx_desc;
+        dma_cookie_t                    cookie;
+        uint32_t                        buf_bytes;
+        uint32_t                        period_bytes;
+        dma_addr_t                      phy_addr;
+        unsigned char                   *vir_addr;
+        enum dma_transfer_direction     direction;
+        uint32_t                        current_send;
+        uint32_t                        have_send;
 };
 
+struct i2s_dma_common{
+        unsigned char                   *vir_addr;
+        dma_addr_t                      phy_addr;
+        uint32_t                        size;
+};
+
+struct axi_i2s {
+        struct device                   *dev;
+        struct i2s_dma                  dma_playback;
+        struct i2s_dma                  dma_capture;
+        struct i2s_dma_common           dma_common;
+        struct snd_pcm_substream        *substream;
+        struct tasklet_struct           tasklet;
+        bool                            is_running;
+        spinlock_t                      lock;
+};
+/**
+ ,*  @brief DAI operation
+ ,*/
 static int axi_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
                            struct snd_soc_dai *dai)
 {
         struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
         unsigned int mask, val;
 
+        pr_info("%s\n", __func__);
         if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-                mask = AXI_I2S_CTRL_RX_EN;
+        {
+
+        }
         else
-                mask = AXI_I2S_CTRL_TX_EN;
+        {
+
+        }
 
         switch (cmd) {
         case SNDRV_PCM_TRIGGER_START:
@@ -609,90 +643,61 @@ static int axi_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
                 return -EINVAL;
         }
 
-        regmap_update_bits(i2s->regmap, AXI_I2S_REG_CTRL, mask, val);
-
         return 0;
 }
 
-static int axi_i2s_hw_params(struct snd_pcm_substream *substream,
-                             struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
-{
-        struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-        unsigned int bclk_div, word_size;
-        unsigned int bclk_rate;
+//static int axi_i2s_hw_params(struct snd_pcm_substream *substream,
+//struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
+//{
+//pr_info("%s\n", __func__);
+//struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
 
-        bclk_rate = params_rate(params) * AXI_I2S_BITS_PER_FRAME;
+//return 0;
+//}
 
-        word_size = AXI_I2S_BITS_PER_FRAME / 2 - 1;
-        bclk_div = DIV_ROUND_UP(clk_get_rate(i2s->clk_ref), bclk_rate) / 2 - 1;
+//static int axi_i2s_startup(struct snd_pcm_substream *substream,
+//struct snd_soc_dai *dai)
+//{
+//pr_info("%s\n", __func__);
+//struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+//int ret = 0;
 
-        regmap_write(i2s->regmap, AXI_I2S_REG_CLK_CTRL, (word_size << 16) |
-                     bclk_div);
+//return ret;
+//}
 
-        return 0;
-}
+//static void axi_i2s_shutdown(struct snd_pcm_substream *substream,
+//struct snd_soc_dai *dai)
+//{
+//pr_info("%s\n", __func__);
+//struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
 
-static int axi_i2s_startup(struct snd_pcm_substream *substream,
-                           struct snd_soc_dai *dai)
-{
-        struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-        uint32_t mask;
-        int ret;
-
-        if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-                mask = AXI_I2S_RESET_RX_FIFO;
-        else
-                mask = AXI_I2S_RESET_TX_FIFO;
-
-        regmap_write(i2s->regmap, AXI_I2S_REG_RESET, mask);
-
-        ret = snd_pcm_hw_constraint_ratnums(substream->runtime, 0,
-                                            SNDRV_PCM_HW_PARAM_RATE,
-                                            &i2s->rate_constraints);
-        if (ret)
-                return ret;
-
-        return clk_prepare_enable(i2s->clk_ref);
-}
-
-static void axi_i2s_shutdown(struct snd_pcm_substream *substream,
-                             struct snd_soc_dai *dai)
-{
-        struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-
-        clk_disable_unprepare(i2s->clk_ref);
-}
-
-static int axi_i2s_dai_probe(struct snd_soc_dai *dai)
-{
-        struct axi_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-
-        snd_soc_dai_init_dma_data(dai, &i2s->playback_dma_data,
-                                  &i2s->capture_dma_data);
-
-        return 0;
-}
+//}
 
 static const struct snd_soc_dai_ops axi_i2s_dai_ops = {
-        .startup = axi_i2s_startup,
-        .shutdown = axi_i2s_shutdown,
+        //.startup = axi_i2s_startup,
+        //.shutdown = axi_i2s_shutdown,
         .trigger = axi_i2s_trigger,
-        .hw_params = axi_i2s_hw_params,
+        //.hw_params = axi_i2s_hw_params,
 };
 
+#define AXI_I2S_RATE    (SNDRV_PCM_RATE_44100)
+#define AXI_I2S_FORMAT  (SNDRV_PCM_FMTBIT_S16_LE)
+
 static struct snd_soc_dai_driver axi_i2s_dai = {
-        .probe = axi_i2s_dai_probe,
+        .name = "axi-i2s-dai",
         .playback = {
+                .stream_name = "Playback",
                 .channels_min = 2,
                 .channels_max = 2,
-                .rates = SNDRV_PCM_RATE_KNOT,
-                .formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_U32_LE,
+                .rates = AXI_I2S_RATE,
+                .formats = AXI_I2S_FORMAT,
         },
         .capture = {
+                .stream_name = "Capture",
                 .channels_min = 2,
                 .channels_max = 2,
-                .rates = SNDRV_PCM_RATE_KNOT,
-                .formats = SNDRV_PCM_FMTBIT_S32_LE | SNDRV_PCM_FMTBIT_U32_LE,
+                .rates = AXI_I2S_RATE,
+                .formats = AXI_I2S_FORMAT,
         },
         .ops = &axi_i2s_dai_ops,
         .symmetric_rates = 1,
@@ -702,111 +707,582 @@ static const struct snd_soc_component_driver axi_i2s_component = {
         .name = "axi-i2s",
 };
 
-static const struct regmap_config axi_i2s_regmap_config = {
-        .reg_bits = 32,
-        .reg_stride = 4,
-        .val_bits = 32,
-        .max_register = AXI_I2S_REG_STATUS,
+/**
+ ,* @brief dma operation
+ ,*/
+#define DMA_PERIOD_BYTES_MIN    (256)
+#define DMA_PERIOD_BYTES_MAX    (10240)
+#define DMA_PERIOD_COUNT_MIN    (4)
+#define DMA_PERIOD_COUNT_MAX    (20)
+#define DMA_BUFFER_SIZE         (DMA_PERIOD_BYTES_MAX * DMA_PERIOD_COUNT_MAX)
+#define DMA_AUDIO_CHANNEL       (2)
+static const struct snd_pcm_hardware i2s_pcm_hardware = {
+        .info = SNDRV_PCM_INFO_INTERLEAVED,
+        .formats = AXI_I2S_FORMAT,
+        .rates = AXI_I2S_RATE,
+        .channels_min = DMA_AUDIO_CHANNEL,
+        .channels_max = DMA_AUDIO_CHANNEL,
+        .period_bytes_min = DMA_PERIOD_BYTES_MIN,
+        .period_bytes_max = DMA_PERIOD_BYTES_MAX,
+        .periods_min = DMA_PERIOD_COUNT_MIN,
+        .periods_max = DMA_PERIOD_COUNT_MAX,
+        .buffer_bytes_max = DMA_BUFFER_SIZE,
+        .fifo_size = 0,
 };
-
-static int axi_i2s_probe(struct platform_device *pdev)
+static struct axi_i2s *i2s_data_get(struct snd_pcm_substream *ss)
 {
-        struct resource *res;
-        struct axi_i2s *i2s;
-        void __iomem *base;
-        int ret;
+        struct device *card_dev = ss->pcm->card->dev;
+        struct snd_soc_card *soc_card = card_dev->driver_data;
+        struct device_node *platform_node = soc_card->dai_link->platform_of_node;
+        struct device *dev = &of_find_device_by_node(platform_node)->dev;
+        struct axi_i2s *i2s = dev_get_drvdata(dev);
 
-        i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
-        if (!i2s)
-                return -ENOMEM;
+        i2s->dev = dev;
 
-        platform_set_drvdata(pdev, i2s);
+        return i2s;
+}
+static int i2s_pcm_open(struct snd_pcm_substream *ss)
+{
+        struct axi_i2s *i2s = i2s_data_get(ss);
+        int ret = 0;
 
-        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-        base = devm_ioremap_resource(&pdev->dev, res);
-        if (IS_ERR(base))
-                return PTR_ERR(base);
+        pr_info("%s\n", __func__);
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                if((i2s->dma_playback.channel = dma_request_slave_channel(i2s->dev, "dma_playback")) == NULL)
+                {
+                        dev_info(i2s->dev, "channel addr = %p\n", i2s->dma_playback.channel);
+                        dev_err(i2s->dev, "dma request playback channel failed!\n");
+                        ret = -EINVAL;
+                        goto quick_out;
+                }
+        }
+        else
+        {
+                if((i2s->dma_capture.channel = dma_request_slave_channel(i2s->dev, "dma_capture")) == NULL)
+                {
+                        dev_err(i2s->dev, "dma request capture channel failed!\n");
+                        ret = -EINVAL;
+                        goto quick_out;
+                }
+        }
 
-        i2s->regmap = devm_regmap_init_mmio(&pdev->dev, base,
-                                            &axi_i2s_regmap_config);
-        if (IS_ERR(i2s->regmap))
-                return PTR_ERR(i2s->regmap);
+        i2s->substream = ss;
 
-        i2s->clk = devm_clk_get(&pdev->dev, "axi");
-        if (IS_ERR(i2s->clk))
-                return PTR_ERR(i2s->clk);
+        snd_soc_set_runtime_hwparams(ss, &i2s_pcm_hardware);
 
-        i2s->clk_ref = devm_clk_get(&pdev->dev, "ref");
-        if (IS_ERR(i2s->clk_ref))
-                return PTR_ERR(i2s->clk_ref);
+        struct i2s_dma *dma_stream = NULL;
 
-        ret = clk_prepare_enable(i2s->clk);
-        if (ret)
-                return ret;
-
-        i2s->playback_dma_data.addr = res->start + AXI_I2S_REG_TX_FIFO;
-        i2s->playback_dma_data.addr_width = 4;
-        i2s->playback_dma_data.maxburst = 1;
-
-        i2s->capture_dma_data.addr = res->start + AXI_I2S_REG_RX_FIFO;
-        i2s->capture_dma_data.addr_width = 4;
-        i2s->capture_dma_data.maxburst = 1;
-
-        i2s->ratnum.num = clk_get_rate(i2s->clk_ref) / 2 / AXI_I2S_BITS_PER_FRAME;
-        i2s->ratnum.den_step = 1;
-        i2s->ratnum.den_min = 1;
-        i2s->ratnum.den_max = 64;
-
-        i2s->rate_constraints.rats = &i2s->ratnum;
-        i2s->rate_constraints.nrats = 1;
-
-        regmap_write(i2s->regmap, AXI_I2S_REG_RESET, AXI_I2S_RESET_GLOBAL);
-
-        ret = devm_snd_soc_register_component(&pdev->dev, &axi_i2s_component,
-                                              &axi_i2s_dai, 1);
-        if (ret)
-                goto err_clk_disable;
-
-        ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
-        if (ret)
-                goto err_clk_disable;
-
-        return 0;
-
-err_clk_disable:
-        clk_disable_unprepare(i2s->clk);
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+                dma_stream->direction = DMA_MEM_TO_DEV;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+                dma_stream->direction = DMA_DEV_TO_MEM;
+        }
+quick_out:
         return ret;
 }
 
-static int axi_i2s_dev_remove(struct platform_device *pdev)
+static int i2s_pcm_close(struct snd_pcm_substream *ss)
 {
-        struct axi_i2s *i2s = platform_get_drvdata(pdev);
+        struct axi_i2s *i2s = i2s_data_get(ss);
 
-        clk_disable_unprepare(i2s->clk);
+        pr_info("%s\n", __func__);
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_release_channel(i2s->dma_playback.channel);
+        }
+        else
+        {
+                dma_release_channel(i2s->dma_capture.channel);
+        }
+        return 0;
+}
+
+static int i2s_pcm_prepare(struct snd_pcm_substream *ss)
+{
+        struct axi_i2s *i2s = i2s_data_get(ss);
+        struct snd_pcm_runtime *rt = ss->runtime;
+        struct i2s_dma *dma_stream = NULL;
+
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+                dma_stream->direction = DMA_MEM_TO_DEV;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+                dma_stream->direction = DMA_DEV_TO_MEM;
+        }
+        dma_stream->buf_bytes = snd_pcm_lib_buffer_bytes(ss);
+        dma_stream->period_bytes = snd_pcm_lib_period_bytes(ss);
+        dma_stream->phy_addr = rt->dma_addr;
+        dma_stream->vir_addr = rt->dma_area;
+        i2s->is_running = false;
+
+        dev_info(i2s->dev,"dma buf size = %d, period size = %d\n", dma_stream->buf_bytes,
+                 dma_stream->period_bytes);
 
         return 0;
 }
 
-static const struct of_device_id axi_i2s_of_match[] = {
-        { .compatible = "adi,axi-i2s-1.00.a", },
-        {},
+static void i2s_dma_callback(void *completion)
+{
+        struct axi_i2s *i2s = completion;
+        struct snd_pcm_substream *ss = i2s->substream;
+        struct i2s_dma *dma_stream = NULL;
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+        }
+
+        dma_stream->have_send += dma_stream->current_send;
+        //pr_info("dma callback -> %d!\n", dma_stream->have_send);
+        snd_pcm_period_elapsed(i2s->substream);
+        #if DMA_SG_MODE
+        tasklet_schedule(&i2s->tasklet);
+        #endif
+}
+
+static int dma_trigger_once(struct axi_i2s *i2s)
+{
+        int ret = 0;
+        struct snd_pcm_substream *ss = i2s->substream;
+        struct i2s_dma *dma_stream = NULL;
+        enum dma_ctrl_flags flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+        }
+
+        if(dma_stream->have_send == dma_stream->buf_bytes)
+        {
+                dma_stream->have_send = 0;
+        }
+
+        uint32_t remain_bytes = dma_stream->buf_bytes - dma_stream->have_send;
+        if(remain_bytes >= dma_stream->period_bytes)
+        {
+                dma_stream->current_send = dma_stream->period_bytes;
+        }
+        else
+        {
+                dma_stream->current_send = remain_bytes;
+        }
+        //dev_info(i2s->dev,"trigger byte: %d\n", dma_stream->current_send);
+
+        #if DMA_SG_MODE
+        struct scatterlist sg;
+        sg_init_table(&sg, 1);
+
+        dma_addr_t buf_addr = dma_stream->phy_addr + dma_stream->have_send;
+        #if DEBUG_VALUE_CHECK
+        uint32_t *buf = (uint32_t *)(dma_stream->vir_addr + dma_stream->have_send);
+        uint32_t i;
+        uint32_t str = buf[0];
+        //printk(KERN_INFO "\naddr -> %p, phy = %d, tr = %d\n", buf, buf_addr, virt_to_phys(buf));
+        for(i = 0; i < dma_stream->period_bytes / 4; i++)
+        {
+                //if(buf[i] != str)
+                //{
+                //printk(KERN_INFO "buf = %8x != str = %8x, index = %d", buf[i], str, i);
+                //}
+                //str += 0x10001;
+                //if(str > 0x90009)
+                //{
+                //str = 0;
+                //}
+                //printk(KERN_INFO "%4d --> %8x\n", i, buf[i]);
+                printk(KERN_INFO "%d ", buf[i]);
+        }
+        #endif
+
+        sg_set_page(&sg, pfn_to_page(PFN_DOWN(buf_addr)),
+                    dma_stream->current_send,
+                    offset_in_page(buf_addr));
+        sg_dma_len(&sg) = dma_stream->current_send;
+        sg_dma_address(&sg) = buf_addr;
+        dma_stream->tx_desc = dmaengine_prep_slave_sg(dma_stream->channel,
+                                                      &sg, 1, dma_stream->direction, flags);
+        if (!dma_stream->tx_desc) {
+                dev_err(i2s->dev, "Failed to allocate a dma descriptor\n");
+                return -ENOMEM;
+        }
+        #else
+        dma_stream->tx_desc = dmaengine_prep_dma_cyclic(dma_stream->channel,
+                                                        dma_stream->phy_addr, dma_stream->buf_bytes,
+                                                        dma_stream->period_bytes, dma_stream->direction,
+                                                        flags);
+        if (!dma_stream->tx_desc) {
+                dev_err(i2s->dev, "Failed to allocate a dma descriptor\n");
+                return -ENOMEM;
+        }
+        #endif
+        dma_stream->tx_desc->callback = i2s_dma_callback;
+        dma_stream->tx_desc->callback_param = i2s;
+        dma_stream->cookie = dmaengine_submit(dma_stream->tx_desc);
+        if(dma_submit_error(dma_stream->cookie))
+        {
+                dev_err(i2s->dev, "submit dma failed!\n");
+                ret = -EINVAL;
+                goto quick_out;
+        }
+        dma_async_issue_pending(dma_stream->channel);
+quick_out:
+        return ret;
+}
+static void dma_start(struct axi_i2s *i2s)
+{
+        struct snd_pcm_substream *ss = i2s->substream;
+        struct i2s_dma *dma_stream = NULL;
+
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+        }
+        dma_stream->current_send = 0;
+        dma_stream->have_send = 0;
+        i2s->is_running = true;
+        tasklet_schedule(&i2s->tasklet);
+}
+static void dma_stop(struct axi_i2s *i2s)
+{
+        struct snd_pcm_substream *ss = i2s->substream;
+        struct i2s_dma *dma_stream = NULL;
+
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+        }
+        spin_lock(&i2s->lock);
+        i2s->is_running = false;
+        dmaengine_terminate_all(dma_stream->channel);
+        spin_unlock(&i2s->lock);
+}
+
+static int i2s_pcm_trigger(struct snd_pcm_substream *ss, int cmd)
+{
+        int ret = 0;
+        struct axi_i2s *i2s = i2s_data_get(ss);
+
+        switch(cmd)
+        {
+        case SNDRV_PCM_TRIGGER_START:
+        {
+                dev_info(i2s->dev, "starting dma!\n");
+                dma_start(i2s);
+        }break;
+        case SNDRV_PCM_TRIGGER_STOP:
+        {
+                dev_info(i2s->dev, "stopping dma!\n");
+                dma_stop(i2s);
+        }break;
+        default:
+                dev_err(i2s->dev, "unsupported cmd = %d\n", cmd);
+                ret = -EINVAL;
+        }
+
+quick_out:
+        return ret;
+}
+
+static void dma_task_let(unsigned long i2s_addr)
+{
+        struct axi_i2s *i2s = (struct axi_i2s *)i2s_addr;
+        unsigned long flags = 0;
+
+        spin_lock_irqsave(&i2s->lock, flags);
+        if(i2s->is_running == true)
+        {
+                dma_trigger_once(i2s);
+        }
+        else
+        {
+                pr_info("tasklet stop!\n");
+        }
+        spin_unlock_irqrestore(&i2s->lock, flags);
+}
+
+/*
+ ,* So far only resolution of one period is supported, subject to extending the
+ ,* dmangine API
+ ,*/
+static snd_pcm_uframes_t i2s_pcm_pointer_dma(struct snd_pcm_substream *ss)
+{
+        struct axi_i2s *i2s = i2s_data_get(ss);
+        struct i2s_dma *dma_stream = NULL;
+        struct snd_pcm_runtime *rt = ss->runtime;
+        snd_pcm_uframes_t   frame_index = 0;
+
+        if(ss->stream == SNDRV_PCM_STREAM_PLAYBACK)
+        {
+                dma_stream = &i2s->dma_playback;
+        }
+        else
+        {
+                dma_stream = &i2s->dma_capture;
+        }
+
+        if(dma_stream->have_send >= dma_stream->buf_bytes)
+        {
+                dma_stream->have_send = 0;
+        }
+
+        frame_index =  bytes_to_frames(rt, dma_stream->have_send);
+        //dev_info(i2s->dev, "return addr = %d, frame = %d\n", dma_stream->have_send, frame_index);
+
+        return frame_index;
+}
+
+static int i2s_pcm_new(struct snd_soc_pcm_runtime *rtd)
+{
+        int ret = 0;
+        struct snd_pcm *pcm = rtd->pcm;
+        struct snd_card *card = rtd->card->snd_card;
+
+        pr_info("%s\n", __func__);
+
+        #if DMA_SELF_BUFFER
+        struct device * dev = rtd->platform->dev;
+        struct axi_i2s *i2s = dev->driver_data;
+        pr_info("i2s ->addr = %p\n", i2s);
+        i2s->dma_common.size = DMA_BUFFER_SIZE;
+        i2s->dma_common.vir_addr = (unsigned char *)dmam_alloc_coherent(dev,
+                                                                        i2s->dma_common.size, &i2s->dma_common.phy_addr, GFP_KERNEL);
+        if(i2s->dma_common.vir_addr == NULL)
+        {
+                dev_err(dev,"can not prealloc dma buffer\n");
+                ret = -ENOMEM;
+                goto quick_out;
+        }
+        dev_info(dev, "alloced dma vir = %p, phy = %d, size = %d\n",
+                 i2s->dma_common.vir_addr, i2s->dma_common.phy_addr,
+                 i2s->dma_common.size);
+        #else
+        if((ret = snd_pcm_lib_preallocate_pages_for_all(pcm,
+                                                        SNDRV_DMA_TYPE_CONTINUOUS, snd_dma_continuous_data(GFP_KERNEL),
+                                                        DMA_BUFFER_SIZE, DMA_BUFFER_SIZE)) != 0)
+        {
+                dev_err(card->dev,"can not prealloc dma buffer\n");
+                ret = -ENOMEM;
+                goto quick_out;
+        }
+        #endif
+
+quick_out:
+        return ret;
+}
+
+static void i2s_pcm_free(struct snd_pcm *pcm)
+{
+        pr_info("%s\n", __func__);
+}
+static int i2s_pcm_hw_params(struct snd_pcm_substream *ss,
+                             struct snd_pcm_hw_params *hw_params)
+{
+        struct axi_i2s *i2s = i2s_data_get(ss);
+        struct device *dev = ss->pcm->card->dev;
+        struct snd_pcm_runtime *rt = ss->runtime;
+        struct snd_dma_buffer  *dmab = rt->dma_buffer_p;
+        int ret  = 0;
+        pr_info("%s\n", __func__);
+        #if DMA_SELF_BUFFER
+        if(dmab == NULL)
+        {
+                dev_info(dev, "alloc dmab memory!\n");
+                if((dmab = kzalloc(sizeof(struct snd_dma_buffer), GFP_KERNEL)) == NULL)
+                {
+                        dev_err(dev, "can not alloc dmab buffer!\n");
+                        ret = -ENOMEM;
+                        goto quick_out;
+                }
+        }
+        dmab->dev = ss->dma_buffer.dev;
+        dmab->bytes = params_buffer_bytes(hw_params);
+        dev_info(dev, "alloc %d bytes dma buffer, virt = %p, phy = %d\n",
+                 dmab->bytes, dmab->area, dmab->addr);
+        if(dmab->bytes > i2s->dma_common.size)
+        {
+                dev_err(dev, "request memory is larger than dma common have\n");
+                ret = -ENOMEM;
+                goto quick_out;
+        }
+
+        dmab->area = i2s->dma_common.vir_addr;
+        dmab->addr = i2s->dma_common.phy_addr;
+        if(dmab->area == NULL)
+        {
+                dev_err(dev, "can not alloc dma buffer!\n");
+                ret = -ENOMEM;
+                goto quick_out;
+        }
+        dev_info(dev, "alloced %d bytes dma buffer, virt = %p, phy = %d\n",
+                 dmab->bytes, dmab->area, dmab->addr);
+
+        rt->dma_buffer_p = dmab;
+        rt->dma_area = dmab->area;
+        rt->dma_addr = dmab->addr;
+        rt->dma_bytes = dmab->bytes;
+        #else
+        if((ret = snd_pcm_lib_malloc_pages(ss, params_buffer_bytes(hw_params))) < 0)
+        {
+                dev_err(dev, "malloc pages failed, ret = %d, size = %d\n", ret,
+                        params_buffer_bytes(hw_params));
+                ret = -EINVAL;
+        }
+        #endif
+        if(rt->dma_addr == 0)
+        {
+                dev_info(dev, "translate addr\n");
+                rt->dma_addr = virt_to_phys(rt->dma_area);
+        }
+quick_out:
+        return ret;
+}
+
+static int i2s_pcm_hw_free(struct snd_pcm_substream *ss)
+{
+        pr_info("%s\n", __func__);
+        #if DMA_SELF_BUFFER
+        struct snd_pcm_runtime *rt = ss->runtime;
+        struct snd_dma_buffer  *dmab = rt->dma_buffer_p;
+
+        kfree(dmab);
+        return 0;
+        #else
+        return snd_pcm_lib_free_pages(ss);
+        #endif
+}
+static struct snd_pcm_ops i2s_pcm_ops = {
+        .open= i2s_pcm_open,
+        .close= i2s_pcm_close,
+        .hw_params= i2s_pcm_hw_params,
+        .hw_free= i2s_pcm_hw_free,
+        .prepare= i2s_pcm_prepare,
+        .trigger= i2s_pcm_trigger,
+        .pointer= i2s_pcm_pointer_dma,
+};
+struct snd_soc_platform_driver i2s_platform = {
+        .ops= &i2s_pcm_ops,
+        .pcm_new= i2s_pcm_new,
+        .pcm_free= i2s_pcm_free,
+};
+/**
+ ,* @brief driver probe and remove
+ ,*/
+static int axi_i2s_probe(struct platform_device *pdev)
+{
+        struct axi_i2s *i2s;
+        int rc = 0;
+
+        i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
+        if (i2s == NULL)
+        {
+                dev_err(&pdev->dev, "alloc memory failed!\n");
+                rc =  -ENOMEM;
+                goto quick_out;
+        }
+        tasklet_init(&i2s->tasklet, dma_task_let,(unsigned long)i2s);
+        spin_lock_init(&i2s->lock);
+
+        platform_set_drvdata(pdev, i2s);
+        dev_set_drvdata(&pdev->dev, i2s);
+
+
+        pr_info("i2s ->addr = %p\n", i2s);
+        rc = devm_snd_soc_register_component(&pdev->dev, &axi_i2s_component,
+                                             &axi_i2s_dai, 1);
+        if (rc)
+        {
+                dev_err(&pdev->dev, "can not register component\n");
+                goto quick_out;
+        }
+        rc = devm_snd_soc_register_platform(&pdev->dev, &i2s_platform);
+        if (rc < 0)
+        {
+                dev_err(&pdev->dev, "can not register platform\n");
+                goto quick_out;
+        }
+        dev_info(&pdev->dev, "%s\n", __func__);
+
+quick_out:
+        return rc;
+}
+
+static int axi_i2s_remove(struct platform_device *pdev)
+{
+
+        return 0;
+}
+
+#ifdef CONFIG_OF
+static struct of_device_id axi_i2s_of_match[] = {
+        { .compatible = "zynq,axi-i2s", },
+        { /* end of list */ },
 };
 MODULE_DEVICE_TABLE(of, axi_i2s_of_match);
+#else
+# define axi_i2s_of_match
+#endif
+
 
 static struct platform_driver axi_i2s_driver = {
         .driver = {
-                .name = "axi-i2s",
-                .of_match_table = axi_i2s_of_match,
+                .name = DRIVER_NAME,
+                .owner = THIS_MODULE,
+                .of_match_table= axi_i2s_of_match,
         },
-        .probe = axi_i2s_probe,
-        .remove = axi_i2s_dev_remove,
+        .probe= axi_i2s_probe,
+        .remove= axi_i2s_remove,
 };
-module_platform_driver(axi_i2s_driver);
 
-MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
-MODULE_DESCRIPTION("AXI I2S driver");
-MODULE_LICENSE("GPL");
+static int __init axi_i2s_init(void)
+{
+        pr_info("module initialize\n");
+        return platform_driver_register(&axi_i2s_driver);
+}
+
+
+static void __exit axi_i2s_exit(void)
+{
+        pr_info("module exit\n");
+        platform_driver_unregister(&axi_i2s_driver);
+}
+
+module_init(axi_i2s_init);
+module_exit(axi_i2s_exit);
 #+END_SRC
+** 设备树
+#+begin_example
+kc_audio_i2s_label:kc_audio_i2s{
+                    compatible = "zynq,axi-i2s";
+                    dmas = <&axi_dma_IQ0 0
+                    &axi_dma_IQ0 1>;
+                    dma-names = "dma_playback", "dma_capture";
+                   };
+#+end_example
 * 板级驱动
 板级驱动用于将芯片驱动和平台驱动连接在一起，并且还用来描述其他附加信息。
 
@@ -1024,142 +1500,125 @@ static struct snd_soc_card snd_soc_corgi = {
         .num_links = 1,
 };
 #+END_SRC
-** 实例(zed_adau1761.c)
+** 实例
 #+BEGIN_SRC c
-/*
- ,*  Copyright (C) 2012-2013, Analog Devices Inc.
- ,*Author: Lars-Peter Clausen <lars@metafoo.de>
- ,*
- ,*  This program is free software; you can redistribute it and/or modify it
- ,*  under  the terms of the GNU General  Public License as published by the
- ,*  Free Software Foundation;  either version 2 of the License, or (at your
- ,*  option) any later version.
- ,*
- ,*  You should have received a copy of the GNU General Public License along
- ,*  with this program; if not, write to the Free Software Foundation, Inc.,
- ,*  675 Mass Ave, Cambridge, MA 02139, USA.
- ,*
+/*  audio_speaker.c - The simplest kernel module.
  ,*/
-
+#define pr_fmt(fmt)   "[driver] machine:"fmt
+#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>
-#include <linux/timer.h>
+#include <linux/slab.h>
+#include <linux/io.h>
 #include <linux/interrupt.h>
-#include <linux/platform_device.h>
-#include <linux/of.h>
+
+#include <linux/of_address.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
+
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
-#include "../codecs/adau17x1.h"
 
-static const struct snd_soc_dapm_widget zed_adau1761_widgets[] = {
-        SND_SOC_DAPM_SPK("Line Out", NULL),
-        SND_SOC_DAPM_HP("Headphone Out", NULL),
-        SND_SOC_DAPM_MIC("Mic In", NULL),
-        SND_SOC_DAPM_MIC("Line In", NULL),
+/* Standard module information, edit as appropriate */
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("kcl");
+MODULE_DESCRIPTION("audio_speaker - loadable module template generated by petalinux-create -t modules");
+
+#define DRIVER_NAME "audio_speaker"
+
+#define SSM2518_SYSCLK 0
+
+enum ssm2518_sysclk_src {
+        SSM2518_SYSCLK_SRC_MCLK = 0,
+        SSM2518_SYSCLK_SRC_BCLK = 1,
 };
 
-static const struct snd_soc_dapm_route zed_adau1761_routes[] = {
-        { "Line Out", NULL, "LOUT" },
-        { "Line Out", NULL, "ROUT" },
-        { "Headphone Out", NULL, "LHP" },
-        { "Headphone Out", NULL, "RHP" },
-        { "Mic In", NULL, "MICBIAS" },
-        { "LINN", NULL, "Mic In" },
-        { "RINN", NULL, "Mic In" },
-        { "LAUX", NULL, "Line In" },
-        { "RAUX", NULL, "Line In" },
+struct audio_speaker{
+        uint32_t data;
 };
 
-static int zed_adau1761_hw_params(struct snd_pcm_substream *substream,
-                                  struct snd_pcm_hw_params *params)
+static int audio_speaker_chip_init(struct snd_soc_pcm_runtime *rtd)
 {
-        struct snd_soc_pcm_runtime *rtd = substream->private_data;
-        struct snd_soc_dai *codec_dai = rtd->codec_dai;
-        unsigned int pll_rate;
-        int ret;
-
-        switch (params_rate(params)) {
-        case 48000:
-        case 8000:
-        case 12000:
-        case 16000:
-        case 24000:
-        case 32000:
-        case 96000:
-                pll_rate = 48000 * 1024;
-                break;
-        case 44100:
-        case 7350:
-        case 11025:
-        case 14700:
-        case 22050:
-        case 29400:
-        case 88200:
-                pll_rate = 44100 * 1024;
-                break;
-        default:
-                return -EINVAL;
-        }
-
-        ret = snd_soc_dai_set_pll(codec_dai, ADAU17X1_PLL,
-                                  ADAU17X1_PLL_SRC_MCLK, 12288000, pll_rate);
-        if (ret)
-                return ret;
-
-        ret = snd_soc_dai_set_sysclk(codec_dai, ADAU17X1_CLK_SRC_PLL, pll_rate,
-                                     SND_SOC_CLOCK_IN);
-
-        return ret;
+        pr_info("%s\n", __func__);
+        return snd_soc_codec_set_sysclk(rtd->codec, SSM2518_SYSCLK, SSM2518_SYSCLK_SRC_MCLK,11289600, SND_SOC_CLOCK_IN);
 }
-
-static struct snd_soc_ops zed_adau1761_ops = {
-        .hw_params = zed_adau1761_hw_params,
+static const struct snd_soc_dapm_widget audio_speaker_widgets[] =
+{
+        SND_SOC_DAPM_SPK("Speaker Out", NULL),
 };
 
-static struct snd_soc_dai_link zed_adau1761_dai_link = {
-        .name = "adau1761",
-        .stream_name = "adau1761",
-        .codec_dai_name = "adau-hifi",
-        .dai_fmt = SND_SOC_DAIFMT_I2S |
-        SND_SOC_DAIFMT_NB_NF |
+static const struct snd_soc_dapm_route audio_speaker_routes[] =
+{
+        {"Speaker Out", NULL, "OUTL"},
+        {"Speaker Out", NULL, "OUTR"},
+};
+
+static struct snd_soc_dai_link audio_speaker_link = {
+        .name = "ssm2518",
+        .stream_name = "ssm2518",
+        .codec_dai_name = "ssm2518-hifi",
+            .dai_fmt = SND_SOC_DAIFMT_LEFT_J |
+                SND_SOC_DAIFMT_NB_NF |
         SND_SOC_DAIFMT_CBS_CFS,
-        .ops = &zed_adau1761_ops,
+        .init = audio_speaker_chip_init,
 };
-
-static struct snd_soc_card zed_adau1761_card = {
-        .name = "ZED ADAU1761",
+static struct snd_soc_card audio_speaker_card = {
+        .name = "zynq ssm2518",
         .owner = THIS_MODULE,
-        .dai_link = &zed_adau1761_dai_link,
+        .dai_link = &audio_speaker_link,
         .num_links = 1,
-        .dapm_widgets = zed_adau1761_widgets,
-        .num_dapm_widgets = ARRAY_SIZE(zed_adau1761_widgets),
-        .dapm_routes = zed_adau1761_routes,
-        .num_dapm_routes = ARRAY_SIZE(zed_adau1761_routes),
+        .dapm_widgets = audio_speaker_widgets,
+        .num_dapm_widgets = ARRAY_SIZE(audio_speaker_widgets),
+        .dapm_routes = audio_speaker_routes,
+        .num_dapm_routes = ARRAY_SIZE(audio_speaker_routes),
         .fully_routed = true,
 };
 
-static int zed_adau1761_probe(struct platform_device *pdev)
+static int audio_speaker_probe(struct platform_device *pdev)
 {
-        struct snd_soc_card *card = &zed_adau1761_card;
-        struct device_node *of_node = pdev->dev.of_node;
+        int rc = 0;
 
-        if (!of_node)
-                return -ENXIO;
+        struct snd_soc_card *card = &audio_speaker_card;
+        struct device_node *of_node = pdev->dev.of_node;
+        if(!of_node)
+        {
+                dev_err(&pdev->dev,"can not get of node\n");
+                rc = -ENXIO;
+                goto quick_out;
+        }
+        platform_set_drvdata(pdev, card);
 
         card->dev = &pdev->dev;
 
-        zed_adau1761_dai_link.codec_of_node = of_parse_phandle(of_node, "audio-codec", 0);
-        zed_adau1761_dai_link.cpu_of_node = of_parse_phandle(of_node, "cpu-dai", 0);
-        zed_adau1761_dai_link.platform_of_node = zed_adau1761_dai_link.cpu_of_node;
 
-        if (!zed_adau1761_dai_link.codec_of_node ||
-            !zed_adau1761_dai_link.cpu_of_node)
-                return -ENXIO;
+        audio_speaker_link.codec_of_node = of_parse_phandle(of_node, "audio-codec", 0);
+        audio_speaker_link.cpu_of_node = of_parse_phandle(of_node, "cpu-dai", 0);
+        audio_speaker_link.platform_of_node = audio_speaker_link.cpu_of_node;
 
-        return snd_soc_register_card(card);
+        if(!audio_speaker_link.codec_of_node ||
+           !audio_speaker_link.cpu_of_node)
+        {
+                dev_err(&pdev->dev,"can not find node codec ->%p, cpu -> %p\n",
+                        audio_speaker_link.codec_of_node,
+                        audio_speaker_link.cpu_of_node);
+                rc = -ENXIO;
+                goto quick_out;
+        }
+        if((rc = snd_soc_register_card(card))!=0)
+        {
+                dev_err(&pdev->dev, "can not register card!\n");
+                rc = -ENXIO;
+                goto quick_out;
+        }
+        dev_info(&pdev->dev, "%s\n", __func__);
+
+quick_out:
+
+        return rc;
 }
 
-static int zed_adau1761_remove(struct platform_device *pdev)
+static int audio_speaker_remove(struct platform_device *pdev)
 {
         struct snd_soc_card *card = platform_get_drvdata(pdev);
 
@@ -1168,26 +1627,154 @@ static int zed_adau1761_remove(struct platform_device *pdev)
         return 0;
 }
 
-static const struct of_device_id zed_adau1761_of_match[] = {
-        { .compatible = "digilent,zed-sound", },
+#ifdef CONFIG_OF
+static struct of_device_id audio_speaker_of_match[] = {
+        { .compatible = "zynq, audio_speaker", },
+        { /* end of list */ },
+};
+MODULE_DEVICE_TABLE(of, audio_speaker_of_match);
+#else
+# define audio_speaker_of_match
+#endif
+
+
+static struct platform_driver audio_speaker_driver = {
+        .driver = {
+                .name = DRIVER_NAME,
+                .owner = THIS_MODULE,
+                .of_match_table= audio_speaker_of_match,
+        },
+        .probe= audio_speaker_probe,
+        .remove= audio_speaker_remove,
+};
+
+static int __init audio_speaker_init(void)
+{
+        printk("<1>Hello module world.\n");
+
+        return platform_driver_register(&audio_speaker_driver);
+}
+
+
+static void __exit audio_speaker_exit(void)
+{
+        platform_driver_unregister(&audio_speaker_driver);
+        printk(KERN_ALERT "Goodbye module world.\n");
+}
+
+module_init(audio_speaker_init);
+module_exit(audio_speaker_exit);
+
+
+#+END_SRC
+** 设备树
+#+begin_example
+kc_audio_speaker_label:kc_audio_speaker{
+                     compatible = "zynq, audio_speaker";
+                     audio-codec = <&ssm2518_label>;
+                     cpu-dai = <&kc_audio_i2s_label>;
+                    };
+#+end_example
+** 关于一个I2S接2个及以上codec的连接
+这种情况ALSA也是支持的，只需要修改相应的设备树和注册函数即可：
+#+begin_example
+sound: n900-audio {
+                   compatible = "nokia,n900-audio";
+
+                    nokia,cpu-dai = <&mcbsp2>;
+                    nokia,audio-codec = <&tlv320aic3x>, <&tlv320aic3x_aux>;
+                    nokia,headphone-amplifier = <&tpa6130a2>;
+                    tvout-selection-gpios = <&gpio2 8 GPIO_ACTIVE_HIGH>; /* 40 */
+                    jack-detection-gpios = <&gpio6 17 GPIO_ACTIVE_HIGH>; /* 177 */
+                    eci-switch-gpios = <&gpio6 22 GPIO_ACTIVE_HIGH>; /* 182 */
+                    speaker-amplifier-gpios = <&twl_gpio 7 GPIO_ACTIVE_HIGH>;
+                   };
+#+end_example
+
+#+BEGIN_SRC c
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/platform_device.h>
+
+#include <sound/soc.h>
+
+static struct snd_soc_dai_link xilinx_dp_dai_links[] = {
+        {
+                .name= "xilinx-dp0",
+                .codec_dai_name= "xilinx-dp-snd-codec-dai",
+        },
+        {
+                .name= "xilinx-dp1",
+                .codec_dai_name= "xilinx-dp-snd-codec-dai",
+        },
+
+};
+
+static struct snd_soc_card xilinx_dp_card = {
+        .name= "DisplayPort monitor",
+        .owner= THIS_MODULE,
+        .dai_link= xilinx_dp_dai_links,
+        .num_links= 2,
+};
+
+static int xilinx_dp_probe(struct platform_device *pdev)
+{
+        struct snd_soc_card *card = &xilinx_dp_card;
+        struct device_node *node = pdev->dev.of_node;
+        struct device_node *codec, *pcm;
+        int ret;
+
+        card->dev = &pdev->dev;
+
+        codec = of_parse_phandle(node, "xlnx,dp-snd-codec", 0);
+        if (!codec)
+                return -ENODEV;
+
+        pcm = of_parse_phandle(node, "xlnx,dp-snd-pcm", 0);
+        if (!pcm)
+                return -ENODEV;
+        xilinx_dp_dai_links[0].platform_of_node = pcm;
+        xilinx_dp_dai_links[0].cpu_of_node = codec;
+        xilinx_dp_dai_links[0].codec_of_node = codec;
+
+        pcm = of_parse_phandle(node, "xlnx,dp-snd-pcm", 1);
+        if (!pcm)
+                return -ENODEV;
+        xilinx_dp_dai_links[1].platform_of_node = pcm;
+        xilinx_dp_dai_links[1].cpu_of_node = codec;
+        xilinx_dp_dai_links[1].codec_of_node = codec;
+
+        ret = devm_snd_soc_register_card(&pdev->dev, card);
+        if (ret)
+                return ret;
+
+        dev_info(&pdev->dev, "Xilinx DisplayPort Sound Card probed\n");
+
+        return 0;
+}
+
+static int xilinx_dp_remove(struct platform_device *pdev)
+{
+        return 0;
+}
+
+static const struct of_device_id xilinx_dp_of_match[] = {
+        { .compatible = "xlnx,dp-snd-card", },
         {},
 };
-MODULE_DEVICE_TABLE(of, zed_adau1761_of_match);
+MODULE_DEVICE_TABLE(of, xilinx_dp_of_match);
 
-static struct platform_driver zed_adau1761_card_driver = {
-        .driver = {
-                .name = "zed-adau1761-snd",
-                .owner = THIS_MODULE,
-                .of_match_table = zed_adau1761_of_match,
-                .pm = &snd_soc_pm_ops,
+static struct platform_driver xilinx_dp_aud_driver = {
+        .driver= {
+                .name= "xilinx-dp-snd-card",
+                .of_match_table= xilinx_dp_of_match,
+                .pm= &snd_soc_pm_ops,
         },
-        .probe = zed_adau1761_probe,
-        .remove = zed_adau1761_remove,
+        .probe= xilinx_dp_probe,
+        .remove= xilinx_dp_remove,
 };
-module_platform_driver(zed_adau1761_card_driver);
+module_platform_driver(xilinx_dp_aud_driver);
 
-MODULE_DESCRIPTION("ASoC ZED board ADAU1761 driver");
-MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
-MODULE_LICENSE("GPL");
-MODULE_ALIAS("platform:zed-adau1761-snd");
+MODULE_DESCRIPTION("Xilinx DisplayPort Sound Card module");
+MODULE_LICENSE("GPL v2");
 #+END_SRC

@@ -1,0 +1,46 @@
+digraph solution{
+    graph[label="解决BUG思路图"];
+
+    node[shape=box];
+
+    find_solution[label="发现问题"];
+    familiar[label="熟悉的问题"];
+    unfamiliar[label="不熟悉的问题"];
+
+
+    find_solution -> familiar;
+    find_solution -> unfamiliar;
+
+    unknown[label="未找到答案"];
+    done[label="解决"];
+    unfamiliar -> google;
+    google -> unknown;
+    google -> done;
+
+    import[shape=diamond,label="此问题是否重要?"];
+    learn[label="学习概念，熟悉此对象"];
+    unknown -> import;
+    import -> learn[label="Y"];
+    import -> done[label="N"];
+
+    learn -> familiar;
+
+    reduce_scope[label="定位问题，缩小范围"];
+    try_solve[label="利用已有知识解决"];
+    familiar -> reduce_scope;
+    reduce_scope -> try_solve;
+
+    try_solve -> done;
+
+    back_trace[label="回到原点，梳理思维"];
+    try_solve -> back_trace;
+    back_trace -> done;
+
+    find_forum[label="求助论坛"];
+    back_trace -> find_forum;
+
+    find_forum -> done;
+
+    verify[label="验证问题"];
+    done -> verify;
+}

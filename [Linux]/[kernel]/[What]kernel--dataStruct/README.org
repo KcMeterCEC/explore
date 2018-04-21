@@ -1,55 +1,24 @@
-* [What]kernel --> data structure
-** 基本宏操作
-*** container_of
-在文件 =include/linux/kernel.h= 中定义了 container_of 宏:
+#+TITLE: [What]linux -> list
+#+DATE:  <2018-04-20 Fri> 
+#+TAGS: kernel
+#+LAYOUT: post 
+#+CATEGORIES: linux, kernel, data_structure
+#+NAME: <linux_kernel_data_structure_list.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-功能是: 通过 =ptr= 反推出包含它结构体的地址.
-**** 使用
-#+BEGIN_SRC c
-typedef struct
-{
-        int a;
-        int b;
-        int c;
-}numStr;
-
-
-numStr str_num;
-
-numStr *pstr_num = container_of(&str_num.b, numStr, b);
-#+END_SRC
-**** 分析
-#+BEGIN_SRC c
-/**
- ,* @brief:    container_of - cast a member of a structure out to the containing structure
- ,* @ptr:      the pointer to the member
- ,* @type:     the type of the container struct this is embedded in
- ,* @memver:   the name of the member within the struct
- ,*/
-
-#define container_of(ptr, type, member) ({      \
-        const typeof(((type *)0)->member) *__mptr = (ptr);
-        (type *)((char *)__mptr - offsetof(type, member));})
-
-#define offsetof(TYPE,MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
-#+END_SRC
-
-- const typeof(((type *)0)->member) *__mptr = (ptr); 
-创建了一个指向 =member= 成员的指针, 然后将现有的 =ptr= 地址赋值给 =__mptr=, 也就是说目前 =__mptr= 表示了 =ptr= 的实际地址.
-
-- (type *)((char *)__mptr - offsetof(type, member)); 
-=offsetof= 计算出 =member= 成员在结构体 =type= 中偏移的字节数, 然后通过现有的 =__mptr= 与字节偏移作差值,
-便得出了 =ptr= 所在的结构体的地址.
-** 基本函数操作
-*** list
+罗列内核已经提供的双向链表数据结构的使用方式。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
 linux 在 =linux/list.h= 中提供了 *双向环形链表* 和 *双向链表* 的操作函数, 此代码可以移植到其他应用环境中,方便使用.
 
 需要注意的是:
 1. linux是通过 *将此链表嵌入在其他数据结构中, 从而将很多不同的数据结构链接起来!*. (而不是链表中包含数据).
 2. 函数中的参数 =head= 代表的即为链表头!
 3. =typeof= 是GCC扩展的关键字, 所以不能在编译选项重添加 =-std=c99=!
-**** 使用
-***** 双向环形链表
+* 使用
+** 双向环形链表
 内核提供了以下宏供操作:
 - LIST_HEAD(name)  : 定义一个名称为 =name= 的双向环形链表.
 - list_entry(ptr, type, member) : 通过链表节点地址 =ptr= , 来反推处包含它的 =type= 类型数据的起始地址, =member= 就是该链表节点在 =type= 中定义的名称
@@ -151,7 +120,7 @@ static inline int list_splice_tail(struct list_head *list, struct list_head *hea
 static inline int list_splice_tail_init(struct list_head *list, struct list_head *head);
 
 #+END_SRC
-***** 双向链表(*待分析*)
+** 双向链表(*待分析*)
 内核提供了以下宏供操作:
 - HLIST_HEAD(name) : 定义一个名称为 =name= 的双向链表
 内核提供了如下函数供操作:
@@ -162,4 +131,3 @@ static inline int list_splice_tail_init(struct list_head *list, struct list_head
 static inline void INIT_HLIST_NODE(struct hlist_node *h);
 
 #+END_SRC
-**** 分析

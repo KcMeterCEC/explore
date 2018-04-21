@@ -332,7 +332,7 @@ int io_destory(io_context_t ctx);
 int io_submit(io_context_t ctx, long nr, struct iocb *ios[]);
 int io_cancel(io_context_t ctx, struct iocb *iocb, struct io_event *evt);
 //获取完成事件
-io io_getevents(io_context_t ctx_id, long min_nr, long nr, struct io_event *events,
+int io_getevents(io_context_t ctx_id, long min_nr, long nr, struct io_event *events,
                 struct timespec *timeout);
 //设置完成时的回调
 void io_set_callback(struct iocb *iocb, io_callback_t cb);

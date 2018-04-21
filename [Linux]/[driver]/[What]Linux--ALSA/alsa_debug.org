@@ -1,0 +1,32 @@
+#+TITLE: [What]linux -> ALSA 调试
+#+DATE:  <2018-04-16 Mon> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, ALSA
+#+NAME: <linux_driver_ALSA_debug.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+记录ALSA的驱动和上层调试。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* ALSA自带调试输出
+在内核的子系统中已经自带了很多调试信息，而不需要我们在这些子系统代码中再手动的插入。
+
+通过查看文件 =include/sound/core.h= 发现有宏 =CONFIG_SND_DEBUG , CONFIG_SND_DEBUG_VERBOSE, CONFIG_SND_VERBOSE_PRINTK=, 通过在 menuconfig 中搜索发现其路径为：
+#+begin_example
+Device Drivers -> Sound card support -> Advanced Linux Sound Architecture 
+#+end_example
+- CONFIG_SND_DEBUG : 输出基本的调试信息
+- CONFIG_SND_VERBOSE_PRINTK : 在调试信息头前加上文件及位置标记
+- CONFIG_SND_DEBUG_VERBOSE: 更多的调试信息输出
+  + 在选中 =Debug= 后才会出现 =More verbose debug= 的选项。
+* 数据验证
+上层的数据是会通过 wirte 类函数发送下来，可以在驱动中打印缓冲中的值以确认数据对齐操作。
+
+比较常见的方法就是写一个递增的数据，下层来依次匹配。
+* 注意I2S协议
+除了标准的I2S协议外，还有左右对齐两种方式，如果这个没有配置与codec芯片一致，那么听到的声音就会有类似过载的效果。(因为上一个通道的低位数据被采用到了下一个通道的高位上去)
+* codec配置
+有些芯片的配置默认是静音，有些复杂的芯片(比如AD1761)内部还有很多通路，这些都可以先通过 =amixer= 命令配置, 再确定参数后再使用程序配置。
