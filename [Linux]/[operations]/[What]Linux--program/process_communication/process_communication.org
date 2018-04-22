@@ -1,0 +1,111 @@
+#+TITLE: [What]Linux 进程间通信
+#+DATE:  <2018-04-19 Thu> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, process
+#+NAME: <linux_operations_process_communication.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考书籍： APUE
+
+整理Linux中的进程间通信编程。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 管道
+管道具有如下特点：
+1. 半双工通信，数据流是单向的
+2. 管道只能用于两个有亲缘关系进程间通信，一般是父子进程间通信
+#+begin_example
+FIFO 突破了第二点限制，socket 突破了以上两点限制。
+#+end_example
+shell 用经常使用管道来将一个命令的输出作为下一个命令的输入：
+#+begin_example
+cat abc.txt | grep "123"
+#+end_example
+** 数据流方式
+pipe 有两种数据流方式：
+1. 数据在一个进程内在用户空间交互
+2. 数据经过了内核pipe进行交互
+[[./pipe_two_ways.jpg]]
+
+在实际使用中，用得最多的是父子进程间的通信
+[[./pipe_fork.jpg]]
+- 当写端的被关闭时，读端读取时将会返回0.
+- 当读端被关闭时，写端写入时将会返回 -1 ,此时 =errno= 的值为 =EPIPE= ，还会接受到信号 =SIGPIPE=.
+- 宏 =PIPE_BUF= 指定了内核pip的大小(字节)，可以通过 =pathconf= 或 =fpathconf= 来设置此值。
+** 操作函数
+#+BEGIN_SRC c
+#include <unistd.h>
+/**
+ ,* @brief 创建两个pipe
+ ,* @param fd: 包含两个元素的数组
+ ,* @note fd[0] 代表当前进程读端，fd[1]代表当前进程写端。
+ ,* 当只使用其中一个描述符时，需要关掉另一个描述符
+ ,* @ret 0 : 创建成功 -1 : 创建失败
+ ,*/
+int pipe(int fd[2]);
+#+END_SRC
+** 实例
+*** 父进程向子进程发送数据
+#+BEGIN_SRC c
+#include <stdint.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+#define BUFFER_LEN  (20)
+int main(void)
+{
+        int ret = 0;
+        int fd[2];
+        pid_t pid;
+        char buf[BUFFER_LEN];
+        char *str = "Hello world!\n";
+
+        memset(buf, 0, BUFFER_LEN);
+
+        if((ret = pipe(fd)) < 0)
+        {
+                printf("can not create pipe!\n");
+                goto quick_out;
+        }
+        if((pid = fork()) < 0)
+        {
+                printf("can not fork process!\n");
+                ret = -1;
+                goto quick_out;
+        }
+        else if(pid > 0) //parent
+        {
+                close(fd[0]); //close read node
+                if((ret = write(fd[1], str, strlen(str) + 1)) < 0)
+                {
+                        printf("Can not write data to pipe!\n");
+                        goto quick_out;
+                }
+        }
+        else //child
+        {
+                close(fd[1]); //close write node
+                if((ret = read(fd[0], buf, BUFFER_LEN)) < 0)
+                {
+                        printf("Can not read data from pipe!\n");
+                        goto quick_out;
+                }
+                printf("child process received data: %s", buf);
+        }
+
+
+quick_out:
+        return ret;
+}
+#+END_SRC
+ 
+
+* 共享内存
+共享内存用于两个及以上的进程共享一段内存，一般用于传输高速数据。
+因为在通信过程中不需要数据的拷贝，所以其速度最快。
+
+在使用的过程中需要注意读写端的互斥，一般使用信号量来完成二者的同步。

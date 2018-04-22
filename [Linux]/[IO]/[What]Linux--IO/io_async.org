@@ -461,3 +461,9 @@ err:
         return -1;
 }
 #+END_SRC
+* 使用场景
+- 当一个简单的任务仅是读写一个对象时，可以使用最简单的阻塞方式。
+- 当需要对多个对象进行I/O操作时考虑使用 =select= 或 =epoll/libevent=
+  + 一般 =epoll/libevent= 用于监控网络 socket 
+  + =select= 在处理效率会随着I/O数的增加而下降，这个时候可以使用 =epoll= 替代
+- 当需要异步读写I/O时那么使用AIO是一个比较好的选择
