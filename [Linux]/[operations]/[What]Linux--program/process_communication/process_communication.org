@@ -102,10 +102,1024 @@ quick_out:
         return ret;
 }
 #+END_SRC
- 
+* XSI IPC
+消息队列、信号量、共享内存具有很多相同的地方，因此将它们称为 XSI IPC.
 
+这里整体这3种IPC的共同概念及操作方法。
+** 标识符和键值
+- 标识符(indentifier)： 每个IPC的结构在内核中都有一个非负整数标识符与其对应，以便于区分各个IPC。
+- 键值(key)：键值用于每个通信进程所约定的共同的一个值，以便于它们匹配同一个IPC.
+  + 当IPC被创建时，用户就需要提供一个键值（这个值在内部被转换为标识符）。
+
+进程间约定同一个键值有以下3种方式：
+1. 由系统分配
+  - 服务端在创建IPC时使用标志 =IPC_PRIVATE= 指定 =key= ，函数会返回系统分配的键值。
+  - 将键值保存在文件中，然后其他的客户端进程来读取该文件以获取键值
+    + 在父子进程通信中，可以直接共享该值
+2. 指定同一个整数值
+  - 服务端和客户端共同约定一个整数值来表示 =key= ，以免去文件传递的麻烦
+    + *注意：* 如果此整数值已经被其他IPC所使用(创建IPC会返回错误)，那么服务端需要重新约定值并创建IPC
+3. 指定同一个文件名和ID
+  - 给函数 =key_t ftok(const char *path, int id)= 传递一个文件名(此文件必须存在)和一个ID(0~255)来由系统获取一个 =key= 
+    + 服务端和客户端使用相同的参数以得到相同的key, *如果要得到不同的key，则两个参数都要与其他使用过的参数不同*
+
+3个IPC的创建/获取函数(msgget,semget,shmget)都具有 =key= 和 =flag= 两个参数。
+服务端需要提供创建的键值给 =key= 和 =IPC_CREAT= 给 =flag= ，而客户端需要提供服务端创建的键值， =flag= 置0即可。
+** IPC的操作权限
+IPC的操作权限，可以在服务端创建IPC后通过函数 =msgctl,semctl,shmctl= 来改变其操作权限。
+* 消息队列
+消息队列是一个用链表链接起来的存储于内核中的数据结构。
+** 操作函数
+#+BEGIN_SRC c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+
+/**
+ ,* @brief 将文件路径和ID转换为 key
+ ,* @note: proj_id 一般取一个ascii字符表示
+ ,*/
+key_t ftok(const char *pathname, int proj_id);
+/**
+ ,* @brief 创建或获取一个消息队列
+ ,* @param key : 键值
+ ,* @param msgflg :
+ ,* IPC_CREAT | IPC_EXCL : 当创建的消息队列已经存在了，函数返回错误并且 errno=EEXIST
+ ,* msgflg也可以指定其操作权限通过 S_IRWXU,S_IRUSR 等来指定
+ ,* @ret 非负整数代表成功，-1代表失败并且相应的错误存于 errno
+ ,*/
+int msgget(key_t key, int msgflg);
+
+/**
+ ,* @brief 控制消息队列
+ ,*/
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+/**
+ ,* @brief 发送一则消息
+ ,* @note msgsz 表示的是消息的内容，不包括消息的类型
+ ,*/
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+/**
+ ,* @brief 接收一则消息
+ ,*/
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp,
+               int msgflg);
+#+END_SRC
+** 实例
+实现服务端和客户端相互发送消息（服务端需要先启动）。
+服务端代码：
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+
+#define MSG_KEY_PATH    "./msg_key"
+#define PROJ_ID         'm'
+
+struct msgbuf{
+        long mtype;
+        char mtext[50];
+};
+
+static struct msgbuf msg;
+int main(void)
+{
+        int ret = 0;
+        int msg_id = 0;
+        key_t msg_key;
+        if((ret = creat(MSG_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((msg_key = ftok(MSG_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", msg_key);
+
+        if((msg_id = msgget(msg_key, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create msg!");
+                goto quick_out;
+        }
+        printf("message id is  %d \n", msg_id);
+
+        msg.mtype = 1;
+        sprintf(msg.mtext, "server : Hello world\n");
+        if((ret = msgsnd(msg_id, &msg, sizeof(msg.mtext), IPC_NOWAIT)) == -1)
+        {
+                perror("Can not sent message!");
+                goto quick_out;
+        }
+        msg.mtype = 2;
+        if((ret = msgrcv(msg_id, &msg, sizeof(msg.mtext), msg.mtype, 0)) == -1)
+        {
+                perror("Can not recv message!");
+                goto quick_out;
+        }
+        printf("received client data: %s", msg.mtext);
+
+quick_out:
+        return -1;
+
+}
+#+END_SRC
+客户端：
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+
+#define MSG_KEY_PATH    "./msg_key"
+#define PROJ_ID         'm'
+
+struct msgbuf{
+        long mtype;
+        char mtext[50];
+};
+
+static struct msgbuf msg;
+int main(void)
+{
+        int ret = 0;
+        int msg_id = 0;
+        key_t msg_key;
+
+        if((msg_key = ftok(MSG_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", msg_key);
+
+        if((msg_id = msgget(msg_key, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not get msg!");
+                goto quick_out;
+        }
+        printf("message id is  %d \n", msg_id);
+
+        msg.mtype = 1;
+        if((ret = msgrcv(msg_id, &msg, sizeof(msg.mtext), msg.mtype, 0)) == -1)
+        {
+                perror("Can not recv message!");
+                goto quick_out;
+        }
+        printf("received server data: %s", msg.mtext);
+        msg.mtype = 2;
+        sprintf(msg.mtext, "client : Hi this is client\n");
+        if((ret = msgsnd(msg_id, &msg, sizeof(msg.mtext), IPC_NOWAIT)) == -1)
+        {
+                perror("Can not sent message!");
+                goto quick_out;
+        }
+
+quick_out:
+        return -1;
+
+}
+#+END_SRC
+* 信号量
+** 操作函数
+#+BEGIN_SRC c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+/**
+ ,* @brief 创建/获取信号量
+ ,* @param nsems: 信号量的数量，当服务端创建时需要指定此值，当客户端使用时设置为0
+ ,*/
+int semget(key_t key, int nsems, int semflg);
+
+/**
+ ,* @brief 设置或获取信号量状态
+ ,*/
+int semctl(int semid, int semnum, int cmd, ...);
+/**
+ ,* @brief 释放或等待信号量
+ ,*/
+int semop(int semid, struct sembuf *sops, size_t nsops);
+/**
+ ,* @brief 在以上函数基础上具备超时等待
+ ,*/
+int semtimedop(int semid, struct sembuf *sops, size_t nsops,
+               const struct timespec *timeout);
+#+END_SRC
+** 实例
+服务端创建信号量，等待客户端来释放信号量。
+
+服务端代码：
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+
+#define SEM_KEY_PATH    "./sem_key"
+#define PROJ_ID         's'
+
+union semun{
+        int     val; //Value for SETVAL
+        struct semid_ds *buf;//Buffer for IPC_STAT, IPC_SET
+        unsigned short *array; //Array fro GETALL, SETALL
+        struct seminfo *__buf; //Buffer for IPC_INFO
+};
+
+int main(void)
+{
+        int ret = 0;
+        int sem_id = 0;
+        key_t sem_key;
+        union semun semct;
+        if((ret = creat(SEM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((sem_key = ftok(SEM_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create sem key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", sem_key);
+
+        if((sem_id = semget(sem_key, 1, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create sem!");
+                goto quick_out;
+        }
+        printf("semaphore id is  %d \n", sem_id);
+
+        //initialize semaphore
+        semct.val = 0;
+        if((ret = semctl(sem_id, 0, SETVAL, semct)) == -1)
+        {
+                perror("Can not initialize sem!");
+                goto quick_out;
+        }
+        printf("The value of semaphore is %d\n", semctl(sem_id, 0, GETVAL));
+
+        struct sembuf semops;
+
+        semops.sem_num = 0;//index
+        semops.sem_op = -1;
+        semops.sem_flg = 0;
+        printf("waitting client\n");
+        if((ret = semop(sem_id, &semops, 1)) == -1)
+        {
+                perror("Waitting semaphore failed!");
+                goto quick_out;
+        }
+        printf("The value of semaphore is %d\n", semctl(sem_id, 0, GETVAL));
+        printf("client is connected!\n");
+
+quick_out:
+        return -1;
+
+}
+
+#+END_SRC
+客户端代码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+
+#define SEM_KEY_PATH    "./sem_key"
+#define PROJ_ID         's'
+
+
+int main(void)
+{
+        int ret = 0;
+        int sem_id = 0;
+        key_t sem_key;
+
+        if((sem_key = ftok(SEM_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create sem key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", sem_key);
+
+        if((sem_id = semget(sem_key, 1, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create sem!");
+                goto quick_out;
+        }
+        printf("semaphore id is  %d \n", sem_id);
+
+        //initialize semaphore
+        printf("The value of semaphore is %d\n", semctl(sem_id, 0, GETVAL));
+
+        struct sembuf semops;
+
+        semops.sem_num = 0;//index
+        semops.sem_op = 1;
+        semops.sem_flg = 0;
+        printf("release a semaphore\n");
+        if((ret = semop(sem_id, &semops, 1)) == -1)
+        {
+                perror("release semaphore failed!");
+                goto quick_out;
+        }
+        printf("The value of semaphore is %d\n", semctl(sem_id, 0, GETVAL));
+
+quick_out:
+        return -1;
+
+}
+#+END_SRC
 * 共享内存
 共享内存用于两个及以上的进程共享一段内存，一般用于传输高速数据。
 因为在通信过程中不需要数据的拷贝，所以其速度最快。
 
 在使用的过程中需要注意读写端的互斥，一般使用信号量来完成二者的同步。
+** 操作函数
+#+BEGIN_SRC c
+#include <sys/ipc.h>
+#include <sys/shm.h>
+
+/**
+ ,* @brief 申请/获取共享内存
+ ,* @param size: 要申请的字节数
+ ,* 最终内核会申请以 PAGE_SIZE 为粒度的页，如果申请的内存不是 PAGE_SIZE整数倍
+ ,* 那么最后一页中剩下的内存将不能使用
+ ,* @note 当申请内存成功时，这部分内存将会被清零
+ ,* 更多关于内存限制的操作需查看 man shmget
+ ,*/
+int shmget(key_t key, size_t size, int shmflg);
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+
+/**
+ ,* @brief 将申请好的共享内存映射到本进程的虚拟地址
+ ,* @param shmaddr ： 一般设为0，由内核来映射
+ ,* @param shmflg: SHM_RDONLY 代表以只读的方式映射
+ ,*/
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+/**
+ ,* @brief 取消映射关系
+ ,* @note: 此操作仅仅需要映射，并不会释放共享内存，使用 shmctl 才能释放
+ ,* 当进程不使用共享内存时，客户端需要主动调用 shmctl(shmid, IPC_RMID, 0) ，
+ ,* 同时客户端需要调用 shmdt(addr) 来释放内存
+ ,*/
+int shmdt(const void *shmaddr);
+#+END_SRC
+** 实例
+服务端申请共享内存，客户端从共享内存读取数据。
+
+服务端代码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#define SHM_KEY_PATH    "./shm_key"
+#define PROJ_ID         'm'
+
+
+int main(void)
+{
+        int ret = 0;
+        int shm_id = 0;
+        char *buf = NULL;
+        key_t shm_key;
+        if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((shm_key = ftok(SHM_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create shm key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", shm_key);
+
+        if((shm_id = shmget(shm_key, 100, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create shm!");
+                goto quick_out;
+        }
+        printf("share memory id is  %d \n", shm_id);
+
+        if((buf = shmat(shm_id, 0, 0)) == (void *)-1)
+        {
+                perror("Can not map share memory!");
+                goto quick_out;
+        }
+        printf("share memory mapped to virtual add = %p\n", buf);
+
+        sprintf(buf, "Hello world!\n");
+
+        while(1)
+        {
+                sleep(1);
+        }
+quick_out:
+        return -1;
+
+}
+
+#+END_SRC
+客户端代码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#define SHM_KEY_PATH    "./shm_key"
+#define PROJ_ID         'm'
+
+
+int main(void)
+{
+        int ret = 0;
+        int shm_id = 0;
+        char *buf = NULL;
+        key_t shm_key;
+        if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((shm_key = ftok(SHM_KEY_PATH, PROJ_ID)) == -1)
+        {
+                perror("Can not create shm key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", shm_key);
+
+        if((shm_id = shmget(shm_key, 100, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create shm!");
+                goto quick_out;
+        }
+        printf("share memory id is  %d \n", shm_id);
+
+        if((buf = shmat(shm_id, 0, SHM_RDONLY)) == (void *)-1)
+        {
+                perror("Can not map share memory!");
+                goto quick_out;
+        }
+        printf("share memory mapped to virtual add = %p\n", buf);
+
+
+        printf("get memory string: %s", buf);
+quick_out:
+        return -1;
+
+}
+
+#+END_SRC
+* 共享内存与信号量
+当服务端与客户端共享一段高速数据时，为了服务端能够一直不停的将流数据写入内存而客户端可以断续的读取内存内容。
+通常使用将环形队列分段的方式进行处理，为了数据间的同步还得需要加上信号量，这就是典型的生产者与消费者模型。
+
+服务端代码:
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BUF_CNT     (5)
+
+#define SHM_KEY_PATH    "./shm_key"
+#define SHM_PROJ_ID     'm'
+
+#define SEM_KEY_PATH    "./sem_key"
+#define SEM_PROJ_ID     's'
+
+union semun{
+        int     val; //Value for SETVAL
+        struct semid_ds *buf;//Buffer for IPC_STAT, IPC_SET
+        unsigned short *array; //Array for GETALL, SETALL
+        struct seminfo *__buf; //Buffer for IPC_INFO
+};
+int main(void)
+{
+        int ret = 0;
+
+        int shm_id = 0;
+        char *buf = NULL;
+        key_t shm_key;
+
+        int sem_id = 0;
+        key_t sem_key;
+        union semun semct;
+        int write_index = 0;
+        /*
+         ,* create semaphore
+         ,*/
+        if((ret = creat(SEM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((sem_key = ftok(SEM_KEY_PATH, SEM_PROJ_ID)) == -1)
+        {
+                perror("Can not create sem key");
+                goto quick_out;
+        }
+        printf("sem key is  %d \n", sem_key);
+
+        if((sem_id = semget(sem_key, 2, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create sem!");
+                goto quick_out;
+        }
+        printf("semaphore id is  %d \n", sem_id);
+
+        //initialize semaphore(full flag)
+        semct.val = 0;
+        if((ret = semctl(sem_id, 0, SETVAL, semct)) == -1)
+        {
+                perror("Can not initialize sem!");
+                goto quick_out;
+        }
+        printf("The value of semaphore 0 is %d\n", semctl(sem_id, 0, GETVAL));
+        //initialize semaphore(empty flag)
+        semct.val = BUF_CNT;
+        if((ret = semctl(sem_id, 1, SETVAL, semct)) == -1)
+        {
+                perror("Can not initialize sem!");
+                goto quick_out;
+        }
+        printf("The value of semaphore 1 is %d\n", semctl(sem_id, 1, GETVAL));
+
+        /*
+         ,* create share memory
+         ,*/
+        if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((shm_key = ftok(SHM_KEY_PATH, SHM_PROJ_ID)) == -1)
+        {
+                perror("Can not create shm key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", shm_key);
+
+        if((shm_id = shmget(shm_key, 100, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create shm!");
+                goto quick_out;
+        }
+        printf("share memory id is  %d \n", shm_id);
+
+        if((buf = shmat(shm_id, 0, 0)) == (void *)-1)
+        {
+                perror("Can not map share memory!");
+                goto quick_out;
+        }
+        printf("share memory mapped to virtual add = %p\n", buf);
+
+
+        struct sembuf semops;
+        semops.sem_flg = 0;
+        while(write_index < 10)
+        {
+                //getting an empty flag
+                semops.sem_num = 1;//index
+                semops.sem_op = -1;
+                if((ret = semop(sem_id, &semops, 1)) == -1)
+                {
+                        perror("Waitting semaphore failed!");
+                        goto quick_out;
+                }
+                char *str_buf = buf + (write_index % BUF_CNT) * 20;
+                sprintf(str_buf, "buf -> %d\n", write_index);
+                printf("write index = %d = %s\n", write_index, str_buf);
+                write_index++;
+                //release a full flag
+                semops.sem_num = 0;//index
+                semops.sem_op = 1;
+                if((ret = semop(sem_id, &semops, 1)) == -1)
+                {
+                        perror("release semaphore failed!");
+                        goto quick_out;
+                }
+        }
+        if(shmctl(shm_id, IPC_RMID, 0) < 0)
+        {
+                perror("can not delete sharememory\n");
+        }
+quick_out:
+        return -1;
+
+}
+
+#+END_SRC
+客户端代码
+#+BEGIN_SRC c
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BUF_CNT     (5)
+
+#define SHM_KEY_PATH    "./shm_key"
+#define SHM_PROJ_ID         'm'
+
+#define SEM_KEY_PATH    "./sem_key"
+#define SEM_PROJ_ID         's'
+
+int main(void)
+{
+        int ret = 0;
+        int shm_id = 0;
+        char *buf = NULL;
+        key_t shm_key;
+        int  read_index = 0;
+
+
+        int sem_id = 0;
+        key_t sem_key;
+        /*
+         ,*  getting semaphore
+         ,*/
+        if((sem_key = ftok(SEM_KEY_PATH, SEM_PROJ_ID)) == -1)
+        {
+                perror("Can not create sem key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", sem_key);
+
+        if((sem_id = semget(sem_key, 2, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create sem!");
+                goto quick_out;
+        }
+        printf("semaphore id is  %d \n", sem_id);
+
+        //initialize semaphore
+        printf("The value of semaphore full is %d\n", semctl(sem_id, 0, GETVAL));
+        printf("The value of semaphore empty is %d\n", semctl(sem_id, 1, GETVAL));
+        /*
+         ,*  getting share memory
+         ,*/
+        if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create file!");
+                goto quick_out;
+        }
+
+        if((shm_key = ftok(SHM_KEY_PATH, SHM_PROJ_ID)) == -1)
+        {
+                perror("Can not create shm key");
+                goto quick_out;
+        }
+        printf("key is  %d \n", shm_key);
+
+        if((shm_id = shmget(shm_key, 100, S_IRUSR | S_IWUSR)) == -1)
+        {
+                perror("Can not create shm!");
+                goto quick_out;
+        }
+        printf("share memory id is  %d \n", shm_id);
+
+        if((buf = shmat(shm_id, 0, SHM_RDONLY)) == (void *)-1)
+        {
+                perror("Can not map share memory!");
+                goto quick_out;
+        }
+        printf("share memory mapped to virtual add = %p\n", buf);
+
+        struct sembuf semops;
+        semops.sem_flg = 0;
+        while(read_index < 10)
+        {
+                //getting an full flag
+                semops.sem_num = 0;//index
+                semops.sem_op = -1;
+                if((ret = semop(sem_id, &semops, 1)) == -1)
+                {
+                        perror("Waitting semaphore failed!");
+                        goto quick_out;
+                }
+                char *str_buf = buf + (read_index % BUF_CNT) * 20;
+                printf("read index = %d = %s", read_index, str_buf);
+                //release an empty flag
+                semops.sem_num = 1;//index
+                semops.sem_op = 1;
+                read_index++;
+                if((ret = semop(sem_id, &semops, 1)) == -1)
+                {
+                        perror("release semaphore failed!");
+                        goto quick_out;
+                }
+                sleep(3);
+        }
+        if(shmdt(buf) < 0)
+        {
+                perror("can not detach memory!\n");
+        }
+
+quick_out:
+        return -1;
+
+}
+#+END_SRC
+* socket 
+socket的魅力就在于它既可以本机内通信，又可以跨平台通信，这为以后程序的扩展性提供了各种可能。
+** socket 描述符
+socket用于抽象网络协议上的一个端点，用于仅需要操作对应的 socket 描述符便可以对该socket进行读写。
+#+BEGIN_SRC c
+#include <sys/types.h>          /* See NOTES */
+#include <sys/socket.h>
+
+/**
+ ,* @brief 创建一个socket
+ ,* @param domain: 代表通信的数据格式(具体种类 man socket)
+ ,* 常用的有 AF_UNIX,AF_LOCAL : 本地通信
+ ,* AF_INET,AF_INET6: ipv4, ipv6
+ ,* @param type: 指定数据流形式
+ ,* 常用的有 ：
+ ,* SOCK_STREAM : 以流的形式进行可靠的双向传输
+ ,* SOCK_DGRAM: 固定长度的非可靠传输
+ ,* @param protocol: 一般设置为0以让前两个参数自动决定协议
+ ,*/
+int socket(int domain, int type, int protocol);
+/**
+ ,* @brief 控制socket 可操作方向
+ ,* @param how : SHUT_RD: 关闭读
+ ,* SHUD_WR: 关闭写
+ ,* SHUD_RDWR: 关闭读写通道
+ ,* @note 此函数与close的区别在于，此函数设置立即生效，而close需要所有引用该socket的进程都释放该资源后才关掉。
+ ,*/
+int shutdown(int sockfd, int how);
+#+END_SRC
+** 地址描述
+在创建socket之后，需要为其指定通信的地址和当前绑定的端点。
+
+为了避免大小端不同而造成的数据对应问题，提供了以下函数供用户使用:
+#+BEGIN_SRC c
+#include <arpa/inet.h>
+
+//host to net
+uint32_t htonl(uint32_t hostlong);
+
+uint16_t htons(uint16_t hostshort);
+
+//net to host
+uint32_t ntohl(uint32_t netlong);
+
+uint16_t ntohs(uint16_t netshort);
+#+END_SRC
+在IPV4格式中，使用结构体 =sockaddr_in= 来描述一个地址:
+#+BEGIN_SRC c
+struct sockaddr_in{
+        sa_family_t    sin_family; //address family
+        in_port_t      sin_port;//port number,port must > 1024
+        struct in_addr sin_addr;//IPV4 address
+};
+#+END_SRC
+为了地址便于上层用户使用，提供了以下函数用于转换
+#+BEGIN_SRC c
+/**
+ ,* @brief 将网络层地址转化为可阅读的字符串
+ ,* @param af: 类
+ ,* @param src: 要被转换的地址
+ ,* @param dst: 转换后存储字符串的地址
+ ,* @param size: 存储地址的大小(字节)
+ ,* @note 当 af 为 AF_INET 时，src 类型为 struct in_addr，dst缓存大小至少为 INET_ADDRSTRLEN 大
+ ,* 当 af为AF_INET6 时， src 类型为 struct in6_addr, dst缓存大小至少为 INET6_ADDRSTRLEN 大
+ ,* @ret 为NULL时表示失败，否则返回字符串
+ ,*/
+const char *inet_ntop(int af, const void *src,
+                      char *dst, socklen_t size);
+
+/**
+ ,* @brief 当字符串转换为网络层地址
+ ,* @param af: 类
+ ,* @param src: 字符串
+ ,* @param dst: 存储地址 
+ ,*/
+int inet_pton(int af, const char *src, void *dst);
+#+END_SRC
+
+** socket与地址绑定
+使用 =bind= 完成二者的绑定
+#+BEGIN_SRC c
+int bind(int sockfd, const struct sockaddr *addr,
+         socklen_t addrlen);
+#+END_SRC
+** 建立连接
+客户端与服务器连接使用 =connect= 函数
+#+BEGIN_SRC c
+int connect(int sockfd, const struct sockaddr *addr,
+            socklen_t addrlen);
+#+END_SRC
+服务器需要先监听端口，然后等待连接请求
+#+BEGIN_SRC c
+/**
+ ,* @brief 监听socket
+ ,* @param backlog : 监听的最大个数
+ ,*/
+int listen(int sockfd, int backlog);
+
+/**
+ ,* @brief 等待连接请求
+ ,* @param *addr : 客户端的地址信息
+ ,* @param *addrlen: 存储客户端信息缓存大小
+ ,* @note: 当需要监听很多socket时，使用 epoll 比较合适
+ ,* 默认此函数是以阻塞的形式等待连接，如果 socket 以 SOCK_NONBLOCK 创建时则不会阻塞
+ ,*/
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+#+END_SRC
+** 数据的收发
+#+BEGIN_SRC c
+ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+#+END_SRC
+** 实例
+服务端等待客户端连接，然后给客户端发送一条信息。
+
+服务端代码:
+#+BEGIN_SRC c
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+
+int main(void)
+{
+        int ret = 0;
+        struct sockaddr_in addr;
+        int     socket_fd;
+        int     socket_client;
+        struct sockaddr client_addr;
+        struct sockaddr_in *sin = (struct sockaddr_in *)&client_addr;
+        int len = 0;
+        char addr_buf[50];
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(1055);
+        addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+        if((socket_fd = socket(addr.sin_family, SOCK_STREAM, 0)) < -1)
+        {
+                perror("can not create socket!");
+                ret = socket_fd;
+                goto errout;
+        }
+        if((ret = bind(socket_fd, (struct sockaddr *)&addr, sizeof(struct sockaddr))) == -1)
+        {
+                perror("Can not bind socket to addr!");
+                goto quick_out;
+        }
+        if((ret = listen(socket_fd, 1)) == -1)
+        {
+                perror("Can not listen the socket!");
+
+                goto quick_out;
+        }
+        printf("waitting for client...\n");
+        if((socket_client = accept(socket_fd, &client_addr, &len)) == -1)
+        {
+                perror("Can not accept client!");
+                goto quick_out;
+        }
+        const char * client_addr_str = inet_ntop(addr.sin_family, &sin->sin_addr, addr_buf, sizeof(addr_buf));
+        printf("get client addr = %s, port = %d\n", client_addr_str, ntohs(sin->sin_port));
+        if(recv(socket_client, addr_buf, sizeof(addr_buf), 0) ==-1)
+        {
+                perror("Can not recv data from client!");
+                goto quick_out;
+        }
+        printf("recv = %s", addr_buf);
+        sprintf(addr_buf, "This is server\n");
+        if(send(socket_client, addr_buf, sizeof(addr_buf), 0) == -1)
+        {
+                perror("Can not send data to client!");
+        }
+
+        sleep(2);
+
+quick_out:
+        close(socket_fd);
+        return ret ;
+errout:
+        return -1;
+}
+#+END_SRC
+
+客户端代码:
+#+BEGIN_SRC c
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+
+int main(void)
+{
+        int ret = 0;
+        struct sockaddr_in addr;
+        int     socket_fd;
+        char buf[50];
+
+        memset(&addr, 0, sizeof(addr));
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(1055);
+
+        if((socket_fd = socket(addr.sin_family, SOCK_STREAM, 0)) < -1)
+        {
+                perror("can not create socket!");
+                ret = socket_fd;
+                goto errout;
+        }
+        if(inet_pton(addr.sin_family, "127.0.0.1", &addr.sin_addr) <= 0)
+        {
+                perror("inet_pton failed!");
+                goto quick_out;
+        }
+        if((ret = connect(socket_fd, (struct sockaddr *)&addr, sizeof(addr))) == -1)
+        {
+                perror("Can not connect to server!\n");
+                goto quick_out;
+        }
+        sprintf(buf, "This is client!\n");
+        if(send(socket_fd, buf, sizeof(buf), 0) == -1)
+        {
+                perror("Can not send to server!");
+                goto quick_out;
+        }
+
+        if(recv(socket_fd, buf, sizeof(buf), 0) ==-1)
+        {
+                perror("Can not recv data from client!");
+                goto quick_out;
+        }
+        printf("recv = %s", buf);
+
+
+quick_out:
+        close(socket_fd);
+        return ret ;
+errout:
+        return -1;
+}
+#+END_SRC
