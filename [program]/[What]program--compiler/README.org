@@ -71,3 +71,22 @@ _MSC_VER
 ...
 #endif
 #+END_SRC
+* 区分系统
+** 通过CPU字长区分
+在嵌入式开发中，应用代码经常在PC上进行模拟，模拟无误后再在目标板上执行。
+现在PC基本上都是64位了，所以可以通过其字长来判断当前代码是在PC上运行还是在目标机上运行。
+
+#+BEGIN_SRC c
+#if __SIZEOF_POINTER__ == 8
+//PC 64bit
+#else
+//target
+#endif
+#+END_SRC
+** 通过系统类型区分
+不同的系统定义了不同的宏：
+- windows 
+  + _WIN32  
+  + _WIN64  
+- linux
+  + __linux__

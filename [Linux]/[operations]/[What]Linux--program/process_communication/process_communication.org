@@ -814,11 +814,6 @@ int main(void)
         /*
          ,*  getting share memory
          ,*/
-        if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
-        {
-                perror("Can not create file!");
-                goto quick_out;
-        }
 
         if((shm_key = ftok(SHM_KEY_PATH, SHM_PROJ_ID)) == -1)
         {
@@ -1085,7 +1080,7 @@ int main(void)
         addr.sin_family = AF_INET;
         addr.sin_port = htons(1055);
 
-        if((socket_fd = socket(addr.sin_family, SOCK_STREAM, 0)) < -1)
+        if((socket_fd = socket(addr.sin_family, SOCK_STREAM, 0)) == -1)
         {
                 perror("can not create socket!");
                 ret = socket_fd;
@@ -1110,7 +1105,7 @@ int main(void)
 
         if(recv(socket_fd, buf, sizeof(buf), 0) ==-1)
         {
-                perror("Can not recv data from client!");
+                perror("Can not recv data from server!");
                 goto quick_out;
         }
         printf("recv = %s", buf);
