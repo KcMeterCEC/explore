@@ -1,0 +1,179 @@
+#+TITLE: [What]Linux文件系统结构概览
+#+DATE:  <2018-04-26 Thu> 
+#+TAGS: filesystem
+#+LAYOUT: post 
+#+CATEGORIES: linux, fs, overview
+#+NAME: <linux_fs_overview_struct.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+复习网站： [[http://linux.vbird.org/linux_basic/0230filesystem.php#][鸟哥私房菜]]
+
+重温文件系统(ext)的相关操作并做整理，不然我这尿记性要不了多久又会忘。。。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 文件系统的组成
+** 概览
+在Linux中，一个磁盘可以分为多个区，每个区可以格式化为不同的文件系统，
+最终通过虚拟文件系统VFS将这些抽象给上层统一的函数接口操作。
+
+一个文件系统的组成部分如下图：
+[[./fs_struct_overview.jpg]]
+
+*** Boot Sector 
+此部分通过MBR跳转过来，用于显示关于此部分系统的启动界面以及引导系统启动，以达到多重启动的目的。 [[https://en.wikipedia.org/wiki/Boot_sector][wiki上有很详细的解释]]
+*** Block Group 
+Block Group 用于将文件系统分为几个块，便于管理。
+*** Superblock
+此部分描述整个文件系统信息，是此分区文件系统的全部概览。 
+*一个文件系统只能有一个Superblock,其他BlockGroup中可能会具有Superblock的备份，用于备用恢复。*
+*** 文件系统描述
+此部分是描述当前block group的相关信息。
+*** 区块对照表(block bitmap)
+此表用于查询文件系统中的block的使用情况，以反应出block的全局概览。
+*** inode对照表(inode bitmap)
+此表用于查询文件系统中的inode的使用情况，以反应出inode的全局概览。
+*** inode table
+用于存储该部分的inode，一个文件对应一个inode。
+
+inode用于描述文件权限、群组关系、容量、时间、链接的block等等相关信息，它不包含文件的实际内容。
+
+inode中存储了包含文件内容的block索引，系统可以根据此索引预读文件内容，如下图：
+[[inode_block_overview.jpg]]
+
+一个inode的大小是有限制的，如果一个文件很大，就会需要很多的block。
+那么一个inode就无法存储这么多地址，所以文件系统使用一部分block来存储inode，如下图：
+[[./inode_save_block.jpg]]
+
+*** data block 
+data block 用于存储文件的实际内容，在格式化的时候一个block的大小就规定好了，此为最小的存储单位。
+也就是说当一个文件内容不足一个block也会占用一个block。
+
+** superblock 查看与理解
+- 首先使用命令 =sudo blkid= 查看当前已经被格式化过的且已挂载的分区以及对应的文件系统
+- 然后使用命令 =sudo dumpe2fs -h <partition>= 用于查看文件系统的全局概览。
+  + 当不加 h 选项时还会输出 block group 的信息。
+通过下面这个输出就可以看出一个 superblock 中可以看到的文件系统信息：
+#+begin_example
+#文件系统名称
+Filesystem volume name:   <none>
+#上一次的挂载点
+Last mounted on:          /
+Filesystem UUID:          db4b4bdb-ebff-4928-b154-786622f8438f
+Filesystem magic number:  0xEF53
+Filesystem revision #:    1 (dynamic)
+#文件系统特征
+Filesystem features:      has_journal ext_attr resize_inode dir_index filetype needs_recovery extent flex_bg sparse_super large_file huge_file uninit_bg dir_nlink extra_isize
+Filesystem flags:         signed_directory_hash
+#默认挂载选项
+Default mount options:    user_xattr acl
+#文件系统状态
+Filesystem state:         clean
+Errors behavior:          Continue
+Filesystem OS type:       Linux
+#总共的inode数量
+Inode count:              8126464
+#总共的block数量
+Block count:              32505600
+#保留的block数量
+Reserved block count:     1625280
+#还剩余多少blocks和inodes可用
+Free blocks:              28442724
+Free inodes:              7560146
+#第一个block的起始索引
+First block:              0
+#block 大小
+Block size:               4096
+Fragment size:            4096
+Reserved GDT blocks:      1016
+#每个group的block数量
+Blocks per group:         32768
+Fragments per group:      32768
+#每个group的inode数量
+Inodes per group:         8192
+#每个group可用多少个block来表示inode
+Inode blocks per group:   512
+Flex block group size:    16
+#时间信息
+Filesystem created:       Tue Apr 18 22:27:06 2017
+Last mount time:          Thu Apr 26 09:20:42 2018
+Last write time:          Thu Apr 26 09:20:38 2018
+Mount count:              280
+Maximum mount count:      -1
+Last checked:             Tue Apr 18 22:27:06 2017
+Check interval:           0 (<none>)
+Lifetime writes:          137 GB
+Reserved blocks uid:      0 (user root)
+Reserved blocks gid:      0 (group root)
+First inode:              11
+#inode大小
+Inode size:               256
+Required extra isize:     28
+Desired extra isize:      28
+#日志系统的inode号码
+Journal inode:            8
+First orphan inode:       3538974
+Default directory hash:   half_md4
+Directory Hash Seed:      7deaec65-123c-4de8-aab7-9ca8dd458823
+Journal backup:           inode blocks
+Journal features:         journal_incompat_revoke
+#文件日志可用大小
+Journal size:             128M
+Journal length:           32768
+Journal sequence:         0x00042c45
+Journal start:            16552
+
+
+#第一个group的block索引范围
+Group 0: (Blocks 0-32767) [ITABLE_ZEROED]
+  Checksum 0x5c5a, unused inodes 8175
+  #主superblock在0号block里面，group描述符在1-8号block里面
+  Primary superblock at 0, Group descriptors at 1-8
+  Reserved GDT blocks at 9-1024
+  #block位图地址与inode位图地址
+  Block bitmap at 1025 (+1025), Inode bitmap at 1041 (+1041)
+  #Inode Table地址
+  Inode table at 1057-1568 (+1057)
+  #剩余可用inode和block
+  22550 free blocks, 8176 free inodes, 2 directories, 8175 unused inodes
+  #具体剩余索引
+  Free blocks: 9255-9309, 9366-9402, 10310-32767
+  Free inodes: 16, 18-8192
+#+end_example
+上面信息中说每个group有8192个inode可用，其 计算公式为：
+- Inode Table 占用的block数量为 1568 - 1057 + 1 = 512
+- 由于一个block大小为4096字节，所以inode table 总共占用 512 * 4096 = 2097152 字节
+- 由于一个inode的大小为256字节，所以一个inode table可用容纳 2097152 / 256 = 8192 个inode
+
+根据文件系统的结构来看，可以知道新增一个档案的流程为：
+1. 确定使用者是否有 wx 权限，有权限才能新增
+2. 从inode bitmap 中取出一个空闲的inode号码 ,并将权限写入此inode
+3. 从block bitmap 中根据文件大小取出对应个数的block并将文件内容写入block
+4. 将文件对应的block号码写入其对应的inode,如果block太多还需要申请更多的block来存储inode
+5. 将新写入的inode和block同步到inode bitmap,block bitmap, superblock 中
+
+对应的删除一个档案的流程为：
+1. 确定使用者具有wx权限
+2. 将对应的block 和 inode 置为空闲并同步到 inode bitmap , block bitmap ,superblock 中
+  + 这里仅仅是猜测文件系统为了效率是不会实际删除内容的，而是清除其标志即可。待后面分析其代码再回头来梳理
+
+** 目录与文件的关系
+通过inode与block的关系可以知道目录肯定有其自己的inode与block，其block链接至其他的文件，如下图：
+[[./dir2file.jpg]]
+
+- 使用命令 =ls -li= 可以列出当前目录下存储文档的inode 
+
+需要注意的是：inode并不保存文件名，文件名是保存在目录的block中的， *所以文件的读取都是要先经过目录的*
+其流程为：
+1. 根据文件系统挂载点得知起始目录的inode
+2. 读取目录inode权限确认可以访问对应block中的内容
+3. 读取目录block中的内容，并根据文件名匹配到对应的inode
+4. 根据文件的inode进行权限确认是否可以访问文件block
+5. 读取block中的内容...
+** 日志档案系统的作用
+当在文件的增删过程中如果出现意外(比如文件内容已经写入但是inode bitmap, block bitmap, superblock没有得到同步)，
+这就会出现内容与描述不一致的情况，系统为了还原此描述就需要扫描整个文件系统内容来同步修复，这个效率显然是很低下的。
+
+日志文件系统就是记录文件的修改过程，当出现不一致时系统直接来比对日志即可，这样效率就提高了不少。
+

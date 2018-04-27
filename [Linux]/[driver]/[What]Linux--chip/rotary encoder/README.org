@@ -1,0 +1,167 @@
+#+TITLE: [What]linux -> incremental rotary encoder
+#+DATE:  <2018-04-26 Thu> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, chip
+#+NAME: <linux_driver_chip_inc_encoder.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+本来想自己写个增量编码器的client driver，结果一搜 =Documentation/input/rotary-encoder.txt= 发现内核已经提供了通用框架了。
+这里就记录以下此框架的使用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 波形与判断
+[[./inc_encoder.jpg]]
+
+驱动文档上指出了正转的波形输出，可以理解为A超前B 90°，当反转时就是A滞后B 90°。
+
+** 简易判断方法
+前几年做单片机的时候，用的是简易判断方法：
+1. 配置AB管脚为输入模式，且A为上升沿触发中断
+2. 当进入中断后进行一段时间的循环判断(这个时间要先根据示波器观察编码器周期长短来确定)
+  + 判断逻辑为：只要在这段时间A电平为低则退出处理函数，判断为误触发
+3. 在中断中读取AB的电平，当A和B都为高时代表正转，当A为高B为低时代表反转
+** 驱动中的判断逻辑
+根据AB波形时序可以得出其组合值为：
+- 正转： 0b10(0x2) -> 0b11(0x3) -> 0b01(0x1) -> 0b00(0x0)
+- 反转:  0b11(0x3) -> 0b10(0x2) -> 0b00(0x0) -> 0b01(0x1)
+
+驱动的逻辑为：
+- 将AB脚都配置为双边沿触发
+- 进入中断以后驱动先后读取AB的值，A放在第1位与B的值或。
+- 根据上面的正反转做成状态机，当进入到状态 0b00 时即可向上层反应方向
+  + 因为在状态 0b10 和 0b01 中都会判断方向，在反转中只判断 0b10 即可
+
+有个疑问：这里为什么没有消抖处理，是默认硬件上以并电容的方式处理的吗？
+
+具体流程看代码:
+#+BEGIN_SRC c
+static int rotary_encoder_get_state(const struct rotary_encoder_platform_data *pdata)
+{
+        int a = !!gpio_get_value(pdata->gpio_a);
+        int b = !!gpio_get_value(pdata->gpio_b);
+
+        a ^= pdata->inverted_a;
+        b ^= pdata->inverted_b;
+
+        //组合AB值
+        return ((a << 1) | b);
+}
+//进入状态机判断
+static irqreturn_t rotary_encoder_irq(int irq, void *dev_id)
+{
+        struct rotary_encoder *encoder = dev_id;
+        int state;
+
+        state = rotary_encoder_get_state(encoder->pdata);
+
+        switch (state) {
+        case 0x0:
+                if (encoder->armed) {
+                        rotary_encoder_report_event(encoder);
+                        encoder->armed = false;
+                }
+                break;
+
+        case 0x1:
+        case 0x2:
+                if (encoder->armed)
+                        encoder->dir = state - 1;
+                break;
+
+        case 0x3:
+                encoder->armed = true;
+                break;
+        }
+
+        return IRQ_HANDLED;
+}
+static void rotary_encoder_report_event(struct rotary_encoder *encoder)
+{
+        const struct rotary_encoder_platform_data *pdata = encoder->pdata;
+
+        if (pdata->relative_axis) {
+                //方向返回
+                input_report_rel(encoder->input,
+                                 pdata->axis, encoder->dir ? -1 : 1);
+        } else {
+                unsigned int pos = encoder->pos;
+
+                if (encoder->dir) {
+                        /* turning counter-clockwise */
+                        if (pdata->rollover)
+                                pos += pdata->steps;
+                        if (pos)
+                                pos--;
+                } else {
+                        /* turning clockwise */
+                        if (pdata->rollover || pos < pdata->steps)
+                                pos++;
+                }
+
+                if (pdata->rollover)
+                        pos %= pdata->steps;
+
+                encoder->pos = pos;
+                input_report_abs(encoder->input, pdata->axis, encoder->pos);
+        }
+
+        input_sync(encoder->input);
+}
+#+END_SRC
+* 驱动的使用
+** 使用前的确认
+在使用此驱动前需要确保：
+1. GPIO驱动已经正确加载
+2. GPIO相关中断控制器能正常工作且能接收双边沿触发
+
+** 配置设备树
+参考文档 =Documentation/devicetree/bindings/input/rotary-encoder.txt= 可以知道其典型设备树为：
+#+begin_example
+rotary@0 {
+             compatible = "rotary-encoder";
+             gpios = <&gpio 19 0>, <&gpio 20 0>;
+             rotary-encoder,relative-axis;
+          };
+#+end_example
+** 加入编译选项
+位于 =Device Dervers->Input device support->Generic input layer -> Miscellaneous devices ::Rotary encoders connected to GPIO pins=
+** 用户空间使用
+#+BEGIN_SRC c
+#include <sys/file.h>
+#include <stdio.h>
+#include <string.h>
+#include <linux/input.h>
+
+int main (int argc, char *argv[])
+{
+        struct input_event ev;
+        int fd, rd;
+
+        if ((fd = open ("/dev/input/event0", O_RDONLY|O_NONBLOCK)) == -1)
+        {
+                perror("Can not open device!");
+                return -1;
+        }
+
+        while (1)
+        {
+
+                memset((void*)&ev, 0, sizeof(ev));
+
+                if((rd = read (fd, (void*)&ev, sizeof(ev))) > 0)
+                {
+                    printf("value: %d\n", ev.value);
+                }
+
+
+        }
+
+        return 0;
+}
+#+END_SRC
+通过上面程序验证可以发现event只返回 1,0,-1 这个方向，而无法判断出速度。
+而关于速度的判断，可以通过状态机的方式在应用代码中实现(在一定时间内判断单一方向上数据增加的个数来区分速度)。
+
