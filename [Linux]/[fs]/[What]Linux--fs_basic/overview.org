@@ -41,7 +41,7 @@ Block Group 用于将文件系统分为几个块，便于管理。
 inode用于描述文件权限、群组关系、容量、时间、链接的block等等相关信息，它不包含文件的实际内容。
 
 inode中存储了包含文件内容的block索引，系统可以根据此索引预读文件内容，如下图：
-[[inode_block_overview.jpg]]
+[[./inode_block_overview.jpg]]
 
 一个inode的大小是有限制的，如果一个文件很大，就会需要很多的block。
 那么一个inode就无法存储这么多地址，所以文件系统使用一部分block来存储inode，如下图：
