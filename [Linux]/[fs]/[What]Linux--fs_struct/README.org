@@ -1,0 +1,443 @@
+#+TITLE: [What]Linux文件系统基本脉络
+#+DATE:  <2018-04-29 Sun> 
+#+TAGS: filesystem
+#+LAYOUT: post 
+#+CATEGORIES: linux, fs, struct
+#+NAMA: <linux_fs_struct_base.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+记录从上层用户操作到底层文件系统之间的调用流程以及数据流。
+[[./vfs_fileoperations.jpg]]
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 比较重要的数据结构
+#+BEGIN_SRC c
+/**
+ ,* @brief 文件系统总览
+ ,*/
+struct file_system_type {
+        const char *name;
+        int fs_flags;
+#define FS_REQUIRES_DEV1
+#define FS_BINARY_MOUNTDATA2
+#define FS_HAS_SUBTYPE4
+#define FS_USERNS_MOUNT8/* Can be mounted by userns root */
+#define FS_USERNS_DEV_MOUNT16 /* A userns mount does not imply MNT_NODEV */
+#define FS_USERNS_VISIBLE32/* FS must already be visible */
+#define FS_RENAME_DOES_D_MOVE32768/* FS will handle d_move() during rename() internally. */
+        struct dentry *(*mount) (struct file_system_type *, int,
+                                 const char *, void *);
+        void (*kill_sb) (struct super_block *);
+        struct module *owner;
+        struct file_system_type * next;
+        struct hlist_head fs_supers;
+
+        struct lock_class_key s_lock_key;
+        struct lock_class_key s_umount_key;
+        struct lock_class_key s_vfs_rename_key;
+        struct lock_class_key s_writers_key[SB_FREEZE_LEVELS];
+
+        struct lock_class_key i_lock_key;
+        struct lock_class_key i_mutex_key;
+        struct lock_class_key i_mutex_dir_key;
+};
+/**
+ ,* @brief super block 信息及操作结构体
+ ,*/
+struct super_block {
+        struct list_heads_list;/* Keep this first */
+        dev_ts_dev;/* search index; _not_ kdev_t */
+        unsigned chars_blocksize_bits;
+        unsigned longs_blocksize;
+        loff_ts_maxbytes;/* Max file size */
+        struct file_system_type*s_type;
+        const struct super_operations*s_op;
+        const struct dquot_operations*dq_op;
+        const struct quotactl_ops*s_qcop;
+        const struct export_operations *s_export_op;
+        unsigned longs_flags;
+        unsigned longs_iflags;/* internal SB_I_* flags */
+        unsigned longs_magic;
+        struct dentry*s_root;
+        struct rw_semaphores_umount;
+        ints_count;
+        atomic_ts_active;
+        #ifdef CONFIG_SECURITY
+        void                    *s_security;
+        #endif
+        const struct xattr_handler **s_xattr;
+
+        struct hlist_bl_heads_anon;/* anonymous dentries for (nfs) exporting */
+        struct list_heads_mounts;/* list of mounts; _not_ for fs use */
+        struct block_device*s_bdev;
+        struct backing_dev_info *s_bdi;
+        struct mtd_info*s_mtd;
+        struct hlist_nodes_instances;
+        unsigned ints_quota_types;/* Bitmask of supported quota types */
+        struct quota_infos_dquot;/* Diskquota specific options */
+
+        struct sb_writerss_writers;
+
+        char s_id[32];/* Informational name */
+        u8 s_uuid[16];/* UUID */
+
+        void *s_fs_info;/* Filesystem private info */
+        unsigned ints_max_links;
+        fmode_ts_mode;
+
+        /* Granularity of c/m/atime in ns.
+           Cannot be worse than a second */
+        u32   s_time_gran;
+
+        /*
+         ,* The next field is for VFS *only*. No filesystems have any business
+         ,* even looking at it. You had been warned.
+         ,*/
+        struct mutex s_vfs_rename_mutex;/* Kludge */
+
+        /*
+         ,* Filesystem subtype.  If non-empty the filesystem type field
+         ,* in /proc/mounts will be "type.subtype"
+         ,*/
+        char *s_subtype;
+
+        /*
+         ,* Saved mount options for lazy filesystems using
+         ,* generic_show_options()
+         ,*/
+        char __rcu *s_options;
+        const struct dentry_operations *s_d_op; /* default d_op for dentries */
+
+        /*
+         ,* Saved pool identifier for cleancache (-1 means none)
+         ,*/
+        int cleancache_poolid;
+
+        struct shrinker s_shrink;/* per-sb shrinker handle */
+
+        /* Number of inodes with nlink == 0 but still referenced */
+        atomic_long_t s_remove_count;
+
+        /* Being remounted read-only */
+        int s_readonly_remount;
+
+        /* AIO completions deferred from interrupt context */
+        struct workqueue_struct *s_dio_done_wq;
+        struct hlist_head s_pins;
+
+        /*
+         ,* Keep the lru lists last in the structure so they always sit on their
+         ,* own individual cachelines.
+         ,*/
+        struct list_lrus_dentry_lru ____cacheline_aligned_in_smp;
+        struct list_lrus_inode_lru ____cacheline_aligned_in_smp;
+        struct rcu_headrcu;
+        struct work_structdestroy_work;
+
+        struct mutexs_sync_lock;/* sync serialisation lock */
+
+        /*
+         ,* Indicates how deep in a filesystem stack this SB is
+         ,*/
+        int s_stack_depth;
+
+        /* s_inode_list_lock protects s_inodes */
+        spinlock_ts_inode_list_lock ____cacheline_aligned_in_smp;
+        struct list_heads_inodes;/* all inodes */
+};
+
+/*
+ ,* Keep mostly read-only and often accessed (especially for
+ ,* the RCU path lookup and 'stat' data) fields at the beginning
+ ,* of the 'struct inode'
+ ,*/
+struct inode {
+        umode_t                i_mode;
+        unsigned               shorti_opflags;
+        kuid_t                 i_uid;
+        kgid_t                 i_gid;
+        unsigned int           i_flags;
+
+        #ifdef CONFIG_FS_POSIX_ACL
+        struct posix_acl       *i_acl;
+        struct posix_acl       *i_default_acl;
+        #endif
+
+        const struct inode_operations  *i_op;
+        struct super_block             *i_sb;
+        struct address_space           *i_mapping;
+
+        #ifdef CONFIG_SECURITY
+        void                           *i_security;
+        #endif
+
+        /* Stat data, not accessed from path walking */
+        unsigned long                  i_ino;
+        /*
+         ,* Filesystems may only read i_nlink directly.  They shall use the
+         ,* following functions for modification:
+         ,*
+         ,*    (set|clear|inc|drop)_nlink
+         ,*    inode_(inc|dec)_link_count
+         ,*/
+        union {
+                const unsigned int i_nlink;
+                unsigned int __i_nlink;
+        };
+        dev_t                  i_rdev;
+        loff_t                 i_size;
+        struct timespec        i_atime;
+        struct timespec        i_mtime;
+        struct timespec        i_ctime;
+        spinlock_ti_lock;/* i_blocks, i_bytes, maybe i_size */
+        unsigned short         i_bytes;
+        unsigned int           i_blkbits;
+        blkcnt_t               i_blocks;
+
+        #ifdef __NEED_I_SIZE_ORDERED
+        seqcount_t             i_size_seqcount;
+        #endif
+
+        /* Misc */
+        unsigned long          i_state;
+        struct mutex           i_mutex;
+
+        unsigned long          dirtied_when;/* jiffies of first dirtying */
+        unsigned long          dirtied_time_when;
+
+        struct hlist_node      i_hash;
+        struct list_head       i_io_list;/* backing dev IO list */
+        #ifdef CONFIG_CGROUP_WRITEBACK
+        struct bdi_writeback   *i_wb;/* the associated cgroup wb */
+
+        /* foreign inode detection, see wbc_detach_inode() */
+        int                     i_wb_frn_winner;
+        u16                     i_wb_frn_avg_time;
+        u16                     i_wb_frn_history;
+        #endif
+        struct list_head        i_lru;/* inode LRU list */
+        struct list_head        i_sb_list;
+        union {
+                struct hlist_head  i_dentry;
+                struct rcu_head    i_rcu;
+        };
+        u64                        i_version;
+        atomic_t                   i_count;
+        atomic_t                   i_dio_count;
+        atomic_t                   i_writecount;
+        #ifdef CONFIG_IMA
+        atomic_t                   i_readcount; /* struct files open RO */
+        #endif
+        const struct file_operations   *i_fop;/* former ->i_op->default_file_ops */
+        struct file_lock_context       *i_flctx;
+        struct address_space           i_data;
+        struct list_head               i_devices;
+        union {
+                struct pipe_inode_info *i_pipe;
+                struct block_device    *i_bdev;
+                struct cdev            *i_cdev;
+                char                   *i_link;
+        };
+
+        __u32                          i_generation;
+
+        #ifdef CONFIG_FSNOTIFY
+        __u32                          i_fsnotify_mask; /* all events this inode cares about */
+        struct hlist_head              i_fsnotify_marks;
+        #endif
+
+        void                           *i_private; /* fs or device private pointer */
+};
+struct inode_operations {
+        struct dentry * (*lookup) (struct inode *,struct dentry *, unsigned int);
+        const char * (*follow_link) (struct dentry *, void **);
+        int (*permission) (struct inode *, int);
+        struct posix_acl * (*get_acl)(struct inode *, int);
+
+        int (*readlink) (struct dentry *, char __user *,int);
+        void (*put_link) (struct inode *, void *);
+
+        int (*create) (struct inode *,struct dentry *, umode_t, bool);
+        int (*link) (struct dentry *,struct inode *,struct dentry *);
+        int (*unlink) (struct inode *,struct dentry *);
+        int (*symlink) (struct inode *,struct dentry *,const char *);
+        int (*mkdir) (struct inode *,struct dentry *,umode_t);
+        int (*rmdir) (struct inode *,struct dentry *);
+        int (*mknod) (struct inode *,struct dentry *,umode_t,dev_t);
+        int (*rename) (struct inode *, struct dentry *,
+                       struct inode *, struct dentry *);
+        int (*rename2) (struct inode *, struct dentry *,
+                        struct inode *, struct dentry *, unsigned int);
+        int (*setattr) (struct dentry *, struct iattr *);
+        int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
+        int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
+        ssize_t (*getxattr) (struct dentry *, const char *, void *, size_t);
+        ssize_t (*listxattr) (struct dentry *, char *, size_t);
+        int (*removexattr) (struct dentry *, const char *);
+        int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start,
+                      u64 len);
+        int (*update_time)(struct inode *, struct timespec *, int);
+        int (*atomic_open)(struct inode *, struct dentry *,
+                           struct file *, unsigned open_flag,
+                           umode_t create_mode, int *opened);
+        int (*tmpfile) (struct inode *, struct dentry *, umode_t);
+        int (*set_acl)(struct inode *, struct posix_acl *, int);
+} ____cacheline_aligned;
+
+/**
+ ,* @brief 代表的是一个路径
+ ,*/
+struct dentry {
+        /* RCU lookup touched fields */
+        unsigned int d_flags;/* protected by d_lock */
+        seqcount_t d_seq;/* per dentry seqlock */
+        struct hlist_bl_node d_hash;/* lookup hash list */
+        struct dentry *d_parent;/* parent directory */
+        struct qstr d_name;
+        struct inode *d_inode;/* Where the name belongs to - NULL is
+                               ,* negative */
+        unsigned char d_iname[DNAME_INLINE_LEN];/* small names */
+
+        /* Ref lookup also touches following */
+        struct lockref d_lockref;/* per-dentry lock and refcount */
+        const struct dentry_operations *d_op;
+        struct super_block *d_sb;/* The root of the dentry tree */
+        unsigned long d_time;/* used by d_revalidate */
+        void *d_fsdata;/* fs-specific data */
+
+        struct list_head d_lru;/* LRU list */
+        struct list_head d_child;/* child of parent list */
+        struct list_head d_subdirs;/* our children */
+        /*
+         ,* d_alias and d_rcu can share memory
+         ,*/
+        union {
+                struct hlist_node d_alias;/* inode alias list */
+                struct rcu_head d_rcu;
+        } d_u;
+};
+/**
+ ,* @brief 代表一个文件的引用（一个文件可以被打开多次就有多个引用，但inode却是仅有一个）
+ ,*/
+struct file {
+        union {
+                struct llist_node     fu_llist;
+                struct rcu_head       fu_rcuhead;
+        } f_u;
+        struct path                   f_path;
+        struct inode                  *f_inode;/* cached value */
+        const struct file_operations  *f_op;
+
+        /*
+         ,* Protects f_ep_links, f_flags.
+         ,* Must not be taken from IRQ context.
+         ,*/
+        spinlock_t                    f_lock;
+        atomic_long_t                 f_count;
+        unsigned int                  f_flags;
+        fmode_t                       f_mode;
+        struct mutex                  f_pos_lock;
+        loff_t                        f_pos;
+        struct fown_struct            f_owner;
+        const struct cred             *f_cred;
+        struct file_ra_state          f_ra;
+
+        u64                           f_version;
+        #ifdef CONFIG_SECURITY
+        void                          *f_security;
+        #endif
+        /* needed for tty driver, and maybe others */
+        void                          *private_data;
+
+        #ifdef CONFIG_EPOLL
+        /* Used by fs/eventpoll.c to link all the hooks to this file */
+        struct list_head              f_ep_links;
+        struct list_head              f_tfile_llink;
+#endif /* #ifdef CONFIG_EPOLL */
+        struct address_space          *f_mapping;
+} __attribute__((aligned(4)));/* lest something weird decides that 2 is OK */
+#+END_SRC
+
+inode Tab 存在于硬盘中，如果每次CPU从硬盘中读取那么效率会比较低下，
+所以内核会为inode Table 申请一段内存以作为缓存，称为 *对应文件系统的 inode cache*.
+#+BEGIN_SRC c
+static int __init init_inodecache(void)
+{
+        ext4_inode_cachep = kmem_cache_create("ext4_inode_cache",
+                                              sizeof(struct ext4_inode_info),
+                                              0, (SLAB_RECLAIM_ACCOUNT|
+                                                  SLAB_MEM_SPREAD),
+                                              init_once);
+        if (ext4_inode_cachep == NULL)
+                return -ENOMEM;
+        return 0;
+}
+#+END_SRC
+
+同样在VFS层面上，也会对抽象出来的 inode 和 路径进行缓存(dentry), 分别称为 icache 和 dcache.
+#+BEGIN_SRC c
+static void __init dcache_init(void)
+{
+        unsigned int loop;
+
+        /*
+         ,* A constructor could be added for stable state like the lists,
+         ,* but it is probably not worth it because of the cache nature
+         ,* of the dcache.
+         ,*/
+        dentry_cache = KMEM_CACHE(dentry,
+                                  SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD);
+
+        /* Hash may have been set up in dcache_init_early */
+        if (!hashdist)
+                return;
+
+        dentry_hashtable =
+                alloc_large_system_hash("Dentry cache",
+                                        sizeof(struct hlist_bl_head),
+                                        dhash_entries,
+                                        13,
+                                        0,
+                                        &d_hash_shift,
+                                        &d_hash_mask,
+                                        0,
+                                        0);
+
+        for (loop = 0; loop < (1U << d_hash_shift); loop++)
+                INIT_HLIST_BL_HEAD(dentry_hashtable + loop);
+}
+void __init inode_init(void)
+{
+        unsigned int loop;
+
+        /* inode slab cache */
+        inode_cachep = kmem_cache_create("inode_cache",
+                                         sizeof(struct inode),
+                                         0,
+                                         (SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|
+                                          SLAB_MEM_SPREAD),
+                                         init_once);
+
+        /* Hash may have been set up in inode_init_early */
+        if (!hashdist)
+                return;
+
+        inode_hashtable =
+                alloc_large_system_hash("Inode-cache",
+                                        sizeof(struct hlist_head),
+                                        ihash_entries,
+                                        14,
+                                        0,
+                                        &i_hash_shift,
+                                        &i_hash_mask,
+                                        0,
+                                        0);
+
+        for (loop = 0; loop < (1U << i_hash_shift); loop++)
+                INIT_HLIST_HEAD(&inode_hashtable[loop]);
+}
+#+END_SRC
+最终这些申请的缓存都是内核通过LRU算法进行回收的(内核通过 shrink方法来回收slab内存)
+- shrink 方法需要驱动编写者来主动实现

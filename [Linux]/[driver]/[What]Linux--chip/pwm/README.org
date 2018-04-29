@@ -1,0 +1,15 @@
+#+TITLE: [What]linux -> PWM
+#+DATE:  <2018-04-26 Thu> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, chip
+#+NAMA: <linux_driver_chip_inc_encoder.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+
