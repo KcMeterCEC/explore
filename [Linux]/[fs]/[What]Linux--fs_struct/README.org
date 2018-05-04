@@ -12,6 +12,20 @@
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* simplefs 实战
+[[https://github.com/psankar/simplefs][simplefs]] 用最少的代码实现了文件系统的基本操作。
+** 基本体验
+*** 创建一个硬盘
+目前使用 =dd= 命令创建一个块大小为 4096字节，共100个块的硬盘文件。
+#+begin_example
+dd bs=4096 count=100 if=/dev/zero of=image
+#+end_example
+*** 格式化并挂载
+#+begin_example
+make 
+./mkfs-simplefs image
+
+#+end_example
 * 比较重要的数据结构
 #+BEGIN_SRC c
 /**

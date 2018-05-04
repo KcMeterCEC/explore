@@ -252,11 +252,36 @@ du -sh
 - 使用 =fdisk /dev/xxx= 对使用MBR分割表的磁盘进行分割
 - 使用 =gdisk /dev/xxx= 对使用GPT分割表的磁盘进行分割
 - 分割完成后，使用 =partprobe -s= 来更新分区表
+
+嵌入式批量出厂时， 可以在 =sed= 的帮助下完成自动化的分割，来源于 [[https://superuser.com/questions/332252/how-to-create-and-format-a-partition-using-a-bash-script][StackExchange]]
+#+begin_example
+# to create the partitions programatically (rather than manually)
+# we're going to simulate the manual input to fdisk
+# The sed script strips off all the comments so that we can
+# document what we're doing in-line with the actual commands
+# Note that a blank line (commented as "default" will send a empty
+# line terminated with a newline to take the fdisk default.
+sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' << EOF | fdisk ${TGTDEV}
+  o # clear the in memory partition table
+  n # new partition
+  p # primary partition
+  1 # partition number 1
+  # default - start at beginning of disk
+  +100M # 100 MB boot parttion
+  n # new partition
+  p # primary partition
+  2 # partion number 2
+  # default, start immediately after preceding partition
+  # default, extend partition to end of disk
+  a # make a partition bootable
+  1 # bootable partition is partition 1 -- /dev/sda1
+  p # print the in-memory partition table
+  w # write the partition table
+  q # and we're done
+  EOF
+#+end_example
 *** 磁盘格式化
 - 使用命令 =mkfs.ext4 /dev/xxxn= 来格式化对应分区
-
-
-
 *** 文件系统的检验
 - 使用命令 =fsck.ext4= 可以完成ext4 文件系统的检查
 *** 挂载与卸载

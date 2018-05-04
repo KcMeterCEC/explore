@@ -1,0 +1,26 @@
+#+TITLE: zynq petalinux -> 使能ext格式化
+#+DATE:  <2018-05-02 Wed> 
+#+TAGS: zynq
+#+LAYOUT: post 
+#+CATEGORIES: processor, zynq, petalinux
+#+NAME: <processor_zynq_petalinux_mkfs.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+- 问题：
+默认情况下 petalinux(2016.2) 中使用命令 =mkfs= 仅能找到 =mkfs.vfat= 一项命令，并没有找到 =mkfs.ext= 这类命令。
+- 解决：
+可以猜想，这是由于文件系统中并没有加入ext相关格式化命令造成的，所以需要重新配置一下根文件系统。
+
+使用命令 =petalinux-config -c rootfs= 并找到路径 =Filesystem Packages -> base -> e2fsprogs= 选中此路径中所有选项，
+重新编译并打包，便可以发现具有命令 =mkfs.ext2, mkfs.ext3, mkfs.ext4= 以及对应的fsck命令。
+
+
+
+
+
+  
+
+
+
+
