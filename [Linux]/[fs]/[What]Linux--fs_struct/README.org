@@ -3,7 +3,7 @@
 #+TAGS: filesystem
 #+LAYOUT: post 
 #+CATEGORIES: linux, fs, struct
-#+NAMA: <linux_fs_struct_base.org>
+#+NAME: <linux_fs_struct_base.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
@@ -24,8 +24,199 @@ dd bs=4096 count=100 if=/dev/zero of=image
 #+begin_example
 make 
 ./mkfs-simplefs image
-
+mkdir mount
+sudo insmod simplefs.ko ; mount -o loop -t simplefs image ./mount
 #+end_example
+*** 查看内容
+接下来就是以root的身份进入到 =mount= 文件夹，便可以查看其文件及文件内容。
+** 格式化代码分析
+格式化代码为 =mkfs-simplefs.c= ，其格式化的步骤为：
+1. 写入superblock 的内容
+2. 写根目录inode
+3. 写文件inode
+4. 写根目录block
+5. 写文件block
+*** 写 superblock
+此函数将一个block来保存superblock的信息。
+#+BEGIN_SRC c
+#define SIMPLEFS_MAGIC 0x10032013
+#define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
+struct simplefs_super_block {
+        uint64_t version; //版本号
+        uint64_t magic; //魔数
+        uint64_t block_size;//super block 信息所占用的块大小
+
+        /* FIXME: This should be moved to the inode store and not part of the sb */
+        uint64_t inodes_count;//目前已经使用了多少个inode
+
+        uint64_t free_blocks;//目前还剩下多少个block
+
+        //此部分是为了填充结构体，使整个结构体大小为4096字节
+        char padding[SIMPLEFS_DEFAULT_BLOCK_SIZE - (5 * sizeof(uint64_t))];
+};
+static int write_superblock(int fd)
+{
+        struct simplefs_super_block sb = {
+                .version = 1,
+                .magic = SIMPLEFS_MAGIC,
+                .block_size = SIMPLEFS_DEFAULT_BLOCK_SIZE,
+                /* One inode for rootdirectory and another for a welcome file that we are going to create */
+                .inodes_count = 2,//使用一个inode对应根目录，一个inode对应一个文件
+                /* FIXME: Free blocks management is not implemented yet */
+                .free_blocks = (~0) & ~(1 << WELCOMEFILE_DATABLOCK_NUMBER),
+        };
+        ssize_t ret;
+
+        ret = write(fd, &sb, sizeof(sb));
+        if (ret != SIMPLEFS_DEFAULT_BLOCK_SIZE) {
+                printf
+                        ("bytes written [%d] are not equal to the default block size\n",
+                         (int)ret);
+                return -1;
+        }
+
+        printf("Super block written succesfully\n");
+        return 0;
+}
+#+END_SRC
+*** 写根文件inode
+根文件的inode紧接着superblock 往后填充，也就是在第2个block中存储inode.
+#+BEGIN_SRC c
+struct simplefs_inode {
+        mode_t mode; //此inode表示的档案类型
+        uint64_t inode_no;//inode的索引号
+        uint64_t data_block_number;//与inode对应的block的索引号
+
+        union {//文件大小或是目录对应的内容对
+                uint64_t file_size;
+                uint64_t dir_children_count;
+        };
+};
+const int SIMPLEFS_ROOTDIR_INODE_NUMBER = 1;
+const int SIMPLEFS_ROOTDIR_DATABLOCK_NUMBER = 2;
+const int SIMPLEFS_INODESTORE_BLOCK_NUMBER = 1;
+static int write_inode_store(int fd)
+{
+        ssize_t ret;
+
+        struct simplefs_inode root_inode;
+
+        root_inode.mode = S_IFDIR;
+        root_inode.inode_no = SIMPLEFS_ROOTDIR_INODE_NUMBER;
+        root_inode.data_block_number = SIMPLEFS_ROOTDIR_DATABLOCK_NUMBER;
+        root_inode.dir_children_count = 1;
+
+        ret = write(fd, &root_inode, sizeof(root_inode));
+
+        if (ret != sizeof(root_inode)) {
+                printf
+                        ("The inode store was not written properly. Retry your mkfs\n");
+                return -1;
+        }
+
+        printf("root directory inode written succesfully\n");
+        return 0;
+}
+#+END_SRC
+*** 写文件inode
+通过此函数可以看出：所有的inode都存储在一个block中，而一个inode大小为 =28= 字节。
+也就是说，此文件系统最多支持文件和文件夹的总数为 4096 / 28 = 146 
+#+BEGIN_SRC c
+#define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
+const uint64_t WELCOMEFILE_INODE_NUMBER = 2;//文件inode为2号
+const uint64_t WELCOMEFILE_DATABLOCK_NUMBER = 3;//文件内容block
+char welcomefile_body[] = "Love is God. God is Love. Anbe Murugan.\n";
+struct simplefs_inode welcome = {
+        .mode = S_IFREG,
+        .inode_no = WELCOMEFILE_INODE_NUMBER,
+        .data_block_number = WELCOMEFILE_DATABLOCK_NUMBER,
+        .file_size = sizeof(welcomefile_body),
+};
+static int write_inode(int fd, const struct simplefs_inode *i)
+{
+        off_t nbytes;
+        ssize_t ret;
+
+        ret = write(fd, i, sizeof(*i));
+        if (ret != sizeof(*i)) {
+                printf
+                        ("The welcomefile inode was not written properly. Retry your mkfs\n");
+                return -1;
+        }
+        printf("welcomefile inode written succesfully\n");
+
+        //算出需要移动到block尾需要多少字节(依次减去root inode 和 welcome inode)
+        nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(*i) - sizeof(*i);
+        ret = lseek(fd, nbytes, SEEK_CUR);
+        if (ret == (off_t)-1) {
+                printf
+                        ("The padding bytes are not written properly. Retry your mkfs\n");
+                return -1;
+        }
+
+        printf
+                ("inode store padding bytes (after the two inodes) written sucessfully\n");
+        return 0;
+}
+#+END_SRC
+*** 写根目录block
+写根目录block就是写文件名以及其inode的索引,一个名称对的大小为 264 字节，
+也就是说一个目录最多可以存储的名称对为 4096 / 264 = 15 个，也就是说一个目录
+最多存储15个文件或目录名。
+#+BEGIN_SRC c
+#define SIMPLEFS_FILENAME_MAXLEN 255 //文件名的最大长度
+struct simplefs_dir_record {
+        char filename[SIMPLEFS_FILENAME_MAXLEN];
+        uint64_t inode_no;//文件名以及其对应的block索引
+};
+struct simplefs_dir_record record = {
+        .filename = "vanakkam",
+        .inode_no = WELCOMEFILE_INODE_NUMBER,
+};
+int write_dirent(int fd, const struct simplefs_dir_record *record)
+{
+        ssize_t nbytes = sizeof(*record), ret;
+
+        ret = write(fd, record, nbytes);
+        if (ret != nbytes) {
+                printf
+                        ("Writing the rootdirectory datablock (name+inode_no pair for welcomefile) has failed\n");
+                return -1;
+        }
+        printf
+                ("root directory datablocks (name+inode_no pair for welcomefile) written succesfully\n");
+
+        nbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE - sizeof(*record);
+        ret = lseek(fd, nbytes, SEEK_CUR);//移动到下一个block
+        if (ret == (off_t)-1) {
+                printf
+                        ("Writing the padding for rootdirectory children datablock has failed\n");
+                return -1;
+        }
+        printf
+                ("padding after the rootdirectory children written succesfully\n");
+        return 0;
+}
+#+END_SRC
+*** 写文件block 
+写文件block就是把文件内容写进去即可。
+#+BEGIN_SRC c
+int write_block(int fd, char *block, size_t len)
+{
+        ssize_t ret;
+
+        ret = write(fd, block, len);
+        if (ret != len) {
+                printf("Writing file body has failed\n");
+                return -1;
+        }
+        printf("block has been written succesfully\n");
+        return 0;
+}
+#+END_SRC
+** 文件系统的结构
+根据上面的格式化代码，可以知道其结构如下图：
+
 * 比较重要的数据结构
 #+BEGIN_SRC c
 /**
