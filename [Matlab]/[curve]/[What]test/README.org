@@ -1,0 +1,35 @@
+#+TITLE: [What]Matlab 测试曲线
+#+DATE:  <2018-05-08 Tue> 
+#+TAGS: matlab
+#+LAYOUT: post 
+#+CATEGORIES: matlab, curve
+#+NAME: <matlab_curve_test.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+在嵌入式开发中，经常需要对数据流进行验证，比较好的方式就是通过 matlab 来图形化的显示曲线。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 简易显示二维曲线
+通常经过采样得到的数据都是二维曲线，仅需要直观的观察其趋势即可。
+** 显示一个简单的曲线
+比如将FFT的结果进行显示以验证处理过程是否正常。
+
+对应的脚本如下（数据以逗号做分隔）：
+#+begin_example
+close all;
+clc;
+
+file = fopen('fft.data', 'r');
+
+% 直到读到文件末尾
+fft_val = fscanf(file, '%d,', Inf);
+points = numel(fft_val);
+
+fclose(file);
+
+x = [1:1:points];
+
+plot(x, fft_val);title('FFT value');
+#+end_example

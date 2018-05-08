@@ -121,7 +121,7 @@ Kernel hacking -> Early printk
 early_printk("Hello world\n");
 #+END_SRC
 * 与用户空间顺序输出
-当用户空间在使用 =printf= 的同时内核在使用 =printk= 时会造成两个输出相互干扰，与照成竞态的效果一样。
+当用户空间在使用 =printf= 的同时内核在使用 =printk= 时会造成两个输出相互干扰，与造成竞态的效果一样。
 
 内核为用户空间提供了设备文件 =/dev/ttyprink= 以让用户空间的log可以在内核中打印，打印的Log前会加上 =[U]= 标识，
 这样便不会造成二者干扰了。

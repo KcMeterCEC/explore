@@ -29,8 +29,8 @@ sudo insmod simplefs.ko ; mount -o loop -t simplefs image ./mount
 #+end_example
 *** 查看内容
 接下来就是以root的身份进入到 =mount= 文件夹，便可以查看其文件及文件内容。
-** 格式化代码分析
-格式化代码为 =mkfs-simplefs.c= ，其格式化的步骤为：
+** 格式化代码分析(mkfs-simplefs.c)
+其格式化的步骤为：
 1. 写入superblock 的内容
 2. 写根目录inode
 3. 写文件inode
@@ -216,6 +216,159 @@ int write_block(int fd, char *block, size_t len)
 #+END_SRC
 ** 文件系统的结构
 根据上面的格式化代码，可以知道其结构如下图：
+[[./simplefs_struct.jpg]]
+
+可以看出此文件系统的确是足够的简单：
+1. superblock描述极为简单
+2. 并不具备block bitmap 和 inode bitmap
+3. 最多支持的文件和文件夹总数为146个(因为仅用了一个block来存储inode)
+4. 一个文件夹中可以存储的文件和文件夹总数为15个
+5. 一个文件的内容不能超过一个block
+
+*** 文件系统操作逻辑
+根据以上简单结构的分析，可以猜测出其基本的文件操作逻辑：
+1. 新建文件夹
+  + 从inode table 中填充一个文件夹类型的inode并获取其索引
+  + 为此索引的inode分配一个block并写入对应的inode
+  + 将新建文件夹的名称和inode索引对应存储在当前文件夹的block中
+  + 更新 superblock 中的inode计数
+2. 新建文件
+  + 从inode table 中填充一个文件类型的inode并获取其索引
+  + 为此索引的inode分配一个block并写入对应的inode
+  + 将文件内容写入其block中
+  + 将新建文件的名称和inode索引对应存储在当前文件夹的block中
+  + 更新 superblock 中的inode计数
+3. 删除文件或文件夹
+  + 去除当前文件夹中对应此文件或文件夹的描述字符串
+  + 更新 superblock 中的inode计数
+4. 建立硬链接
+  + 在当前文件夹下拷贝一份目标文件所在的文件夹中对于此文件的描述字符串
+5. 建立符号链接
+  + 首先新建一个文件
+  + 然后新建文件的内容指向目标文件所在的文件夹的inode
+
+基于这些猜测，接下来分析其文件系统操作代码。
+
+** 操作代码分析(simple.c)
+*** 挂载
+在载入模块时，会首先使用函数 =kmem_cache_create= ，用于为文件系统的inode申请缓存以便达到快速访问的目的。
+#+BEGIN_SRC c
+sfs_inode_cachep = kmem_cache_create("sfs_inode_cache",
+                                     sizeof(struct simplefs_inode),
+                                     0,
+                                     (SLAB_RECLAIM_ACCOUNT| SLAB_MEM_SPREAD),
+                                     NULL);
+#+END_SRC
+在挂载文件时，会调用函数 =simplefs_fill_super= 函数，此函数的主要目的就是填充 =super_block= 结构体
+#+BEGIN_SRC c
+/* This function, as the name implies, Makes the super_block valid and
+ ,* fills filesystem specific information in the super block */
+int simplefs_fill_super(struct super_block *sb, void *data, int silent)
+{
+        struct inode *root_inode;
+        struct buffer_head *bh;
+        struct simplefs_super_block *sb_disk;
+        int ret = -EPERM;
+
+        //从存储super block 描述的block(0)中读取数据
+        bh = sb_bread(sb, SIMPLEFS_SUPERBLOCK_BLOCK_NUMBER);
+        BUG_ON(!bh);
+
+        //得到 simplefs_super_block 具体内容
+        sb_disk = (struct simplefs_super_block *)bh->b_data;
+
+        printk(KERN_INFO "The magic number obtained in disk is: [%llu]\n",
+               sb_disk->magic);
+
+        if (unlikely(sb_disk->magic != SIMPLEFS_MAGIC)) {
+                printk(KERN_ERR
+                       "The filesystem that you try to mount is not of type simplefs. Magicnumber mismatch.");
+                goto release;
+        }
+
+        if (unlikely(sb_disk->block_size != SIMPLEFS_DEFAULT_BLOCK_SIZE)) {
+                printk(KERN_ERR
+                       "simplefs seem to be formatted using a non-standard block size.");
+                goto release;
+        }
+
+        printk(KERN_INFO
+               "simplefs filesystem of version [%llu] formatted with a block size of [%llu] detected in the device.\n",
+               sb_disk->version, sb_disk->block_size);
+
+        /* A magic number that uniquely identifies our filesystem type */
+        sb->s_magic = SIMPLEFS_MAGIC;
+
+        /* For all practical purposes, we will be using this s_fs_info as the super block */
+        //设为私有地址，以便后面使用
+        sb->s_fs_info = sb_disk;
+
+        //最大的文件大小就是为一个block
+        sb->s_maxbytes = SIMPLEFS_DEFAULT_BLOCK_SIZE;
+        //super block 操作
+        sb->s_op = &simplefs_sops;
+
+        root_inode = new_inode(sb);
+        //跟目录的inode位置
+        root_inode->i_ino = SIMPLEFS_ROOTDIR_INODE_NUMBER;
+        inode_init_owner(root_inode, NULL, S_IFDIR);
+        root_inode->i_sb = sb;
+        //inode操作
+        root_inode->i_op = &simplefs_inode_ops;
+        //文件操作
+        root_inode->i_fop = &simplefs_dir_operations;
+        root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime =
+                CURRENT_TIME;
+
+        //得到根目录的inode内容(并且会将此inode放入inode cache 中)
+        root_inode->i_private =
+                simplefs_get_inode(sb, SIMPLEFS_ROOTDIR_INODE_NUMBER);
+
+        /* TODO: move such stuff into separate header. */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+        sb->s_root = d_make_root(root_inode);
+        #else
+        sb->s_root = d_alloc_root(root_inode);
+        if (!sb->s_root)
+                iput(root_inode);
+        #endif
+
+        if (!sb->s_root) {
+                ret = -ENOMEM;
+                goto release;
+        }
+
+        ret = 0;
+release:
+        brelse(bh);
+
+        return ret;
+}
+#+END_SRC
+
+其数据填充结果如下图：
+[[./struct_super_block.jpg]]
+
+在 =super.h= 中有以下两个操作,对照上图就可以看出其意义：
+#+BEGIN_SRC c
+//获取 simplefs_super_block 结构体地址
+static inline struct simplefs_super_block *SIMPLEFS_SB(struct super_block *sb)
+{
+        return sb->s_fs_info;
+}
+
+//获取根目录 inode的地址
+static inline struct simplefs_inode *SIMPLEFS_INODE(struct inode *inode)
+{
+        return inode->i_private;
+}
+#+END_SRC
+*** 读取文件夹内容
+当在 =mount= 文件夹下使用命令 =ls= 时，其执行路径依次为：
+- simplefs_iterate 
+- simplefs_lookup
+- simplefs_get_inode
+- simplefs_iterate
 
 * 比较重要的数据结构
 #+BEGIN_SRC c

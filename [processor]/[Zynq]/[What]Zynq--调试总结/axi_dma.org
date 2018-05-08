@@ -1,0 +1,41 @@
+#+TITLE: zynq debug -> axi dma 
+#+DATE:  <2018-05-07 Mon> 
+#+TAGS: zynq
+#+LAYOUT: post 
+#+CATEGORIES: processor, zynq, debug
+#+NAME: <processor_zynq_dbg_axidma.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+记录在调试axi dma 过程中所需要的问题。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* Channel xxx has errors 10019 cdr xxx cdr msb ....
+** 描述
+当使用axi_dma的S2MM通道接收数据到内存时，驱动打印出此错误。
+** 分析
+首先理了一下 dma engine 的配置代码，并没有发现什么问题。
+
+然后查看状态寄存器的值为 =0x10019= ，其中有一个标志位 =DMAIntErr= 被置位了，查看其手册描述如下：
+#+begin_example
+This error occurs if the buffer length specified in the fetched descriptor is set to 0.
+
+Also, when in Scatter Gather Mode and using the status app length field, this error occurs
+when the Status AXI4-Stream packet RxLength field does not match the S2MM packet being received
+by the S_AXIS_S2MM interface.
+
+When Scatter Gather is disabled, this error is flagged if any error occurs during Memory write or
+if the incoming packet is bigger than what is specified in the DMA length register.
+#+end_example
+根据以上描述分析：首先我使用的是SG模式，并且也确定传输的数据数量值不为0，那么就只有可能是数据值不匹配造成的。
+
+- 所谓的数据不匹配指的是用户设置的接收数据长度和接口实际接收的数据长度不一致。
+  + 而接口接收的数据长度是以 =tlast= 信号为分隔的。
+
+通过调试核来抓取tlast发现果然是上层设置的 =peroid= 值与 =tlast= 数据周期不一致造成的！
+** 解决
+*=axi_dma= 的 =period= 必须与 =tlast= 信号相匹配* ，如果此值是会变动的，那么上层需要注意动态匹配！
+** 反思
+其实这是一个很低级的错误，其根本原因在于自己没有深入理解axi_dma的数据通信协议。倘若一开始就很清楚其 =period= 
+与 =tlast= 之间的关系，那么在最开始写驱动的时候就会注意这个问题的。
