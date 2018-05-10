@@ -313,9 +313,9 @@ int simplefs_fill_super(struct super_block *sb, void *data, int silent)
         root_inode->i_ino = SIMPLEFS_ROOTDIR_INODE_NUMBER;
         inode_init_owner(root_inode, NULL, S_IFDIR);
         root_inode->i_sb = sb;
-        //inode操作
+        //根目录inode操作
         root_inode->i_op = &simplefs_inode_ops;
-        //文件操作
+        //根目录操作
         root_inode->i_fop = &simplefs_dir_operations;
         root_inode->i_atime = root_inode->i_mtime = root_inode->i_ctime =
                 CURRENT_TIME;
@@ -357,19 +357,631 @@ static inline struct simplefs_super_block *SIMPLEFS_SB(struct super_block *sb)
         return sb->s_fs_info;
 }
 
-//获取根目录 inode的地址
+//获取文件或目录 inode的地址
 static inline struct simplefs_inode *SIMPLEFS_INODE(struct inode *inode)
 {
         return inode->i_private;
 }
 #+END_SRC
 *** 读取文件夹内容
+为了获取文件夹的内容得先从目录inode找到其对应的block。
+
 当在 =mount= 文件夹下使用命令 =ls= 时，其执行路径依次为：
-- simplefs_iterate 
-- simplefs_lookup
-- simplefs_get_inode
+- simplefs_iterate : 用于扫描目录中的文件或文件夹名称以及其对应的inode
+#+BEGIN_SRC c
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+static int simplefs_iterate(struct file *filp, struct dir_context *ctx)
+#else
+static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
+#endif
+{
+        loff_t pos;
+        struct inode *inode;
+        struct super_block *sb;
+        struct buffer_head *bh;
+        struct simplefs_inode *sfs_inode;
+        struct simplefs_dir_record *record;
+        int i;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+        pos = ctx->pos;
+        #else
+        pos = filp->f_pos;
+        #endif
+        inode = filp->f_dentry->d_inode;
+        sb = inode->i_sb;
+
+        if (pos) {
+                /* FIXME: We use a hack of reading pos to figure if we have filled in all data.
+                 ,* We should probably fix this to work in a cursor based model and
+                 ,* use the tokens correctly to not fill too many data in each cursor based call */
+                return 0;
+        }
+
+        //得到目录的inode
+        sfs_inode = SIMPLEFS_INODE(inode);
+
+        if (unlikely(!S_ISDIR(sfs_inode->mode))) {
+                printk(KERN_ERR
+                       "inode [%llu][%lu] for fs object [%s] not a directory\n",
+                       sfs_inode->inode_no, inode->i_ino,
+                       filp->f_dentry->d_name.name);
+                return -ENOTDIR;
+        }
+
+        //得到目录的block
+        bh = sb_bread(sb, sfs_inode->data_block_number);
+        BUG_ON(!bh);
+
+        //获取目录blockc内容
+        record = (struct simplefs_dir_record *)bh->b_data;
+        //根据目录中含有的条目进行扫描
+        for (i = 0; i < sfs_inode->dir_children_count; i++) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+                //返回文件名以及其对应的inode
+                dir_emit(ctx, record->filename, SIMPLEFS_FILENAME_MAXLEN,
+                         record->inode_no, DT_UNKNOWN);
+                ctx->pos += sizeof(struct simplefs_dir_record);
+                #else
+                filldir(dirent, record->filename, SIMPLEFS_FILENAME_MAXLEN, pos,
+                        record->inode_no, DT_UNKNOWN);
+                filp->f_pos += sizeof(struct simplefs_dir_record);
+                #endif
+                pos += sizeof(struct simplefs_dir_record);
+                record++;
+        }
+        brelse(bh);
+
+        return 0;
+}
+#+END_SRC
+- simplefs_lookup : 得到文件或文件夹的inode内容并初始化系统的 inode结构体
+#+BEGIN_SRC c
+struct dentry *simplefs_lookup(struct inode *parent_inode,
+                               struct dentry *child_dentry, unsigned int flags)
+{
+        //获取目录inode
+        struct simplefs_inode *parent = SIMPLEFS_INODE(parent_inode);
+        struct super_block *sb = parent_inode->i_sb;
+        struct buffer_head *bh;
+        struct simplefs_dir_record *record;
+        int i;
+
+        //读取目录的block
+        bh = sb_bread(sb, parent->data_block_number);
+        BUG_ON(!bh);
+
+        //读取目录的blockå����
+        record = (struct simplefs_dir_record *)bh->b_data;
+        for (i = 0; i < parent->dir_children_count; i++) {
+                if (!strcmp(record->filename, child_dentry->d_name.name)) {
+                        /* FIXME: There is a corner case where if an allocated inode,
+                         ,* is not written to the inode store, but the inodes_count is
+                         ,* incremented. Then if the random string on the disk matches
+                         ,* with the filename that we are comparing above, then we
+                         ,* will use an invalid uninitialized inode */
+
+                        struct inode *inode;
+                        struct simplefs_inode *sfs_inode;
+
+                        //根据文件inode号获取其内容
+                        sfs_inode = simplefs_get_inode(sb, record->inode_no);
+
+                        //初始化inode结构体以及其对应的文件或文件夹操作
+                        inode = new_inode(sb);
+                        inode->i_ino = record->inode_no;
+                        inode_init_owner(inode, parent_inode, sfs_inode->mode);
+                        inode->i_sb = sb;
+                        inode->i_op = &simplefs_inode_ops;
+
+                        if (S_ISDIR(inode->i_mode))
+                                inode->i_fop = &simplefs_dir_operations;
+                        else if (S_ISREG(inode->i_mode))
+                                inode->i_fop = &simplefs_file_operations;
+                        else
+                                printk(KERN_ERR
+                                       "Unknown inode type. Neither a directory nor a file");
+
+                        /* FIXME: We should store these times to disk and retrieve them */
+                        inode->i_atime = inode->i_mtime = inode->i_ctime =
+                                CURRENT_TIME;
+
+                        inode->i_private = sfs_inode;
+
+                        d_add(child_dentry, inode);
+                        return NULL;
+                }
+                record++;
+        }
+
+        printk(KERN_ERR
+               "No inode found for the filename [%s]\n",
+               child_dentry->d_name.name);
+
+        return NULL;
+}
+#+END_SRC
+- simplefs_get_inode : 得到请求的inode号码的内容
+#+BEGIN_SRC c
+/* This functions returns a simplefs_inode with the given inode_no
+ ,* from the inode store, if it exists. */
+struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
+                                          uint64_t inode_no)
+{
+        //获取super block
+        struct simplefs_super_block *sfs_sb = SIMPLEFS_SB(sb);
+        struct simplefs_inode *sfs_inode = NULL;
+        struct simplefs_inode *inode_buffer = NULL;
+
+        int i;
+        struct buffer_head *bh;
+
+        /* The inode store can be read once and kept in memory permanently while mounting.
+         ,* But such a model will not be scalable in a filesystem with
+         ,* millions or billions of files (inodes) */
+        //读取inode table
+        bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+        BUG_ON(!bh);
+
+        sfs_inode = (struct simplefs_inode *)bh->b_data;
+
+        #if 0
+        if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+                printk(KERN_ERR "Failed to acquire mutex lock %s +%d\n",
+                       __FILE__, __LINE__);
+                return NULL;
+        }
+        #endif
+        //扫描inode table 是否有与要求的序号匹配的Inode
+        for (i = 0; i < sfs_sb->inodes_count; i++) {
+                if (sfs_inode->inode_no == inode_no) {
+                        //申请cache
+                        inode_buffer = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
+                        memcpy(inode_buffer, sfs_inode, sizeof(*inode_buffer));
+
+                        break;
+                }
+                sfs_inode++;
+        }
+        //      mutex_unlock(&simplefs_inodes_mgmt_lock);
+
+        brelse(bh);
+        return inode_buffer;
+}
+#+END_SRC
 - simplefs_iterate
 
+可以看出其基本思路是：
+1. 通过文件夹的inode获取其block
+2. 扫描block有哪些文件或文件夹
+3. 获取这些扫描到的文件或文件夹的inode内容，为其操作做好准备
+
+*** 读取文件内容
+可以猜测为了读取文件内容，首先要获取其inode才能找到其block.
+
+当执行 =cat vanakkam= 时，执行的函数依次是：
+- simplefs_iterate : 重复执行了8次
+- simplefs_read
+#+BEGIN_SRC c
+ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
+                      loff_t * ppos)
+{
+        /* After the commit dd37978c5 in the upstream linux kernel,
+         ,* we can use just filp->f_inode instead of the
+         ,* f->f_path.dentry->d_inode redirection */
+        //获取inode内容
+        struct simplefs_inode *inode =
+                SIMPLEFS_INODE(filp->f_path.dentry->d_inode);
+        struct buffer_head *bh;
+
+        char *buffer;
+        int nbytes;
+
+        if (*ppos >= inode->file_size) {
+                /* Read request with offset beyond the filesize */
+                return 0;
+        }
+
+        //读取block
+        bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
+                      inode->data_block_number);
+
+        if (!bh) {
+                printk(KERN_ERR "Reading the block number [%llu] failed.",
+                       inode->data_block_number);
+                return 0;
+        }
+
+        //获取block内容
+        buffer = (char *)bh->b_data;
+        nbytes = min((size_t) inode->file_size, len);
+
+        if (copy_to_user(buf, buffer, nbytes)) {
+                brelse(bh);
+                printk(KERN_ERR
+                       "Error copying file contents to the userspace buffer\n");
+                return -EFAULT;
+        }
+
+        brelse(bh);
+
+        ,*ppos += nbytes;
+
+        return nbytes;
+}
+#+END_SRC
+- simplefs_read
+
+可以看出其思路为：
+1. 从目录inode获取目录block，进而获取到文件的inode
+  + 所以当你对一个目录都没有读权限时，是无法通过其inode来获取文件内容的
+2. 从文件inode找到其对应block再读取其内容
+*** 写文件内容
+可以猜测其与读文件内容的思路是一样的：
+1. 从目录inode获取目录block，进而获取到文件的inode
+2. 从文件inode找到其对应block再写入对应的内容
+3. 更新inode描述(因为inode中具有文件信息)
+
+执行 echo "Hello world!" > vanakkam 其执行路径为：
+- simplefs_iterate : 重复执行了12次，没看懂为什么
+- simplefs_write : 写入数据并同步
+#+BEGIN_SRC c
+ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
+                       loff_t * ppos)
+{
+        /* After the commit dd37978c5 in the upstream linux kernel,
+         ,* we can use just filp->f_inode instead of the
+         ,* f->f_path.dentry->d_inode redirection */
+        struct inode *inode;
+        struct simplefs_inode *sfs_inode;
+        struct buffer_head *bh;
+        struct super_block *sb;
+
+        char *buffer;
+
+        int retval;
+
+        retval = generic_write_checks(filp, ppos, &len, 0);
+        if (retval) {
+                return retval;
+        }
+
+        inode = filp->f_path.dentry->d_inode;
+        //获取inode内容
+        sfs_inode = SIMPLEFS_INODE(inode);
+        sb = inode->i_sb;
+        //获取block地址
+        bh = sb_bread(filp->f_path.dentry->d_inode->i_sb,
+                      sfs_inode->data_block_number);
+
+        if (!bh) {
+                printk(KERN_ERR "Reading the block number [%llu] failed.",
+                       sfs_inode->data_block_number);
+                return 0;
+        }
+        //获取block内容
+        buffer = (char *)bh->b_data;
+
+        /* Move the pointer until the required byte offset */
+        buffer += *ppos;
+
+        if (copy_from_user(buffer, buf, len)) {
+                brelse(bh);
+                printk(KERN_ERR
+                       "Error copying file contents from the userspace buffer to the kernel space\n");
+                return -EFAULT;
+        }
+        ,*ppos += len;
+
+        //同步数据到硬盘
+        mark_buffer_dirty(bh);
+        sync_dirty_buffer(bh);
+        brelse(bh);
+
+        /* Set new size
+         ,* sfs_inode->file_size = max(sfs_inode->file_size, *ppos);
+         ,*
+         ,* FIXME: What to do if someone writes only some parts in between ?
+         ,* The above code will also fail in case a file is overwritten with
+         ,* a shorter buffer */
+        if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                return -EINTR;
+        }
+        sfs_inode->file_size = *ppos;
+        retval = simplefs_inode_save(sb, sfs_inode);
+        if (retval) {
+                len = retval;
+        }
+        mutex_unlock(&simplefs_inodes_mgmt_lock);
+
+        return len;
+}
+#+END_SRC
+- simplefs_inode_save : 更新inode
+#+BEGIN_SRC c
+int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode)
+{
+        struct simplefs_inode *inode_iterator;
+        struct buffer_head *bh;
+
+        //读取inode table
+        bh = sb_bread(sb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+        BUG_ON(!bh);
+
+        if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                return -EINTR;
+        }
+
+        //从inode table 起始遍历出对应inode的内容
+        inode_iterator = simplefs_inode_search(sb,
+                                               (struct simplefs_inode *)bh->b_data,
+                                               sfs_inode);
+
+        if (likely(inode_iterator)) {
+                //更新 inode
+                memcpy(inode_iterator, sfs_inode, sizeof(*inode_iterator));
+                printk(KERN_INFO "The inode updated\n");
+
+                //与硬盘同步
+                mark_buffer_dirty(bh);
+                sync_dirty_buffer(bh);
+        } else {
+                mutex_unlock(&simplefs_sb_lock);
+                printk(KERN_ERR
+                       "The new filesize could not be stored to the inode.");
+                return -EIO;
+        }
+
+        brelse(bh);
+
+        mutex_unlock(&simplefs_sb_lock);
+
+        return 0;
+}
+#+END_SRC
+- simplefs_inode_search : 从inode table 中找到对应序列的inode
+
+*** 新建文件夹
+先来猜测新建文件夹的步骤：
+1. 根据文件夹inode找到其block
+2. 为新建的文件夹在inode table 中获取一个inode
+3. 为新建的文件夹分配一个block
+4. 将新申请到的文件夹名称以及其inode号写入父文件夹的block中
+5. 更新父文件夹inode
+6. 与硬盘同步
+
+执行命令 =mkdir hello= 其调用函数依次为：
+- simplefs_iterate : 浏览目录获取其档案及对应inode
+- simplefs_lookup : 查看当前目录是否已有此档案名
+- simplefs_mkdir : 新建文件夹
+- simplefs_create_fs_object : 新建档案
+#+BEGIN_SRC c
+static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
+                                     umode_t mode)
+{
+        struct inode *inode;
+        struct simplefs_inode *sfs_inode;
+        struct super_block *sb;
+        struct simplefs_inode *parent_dir_inode;
+        struct buffer_head *bh;
+        struct simplefs_dir_record *dir_contents_datablock;
+        uint64_t count;
+        int ret;
+
+        if (mutex_lock_interruptible(&simplefs_directory_children_update_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                return -EINTR;
+        }
+        sb = dir->i_sb;
+
+        //获取 super block 中记录的 inode 数目
+        ret = simplefs_sb_get_objects_count(sb, &count);
+        if (ret < 0) {
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                return ret;
+        }
+
+        if (unlikely(count >= SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED)) {
+                /* The above condition can be just == insted of the >= */
+                printk(KERN_ERR
+                       "Maximum number of objects supported by simplefs is already reached");
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                return -ENOSPC;
+        }
+
+        if (!S_ISDIR(mode) && !S_ISREG(mode)) {
+                printk(KERN_ERR
+                       "Creation request but for neither a file nor a directory");
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                return -EINVAL;
+        }
+
+        inode = new_inode(sb);
+        if (!inode) {
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                return -ENOMEM;
+        }
+
+        inode->i_sb = sb;
+        inode->i_op = &simplefs_inode_ops;
+        inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+        inode->i_ino = (count + SIMPLEFS_START_INO - SIMPLEFS_RESERVED_INODES + 1);
+
+        sfs_inode = kmem_cache_alloc(sfs_inode_cachep, GFP_KERNEL);
+        sfs_inode->inode_no = inode->i_ino;
+        inode->i_private = sfs_inode;
+        sfs_inode->mode = mode;
+
+        if (S_ISDIR(mode)) {
+                printk(KERN_INFO "New directory creation request\n");
+                sfs_inode->dir_children_count = 0;
+                inode->i_fop = &simplefs_dir_operations;
+        } else if (S_ISREG(mode)) {
+                printk(KERN_INFO "New file creation request\n");
+                sfs_inode->file_size = 0;
+                inode->i_fop = &simplefs_file_operations;
+        }
+
+        /* First get a free block and update the free map,
+         ,* Then add inode to the inode store and update the sb inodes_count,
+         ,* Then update the parent directory's inode with the new child.
+         ,*
+         ,* The above ordering helps us to maintain fs consistency
+         ,* even in most crashes
+         ,*/
+        //申请一个空闲的block
+        ret = simplefs_sb_get_a_freeblock(sb, &sfs_inode->data_block_number);
+        if (ret < 0) {
+                printk(KERN_ERR "simplefs could not get a freeblock");
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                return ret;
+        }
+
+        //申请一个空闲的inode
+        simplefs_inode_add(sb, sfs_inode);
+
+        parent_dir_inode = SIMPLEFS_INODE(dir);
+        bh = sb_bread(sb, parent_dir_inode->data_block_number);
+        BUG_ON(!bh);
+
+        //得到父目录的block
+        dir_contents_datablock = (struct simplefs_dir_record *)bh->b_data;
+
+
+        /* Navigate to the last record in the directory contents */
+        dir_contents_datablock += parent_dir_inode->dir_children_count;
+        //在父目录的blockä������������������inode对
+        dir_contents_datablock->inode_no = sfs_inode->inode_no;
+        strcpy(dir_contents_datablock->filename, dentry->d_name.name);
+
+        mark_buffer_dirty(bh);
+        sync_dirty_buffer(bh);
+        brelse(bh);
+
+        if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+                mutex_unlock(&simplefs_directory_children_update_lock);
+                sfs_trace("Failed to acquire mutex lock\n");
+                return -EINTR;
+        }
+
+        //保存父目录inode
+        parent_dir_inode->dir_children_count++;
+        ret = simplefs_inode_save(sb, parent_dir_inode);
+        if (ret) {
+                mutex_unlock(&simplefs_inodes_mgmt_lock);
+                mutex_unlock(&simplefs_directory_children_update_lock);
+
+                /* TODO: Remove the newly created inode from the disk and in-memory inode store
+                 ,* and also update the superblock, freemaps etc. to reflect the same.
+                 ,* Basically, Undo all actions done during this create call */
+                return ret;
+        }
+
+        mutex_unlock(&simplefs_inodes_mgmt_lock);
+        mutex_unlock(&simplefs_directory_children_update_lock);
+
+        inode_init_owner(inode, dir, mode);
+        d_add(dentry, inode);
+
+        return 0;
+}
+#+END_SRC
+- simplefs_sb_get_object_count ： 获取当前super block 中记录的inode数量
+- simplefs_sb_get_a_freeblock : 获取空闲block
+#+BEGIN_SRC c
+int simplefs_sb_get_a_freeblock(struct super_block *vsb, uint64_t * out)
+{
+        //获取super block
+        struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
+        int i;
+        int ret = 0;
+
+        if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                ret = -EINTR;
+                goto end;
+        }
+
+        /* Loop until we find a free block. We start the loop from 3,
+         ,* as all prior blocks will always be in use */
+        //从第三个block 开始寻找，前两个分别是(super block 和 inode table)
+        for (i = 3; i < SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED; i++) {
+                //通过位与的方式来获取空位，这也就是为什么最多支持64个block(free_blocks 是64位)
+                if (sb->free_blocks & (1 << i)) {
+                        break;
+                }
+        }
+
+        if (unlikely(i == SIMPLEFS_MAX_FILESYSTEM_OBJECTS_SUPPORTED)) {
+                printk(KERN_ERR "No more free blocks available");
+                ret = -ENOSPC;
+                goto end;
+        }
+
+        ,*out = i;
+
+        //更新super block 中记录的空闲blockå��
+        /* Remove the identified block from the free list */
+        sb->free_blocks &= ~(1 << i);
+
+        //同步super block 与硬盘
+        simplefs_sb_sync(vsb);
+
+end:
+        mutex_unlock(&simplefs_sb_lock);
+        return ret;
+}
+#+END_SRC
+- simplefs_sb_sync : 同步super block 与硬盘
+- simplefs_inode_add : 获取一个inode
+#+BEGIN_SRC c
+void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
+{
+        struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
+        struct buffer_head *bh;
+        struct simplefs_inode *inode_iterator;
+
+        if (mutex_lock_interruptible(&simplefs_inodes_mgmt_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                return;
+        }
+
+        bh = sb_bread(vsb, SIMPLEFS_INODESTORE_BLOCK_NUMBER);
+        BUG_ON(!bh);
+
+        //获取inode table 内容
+        inode_iterator = (struct simplefs_inode *)bh->b_data;
+
+        if (mutex_lock_interruptible(&simplefs_sb_lock)) {
+                sfs_trace("Failed to acquire mutex lock\n");
+                return;
+        }
+
+        /* Append the new inode in the end in the inode store */
+        //移动到inode table 的第一个空闲处
+        inode_iterator += sb->inodes_count;
+
+        memcpy(inode_iterator, inode, sizeof(struct simplefs_inode));
+        //更新super block 计数
+        sb->inodes_count++;
+
+        mark_buffer_dirty(bh);
+        //同步super block 到硬盘
+        simplefs_sb_sync(vsb);
+        brelse(bh);
+
+        mutex_unlock(&simplefs_sb_lock);
+        mutex_unlock(&simplefs_inodes_mgmt_lock);
+}
+#+END_SRC
+- simplefs_sb_sync 
+- simplefs_inode_save 
+- simplefs_inode_search 
+
+*** 新建文件
+  新建文文件
 * 比较重要的数据结构
 #+BEGIN_SRC c
 /**

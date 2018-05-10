@@ -3,7 +3,10 @@
 #+TAGS: vim
 #+LAYOUT: post
 #+CATEGORIES: editer, vim
-#+NAME: <editer_vim_overview.org>
+#+name: <editer_vim_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
 * 基本知识
 ** 脚本
 vim 的设置可以写入脚本文件中来达到批量配置的目的, 在 vim 中使用 =:scriptnames= 命令查看作用的脚本及其路径.

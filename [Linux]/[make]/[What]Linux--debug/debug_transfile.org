@@ -31,6 +31,16 @@ make install
 1. minicom 中选择文件使用 “单击空格键”，而进入文件夹则使用 “双击空格键”，选中后回车即可发送
 2. 当当前目录下具有相同文件时，需要使用 “lrz -y” 来覆盖当前文件
 #+end_example
+** 提高传输速度
+为了提高文件的传输速度，首先需要将串口速率提高，其次是使用 [[https://github.com/jmacd/xdelta-gpl][xdelta]] 仅传送patch的方式来减小传输文件大小。
+- xdelta 的安装参考 [[https://blog.csdn.net/xiezhaoxuan/article/details/73087246][此博客]] 即可，但命令的使用需要注意一下：
+  + 生成补丁: =xdelta3 -e -s <old file> <new file> <patch_name>=
+  + 应用补丁: =xdelta3 -d -s <old file> <patch_name> <output_file>=
+#+begin_example
+但这种方式仅仅用在出厂调试比较合适，实际在用户远程升级中，不同的用户的当前版本不同，所以无法简单的用一个patch来升级。
+
+除非服务器与产品进行通信，根据产品的版本号提供不同的patch来对应升级。
+#+end_example
 * 遇到的问题
 ** device is locked 
 *** 问题 

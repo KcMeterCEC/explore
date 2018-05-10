@@ -1,5 +1,16 @@
-* [What]emacs --> basic
+#+TITLE: [What] emacs 基本操作总结
+#+DATE:<2018-05-10 四> 
+#+TAGS: emacs
+#+LAYOUT: post
+#+CATEGORIES: editer, emacs
+#+name: <editer_emacs_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
+记录emacs的基本使用快捷键。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
 ** 移动
 | 操作              | 意义                                              |
 |-------------------+---------------------------------------------------|
@@ -28,7 +39,6 @@
 3. C - f
 *注意:*
 此项操作并不适用于所有命令，当 =C - v= 或 =M - v= 加上前缀时，将退化为移动多少行。
-** 取消输入中的命令
 ** 窗口(缓存)
 | 操作                | 意义                                                                                                       |
 |---------------------+------------------------------------------------------------------------------------------------------------|
@@ -98,7 +108,7 @@ emacs 的配置默认是放在 =~/.emacs.d/init.el= 文件中的，文件使用 
 - 高亮当前行 =(global-hl-line-mode t)=
 *** 第三方插件配置
 emacs 具有内置的包管理器，里面包含了很多可以安装的包。安装完成的包存放于 =~/.emacs.d/elpa/= 文件夹中，对应的会在 =~/.emacs.d/init.el= 文件中生成一定的函数
-在使用第三方包之前，需要先配置 [emacs 的源](http://melpa-stable.milkbox.net/#/)
+在使用第三方包之前，需要先配置 http://melpa-stable.milkbox.net/#/
 **** 与 packages 相关的命令
 - package-list-packages  列出所有可用的packages
 - customize-group 图形化定制packages 设置，最终也会在 init.el 文件中添加变量
@@ -112,4 +122,5 @@ emacs 具有内置的包管理器，里面包含了很多可以安装的包。�
 
 ** 懒人配置
 
-- clone [陈斌大师的配置并做了一些修改](https://github.com/KcMeterCEC/emacs.d)
+- [[https://github.com/syl20bnr/spacemacs][spacemacs]] : 使用vim快捷键操作orgmode简直爽到不行
+  + 为了使用鼠标复制粘贴功能，需要使用 =M - x= 选中 "xterm-mouse-mode" 即可
