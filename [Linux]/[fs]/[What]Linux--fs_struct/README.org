@@ -981,7 +981,59 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 - simplefs_inode_search 
 
 *** 新建文件
-  新建文文件
+还是先来猜测一下新建文件的步骤：
+1. 根据文件夹inode找到对应的block
+2. 从inode table 中为新建文件获取一个inode
+3. 从block 中为新建文件获取一个block，并填充其内容
+4. 更新文件的inode
+5. 更新文件夹的inode,以及block
+6. 更新super block 的 inode
+
+下面执行 =echo "hello world!" > hello/hello.txt= 其条用函数依次为：
+- simplefs_iterate : 首先通过根目录扫描其所包含的条目
+- simplefs_iterate : 然后通过扫描 =hello= 目录扫描其所包含的条目
+- simplefs_lookup : 查找是否存在 =hello.txt= 的inode
+- simplefs_create_fs_object: 新建文件
+- simplefs_sb_get_object_count ： 获取当前super block 中记录的inode数量
+- simplefs_sb_get_a_freeblock : 获取空闲block
+- simplefs_sb_sync : 同步super block 与硬盘
+- simplefs_inode_add : 获取一个inode
+- simplefs_sb_sync 
+- simplefs_inode_save 
+- simplefs_inode_search 
+- simplefs_write : 写入文件内容
+- simplefs_inode_save : 更新inode
+- simplefs_inode_search 
+
+** 功能实现
+通过查看其代码可以发现，此文件系统还有以下功能未能实现：
+- 删除文件
+- 删除文件夹
+- 建立符号链接
+- 建立硬链接
+
+下面来尝试一一实现：
+*** 删除文件
+前面已经新建了文件 =/hello/hello.txt= ，下面尝试将它删除。
+
+根据已有的知识先来猜测一下如何以最简单的方式删除一个文件，
+为了能够使得操作步骤尽量的少，其实没有必要去擦除文件block的内容，而只需要对其inode操作即可。
+
+也就是说涉及以下几个部分：
+1. 文件夹block的字符串和inode对擦除
+2. 文件夹inode中的描述修改
+3. inode table 修改
+4. super block 修改
+   
+通过 =strace rm -f hello.txt= 观察到这这么一行输出：
+#+BEGIN_EXAMPLE
+unlinkat(AT_FDCWD, "hello.txt", 0)      = -1 EPERM (Operation not permitted)
+#+END_EXAMPLE
+对应驱动的调用接口应该是 =struct inode_operations= 下的 =unlink=
+#+BEGIN_SRC c
+  int (*unlink) (struct inode *,struct dentry *);
+#+END_SRC
+
 * 比较重要的数据结构
 #+BEGIN_SRC c
 /**

@@ -423,7 +423,7 @@ int of_property_read_u64(const struct device_node *np,const char *propname,
 
 //获取字符串
 int of_property_read_string(struct device_node *np, const char *propname, const char **outstring);
-int of_property_read_string_indec(struct device_node *np, const char *propname,
+int of_property_read_string_index(struct device_node *np, const char *propname,
                                   int index,const char **outstring);
 
 //获取bool值,属性存在返回true

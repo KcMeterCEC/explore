@@ -1,13 +1,28 @@
-* [What] git --> base
+#+TITLE: [What]git -> 基本操作
+#+DATE:  <2018-05-11 五> 
+#+TAGS: git
+#+LAYOUT: post 
+#+CATEGORIES: scm, git, base
+#+NAME: <scm_git_basic.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-- [[#基本命令][基本命令]]
-- [[#使用技巧][使用技巧]]
+记录容易遗忘的一些操作。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 基本配置
+**  合并冲突解决后自动删除临时文件
+git在合并冲突解决后默认会保留临时文件(.BACKUP .BASE .LOCAL. REMOTE)，使用下面配置即可让其自动删除。
+#+BEGIN_EXAMPLE
+git config --global mergetool.keepBackup false
+#+END_EXAMPLE
 
-** 基本命令
-*** 常用命令
+* 基本命令
+** 常用命令
 - git log --stat  : 显示日志的修改记录并列出文件
-*** 在现有的仓库中包含子仓库(子模块)
-**** 在现有仓库中增加子仓库
+** 在现有的仓库中包含子仓库(子模块)
+*** 在现有仓库中增加子仓库
 #+begin_example
 git submodule add <url>
 #+end_example
@@ -18,14 +33,14 @@ git submodule add <url>
 git submodule init 
 git submodule update
 #+end_example
-**** 推送仓库
+*** 推送仓库
 *注意:* 正常的操作程序是修改子仓库后, *在子仓库中进行* commit等操作, 然后再进入父仓库中 commit.
 
 使用以下命令来推送, 它会先检查并推送子仓库, 然后再推送主仓库.
 #+begin_example
 git push --recurse-submodules=on-demand
 #+end_example
-**** 删除子仓库
+*** 删除子仓库
 #+begin_example
 git rm --cached <moduleName>
 rm -rf <moduleName>
@@ -36,13 +51,13 @@ vim .git/config
 # 删除缓存
 rm -rf .git/modules/path_to_submodule
 #+end_example
-**** 注意事项
+*** 注意事项
 当子模块库的相对位置改变时,需要 *以绝对路径手动修改 .gitmodules* 文件!
 
 比如在一台电脑的本地创建了一个库, 在此电脑上子模块路径就是在本地硬盘上.
 但是对于另外一台电脑则是存在于局域网上.
-** 使用技巧
-*** git hook(在很多阶段可以自动运行一些脚本)
+* 使用技巧
+** git hook(在很多阶段可以自动运行一些脚本)
 通过使用 .git/hook/ 中的脚本, 可以让git自动化的完成一些繁琐的操作,在此目录下已经存在了一些示例脚本.
 这些脚本以 =.sample= 结尾, 如果要使用它们, 需要移除这些后缀.
 
@@ -52,31 +67,31 @@ rm -rf .git/modules/path_to_submodule
 
 *注意*: 需要为脚本文件增加 *可执行权限!*
 
-**** 客户端钩子
-***** pre-commit
+*** 客户端钩子
+**** pre-commit
 此脚本在 *输入提交命令,键入提交信息前运行*.如果脚本最后返回 *非零值*,则终止此次提交! 此脚本一般用于:
 - 运行测试代码, 若测试不通过则终止提交
 - 检查代码风格, 若风格不统一则终止提交
 可以通过使用 =git commit --no-verify= 来跳过此脚本的执行.
-***** pre-commit-msg 
+**** pre-commit-msg 
 此脚本在 *启动提交信息编辑器前, 默认信息被创建之后运行*.该脚本接收一些选项:
 - 存有当前提交信息的文件的路径
 - 提交类型
 - 修补提交的SHA-1校验
 
 此脚本一般用于对产生默认信息的提交,动态的插入一些其他信息. 比如合并提交, 压缩提交等.
-***** commit-msg
+**** commit-msg
 此脚本在 *确定提交信息之后运行* , 接收的参数即为提交的信息, 用于检查提交信息是否符合指定的模板.
-***** post-commit
+**** post-commit
 此脚本在 *整个提交过程完成之后运行* , 没有任何参数, 一般用于一些收尾工作.
-***** post-checkout
+**** post-checkout
 在 *checkout* 成功后运行, 可以用于对于不同切换的分支运行不同的命令.
-***** post-merge
+**** post-merge
 在 *merge* 成功后运行
-**** 服务器端钩子 
-***** pre-receive
+*** 服务器端钩子 
+**** pre-receive
 在 *成功推送到服务器前运行*, 用于检查推送内容, 如果以非零值推出, 则阻止推送.
-***** update
+**** update
 和 =pre-receive= 类似, 但它会为每一个准备更新的分支各运行一次. 哪个分支以非零值退出, 哪个分支就阻止提交.
-***** post-receive
+**** post-receive
 在 *推送过程完成之后运行* , 可以更新信息等操作.
