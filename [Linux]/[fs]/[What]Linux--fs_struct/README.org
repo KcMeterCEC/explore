@@ -1,4 +1,4 @@
-#+TITLE: [What]Linux文件系统基本脉络
+﻿#+TITLE: [What]Linux文件系统基本脉络
 #+DATE:  <2018-04-29 Sun> 
 #+TAGS: filesystem
 #+LAYOUT: post 
@@ -1025,7 +1025,7 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 3. inode table 修改
 4. super block 修改
    
-通过 =strace rm -f hello.txt= 观察到这这么一行输出：
+通过 =strace rm -f hello.txt= 观察到有这么一行输出：
 #+BEGIN_EXAMPLE
 unlinkat(AT_FDCWD, "hello.txt", 0)      = -1 EPERM (Operation not permitted)
 #+END_EXAMPLE
@@ -1033,6 +1033,7 @@ unlinkat(AT_FDCWD, "hello.txt", 0)      = -1 EPERM (Operation not permitted)
 #+BEGIN_SRC c
   int (*unlink) (struct inode *,struct dentry *);
 #+END_SRC
+- 在实现的过程中发现，其在增加inode 和 dir content 时是直接简单粗暴的在尾部增加，很明显在删除文件时会产生漏洞，所以此bug也需要修复。
 
 * 比较重要的数据结构
 #+BEGIN_SRC c

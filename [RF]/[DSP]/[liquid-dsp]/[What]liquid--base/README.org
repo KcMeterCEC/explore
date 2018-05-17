@@ -1,0 +1,44 @@
+#+TITLE: [What]liquid-dsp 体验
+#+DATE: <2018-05-17 四> 
+#+TAGS: dsp
+#+LAYOUT: post 
+#+CATEGORIES: RF, DSP, liquid
+#+NAME: <rf_dsp_liquid_base.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+[[https://github.com/jgaeddert/liquid-dsp][liquid-dsp]] 是用于嵌入式平台的SDR库，包含的功能相当丰富，大大提高了开发效率。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 安装及检验
+** 在PC上安装
+#+BEGIN_EXAMPLE
+  #安装工具
+  sudo apt install automake autoconf
+  #获取源码
+  git clone git://github.com/jgaeddert/liquid-dsp.git
+  cd liquid-dsp
+  #编译
+  ./bootstrap.sh     
+  ./configure
+  make
+  sudo make install
+  sudo ldconfig
+  #检验代码
+  make check
+#+END_EXAMPLE
+** 安装到嵌入式
+按照惯例使用命令 =./configure --help= 查看使用方式，得出交叉编译命令为：
+#+BEGIN_EXAMPLE
+  ./bootstrap.sh     
+  ./configure CC=arm-linux-gnueabihf-gcc --host=arm --prefix=/home/cec/liquid
+  make
+  make install
+#+END_EXAMPLE
+然后将文件夹下的内容对应拷贝到嵌入式文件系统即可。
+* 体验
+** fsk 调制
+使用命令 =make examples/fskmodem_example= 生成 =fskmodem_example.m= 文件，然后使用 =matlab= 运行此脚本得到下图：
+[[./fskmodem.jpg]]
+

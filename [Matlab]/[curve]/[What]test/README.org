@@ -13,7 +13,8 @@
 #+END_HTML
 * 简易显示二维曲线
 通常经过采样得到的数据都是二维曲线，仅需要直观的观察其趋势即可。
-** 显示一个简单的曲线
+** 显示简单的曲线
+*** 显示单个曲线
 比如将FFT的结果进行显示以验证处理过程是否正常。
 
 对应的脚本如下（数据以逗号做分隔）：
@@ -33,3 +34,72 @@ x = [1:1:points];
 
 plot(x, fft_val);title('FFT value');
 #+end_example
+*** 显示多个曲线
+有的时候需要测试处理单元，所以需要将处理前后的数据做对比，这时就需要子图功能：
+#+BEGIN_EXAMPLE
+  close all;
+  clc;
+
+  file_iq = fopen('iq.data', 'r');
+  file_demodu = fopen('demo.data', 'r');
+
+  % 直到读到文件末尾
+  iq_val = fscanf(file_iq, '%d,', Inf);
+  iq_points = numel(iq_val);
+
+  demodu_val = fscanf(file_demodu, '%d,', Inf);
+  demodu_points = numel(demodu_val);
+
+  fclose(file_iq);
+  fclose(file_demodu);
+
+  x_iq = [1:1:iq_points];
+  x_demodu = [1:1:demodu_points];
+
+  figure;
+  subplot(2,2, 1);
+  plot(x_iq, iq_val);title('IQ value');
+
+  subplot(2,2, 2);
+  plot(x_iq, demodu_val);title('demodulation value');
+#+END_EXAMPLE
+*** 数据分离后显示
+还需要将数据进行高低位分离以分别显示(比如IQ分离)：
+#+BEGIN_EXAMPLE
+  close all;
+  clc;
+
+  file_iq = fopen('iq.data', 'r');
+  file_demodu = fopen('demo.data', 'r');
+
+  % 直到读到文件末尾
+  iq_val = fscanf(file_iq, '%d,', Inf);
+  iq_val = int32(iq_val);
+  iq_points = numel(iq_val);
+  for n = 1:iq_points
+     temp = typecast(iq_val(n), 'int16');
+     i(n) = temp(1);
+     q(n) = temp(2);
+  end
+  demodu_val = fscanf(file_demodu, '%d,', Inf);
+  demodu_points = numel(demodu_val);
+
+  fclose(file_iq);
+  fclose(file_demodu);
+
+  x_iq = [1:1:iq_points];
+  x_demodu = [1:1:demodu_points];
+
+  figure;
+  subplot(2,2, 1);
+  plot(x_iq, iq_val);title('IQ value');
+
+  subplot(2,2, 2);
+  plot(x_iq, i);title('I value');
+
+  subplot(2,2, 4);
+  plot(x_iq, q);title('Q value');
+
+  subplot(2,2, 3);
+  plot(x_demodu,demodu_val);title('demodulation value');
+#+END_EXAMPLE
