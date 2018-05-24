@@ -1,0 +1,16 @@
+#+TITLE: [What]Linux下进程的基本概念及操作
+#+DATE:  <2018-05-24 四> 
+#+TAGS: process
+#+LAYOUT: post 
+#+CATEGORIES: linux, ps, overview
+#+NAME: <linux_ps_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理Linux下的进程和线程的基本概念。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+** 进程与线程的关系
+首先需要明确的是：进程是资源分配的基本单位，线程是调度的基本单位。同一进程里的线程之间共享进程的资源。
+

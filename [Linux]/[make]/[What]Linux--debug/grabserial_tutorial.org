@@ -67,3 +67,43 @@ sudo grabserial -v -d /dev/ttyUSB0 -e 30 -t -m "Uncompressing Linux" -i "done,"
 #+begin_example
 x = sd.read(1).decode(sys.stdout.encoding, "ignore")
 #+end_example
+* 关于网络数据的时间截取
+有的时候需要截取通过网络发送过来信息的时间戳，对此有两个解决方案：
+1. 通过分析 grabserial 的代码，为其添加连接 socket 的代码
+2. 通过 secure CRT 的日志时间戳功能粗略的计算
+  + 此方法无法显示时间戳的相对值
+** 通过secure CRT 来截取
+在 =Session Optons -> Log File= 中依次做如下设置：
+- 在 =Log file name= 来设置输出日志文件名
+- 选中 =Start log upon connect= 选项
+- 在 =On each line:= 条目中输入 "%h:%m:%s(%t):" (去掉引号) 以显示时:分:秒:(毫秒)
+- 然后重新连接服务器即可
+
+关于时间戳可以用的格式如下(更多的信息需查看其help文件)：
+#+BEGIN_EXAMPLE
+  %H - hostname
+
+  %S - session name
+
+  %Y - four-digit year
+
+  %y - two-digit year
+
+  %M - two-digit month
+
+  %D - two-digit day of the month
+
+  %P - port
+
+  %h - two-digit hour
+
+  %m - two-digit minute
+
+  %s - two-digit seconds
+
+  %t - three-digit milliseconds
+
+  %% - percent (%)
+
+  %envvar% - environment variable
+#+END_EXAMPLE
