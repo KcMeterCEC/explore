@@ -1,0 +1,27 @@
+/**
+ * @brief 展示Linux下的进程声明周期
+ */
+digraph life_cycle{
+    graph[label="进程生命周期"];
+
+    fork[label="fork()"];
+    ready[label="就绪态"];
+    running[label="占有CPU运行"];
+    fork -> ready;
+    ready -> running[label="schedule()"];
+
+
+    sleep_interruptible[label="浅度睡眠"];
+    sleep_uninterruptible[label="深度睡眠"];
+    stop[label="暂停"];
+    zombie[label="僵死"];
+    running -> ready[label="时间片耗净"];
+    running -> sleep_interruptible[label="等待资源\ninterruptible_sleep_on()\nschedule()"];
+    running -> sleep_uninterruptible[label="等待资源\nsleep_on()\nschedule()"];
+    running -> stop[label="schedule()\nptrace()"];
+    running -> zombie[label="do_exit()"];
+
+    sleep_interruptible -> ready[label="资源到位\nwake_up_interruptible()\n或收到信号\nwake_up()"];
+    sleep_uninterruptible -> ready[label="资源到位\nwake_up()"];
+    stop -> ready[label="收到信号SIGCONT\nwake_up()"];
+}

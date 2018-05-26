@@ -1,0 +1,315 @@
+#+TITLE: [What]linux -> regmap usage
+#+DATE:  <2018-05-25 五> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, regmap
+#+NAME: <linux_driver_regmap_usage.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理内核中的 regmap 模块的使用方式。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* regmap 出现的原因
+SPI和I2C子系统对设备的操作流程基本上一样，都是向指定设备的指定地址写入一个或多个数据，但两个子系统却分别实现了自己的读写接口。
+
+根据linux驱动的基本思想之一：要将具有共同操作逻辑的代码分离为一个层，这样便于维护的同时还减小了代码量。
+
+于是Linux在3.1版本便推出了regmap子系统，就是将SPI和I2C子系统的操作再次封装，以后的设备驱动可以通过regmap来操作设备了。
+** regmap cache
+regmap 为IO设备的读写还设置了缓存机制，这样可以避免IO的频繁操作，而是将一些IO聚集到一起后一次性写给设备(这个和块设备的操作类似)。
+以达到更高的吞吐量。
+* 重要的数据结构
+regmap中有个重要的数据结构 =struct regmap_config= 需要理解，才能知道如何操作其接口。
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 使用此结构体来描述一个设备可以被操作的寄存器以及其操作属性
+   ,*
+   ,* @name: Optional name of the regmap. Useful when a device has multiple
+   ,*        register regions.
+   ,*
+   ,* @reg_bits: 地址占用的二进制位数
+   ,* @reg_stride: 地址因子，代表 实际发送的地址 = addr * (reg_stride + 1) ,一般为0，
+   ,* @pad_bits: 地址和数据之间需要填充的位数
+   ,* @val_bits: 数据的位数
+   ,*
+   ,* @writeable_reg: 当调用写接口时会调用此函数，此函数用于检查当前写入的寄存器是否真的可写，
+   ,* 如果不可写，则返回 false
+   ,* @readable_reg: 同上，这个回调是对读操作的检查
+   ,* @volatile_reg: 同上，这个回调对直接读写操作的检查，如果不能直接读写则返回false
+   ,* @precious_reg: 同上，这个回调判断此操作是否可以被外部调用，如不能返回true
+   ,* @lock:	  用户可以自己定义锁以覆盖子系统默认的锁
+   ,* @unlock:	  As above for unlocking.
+   ,* @lock_arg:	  this field is passed as the only argument of lock/unlock
+   ,*		  functions (ignored in case regular lock/unlock functions
+   ,*		  are not overridden).
+   ,* @reg_read:	  读函数重写，一般用不上
+   ,* @reg_write:	写函数重写，一般用不上
+   ,* @fast_io:	  如果是快速IO操作，则其内部使用自旋锁代替互斥锁
+   ,* @max_register: 最大寄存器值的限定
+   ,* @wr_table:     直接列出可以写的寄存器列表，有了此列表就不需要writeable_reg回调了
+   ,* @rd_table:     同上
+   ,* @volatile_table: 同上
+   ,* @precious_table: 同上
+   ,* @reg_defaults: 初始化寄存器的值
+   ,* @num_reg_defaults: 初始化寄存器个数
+   ,*
+   ,* @read_flag_mask: 读的掩码，代表读的时候需要在地址上加上此掩码
+   ,* @write_flag_mask: 写的掩码
+   ,* @use_single_rw: 使用单次读写，也就是每次读写都要写地址和数据
+   ,* @can_multi_write: 大块写支持
+   ,*
+   ,* @cache_type: 缓存的类型
+   ,* @reg_defaults_raw: Power on reset values for registers (for use with
+   ,*                    register cache support).
+   ,* @num_reg_defaults_raw: Number of elements in reg_defaults_raw.
+   ,* @reg_format_endian: 寄存器的端点模式
+   ,* @val_format_endian: 数据的端点模式
+   ,*
+   ,* @ranges: 可操作的地址范围
+   ,* @num_ranges: Number of range configuration entries.
+   ,*/
+  struct regmap_config {
+    const char *name;
+
+    int reg_bits;
+    int reg_stride;
+    int pad_bits;
+    int val_bits;
+
+    bool (*writeable_reg)(struct device *dev, unsigned int reg);
+    bool (*readable_reg)(struct device *dev, unsigned int reg);
+    bool (*volatile_reg)(struct device *dev, unsigned int reg);
+    bool (*precious_reg)(struct device *dev, unsigned int reg);
+    regmap_lock lock;
+    regmap_unlock unlock;
+    void *lock_arg;
+
+    int (*reg_read)(void *context, unsigned int reg, unsigned int *val);
+    int (*reg_write)(void *context, unsigned int reg, unsigned int val);
+
+    bool fast_io;
+
+    unsigned int max_register;
+    const struct regmap_access_table *wr_table;
+    const struct regmap_access_table *rd_table;
+    const struct regmap_access_table *volatile_table;
+    const struct regmap_access_table *precious_table;
+    const struct reg_default *reg_defaults;
+    unsigned int num_reg_defaults;
+    enum regcache_type cache_type;
+    const void *reg_defaults_raw;
+    unsigned int num_reg_defaults_raw;
+
+    u8 read_flag_mask;
+    u8 write_flag_mask;
+
+    bool use_single_rw;
+    bool can_multi_write;
+
+    enum regmap_endian reg_format_endian;
+    enum regmap_endian val_format_endian;
+
+    const struct regmap_range_cfg *ranges;
+    unsigned int num_ranges;
+  };
+#+END_SRC
+* 操作接口
+** 初始化
+#+BEGIN_SRC c
+  /**
+   ,* devm_regmap_init_spi(): Initialise register map
+   ,*
+   ,* @spi: Device that will be interacted with
+   ,* @config: Configuration for register map
+   ,*
+   ,* The return value will be an ERR_PTR() on error or a valid pointer
+   ,* to a struct regmap.  The map will be automatically freed by the
+   ,* device management code.
+   ,*/
+  #define devm_regmap_init_spi(dev, config)
+  /**
+   ,* devm_regmap_init_i2c(): Initialise managed register map
+   ,*
+   ,* @i2c: Device that will be interacted with
+   ,* @config: Configuration for register map
+   ,*
+   ,* The return value will be an ERR_PTR() on error or a valid pointer
+   ,* to a struct regmap.  The regmap will be automatically freed by the
+   ,* device management code.
+   ,*/
+  #define devm_regmap_init_i2c(i2c, config)
+#+END_SRC
+在初始化过后，便得到一个 =struct regmap= 地址，此结构体中就可以区分总线的类型。然后后面的操作都是通过此结构来区分设备的。
+** 读写
+#+BEGIN_SRC c
+  /**
+   ,* regmap_write(): Write a value to a single register
+   ,*
+   ,* @map: Register map to write to
+   ,* @reg: Register to write to
+   ,* @val: Value to be written
+   ,*
+   ,* A value of zero will be returned on success, a negative errno will
+   ,* be returned in error cases.
+   ,*/
+  int regmap_write(struct regmap *map, unsigned int reg, unsigned int val);
+  /**
+   ,* regmap_read(): Read a value from a single register
+   ,*
+   ,* @map: Register map to read from
+   ,* @reg: Register to be read from
+   ,* @val: Pointer to store read value
+   ,*
+   ,* A value of zero will be returned on success, a negative errno will
+   ,* be returned in error cases.
+   ,*/
+  int regmap_read(struct regmap *map, unsigned int reg, unsigned int *val);
+  /**
+   ,* regmap_update_bits: Perform a read/modify/write cycle on the register map
+   ,*
+   ,* @map: Register map to update
+   ,* @reg: Register to update
+   ,* @mask: Bitmask to change
+   ,* @val: New value for bitmask
+   ,*
+   ,* Returns zero for success, a negative number on error.
+   ,*/
+  int regmap_update_bits(struct regmap *map, unsigned int reg,
+                         unsigned int mask, unsigned int val);
+#+END_SRC
+** 缓存操作
+#+BEGIN_SRC c
+  /**
+   ,* regcache_cache_bypass: Put a register map into cache bypass mode
+   ,*
+   ,* @map: map to configure
+   ,* @cache_bypass: flag if changes should not be written to the hardware
+   ,*
+   ,* When a register map is marked with the cache bypass option, writes
+   ,* to the register map API will only update the hardware and not the
+   ,* the cache directly.  This is useful when syncing the cache back to
+   ,* the hardware.
+   ,*/
+  void regcache_cache_bypass(struct regmap *map, bool enable);
+#+END_SRC
+* 实例
+下面以 =ssm2518= 的代码来展示其整体使用：
+** 初始化
+#+BEGIN_SRC c
+  #define SSM2518_REG_POWER1		  0x00
+  #define SSM2518_REG_CLOCK		    0x01
+  #define SSM2518_REG_SAI_CTRL1		0x02
+  #define SSM2518_REG_SAI_CTRL2		0x03
+  #define SSM2518_REG_CHAN_MAP		0x04
+  #define SSM2518_REG_LEFT_VOL		0x05
+  #define SSM2518_REG_RIGHT_VOL		0x06
+  #define SSM2518_REG_MUTE_CTRL		0x07
+  #define SSM2518_REG_FAULT_CTRL	0x08
+  #define SSM2518_REG_POWER2	 	  0x09
+  #define SSM2518_REG_DRC_1	    	0x0a
+  #define SSM2518_REG_DRC_2	    	0x0b
+  #define SSM2518_REG_DRC_3	    	0x0c
+  #define SSM2518_REG_DRC_4	    	0x0d
+  #define SSM2518_REG_DRC_5	    	0x0e
+  #define SSM2518_REG_DRC_6	    	0x0f
+  #define SSM2518_REG_DRC_7	    	0x10
+  #define SSM2518_REG_DRC_8	    	0x11
+  #define SSM2518_REG_DRC_9	    	0x12
+  static const struct reg_default ssm2518_reg_defaults[] = {
+    { 0x00, 0x05 },
+    { 0x01, 0x00 },
+    { 0x02, 0x02 },
+    { 0x03, 0x00 },
+    { 0x04, 0x10 },
+    { 0x05, 0x40 },
+    { 0x06, 0x40 },
+    { 0x07, 0x81 },
+    { 0x08, 0x0c },
+    { 0x09, 0x99 },
+    { 0x0a, 0x7c },
+    { 0x0b, 0x5b },
+    { 0x0c, 0x57 },
+    { 0x0d, 0x89 },
+    { 0x0e, 0x8c },
+    { 0x0f, 0x77 },
+    { 0x10, 0x26 },
+    { 0x11, 0x1c },
+    { 0x12, 0x97 },
+  };
+  static const struct regmap_config ssm2518_regmap_config = {
+    .val_bits = 8,
+    .reg_bits = 8,
+
+    .max_register = SSM2518_REG_DRC_9,
+
+    .cache_type = REGCACHE_RBTREE,
+    .reg_defaults = ssm2518_reg_defaults,
+    .num_reg_defaults = ARRAY_SIZE(ssm2518_reg_defaults),
+  };
+  static int ssm2518_i2c_probe(struct i2c_client *i2c,
+                               const struct i2c_device_id *id)
+  {
+    //....
+    ssm2518->regmap = devm_regmap_init_i2c(i2c, &ssm2518_regmap_config);
+    if (IS_ERR(ssm2518->regmap))
+      {
+        dev_err(&i2c->dev, "regmap failed\n");
+        return PTR_ERR(ssm2518->regmap);
+      }
+    /*
+     ,* The reset bit is obviously volatile, but we need to be able to cache
+     ,* the other bits in the register, so we can't just mark the whole
+     ,* register as volatile. Since this is the only place where we'll ever
+     ,* touch the reset bit just bypass the cache for this operation.
+     ,*/
+    regcache_cache_bypass(ssm2518->regmap, true);
+    ret = regmap_write(ssm2518->regmap, SSM2518_REG_POWER1,
+                       SSM2518_POWER1_RESET);
+    regcache_cache_bypass(ssm2518->regmap, false);
+    if (ret)
+      {
+        dev_err(&i2c->dev, "cache bypass failed, err = %d\n", ret);
+        return ret;
+      }
+    ret = regmap_update_bits(ssm2518->regmap, SSM2518_REG_POWER2,
+                             SSM2518_POWER2_APWDN, 0x00);
+    if (ret)
+      {
+        dev_err(&i2c->dev, "update failed\n");
+        return ret;
+      }
+    //...
+  }
+#+END_SRC
+** 读写
+#+BEGIN_SRC c
+  static int ssm2518_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+  {
+    struct ssm2518 *ssm2518 = snd_soc_codec_get_drvdata(dai->codec);
+    unsigned int ctrl1 = 0, ctrl2 = 0;
+    bool invert_fclk;
+    int ret;
+    //...
+    ret = regmap_write(ssm2518->regmap, SSM2518_REG_SAI_CTRL1, ctrl1);
+    if (ret)
+      return ret;
+
+    return regmap_write(ssm2518->regmap, SSM2518_REG_SAI_CTRL2, ctrl2);
+  }
+  static int ssm2518_mute(struct snd_soc_dai *dai, int mute)
+  {
+    struct ssm2518 *ssm2518 = snd_soc_codec_get_drvdata(dai->codec);
+    unsigned int val;
+
+    if (mute)
+      val = SSM2518_MUTE_CTRL_MUTE_MASTER;
+    else
+      val = 0;
+
+    return regmap_update_bits(ssm2518->regmap, SSM2518_REG_MUTE_CTRL,
+                              SSM2518_MUTE_CTRL_MUTE_MASTER, val);
+  }
+#+END_SRC
+
