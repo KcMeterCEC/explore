@@ -8,9 +8,12 @@
 #+OPTIONS: ^:{}
 
 整理Linux下的进程和线程的调度。
-#+BEGIN_HTML
+
+#+BEGIN_EXPORT html
 <!--more-->
-#+END_HTML
+#+END_EXPORT
+
+
 * 调度的背景
 ** 目标
 *** 吞吐和响应

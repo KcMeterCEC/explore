@@ -22,7 +22,7 @@
 sudo apt-get install dconf-editor
 #+end_example
 - 打开dconf-editor 进入 org->gnome->desktop->remote-access 取消 "requre-encryption" 
-- windows 下安装 [[www.tightvnc.com/download.php][TightVNC]]
+- windows 下安装 www.tightvnc.com/download.php
 - 在Windows下启动 vnc ，输入 ip 地址及密码连接
 ** 多用户桌面
 可以实现多个用户同时登录linux而相互不干扰.
@@ -115,7 +115,7 @@ chroot_list_file=/etc/vsftpd.chroot_list
 #+end_example
 * 远程终端
 ** ssh终端
-使用远程终端快速控制, 使用的软件为: [[www.putty.org][PuTTY]]
+使用远程终端快速控制, 使用的软件为: www.putty.org
 #+begin_example
 sudo apt install openssh-server
 #+end_example

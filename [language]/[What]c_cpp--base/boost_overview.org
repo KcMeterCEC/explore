@@ -14,7 +14,7 @@ boost 库是C++的增强库，强化了C++的很多功能。
 #+END_HTML 
 
 * 准备与安装
-在 [[www.boost.org][官网 ]]下载最新包，然后解压缩 =tar -xjf boost_65_1.tar.bz2=.
+在 www.boost.org 新包，然后解压缩 =tar -xjf boost_65_1.tar.bz2=.
 
 boost大部分的类都是直接定义于头文件中的，对于部分复杂的库，还需要单独安装。
 

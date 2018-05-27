@@ -35,7 +35,10 @@ def get_real_name(file_path, pwd_path):
                     temp_str += "?raw=true"
                     new_str = "#+HTML:<img src=\"%s\" alt=\"%s\">" %(temp_str,pic_str)
                     lines[i] = new_str
-                    # print(lines[i])
+                if '#+BEGIN_HTML' in lines[i]:
+                    lines[i] = "\n#+BEGIN_EXPORT html\n"
+                if '#+END_HTML' in lines[i]:
+                    lines[i] = "#+END_EXPORT\n\n"
         if sweep == 1:
             with open(name_file,'w') as f_new:
                 f_new.writelines(lines)

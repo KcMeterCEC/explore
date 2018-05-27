@@ -1,4 +1,4 @@
-﻿#+TITLE: [What]Linux文件系统基本脉络
+#+TITLE: [What]Linux文件系统基本脉络
 #+DATE:  <2018-04-29 Sun> 
 #+TAGS: filesystem
 #+LAYOUT: post 
@@ -451,7 +451,7 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
         bh = sb_bread(sb, parent->data_block_number);
         BUG_ON(!bh);
 
-        //读取目录的blockå����
+        //读取目录的blockå����
         record = (struct simplefs_dir_record *)bh->b_data;
         for (i = 0; i < parent->dir_children_count; i++) {
                 if (!strcmp(record->filename, child_dentry->d_name.name)) {
@@ -852,7 +852,7 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
         /* Navigate to the last record in the directory contents */
         dir_contents_datablock += parent_dir_inode->dir_children_count;
-        //在父目录的blockä������������������inode对
+        //在父目录的blockä������������������inode对
         dir_contents_datablock->inode_no = sfs_inode->inode_no;
         strcpy(dir_contents_datablock->filename, dentry->d_name.name);
 
@@ -922,7 +922,7 @@ int simplefs_sb_get_a_freeblock(struct super_block *vsb, uint64_t * out)
 
         ,*out = i;
 
-        //更新super block 中记录的空闲blockå��
+        //更新super block 中记录的空闲blockå��
         /* Remove the identified block from the free list */
         sb->free_blocks &= ~(1 << i);
 

@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-参考网站: [[www.wowotech.net][窝窝科技]]
+参考网站: www.wowotech.net
 
 整理如何为系统的关机提供接口。
 #+BEGIN_HTML

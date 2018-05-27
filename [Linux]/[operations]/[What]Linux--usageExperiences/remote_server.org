@@ -123,7 +123,7 @@ sudo systemctl disable gitlab-runsvdir.service
 #+begin_example
 sudo apt install openjdk-8-jdk
 #+end_example
-- 如果要安装官方版本则需要到[[www.oracle.com][Oracle]]安装 =jdk-8u144-linux-64.tar.gz=.
+- 如果要安装官方版本则需要到 www.oracle.com 安装 =jdk-8u144-linux-64.tar.gz=.
 #+begin_example
 #解压文件
 tar -zxf jdk-8u144-linux-64.tar.gz
@@ -161,7 +161,7 @@ make
 sudo make install
 #+end_example
 *** 安装 Tomcat
-- 下载二进制版本的 [[tomcat.apache.org/download-90.cgi][Tomcat]]
+- 下载二进制版本的 tomcat.apache.org/download-90.cgi
 - 配置
 #+begin_example
 #解压文件
