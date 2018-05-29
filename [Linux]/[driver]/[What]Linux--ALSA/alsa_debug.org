@@ -30,6 +30,9 @@ Device Drivers -> Sound card support -> Advanced Linux Sound Architecture
 除了标准的I2S协议外，还有左右对齐两种方式，如果这个没有配置与codec芯片一致，那么听到的声音就会有类似过载的效果。(因为上一个通道的低位数据被采用到了下一个通道的高位上去)
 * codec配置
 有些芯片的配置默认是静音，有些复杂的芯片(比如AD1761)内部还有很多通路，这些都可以先通过 =amixer= 命令配置, 再确定参数后再使用程序配置。
+- 首先使用 =amixer contents= 列出其默认配置
+- 根据芯片的datasheet来查看其中一些不合适的配置罗列出来
+- 根据需要配置的id号(numid=xx)，使用命令配置 =amixer cset numid=xx <value>=
 * ALSA中的生产者和消费者模型
 ** 问题描述
 一般来说是需要消费者的平均速度大于生产者的平均数据才能保证数据不丢失，但是在音频

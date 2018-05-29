@@ -1,0 +1,101 @@
+#+TITLE: [What]Linux文件系统基本实现
+#+DATE:  <2018-05-29 二> 
+#+TAGS: filesystem
+#+LAYOUT: post 
+#+CATEGORIES: linux, fs, struct
+#+NAME: <linux_fs_struct_detail.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+继续深入理解文件系统的实现。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 文件系统的一致性
+根据前面的了解，可以知道当新建一个文件时，需要修改以下部分：
+- 从inode bitmap 中找到空闲位
+- 从block bitmap 中找到空闲位
+- 填充此新文件的数据内容到block中
+- 填充此新文件的inode内容到inode table中
+- 在包含此文件的目录的block中增加新文件的条目
+  + 如果已经超过了一个block，则还需要申请新block并填充
+- 更新目录的inode内容
+- 更新superblock的inode和block记录信息
+  
+以上这么多步操作显然就不是原子性的，如果在操作过程中系统崩溃或者硬件掉电，都会造成元数据和数据不一致的问题。
+#+BEGIN_EXAMPLE
+  这里其实还有会安全性的问题，因为文件系统在删除一个文件时，为了提高处理速度一般是不会去真的删除block中的内容的，一般是直接删除其元数据即可。
+
+  那么当为一个文件增加一个block时，如果在写完元数据后真正的block还没有被写入时发生了掉电，
+  那么下次启动时，这个文件下一个block的内容其实是上次被删除文件的内容!
+#+END_EXAMPLE
+** 实例模拟掉电过程
+*** 格式化硬盘
+#+BEGIN_EXAMPLE
+  #创建一个虚拟硬盘
+  dd if=/dev/zero of=image bs=4096 count=1024
+  #格式化
+  mkfs.ext4 -b 4096 image
+#+END_EXAMPLE
+*** 查看元数据
+#+BEGIN_EXAMPLE
+  #查看super block 的具体描述
+  dumpe2fs image
+
+  #...
+  #First inode:              11
+  #...
+  #Block bitmap at 2 (+2), Inode bitmap at 18 (+18)
+  #Inode table at 34-65 (+34)
+#+END_EXAMPLE
+由上面输出可以看到其 inode bitmap起始块为18，block bitmap起始块为2，inode table起始块为34
+- 查看bitmap内容
+#+BEGIN_EXAMPLE
+  #-C 以16进制显示
+  #-n 32 只显示前32个数
+  dd if=image bs=4096 skip=18 | hexdump -C -n 32
+#+END_EXAMPLE
+可以看到其输出的bitmap，前面的 =ff 07= 正好是11位，和前面的 =First inode: 11= 遥相呼应。
+#+BEGIN_EXAMPLE
+  00000000  ff 07 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+  00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+  00000020
+#+END_EXAMPLE
+*** 增加文件再次查看元数据
+#+BEGIN_EXAMPLE
+  mkdir hello
+  #文件模拟的硬盘需要 "-o loop" 命令
+  mount -o loop image hello
+  #新建文件
+  cd hello
+  echo "hello" > world
+  #再次查看inode bitmap
+  cd ../
+  dd if=image bs=4096 skip=18 | hexdump -C -n 32
+#+END_EXAMPLE
+查看其输出，发现第12位被置位了。
+#+BEGIN_EXAMPLE
+  00000000  ff 0f 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+  00000010  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+  00000020
+#+END_EXAMPLE
+*** 破坏元数据
+下面再来将其12位清零，以造成数据不一致的错误。
+#+BEGIN_EXAMPLE
+  #先卸载挂载
+  umount hello
+  vim image
+  #转为16进制显示
+  #:%!xxd
+  #计算其inode bitmap起始地址为 0x12000
+  #修改对应 0f 为 07
+  #保存后还原为二进制
+  #:%!xxd -r
+  dd if=image bs=4096 skip=18 | hexdump -C -n 32
+#+END_EXAMPLE
+通过以上操作可以发现其12位已经被清零了，并且此时使用 =fsck.ext4 image= 并无法检查出此错误。
+
+重新 =mount= 依然可以看到文件的inode还是12（因为此记录依然保存在文件夹的block中）。
+
+但如果此时再新建一个文件，便会报错 =Input/output error= ,此时通过 =dmesg= 可以看到错误提示。
+

@@ -292,599 +292,400 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan);
 #+END_SRC
 ** 实例
 #+BEGIN_SRC c
-#include <linux/dmaengine.h>
-#include <linux/module.h>
-#include <linux/version.h>
-#include <linux/kernel.h>
-#include <linux/dma-mapping.h>
-#include <linux/slab.h>
-#include <linux/cdev.h>
-#include <linux/device.h>
-#include <linux/fs.h>
-#include <linux/workqueue.h>
-#include <linux/of_dma.h>
-#include <linux/platform_device.h>
-#include <linux/init.h>
-#include <asm/ioctl.h>
-#include <asm/uaccess.h>
-
-#define pr_fmt(fmt)     "[driver] axidma:" fmt
-
-/*
- ,* module infomation
- ,*/
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("kcl");
-MODULE_DESCRIPTION("Linux driver for axi dma/cdma/vdma");
-MODULE_VERSION("0.1");
-
-/*
- ,* data struct
- ,*/
-
-#define KCAXIDMA_CACHED_BUFFERS
-
-#define KCAXIDMA_DRIVER_NAME        "kc_axidmaDriver"
-#define KCAXIDMA_DEVICE_NAME        "kc_axidmaDevice"
-#define KCAXIDMA_CLASS_NAME         "kc_axidmaClass"
-#define KCAXIDMA_DEVICE_NAME_LEN    (30)
-
-#define KCAXIDMA_CHANNEL_COUNT      (1)
-#define KCAXIDMA_ERROR              (-1)
-#define KCAXIDMA_LAST_CHANNEL       (1)
-#define KCAXIDMA_NOT_LAST_CHANNEL   (0)
-
-#define KCAXIDMA_BUFFER_SIZE        (4 * 1024 * 1024)
-
-typedef enum
-{
-        EN_KCAXIDMA_NORMAL,
-        EN_KCAXIDMA_BUSY,
-        EN_KCAXIDMA_TIMEOUT,
-        EN_KCAXIDMA_ERROR,
-}dmaErrorEnum;
-
-typedef struct
-{
-        unsigned char   pbuf[KCAXIDMA_BUFFER_SIZE];
-        dmaErrorEnum    en_dmaError;
-        unsigned int    length;
-        uint8_t         u8_index;
-}dmaChannelDataStr;
-
-typedef struct
-{
-        dmaChannelDataStr       *pstr_channelData;
-        dma_addr_t              channelPhyAddr;
-        struct device           *pstr_proxyDevice;
-        struct device           *pstr_dmaDevice;
-        dev_t                   devNode;
-        struct cdev             str_cdev;
-        struct class            *pstr_class;
-        struct dma_chan         *pstr_channel;
-        struct completion       str_cmp;
-        dma_cookie_t            cookie;
-        dma_addr_t              dmaHandle;
-        u32                     u32_direction;
-}dmaStr;
-
-static dmaStr   pstr_dmaChannels[KCAXIDMA_CHANNEL_COUNT];
-static dmaStr   *pstr_dmaUser;
-struct dma_async_tx_descriptor  *pstr_desc;
-
-#define DMA_SET_MAGIC   0
-#define DMA_SET_NUM     0
-#define DMA_CMD_SET     _IOW(DMA_SET_MAGIC, DMA_SET_NUM, unsigned long)
-
-#define DMA_GET_MAGIC   1
-#define DMA_GET_NUM     1
-#define DMA_CMD_GET     _IOWR(DMA_GET_MAGIC, DMA_GET_NUM, unsigned long)
-typedef enum
-{
-        EN_CMD_CLASS_SET = DMA_CMD_SET,
-        EN_CMD_CLASS_GET = DMA_CMD_GET,
-}cmdClassEN;
-typedef enum
-{
-        EN_CMD_SET_START,
-        EN_CMD_SET_STOP,
-}cmdSetEnum;
-typedef enum
-{
-        EN_CMD_GET_STATUS,
-}cmdGetEnum;
-typedef struct
-{
-        cmdSetEnum  en_cmdSet;
-}cmdSetStr;
-typedef struct
-{
-        bool        b_finished;
-}cmdBufIndex;
-typedef struct
-{
-        cmdGetEnum  en_cmdGet;
-        cmdBufIndex str_buf1Index;
-        cmdBufIndex str_buf2Index;
-        cmdSetEnum  en_userSet;
-        bool        b_update;
-}cmdGetStr;
-
-static cmdGetStr    str_cmdGet;
-
-static unsigned cachedEnable = 0;
-static bool     b_running = false;
-static uint8_t  u8_bufCount = 0;
-module_param(cachedEnable,int,S_IRUGO);
-MODULE_PARM_DESC(cachedEnable,"when cachedEnable = 1 cause the allocated memory to be cached");
-
-/*
- ,*function
- ,*/
-
-static void kcaxidma_callback(void * completion)
-{
-        static bool sb_bufferSw = true;
-
-        //pr_info("ok!\n");
-        str_cmdGet.b_update = true;
-        complete(completion);
-}
-static bool kcaxidma_fillBuf(dmaStr *pstr_dma)
-{
-        struct dma_async_tx_descriptor  *pstr_descBuf;
-        //enum dma_ctrl_flags en_flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT | DMA_PREP_CONTINUE;
-        enum dma_ctrl_flags en_flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
-        //dmaengine_terminate_all(pstr_dma->pstr_channel);
-        if(str_cmdGet.en_userSet == EN_CMD_SET_START)
-        {
-                pr_info("prepare buffer description\n");
-                pstr_descBuf = dmaengine_prep_dma_cyclic(pstr_dma->pstr_channel,pstr_dma->dmaHandle,pstr_dma->pstr_channelData->length * u8_bufCount,
-                                                         pstr_dma->pstr_channelData->length ,pstr_dma->u32_direction,en_flags);
-                if(!pstr_descBuf)
-                {
-                        pr_err("dmaengine_prep_slave_cyclic buffer error!\n");
-                        goto errorOut;
-                }
-                pstr_descBuf->callback = kcaxidma_callback;
-                pstr_descBuf->callback_param = &pstr_dma->str_cmp;
-                init_completion(&pstr_dma->str_cmp);
-                pstr_dma->cookie = dmaengine_submit(pstr_descBuf);
-                if(dma_submit_error(pstr_dma->cookie))
-                {
-                        pr_err("submit buffer error!\n");
-                        goto errorOut;
-                }
-                dma_async_issue_pending(pstr_dma->pstr_channel);
-        }
-
-        return true;
-errorOut:
-        return false;
-}
-static bool kcaxidma_transferStr(dmaStr *pstr_dma)
-{
-        if(kcaxidma_fillBuf(pstr_dma) == false)
-        {
-                goto errorOut;
-        }
-        return true;
-
-errorOut:
-        return false;
-}
-static void kcaxidma_transferWait(dmaStr *pstr_dma)
-{
-        unsigned long timeout = msecs_to_jiffies(10000);
-        enum dma_status en_status;
-
-        pstr_dma->pstr_channelData->en_dmaError = EN_KCAXIDMA_BUSY;
-
-        timeout = wait_for_completion_timeout(&pstr_dma->str_cmp,timeout);
-        en_status = dma_async_is_tx_complete(pstr_dma->pstr_channel,pstr_dma->cookie,NULL,NULL);
-
-        if(timeout == 0)
-        {
-                pstr_dma->pstr_channelData->en_dmaError = EN_KCAXIDMA_ERROR;
-                pr_err("DMA time out!\n");
-        }
-        else if(en_status != DMA_COMPLETE)
-        {
-                pstr_dma->pstr_channelData->en_dmaError = EN_KCAXIDMA_BUSY;
-                pr_info("callback status of :%s\n",
-                        en_status == DMA_ERROR ? "error" : "in progress");
-        }
-        else
-        {
-                pstr_dma->pstr_channelData->en_dmaError = EN_KCAXIDMA_NORMAL;
-        }
-
-        if(cachedEnable)
-        {
-                u32 map_direction;
-
-                if(pstr_dma->u32_direction == DMA_MEM_TO_DEV)
-                {
-                        map_direction = DMA_TO_DEVICE;
-                }
-                else
-                {
-                        map_direction = DMA_FROM_DEVICE;
-                }
-
-                dma_unmap_single(pstr_dma->pstr_dmaDevice,pstr_dma->dmaHandle,pstr_dma->pstr_channelData->length,
-                                 map_direction);
-        }
-}
-static void kcaxidma_parRst(void)
-{
-        str_cmdGet.b_update = false;
-}
-static void kcaxidma_transfer(dmaStr *pstr_dma)
-{
-        dmaChannelDataStr *pstr_channelData = pstr_dma->pstr_channelData;
-        u32 map_direction;
-        u32 u32_bufAddr = (u32)&pstr_channelData->pbuf;
-        unsigned char *pi8_buf = pstr_channelData->pbuf;
-
-        u8_bufCount = KCAXIDMA_BUFFER_SIZE / pstr_dma->pstr_channelData->length;
-
-        pr_info("transfer length = %d, count = %d\n",pstr_dma->pstr_channelData->length, u8_bufCount);
-
-
-
-        kcaxidma_parRst();
-        if(cachedEnable)
-        {
-                if(pstr_dma->u32_direction == DMA_MEM_TO_DEV)
-                {
-                        map_direction = DMA_TO_DEVICE;
-                        pr_info("tx direction\n");
-                }
-                else
-                {
-                        map_direction = DMA_FROM_DEVICE;
-                        pr_info("rx direction\n");
-                }
-
-                pstr_dma->dmaHandle = dma_map_single(pstr_dma->pstr_dmaDevice,pi8_buf,
-                                                     pstr_channelData->length,map_direction);
-        }
-        else
-        {
-                u32 offset = u32_bufAddr - (u32)pstr_channelData;
-                pr_info("offset = %u \n",offset);
-                pstr_dma->dmaHandle = (dma_addr_t)(pstr_dma->channelPhyAddr + offset);
-        }
-
-        pr_info("starting DMA transfers,dst addr = %#x\n",pstr_dma->dmaHandle);
-
-        if(kcaxidma_transferStr(pstr_dma) == false)
-        {
-                pr_err("start transfer failed!\n");
-                return;
-        }
-        b_running = true;
-
-        kcaxidma_transferWait(pstr_dma);
-}
-/*
- ,*character device
- ,*/
-static int dmachar_open(struct inode * pstr_node,struct file *pstr_file)
-{
-        pstr_file->private_data = container_of(pstr_node->i_cdev,dmaStr,str_cdev);
-        kcaxidma_parRst();
-        return 0;
-}
-static int dmachar_release(struct inode * pstr_node,struct file *pstr_file)
-{
-        return 0;
-}
-static long dmachar_ioctl(struct file *pstr_file,unsigned int cmd,unsigned long arg)
-{
-        long i32_return = 0;
-        cmdClassEN  en_cmdClass = (cmdClassEN)cmd;
-
-
-        switch(en_cmdClass)
-        {
-        case EN_CMD_CLASS_GET:
-        {
-                cmdGetStr   str_cmdGetTmp ;
-
-                if(copy_from_user(&str_cmdGetTmp, (cmdGetStr *)arg, sizeof(cmdGetStr)) != 0)
-                {
-                        pr_err("copy from user get failed!\n");
-                        i32_return = -1;
-                        goto out;
-                }
-
-                switch(str_cmdGetTmp.en_cmdGet)
-                {
-                case EN_CMD_GET_STATUS:
-                {
-                        str_cmdGetTmp.b_update = str_cmdGet.b_update;
-                        str_cmdGet.b_update = false;
-                        if(copy_to_user((cmdGetStr *)arg, &str_cmdGetTmp, sizeof(cmdGetStr)) != 0)
-                        {
-                                pr_err("copy to user get failed!\n");
-                        }
-                }break;
-                default:
-                {
-                        pr_info("get cmd get status [unknown]!\n");
-                        i32_return = -1;
-                        goto out;
-
-                }
-                }
-
-        }break;
-        case EN_CMD_CLASS_SET:
-        {
-                cmdSetStr   str_cmdSet ;
-
-                if(copy_from_user(&str_cmdSet, (cmdSetStr *)arg, sizeof(cmdSetStr)) != 0)
-                {
-                        pr_err("copy from user get failed!\n");
-                }
-
-                str_cmdGet.en_userSet = str_cmdSet.en_cmdSet;
-                switch(str_cmdSet.en_cmdSet)
-                {
-                case EN_CMD_SET_START:
-                {
-                        pstr_dmaUser= (dmaStr *)pstr_file->private_data;
-
-                        kcaxidma_transfer(pstr_dmaUser);
-
-                }break;
-                case EN_CMD_SET_STOP:
-                {
-                        if(b_running == true)
-                        {
-                                b_running = false;
-                                dmaengine_terminate_all(pstr_dmaUser->pstr_channel);
-                                kcaxidma_parRst();
-                                pr_info(" stopped\n");
-                        }
-                }break;
-                default:
-                {
-                        pr_info("get cmd set [unknown]\n");
-                        i32_return = -1;
-                        goto out;
-                }
-                }
-        }break;
-        default:
-        {
-                pr_info("unknown cmd class!\n");
-                i32_return = -1;
-                goto out;
-        }
-        }
-out:
-        return i32_return;
-}
-static int dmachar_mmap(struct file *pstr_file,struct vm_area_struct *vma)
-{
-        dmaStr *pstr_dma = (dmaStr *)pstr_file->private_data;
-
-        if(cachedEnable)
-        {
-                if(remap_pfn_range(vma,vma->vm_start,virt_to_phys((void *)pstr_dma->pstr_channelData) >> PAGE_SHIFT,
-                                   vma->vm_end - vma->vm_start,vma->vm_page_prot))
-                {
-                        return -EAGAIN;
-                }
-                return 0;
-        }
-        else
-        {
-                return dma_common_mmap(pstr_dma->pstr_dmaDevice,vma,pstr_dma->pstr_channelData,
-                                       pstr_dma->channelPhyAddr,vma->vm_end - vma->vm_start);
-        }
-
-        return 0;
-}
-static struct file_operations str_dmaFops =
-{
-        .owner = THIS_MODULE,
-        .open = dmachar_open,
-        .release = dmachar_release,
-        .unlocked_ioctl = dmachar_ioctl,
-            .mmap = dmachar_mmap
-};
-
-static int kcaxidma_cdevice_init(dmaStr *pstr_dma,char *pi8_name)
-{
-        int returnVal = 0;
-        char deviceName[KCAXIDMA_DEVICE_NAME_LEN];
-        static struct class *pstr_cClass = NULL;
-
-        returnVal = alloc_chrdev_region(&pstr_dma->devNode,0,1,KCAXIDMA_DEVICE_NAME);
-        if(returnVal)
-        {
-                pr_err("unable to get a char device number\n");
-                return returnVal;
-        }
-        pr_info("character major number = %d\n",pstr_dma->devNode);
-
-        cdev_init(&pstr_dma->str_cdev,&str_dmaFops);
-        pstr_dma->str_cdev.owner = THIS_MODULE;
-        returnVal = cdev_add(&pstr_dma->str_cdev,pstr_dma->devNode,1);
-        if(returnVal)
-        {
-                pr_err("unable to add char device\n");
-                goto init_error1;
-        }
-        if(!pstr_cClass)
-        {
-                pstr_cClass = class_create(THIS_MODULE,KCAXIDMA_CLASS_NAME);
-                if(IS_ERR(pstr_cClass))
-                {
-                        pr_err("Failed to register device class!\n");
-                        returnVal = KCAXIDMA_ERROR;
-                        goto init_error2;
-                }
-        }
-        pstr_dma->pstr_class = pstr_cClass;
-
-        sprintf(deviceName,"%s%s",KCAXIDMA_DEVICE_NAME,pi8_name);
-        pr_info("create device ->%s\n",deviceName);
-        pstr_dma->pstr_proxyDevice = device_create(pstr_dma->pstr_class,NULL,pstr_dma->devNode,NULL,deviceName);
-        if(IS_ERR(pstr_dma->pstr_proxyDevice))
-        {
-                pr_err("Failed to create device!\n");
-                returnVal = KCAXIDMA_ERROR;
-                goto init_error3;
-        }
-        return 0;
-
-init_error3:
-        class_destroy(pstr_cClass);
-init_error2:
-        cdev_del(&pstr_dma->str_cdev);
-init_error1:
-        unregister_chrdev_region(pstr_dma->devNode,1);
-
-        return returnVal;
-}
-static void kcaxidma_cdevice_exit(dmaStr *pstr_dma,int last_channel)
-{
-        if(pstr_dma->pstr_proxyDevice)
-        {
-                device_destroy(pstr_dma->pstr_class,pstr_dma->devNode);
-                if(last_channel)
-                {
-                        class_destroy(pstr_dma->pstr_class);
-                }
-                cdev_del(&pstr_dma->str_cdev);
-                unregister_chrdev_region(pstr_dma->devNode,1);
-        }
-}
-/*
- ,*platform device
- ,*/
-static int kcaxidma_channel_create(dmaStr *pstr_dma,char *pi8_channelName,char *pi8_name,u32 direction,struct platform_device *pstr_dev)
-{
-        int returnVal = 0;
-
-        pr_info("request channel : %s\r\n",pi8_channelName);
-        pstr_dma->pstr_channel = dma_request_slave_channel(&pstr_dev->dev,pi8_channelName);
-        if(pstr_dma->pstr_channel == NULL)
-        {
-                pr_err("DMA channel request error!\n");
-                return KCAXIDMA_ERROR;
-        }
-        pstr_dma->pstr_dmaDevice = &pstr_dma->pstr_channel->dev->device;
-
-        returnVal = kcaxidma_cdevice_init(pstr_dma,pi8_name);
-        if(returnVal)
-        {
-                pr_err("create character device error!\n");
-                return returnVal;
-        }
-
-        pstr_dma->u32_direction = direction;
-
-        if(cachedEnable)
-        {
-                pstr_dma->pstr_channelData = (dmaChannelDataStr *)kzalloc(sizeof(dmaChannelDataStr),GFP_KERNEL);
-
-                pr_info("Allocating cached memory at 0x%08x\r\n",(unsigned int)pstr_dma->pstr_channelData);
-        }
-        else
-        {
-                if(dma_set_coherent_mask(pstr_dma->pstr_proxyDevice,DMA_BIT_MASK(32)) != 0)
-                {
-                        pr_err(" set memory address limit error!\n");
-                }
-                pstr_dma->pstr_channelData = (dmaChannelDataStr *)dmam_alloc_coherent(pstr_dma->pstr_proxyDevice,
-                                                                                      sizeof(dmaChannelDataStr),&pstr_dma->channelPhyAddr,GFP_KERNEL);
-
-                pr_info("Allocating uncached memory at 0x%08x,phyaddr = %08x\r\n",(unsigned int)pstr_dma->pstr_channelData,
-                        pstr_dma->channelPhyAddr);
-        }
-
-        if(!pstr_dma->pstr_channelData)
-        {
-                pr_err("DMA allocation error!\r\n");
-                return KCAXIDMA_ERROR;
-        }
-
-        return 0;
-}
-static int kcaxidma_probe(struct platform_device *pstr_dev)
-{
-        int returnVal = 0;
-        returnVal = kcaxidma_channel_create(&pstr_dmaChannels[0],"axidma1","_rx",DMA_DEV_TO_MEM,pstr_dev);
-        if(returnVal)
-        {
-                return returnVal;
-        }
-        return 0;
-}
-static int kcaxidma_remove(struct platform_device *pstr_dev)
-{
-        int i = 0;
-
-        for(i = 0; i < KCAXIDMA_CHANNEL_COUNT - 1; i++)
-        {
-                if(pstr_dmaChannels[i].pstr_proxyDevice)
-                {
-                        kcaxidma_cdevice_exit(&pstr_dmaChannels[i],KCAXIDMA_NOT_LAST_CHANNEL);
-                }
-        }
-        kcaxidma_cdevice_exit(&pstr_dmaChannels[i],KCAXIDMA_LAST_CHANNEL);
-
-        for(i = 0; i < KCAXIDMA_CHANNEL_COUNT; i++)
-        {
-                if(pstr_dmaChannels[i].pstr_channel)
-                {
-                        dma_release_channel(pstr_dmaChannels[i].pstr_channel);
-                }
-
-                if(pstr_dmaChannels[i].pstr_channelData && cachedEnable)
-                {
-                        kfree((void *)pstr_dmaChannels[i].pstr_channelData);
-                }
-                else
-                {
-                        dmam_free_coherent(pstr_dmaChannels[i].pstr_proxyDevice,sizeof(dmaChannelDataStr),pstr_dmaChannels[i].pstr_channelData,GFP_KERNEL);
-                }
-        }
-        return 0;
-
-}
-static const struct of_device_id kcaxidma_of_ids[] =
-{
-        {.compatible = "xlnx,axi-dma-test-1.00.a",},
-        {}
-};
-static struct platform_driver kcaxidma_driver =
-{
-            .driver =
-            {
-                    .name = KCAXIDMA_DRIVER_NAME,
-                    .owner = THIS_MODULE,
-                    .of_match_table = kcaxidma_of_ids,
-            },
-            .probe = kcaxidma_probe,
-            .remove = kcaxidma_remove,
-};
-static int __init kcaxidma_init(void)
-{
-        return platform_driver_register(&kcaxidma_driver);
-}
-static void __exit kcaxidma_exit(void)
-{
-        platform_driver_unregister(&kcaxidma_driver);
-}
-
-module_init(kcaxidma_init);
-module_exit(kcaxidma_exit);
+  #define pr_fmt(fmt)     "[driver] axidma:" fmt
+  #include <linux/dmaengine.h>
+  #include <linux/module.h>
+  #include <linux/version.h>
+  #include <linux/kernel.h>
+  #include <linux/dma-mapping.h>
+  #include <linux/slab.h>
+  #include <linux/cdev.h>
+  #include <linux/miscdevice.h>
+  #include <linux/device.h>
+  #include <linux/fs.h>
+  #include <linux/workqueue.h>
+  #include <linux/of_dma.h>
+  #include <linux/platform_device.h>
+  #include <linux/init.h>
+  #include <asm/ioctl.h>
+  #include <asm/uaccess.h>
+
+  #include <linux/of_address.h>
+  #include <linux/of_device.h>
+  #include <linux/of_platform.h>
+
+
+  #define SG_MODE 0
+
+  /*
+   ,* module infomation
+   ,*/
+  MODULE_LICENSE("GPL v2");
+  MODULE_AUTHOR("kcl");
+  MODULE_DESCRIPTION("Linux driver for the axi dma");
+  MODULE_VERSION("ver0.1");
+
+  /*
+   ,* data struct
+   ,*/
+  #define KCAXIDMA_BUFFER_SIZE        (4 * 12 * 1024)
+
+  typedef enum
+  {
+      EN_KCAXIDMA_NORMAL,
+      EN_KCAXIDMA_BUSY,
+      EN_KCAXIDMA_TIMEOUT,
+      EN_KCAXIDMA_ERROR,
+  }dmaErrorEnum;
+
+  typedef struct
+  {
+      unsigned char   pbuf[KCAXIDMA_BUFFER_SIZE];
+      dmaErrorEnum    en_dmaError;
+      unsigned int    length;
+  }dmaChannelDataStr;
+
+  #define DMA_SET_MAGIC   0
+  #define DMA_SET_NUM     0
+  #define DMA_CMD_SET     _IOW(DMA_SET_MAGIC, DMA_SET_NUM, unsigned long)
+
+  #define DMA_GET_MAGIC   1
+  #define DMA_GET_NUM     1
+  #define DMA_CMD_GET     _IOWR(DMA_GET_MAGIC, DMA_GET_NUM, unsigned long)
+  typedef enum
+  {
+      EN_CMD_CLASS_SET = DMA_CMD_SET,
+      EN_CMD_CLASS_GET = DMA_CMD_GET,
+  }cmdClassEN;
+  typedef enum
+  {
+      EN_CMD_SET_START,
+      EN_CMD_SET_STOP,
+  }cmdSetEnum;
+  typedef enum
+  {
+      EN_CMD_GET_STATUS,
+  }cmdGetEnum;
+  typedef struct
+  {
+      cmdSetEnum  en_cmdSet;
+  }cmdSetStr;
+  typedef struct
+  {
+      cmdGetEnum  en_cmdGet;
+      cmdSetEnum  en_userSet;
+      bool        b_update;
+  }cmdGetStr;
+  typedef struct
+  {
+      dmaChannelDataStr       *pstr_channelData;
+      dma_addr_t              channelPhyAddr;
+      struct miscdevice       misc_dev;
+      struct dma_chan         *pstr_channel;
+      dma_cookie_t            cookie;
+      dma_addr_t              dmaHandle;
+      u32                     direction;
+      cmdGetStr               cmd;
+      uint8_t                 buf_cnt;
+      bool                    is_running;
+      struct device           *dev;
+  }dmaStr;
+
+  /*
+   ,*function
+   ,*/
+
+  static void kcaxidma_callback(void * completion)
+  {
+      dmaStr *dma = (dmaStr *)completion;
+
+      dma->cmd.b_update = true;
+  }
+  static bool kcaxidma_fillBuf(dmaStr *dma)
+  {
+      struct dma_async_tx_descriptor  *pstr_descBuf;
+      enum dma_ctrl_flags en_flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+      uint32_t buf_len = dma->pstr_channelData->length * dma->buf_cnt;
+
+      dma->cmd.b_update = false;
+      if(dma->cmd.en_userSet == EN_CMD_SET_START)
+      {
+  #if SG_MODE
+          struct scatterlist sg;
+          sg_init_table(&sg, 1);
+          sg_set_page(&sg, pfn_to_page(PFN_DOWN(dma->dmaHandle)),
+                  dma->pstr_channelData->length,
+                  offset_in_page(dma->dmaHandle));
+          sg_dma_len(&sg) = dma->pstr_channelData->length;
+          sg_dma_address(&sg) = dma->dmaHandle;
+          pstr_descBuf = dmaengine_prep_slave_sg(dma->pstr_channel,
+                  &sg, 1, dma->u32_direction, en_flags);
+  #else
+          pstr_descBuf = dmaengine_prep_dma_cyclic(dma->pstr_channel,dma->dmaHandle, buf_len,
+                  dma->pstr_channelData->length ,dma->direction,en_flags);
+  #endif
+          if(!pstr_descBuf)
+          {
+              pr_err("dmaengine_prep_slave_cyclic buffer error!\n");
+              goto errorOut;
+          }
+          pstr_descBuf->callback = kcaxidma_callback;
+          pstr_descBuf->callback_param = dma;
+          dma->cookie = dmaengine_submit(pstr_descBuf);
+          if(dma_submit_error(dma->cookie))
+          {
+              pr_err("submit buffer error!\n");
+              goto errorOut;
+          }
+          dma_async_issue_pending(dma->pstr_channel);
+          dma->is_running = true;
+      }
+
+      return true;
+  errorOut:
+      return false;
+  }
+  static bool kcaxidma_transferStr(dmaStr *dma)
+  {
+      if(kcaxidma_fillBuf(dma) == false)
+      {
+          goto errorOut;
+      }
+      return true;
+
+  errorOut:
+      return false;
+  }
+  static void kcaxidma_transfer(dmaStr *dma)
+  {
+      dmaChannelDataStr *pstr_channelData = dma->pstr_channelData;
+      u32 u32_bufAddr = (u32)&pstr_channelData->pbuf;
+
+      dma->buf_cnt = KCAXIDMA_BUFFER_SIZE / dma->pstr_channelData->length;
+
+
+      u32 offset = u32_bufAddr - (u32)pstr_channelData;
+      dma->dmaHandle = (dma_addr_t)(dma->channelPhyAddr + offset);
+
+       if(kcaxidma_transferStr(dma) == false)
+       {
+          pr_err("start transfer failed!\n");
+          return;
+       }
+  }
+  /*
+   ,*character device
+   ,*/
+  static int dmachar_open(struct inode * pstr_node,struct file *pstr_file)
+  {
+      return 0;
+  }
+  static int dmachar_release(struct inode * pstr_node,struct file *pstr_file)
+  {
+      return 0;
+  }
+  static long dmachar_ioctl(struct file *pstr_file,unsigned int cmd,unsigned long arg)
+  {
+      long i32_return = 0;
+      cmdClassEN  en_cmdClass = (cmdClassEN)cmd;
+
+      dmaStr *dma_user = container_of(pstr_file->private_data, dmaStr, misc_dev);
+
+      switch(en_cmdClass)
+      {
+          case EN_CMD_CLASS_GET:
+          {
+              cmdGetStr   cmd_get ;
+              if(copy_from_user(&cmd_get, (cmdGetStr *)arg, sizeof(cmdGetStr)) != 0)
+              {
+                  pr_err("copy from user get failed!\n");
+                  i32_return = -1;
+                  goto out;
+              }
+              switch(cmd_get.en_cmdGet)
+              {
+                  case EN_CMD_GET_STATUS:
+                  {
+                      if(copy_to_user((cmdGetStr *)arg, &dma_user->cmd, sizeof(cmdGetStr)) != 0)
+                      {
+                          pr_err("copy to user get failed!\n");
+                      }
+                      dma_user->cmd.b_update = false;
+                  }break;
+                  default:
+                  {
+                      pr_err("get cmd get status [unknown]!\n");
+                      i32_return = -1;
+                      goto out;
+                  }
+              }
+          }break;
+          case EN_CMD_CLASS_SET:
+          {
+              if(copy_from_user(&dma_user->cmd.en_userSet, (cmdSetStr *)arg, sizeof(cmdSetStr)) != 0)
+              {
+                  pr_err("copy from user get failed!\n");
+                  i32_return = -1;
+                  goto out;
+              }
+
+              switch(dma_user->cmd.en_userSet)
+              {
+                  case EN_CMD_SET_START:
+                  {
+                      kcaxidma_transfer(dma_user);
+
+                  }break;
+                  case EN_CMD_SET_STOP:
+                  {
+                      if(dma_user->is_running == true)
+                      {
+                          dma_user->is_running = false;
+                          dmaengine_terminate_all(dma_user->pstr_channel);
+                      }
+                  }break;
+                  default:
+                  {
+                      pr_info("get cmd set [unknown]\n");
+                      i32_return = -1;
+                      goto out;
+                  }
+              }
+          }break;
+          default:
+          {
+              pr_info("unknown cmd class!\n");
+              i32_return = -1;
+              goto out;
+          }
+      }
+  out:
+      return i32_return;
+  }
+  static int dmachar_mmap(struct file *pstr_file,struct vm_area_struct *vma)
+  {
+      dmaStr *dma_user = container_of(pstr_file->private_data, dmaStr, misc_dev);
+
+      return dma_common_mmap(dma_user->dev,vma,dma_user->pstr_channelData,
+                             dma_user->channelPhyAddr,vma->vm_end - vma->vm_start);
+
+  }
+  static struct file_operations dma_fops =
+  {
+      .owner = THIS_MODULE,
+      .open = dmachar_open,
+      .release = dmachar_release,
+      .unlocked_ioctl = dmachar_ioctl,
+      .mmap = dmachar_mmap
+  };
+
+  static int kcaxidma_probe(struct platform_device *pstr_dev)
+  {
+      int returnVal = 0;
+      struct device_node *of_node = pstr_dev->dev.of_node;
+      char *request_name = NULL;
+
+      dmaStr *dma_user = (dmaStr *)devm_kzalloc(&pstr_dev->dev, sizeof(dmaStr *), GFP_KERNEL);
+      dma_user->dev = &pstr_dev->dev;
+
+      if(of_property_read_string_index(of_node, "dma-names", 1, &request_name) != 0)
+      {
+          if(of_property_read_string(of_node, "dma-names", &request_name) != 0)
+          {
+              returnVal = -EINVAL;
+              goto quick_out;
+          }
+      }
+
+      dma_user->pstr_channel = dma_request_slave_channel(&pstr_dev->dev, request_name);
+      if(dma_user->pstr_channel == NULL)
+      {
+          pr_err("DMA channel request error!\n");
+          returnVal =  -EINVAL;
+          goto quick_out;
+      }
+      if((strcmp(request_name, "dma_fft_get") == 0) ||\
+         (strcmp(request_name, "dma_demodu_get") == 0))
+      {
+          dma_user->direction = DMA_DEV_TO_MEM;
+      }
+      else if(strcmp(request_name, "dma_send") == 0)
+      {
+          dma_user->direction = DMA_MEM_TO_DEV;
+      }
+      else
+      {
+          dev_err(dma_user->dev, "can not get direction!\n");
+          returnVal =  -EINVAL;
+          goto quick_out;
+      }
+
+      if(dma_set_coherent_mask(&pstr_dev->dev,DMA_BIT_MASK(32)) != 0)
+      {
+          pr_err(" set memory address limit error!\n");
+      }
+      dma_user->pstr_channelData = (dmaChannelDataStr *)dmam_alloc_coherent(&pstr_dev->dev,
+              sizeof(dmaChannelDataStr),&dma_user->channelPhyAddr,GFP_KERNEL);
+
+      if(!dma_user->pstr_channelData)
+      {
+          pr_err("DMA allocation error!\r\n");
+          returnVal =  -EINVAL;
+          goto quick_out;
+      }
+
+      dma_user->misc_dev.minor = MISC_DYNAMIC_MINOR;
+      dma_user->misc_dev.name = request_name;
+      dma_user->misc_dev.fops = &dma_fops;
+      platform_set_drvdata(pstr_dev, dma_user);
+
+      //! 申请注册一个杂散设备
+      returnVal = misc_register(&dma_user->misc_dev);
+      if(returnVal < 0)
+      {
+          returnVal =  -EINVAL;
+          goto quick_out;
+      }
+  quick_out:
+      return returnVal;
+  }
+  static int kcaxidma_remove(struct platform_device *pstr_dev)
+  {
+      int i = 0;
+    dmaStr *dma_user = platform_get_drvdata(pstr_dev);
+
+      platform_set_drvdata(pstr_dev, NULL);
+      dma_release_channel(dma_user->pstr_channel);
+      misc_deregister(&dma_user->misc_dev);
+
+      return 0;
+  }
+  static const struct of_device_id kcaxidma_of_ids[] =
+  {
+      {.compatible = "kc,axi_dma",},
+      {}
+  };
+  static struct platform_driver kcaxidma_driver =
+  {
+      .driver =
+      {
+          .name = "kc_axidma",
+          .owner = THIS_MODULE,
+          .of_match_table = kcaxidma_of_ids,
+      },
+      .probe = kcaxidma_probe,
+      .remove = kcaxidma_remove,
+  };
+  static int __init kcaxidma_init(void)
+  {
+      return platform_driver_register(&kcaxidma_driver);
+  }
+  static void __exit kcaxidma_exit(void)
+  {
+      platform_driver_unregister(&kcaxidma_driver);
+  }
+
+  module_init(kcaxidma_init);
+  module_exit(kcaxidma_exit);
 
 #+END_SRC
