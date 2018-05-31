@@ -32,8 +32,15 @@
 按照惯例使用命令 =./configure --help= 查看使用方式，得出交叉编译命令为：
 #+BEGIN_EXAMPLE
   make distclean
+
+  ##### 注意 ！！！
+  #使用vim编辑 configure.ac 屏蔽掉 AC_FUNC_MALLOC AC_FUNC_REALLOC 两行
+  #如果不屏蔽则会出现错误  undefined reference to rpl_malloc / rpl_realloc
+  #具体原因参看 http://rickfoosusa.blogspot.com/2011/11/howto-fix-undefined-reference-to.html
+
   ./bootstrap.sh     
   export CC=arm-linux-gnueabihf-gcc
+  #如果要修改在目标机的安装路径，还要增加 --prefix=<path>
   ./configure --host=arm 
   make
   make install  DESTDIR=/home/cec/liquid
