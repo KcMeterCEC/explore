@@ -1,0 +1,29 @@
+#+TITLE: [What]Linux 程序错误输出
+#+DATE:  <2018-06-02 六> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, basic
+#+NAMA: <linux_operations_basic_errno.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+回顾Linux应用程序编程中的错误输出。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 规则
+当系统函数出现错误时，全局变量 =errno= 的值便会被设置，此值的定义位于文件 =<errno.h>= 。
+
+如果想要看 =errno= 可以取哪些值，使用 =man errno= 列出详细列表。
+* 使用
+一般情况下不会直接使用 =errno= 这个变量，而是使用函数 =perror()= :
+#+BEGIN_SRC c
+  //输出格式： "s" + ": " + "\n"(所以输入字符串中一般不带换行)
+  void perror( const char *s );
+#+END_SRC
+如果不想使用 =perror()= 的输出格式，也可以单独提取字符串来自己拼接，提取字符串使用 =strerror()= :
+#+BEGIN_SRC c
+  char *strerror(int errnum);
+#+END_SRC
+
+
