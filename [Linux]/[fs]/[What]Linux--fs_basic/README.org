@@ -14,18 +14,23 @@
 * 编程接口
 此节只列出Linux和c库操作接口，具体的详细信息还是要找 =man= 。
 - 其实在实际应用中，还是尽量使用标准的 c/c++ 库便于以后移植。
-** 文件的创建
-*** linux
+
+需要注意的是：标准的ISOC库的I/O操作默认是带有缓存的，也就是填充一定的缓存后才会区调用系统接口。
+而如果直接使用POSIX标准的系统接口，相当于上层没有做缓存，但实际上 *内核为了尽量批量化的操作I/O，其内部也会做缓存。*
+** 常用接口
+*** 文件的创建
+- linux
 #+BEGIN_SRC c
-/**
- ,* @brief 设置文件在创建时需要去掉的权限
- ,*/
-int umask(int newmask);
-/**
- ,* @brief 创建文件并设置权限
- ,* @note 权限与 umask 相与决定最终的权限
- ,*/
-int creat(const char *pathname, mode_t mode);
+  /**
+   ,* @brief 设置文件在创建时需要去掉的权限
+   ,*/
+  int umask(int newmask);
+  /**
+   ,* @brief 创建文件并设置权限
+   ,* @note 权限与 umask 相与决定最终的权限
+   ,* - 此函数使用较少，一般使用 open(path, O_RDWR | O_CREAT | O_TRUNC, mode);
+   ,*/
+  int creat(const char *pathname, mode_t mode);
 #+END_SRC
 | mode value | 含义                 |
 |------------+----------------------|
@@ -43,20 +48,22 @@ int creat(const char *pathname, mode_t mode);
 | S_IRWXO    | 其他人可读、写、执行 |
 | S_ISUID    | 设置用户执行ID       |
 | S_ISGID    | 设置组执行ID         |
-*** c 创建及打开
+- c 创建及打开
 #+BEGIN_SRC c
 FILE *fopen( const char *filename, const char *mode );
 #+END_SRC
 详解: [[http://zh.cppreference.com/w/c/io/fopen][fopen]]
-** 文件打开
-*** linux
+*** 文件打开
+- linux
 #+BEGIN_SRC c
-/**
- ,* @brief 以flags指定的方式打开 pathname 指定的文件
- ,* @note 当 flags 为 O_CREAT 时，需要指定其 mode
- ,*/
-int open(const char *pathname, int flags);
-int open(const char *pathname, int flags, mode_t mode);
+  /**
+   ,* @brief 以flags指定的方式打开 pathname 指定的文件
+   ,* @note
+   ,* 1. 当 flags 为 O_CREAT 时，需要指定其 mode
+   ,* 2. 当pathname为相对路径时，可以使用 openat 为其指定一个 dirfd，以此dir为相对路径
+   ,*/
+  int open(const char *pathname, int flags, .../*mode_t mode*/);
+  int openat(int dirfd, const char *pathname, int flags, .../*mode_t mode*/);
 #+END_SRC
 | flags value | 含义                                       |
 |-------------+--------------------------------------------|
@@ -68,14 +75,19 @@ int open(const char *pathname, int flags, mode_t mode);
 | O_EXCL      | 如果使用了O_CREATE且文件存在，就会发生错误 |
 | O_NOBLOCK   | 以非阻塞的方式打开                         |
 | O_TRUNC     | 如果文件存在则删除其内容                   |
+| ...         | ...                                        |
 
-** 文件读写
-*** linux
+- 在POSIX标准中的标准输入、输出、错误对应的宏依次为 =STDIN_FILENO,STDOUT_FILENO,STDERR_FILENO= 位于头文件 =<unistd.h>= 中
+
+*** 文件读写
+- linux
+    进行read和write大量数据读写时，需要考虑单次读写的字节数，取文件系统的block大小(比如4096字节)，
+能在尽量减小系统调用的同时保证较高的写入效率。
 #+BEGIN_SRC c
-ssize_t read(int fd, void *buf, size_t count);
-ssize_t write(int fd, const void *buf, size_t count);
+  ssize_t read(int fd, void *buf, size_t count);
+  ssize_t write(int fd, const void *buf, size_t count);
 #+END_SRC
-*** c
+- c
 #+BEGIN_SRC c
 size_t fread( void          *buffer, size_t size, size_t count,
               FILE          *stream );
@@ -83,118 +95,140 @@ size_t fwrite( const void *buffer, size_t size, size_t count,
                FILE *stream );
 #+END_SRC
 详解： [[http://zh.cppreference.com/w/c/io/fread][fread]]  [[http://zh.cppreference.com/w/c/io/fwrite][fwrite]]
-** 文件定位
-*** linux
+*** 文件定位
+- linux
 #+BEGIN_SRC c
-/**
- ,* @brief 以 whence 为起始移动 offset 
- ,*/
-off_t lseek(int fd, off_t offset, int whence);
+  /**
+   ,* @brief 以 whence 为起始移动 offset 字节
+   ,* @note
+   ,* 1. 获取当前文件位置使用 currpos = lseek(fd, 0, SEEK_CUR);
+   ,* 当返回负数代表此文件对象不能做移动操作，比如FIFO，SOCKET
+   ,*/
+  off_t lseek(int fd, off_t offset, int whence);
 #+END_SRC
 | whence value | 含义     |
 |--------------+----------|
 | SEEK_SET     | 文件开头 |
 | SEEK_CUR     | 当前位置 |
 | SEEK_END     | 文件尾   |
-*** c
+- c
 #+BEGIN_SRC c
 int fseek( FILE *stream, long offset, int origin );
 #+END_SRC
 详解： [[http://zh.cppreference.com/w/c/io/fseek][fseek]]
-** 文件关闭
-*** linux
+*** 文件关闭
+- linux
 #+BEGIN_SRC c
-int close(int fd);
+  int close(int fd);
 #+END_SRC
-*** c
+- c
 #+BEGIN_SRC c
 int fclose( FILE *stream );
 #+END_SRC
 详解： [[http://zh.cppreference.com/w/c/io/fclose][fclose]]
-** 实例
+*** 实例
 #+BEGIN_SRC c
-/*!
- ,* ### 文件操作
- ,* 1. 创建
- ,* > int create(const char *filename, mode_t mode);
- ,* > mode 与 umask (mode & umask)共同决定文件的最终权限
- ,* > int umask(int newmask);
- ,*
- ,* > FILE *fopen(const char *path, const char *mode);
- ,* > mode --> "r"/"rb"/"w"/"wb"/"a"/"ab"/"r+"/"r+b"/"rb+"/"w+"/"w+b"/"wb+"/"a+"/"a+b"/"ab+"
- ,* 2. 打开
- ,* > int open(const char *pathname, int flags);
- ,* > int open(const char *pathname, int flags, mode_t mode);
- ,* > flag --> O_RDONLY / O_WRONLY / O_RDWR / O_APPEND / O_CREAT / O_EXEC / O_NOBLOCK / O_TRUNC;
- ,* > mode --> S_IRUSR / S_IWUSR/ S_IXUSR / S_IRWXU / S_IRGRP / S_IWGRP / S_IXGRP / S_IRWXGRP / S_IROTH / S_IWOTH / S_IXOTH / S_IRWXO / S_ISUID / S_ISGID;
- ,*
- ,* 3. 读写
- ,* > int read(int fd, const void *buf, size_t length);
- ,* > int write(int fd, const void *buf, size_t length);
- ,*
- ,* > int fgetc(FILE *stream);
- ,* > int fputc(int c, FILE *stream);
- ,* > char *fgets(char *s, int n, FILE *stream);
- ,* > int fputs(const char *s, FILE *stream);
- ,* > int fprintf(FILE *stream, const char *format, ...);
- ,* > int fscanf(FILE *stream, const char *format, ...);
- ,* > size_t fread(void *ptr, size_t size, size_t n, FILE *stream);
- ,* > size_t fwrite(const void *ptr, size_t size, size_t n, FILE *stream);
- ,*
- ,* 4. 定位
- ,* > int lseek(int fd, offset_t offset, int whence);
- ,* > whence --> SEEK_SET / SEEK_CUR / SEEK_END;
- ,* > 得到文件长度 lseek(fd, 0, SEEK_END);
- ,*
- ,* > int fgetpos(FILE *stream, fpos_t *pos);
- ,* > int fsetpos(FILE *stream, const fpos_t *pos);
- ,* > int fseek(FILE *stream, long offset, int whence);
- ,*
- ,* 5. 关闭
- ,* > int close(int fd);
- ,*
- ,* > int fclose(FILE *stream);
- ,*
- ,*/
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <string.h>
+  /*!
+   ,* ### 文件操作
+   ,* 1. 创建
+   ,* > int create(const char *filename, mode_t mode);
+   ,* > mode 与 umask (mode & umask)共同决定文件的最终权限
+   ,* > int umask(int newmask);
+   ,*
+   ,* > FILE *fopen(const char *path, const char *mode);
+   ,* > mode --> "r"/"rb"/"w"/"wb"/"a"/"ab"/"r+"/"r+b"/"rb+"/"w+"/"w+b"/"wb+"/"a+"/"a+b"/"ab+"
+   ,* 2. 打开
+   ,* > int open(const char *pathname, int flags);
+   ,* > int open(const char *pathname, int flags, mode_t mode);
+   ,* > flag --> O_RDONLY / O_WRONLY / O_RDWR / O_APPEND / O_CREAT / O_EXEC / O_NOBLOCK / O_TRUNC;
+   ,* > mode --> S_IRUSR / S_IWUSR/ S_IXUSR / S_IRWXU / S_IRGRP / S_IWGRP / S_IXGRP / S_IRWXGRP / S_IROTH / S_IWOTH / S_IXOTH / S_IRWXO / S_ISUID / S_ISGID;
+   ,*
+   ,* 3. 读写
+   ,* > int read(int fd, const void *buf, size_t length);
+   ,* > int write(int fd, const void *buf, size_t length);
+   ,*
+   ,* > int fgetc(FILE *stream);
+   ,* > int fputc(int c, FILE *stream);
+   ,* > char *fgets(char *s, int n, FILE *stream);
+   ,* > int fputs(const char *s, FILE *stream);
+   ,* > int fprintf(FILE *stream, const char *format, ...);
+   ,* > int fscanf(FILE *stream, const char *format, ...);
+   ,* > size_t fread(void *ptr, size_t size, size_t n, FILE *stream);
+   ,* > size_t fwrite(const void *ptr, size_t size, size_t n, FILE *stream);
+   ,*
+   ,* 4. 定位
+   ,* > int lseek(int fd, offset_t offset, int whence);
+   ,* > whence --> SEEK_SET / SEEK_CUR / SEEK_END;
+   ,* > 得到文件长度 lseek(fd, 0, SEEK_END);
+   ,*
+   ,* > int fgetpos(FILE *stream, fpos_t *pos);
+   ,* > int fsetpos(FILE *stream, const fpos_t *pos);
+   ,* > int fseek(FILE *stream, long offset, int whence);
+   ,*
+   ,* 5. 关闭
+   ,* > int close(int fd);
+   ,*
+   ,* > int fclose(FILE *stream);
+   ,*
+   ,*/
+  #include <sys/types.h>
+  #include <sys/stat.h>
+  #include <fcntl.h>
+  #include <unistd.h>
+  #include <stdio.h>
+  #include <string.h>
 
-#define LENGTH      (100)
+  #define LENGTH      (100)
 
-int main(int argc, char *argv[])
-{
-        int fd, len;
-        char str[LENGTH];
-        FILE *p_fd;
+  int main(int argc, char *argv[])
+  {
+          int fd, len;
+          char str[LENGTH];
+          FILE *p_fd;
 
-        fd = open("hello.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-        if(fd)
-        {
-                write(fd, "Hello world", strlen("Hello world"));
-                close(fd);
-        }
-        p_fd = fopen("hello_lib.txt", "w+");
-        if(p_fd)
-        {
-                fputs("Hello world! ^_^ \n", p_fd);
-                fclose(p_fd);
-        }
+          fd = open("hello.txt", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+          if(fd)
+          {
+                  write(fd, "Hello world", strlen("Hello world"));
+                  close(fd);
+          }
+          p_fd = fopen("hello_lib.txt", "w+");
+          if(p_fd)
+          {
+                  fputs("Hello world! ^_^ \n", p_fd);
+                  fclose(p_fd);
+          }
 
-        fd = open("hello.txt", O_RDWR);
-        len = read(fd, str, LENGTH);
-        str[len] = '\0';
-        printf("%s\n", str);
-        close(fd);
+          fd = open("hello.txt", O_RDWR);
+          len = read(fd, str, LENGTH);
+          str[len] = '\0';
+          printf("%s\n", str);
+          close(fd);
 
-        p_fd = fopen("hello_lib.txt", "r");
-        fgets(str, LENGTH, p_fd);
-        printf("%s\n", str);
-        fclose(p_fd);
-}
+          p_fd = fopen("hello_lib.txt", "r");
+          fgets(str, LENGTH, p_fd);
+          printf("%s\n", str);
+          fclose(p_fd);
+  }
+#+END_SRC
+** 多个进程打开同一个文件
+多个进程打开同一个文件时，每个进程的 =task_struct= 都会包含此文件的资源描述，但是最终它们都是指向同一个 =inode= 。
+- 每个文件资源描述都包含对该文件的操作状态，位置偏移等信息
+- 当进行 =lseek= 这种操作时，如果没有造成文件的扩大，其实是直接操作的资源描述结构体，而没有去操作inode。
+*** 互斥操作
+如果有多个进程在操作同一个文件，则很有可能会造成竞态，有以下方式来避免此问题的发生：
+- pread , pwrite
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 在文件为起始的 offset 字节处开始读或者写
+   ,* @note :
+   ,* 1. 这两个函数的操作是原子性的
+   ,* 2. 此函数并不会改变对应进程本身所保存的 offset
+   ,*/
+  ssize_t pread(int fd, void *buf, size_t count, off_t offset);
+
+  ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
+
 #+END_SRC
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。
