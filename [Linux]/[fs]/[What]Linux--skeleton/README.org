@@ -1,0 +1,34 @@
+#+TITLE: [What]Linux文件系统底层流程
+#+DATE:  <2018-06-04 一> 
+#+TAGS: filesystem
+#+LAYOUT: post 
+#+CATEGORIES: linux, fs, struct
+#+NAME: <linux_fs_struct_skeleton.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+梳理其底层流程，理解最后是如何访问到硬盘的。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+[[./vfs_fileoperations.jpg]]
+
+* 访问硬盘整体视野
+由上图可以看出，虚拟文件系统抽象了各种文件系统的操作为一个 =struct file_operations= 结构体中，至于这个 =file_operations= 如何访问到硬盘呢？
+[[./vfs_harddisk.jpg]]
+
+具体流程如上图所示：
+** 由进程到inode
+- 进程在内容中是以 =task_struct= 来体现的，当一个进程打开一个文件时，其会获取此文件的资源，并且返回文件对应的索引。
+- 通过此索引，就可以在 =fd_arrary= 中获取一个文件的 =struct file= 整体描述，此结构体中就得到了与此文件所对应的 =inode= 。
+- inode中就有文件系统所填充好的 =file_operations= ，此时就可以映射到VFS的file_operations 操作
+** 由inode到硬盘
+- 当应用层调用文件操作接口时，首先从 =inode= 的 =page_tree= 中寻找其要读的部分是否已经被读取缓存，如果缓存命中，则读取缓存并返回
+  + 此部如果正确执行，那就不会访问硬盘
+- 当缓存不命中，再调用 =address_space_operations= 来对硬盘进行真正的读写操作。并将其对应的 =page= 写入 =page cache= 中
+  + 这个过程和CPU的数据缓存和指令缓存类似
+* 访问硬盘的细节
+
+
+
+

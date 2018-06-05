@@ -1040,6 +1040,12 @@ unlinkat(AT_FDCWD, "hello.txt", 0)      = -1 EPERM (Operation not permitted)
 #+END_SRC
 - 在实现的过程中发现，其在增加inode 和 dir content 时是直接简单粗暴的在尾部增加，很明显在删除文件时会产生漏洞，所以此bug也需要修复。
 
+* FUSE
+[[./fuse.jpg]]
+
+如上图所示，FUSE仅仅在内核中实现了一个简单的模块，用于接口VFS和用户空间，文件系统的操作细节则存在于用户空间中。
+- 这种方式导致操作效率低但便于调试
+
 * 比较重要的数据结构
 #+BEGIN_SRC c
 /**
