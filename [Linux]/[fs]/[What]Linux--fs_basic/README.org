@@ -23,6 +23,8 @@
 #+BEGIN_SRC c
   /**
    ,* @brief 设置文件在创建时需要去掉的权限
+   ,* @note : 此设置仅影响此进程的umask，不会影响shell默认的umask
+   ,* 使用shell命令 umask可以查看shell 设置输出依次为: <special bits><user><group><other> 
    ,*/
   int umask(int newmask);
   /**
@@ -229,6 +231,230 @@ int fclose( FILE *stream );
 
   ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 
+#+END_SRC
+** 文件索引的复制
+使用以下函数可以完成文件索引的复制(也就是两个不同的索引指向同一个文件描述资源，它们具有联动的偏移位置)
+#+BEGIN_SRC c
+  int dup(int oldfd);
+  int dup2(int oldfd, int newfd);
+#+END_SRC
+** 主动写回数据到硬盘
+一般的文件读写数据都会被存在 page cache 中，待内核在合适的时间写入硬盘，为了强制同步，可以使用下面函数:
+#+BEGIN_SRC c
+  /**
+   ,* @brief 以阻塞的方式等待某个文件同步
+   ,*/
+  int fsync(int fd);
+
+  /**
+   ,* @brief 以阻塞的方式同步文件数据，文件的元数据不一定会同步
+   ,* @note : 只有一些重要的修改才会同步元数据，比如文件大小改变了
+   ,* 但文件的方式文件改变了，是不会同步元数据的
+   ,*/
+  int fdatasync(int fd);
+
+  /**
+   ,* @brief 给内核发送同步消息，并不会等待内核操作完成
+   ,* @note shell 中的 sync 命令 也是调用的此函数
+   ,*/
+  void sync(void);
+#+END_SRC
+** 文件运行时控制
+当一个文件已经打开，要修改它的一些属性时，可以使用函数 =fcntl= .
+#+BEGIN_SRC c
+  int fcntl(int fd, int cmd, ... /* arg */ );
+#+END_SRC
+此函数具有以下用途：
+1. 生成一个文件描述符的副本
+2. 获取或设置文件描述符标记
+3. 获取或设置文件状态
+4. 获取或设置文件拥有者关系
+5. 获取或设置文件锁
+*需要注意的是：* 当要修改某个文件状态时，应该像操作寄存器位那样通过 =读-修改-写= 的方式操作（也就是先读取当前设置值，然后写入新设置的那一位，再回写回去）。
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <fcntl.h>
+
+  int main(void)
+  {
+      int status = 0;
+      int fd = open("./test", O_CREAT | O_WRONLY);
+      if(fd == -1)
+      {
+          perror("open file failed:");
+          goto quick_out;
+      }
+      if((status = fcntl(fd, F_GETFL, 0)) == -1)
+      {
+          perror("can not get file status:");
+          goto close_out;
+      }
+      switch(status & O_ACCMODE)
+      {
+          case O_RDONLY:
+              {
+                  printf("read only\n");
+              }break;
+          case O_WRONLY:
+              {
+                  printf("write only\n");
+              }break;
+          case O_RDWR:
+              {
+                  printf("read write\n");
+              }break;
+          default:
+              printf("can not get file mode!\n");
+      }
+      if(status & O_APPEND)
+      {
+          printf("append\n");
+      }
+      if(status & O_NONBLOCK)
+      {
+          printf("nonblocking\n");
+      }
+      if(status & O_SYNC)
+      {
+          printf("synchronous writes\n");
+      }
+  close_out:
+      close(fd);
+      remove("./test");
+  quick_out:
+      return 0;
+  }
+#+END_SRC
+另外的一个控制函数便是 =ioctl= ，这个在驱动的操作中经常使用：
+#+BEGIN_SRC c
+  int ioctl(int fd, unsigned long request, ...);
+#+END_SRC
+** 文件的权限与属性
+*** 获取文件属性
+平时使用最多的 shell 命令 =ls -al= 就是提取的文件属性来显示。
+#+BEGIN_SRC c
+  struct stat {
+      dev_t     st_dev;         /* ID of device containing file */
+      ino_t     st_ino;         /* inode number */
+      mode_t    st_mode;        /* file type */
+      nlink_t   st_nlink;       /* number of hard links */
+      uid_t     st_uid;         /* user ID of owner */
+      gid_t     st_gid;         /* group ID of owner */
+      dev_t     st_rdev;        /* device ID (if special file) */
+      off_t     st_size;        /* total size, in bytes */
+      blksize_t st_blksize;     /* blocksize for filesystem I/O */
+      blkcnt_t  st_blocks;      /* number of 512B blocks allocated */
+
+      /* Since Linux 2.6, the kernel supports nanosecond
+        precision for the following timestamp fields.
+        For the details before Linux 2.6, see NOTES. */
+
+      struct timespec st_atim;  /* time of last access */
+      struct timespec st_mtim;  /* time of last modification */
+      struct timespec st_ctim;  /* time of last status change */
+
+  #define st_atime st_atim.tv_sec      /* Backward compatibility */
+  #define st_mtime st_mtim.tv_sec
+  #define st_ctime st_ctim.tv_sec
+  };
+
+  /**
+   ,* @brief 获取文件的属性并存储于结构 stat 中
+   ,*/
+  //如果文件是符号链接，那么获取被链接文件的属性
+  int stat(const char *pathname, struct stat *buf);
+  //获取已打开文件的属性
+  int fstat(int fd, struct stat *buf);
+  //如果文件是符号链接，那么获取该符号链接的属性
+  int lstat(const char *pathname, struct stat *buf);
+
+  //根据用户指定的 dirfd 和提供的路径 pathname 来获取文件属性，
+  //flags 用于控制是否读取符号链接本身
+  int fstatat(int dirfd, const char *pathname, struct stat *buf,
+              int flags);
+#+END_SRC
+如下代码所示，使用lstat来判断文件类型:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <sys/types.h>
+  #include <sys/stat.h>
+  #include <unistd.h>
+
+  int main(int argc, char *argv[])
+  {
+      struct stat file_stat = {0};
+
+      if(argc != 2)
+      {
+          printf("usage: ./a.out <file_path>\n");
+          goto quick_out;
+      }
+      if(lstat(argv[1], &file_stat) == -1)
+      {
+          perror("can not get file status:");
+          goto quick_out;
+      }
+      printf("The file type is : ");
+      if(S_ISREG(file_stat.st_mode))
+      {
+          printf("regular file");
+      }
+      else if(S_ISDIR(file_stat.st_mode))
+      {
+          printf("directory");
+      }
+      else if(S_ISSOCK(file_stat.st_mode))
+      {
+          printf("socket");
+      }
+      else if(S_ISCHR(file_stat.st_mode))
+      {
+          printf("character device");
+      }
+      else if(S_ISBLK(file_stat.st_mode))
+      {
+          printf("block device");
+      }
+      else if(S_ISFIFO(file_stat.st_mode))
+      {
+          printf("FIFO");
+      }
+      else if(S_ISLNK(file_stat.st_mode))
+      {
+          printf("symbolic link");
+      }
+      else
+      {
+          printf("unknown!");
+      }
+
+      printf("\n");
+
+  quick_out:
+      return 0;
+  }
+#+END_SRC
+*** 操作文件的权限
+与操作文件相关的ID具有下面几类：
+| 类型                           | 说明                                                                                    |
+|--------------------------------+-----------------------------------------------------------------------------------------|
+| 真实用户ID和真实组ID           | 表示当前是哪个用户位于哪个组正在访问此文件                                              |
+| 有效用户ID，有效组ID和补充组ID | 表示该文件允许的用户和组(在没有suid,sgid的情况下，此值与真实用户和真实组ID是一个值)     |
+| suid                           | 当文件user的可执行权限打开并设置了suid后，其他用户可以以该文件所有者的权限来运行此文件  |
+| sgid                           | 当文件group的可执行权限打开并设置了sgid后，其他用户可以以该文件组成员的权限来运行此文件 |
+
+- 对于权限方面还有一个(sticky bit):当文件other的可执行权限打开并设置了sticky后，用户都可以在此文件夹下新建文件和文件夹(类似于共享文件夹)
+  + 但用户不能删除其他用户所新建的文件或文件夹
+- 对于普通权限 =rwx= 不得不提的是：
+  + 要进入基本的目录，至少要具有 =x= 权限，要读取目录内容列表信息，至少要具有 =rx= 权限。
+  + 对一个文件是否具有新建或删除的权限，要看用户对此目录是否具有 =rw= 权限。
+    - 这与文件自身的权限无关， *自身权限只关联其内容的操作权限*
+
+可以使用下面的函数来判断当前进程是否有权限访问某个文件:
+#+BEGIN_SRC c
+  int access(const char *pathname, int mode);
+  int faccessat(int dirfd, const char *pathname, int mode, int flags);
 #+END_SRC
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。

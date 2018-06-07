@@ -1,13 +1,39 @@
-* [What] linux --> framebuffer
-*参考资料*: <<linux设备驱动开发详解>>
-** 概览
+#+TITLE: [What]Linux framebuffer 基础操作
+#+DATE:  <2018-06-07 四> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, framebuffer
+#+NAME: <linux_fs_framebuffer_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+*参考资料*: =linux设备驱动开发详解=
+
+回顾 =framebuffer= 驱动。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 概览
+** 硬件连接
+通常的显示硬件连接如下图：
+[[./display_hd.jpg]]
+soc内部显示缓存的数据经由DMA送至时序发生器,时序发生器将输入的数据流以一定的时序送给LCD接口便可显示.
+
+根据设备驱动的基本思想可以通过上图得出与之相关的驱动有:
+- DMA控制器驱动以及设备树
+- DMA客户端驱动以及设备树
+- 时序控制器接口驱动以及设备树
+- 对应的时序发生器驱动以及设备树
+- LCD时序控制器接口驱动以及设备树
+- 对应的LCD设备驱动以及设备树
+  
+Linux为此提供了 =framebuffer= 驱动框架,将设备端的驱动进行了一个整合.
+** framebuffer
 Framebuffer(帧缓冲)是 Linux 系统为显示设备提供的一个接口, 它将显示缓冲区抽象, 屏蔽图像硬件底层差异, 
 *允许上层应用程序在图形模式下直接对显示缓冲区进行读写操作*.对于帧缓冲设备而言, 只要在显示缓冲区中与
 显示点对应的区域写入颜色值, 对应的颜色会自动在屏幕上显示.
-
 *** 用户空间
-一般来说, 在用户空间中, 设备节点为 =/dev/fb*=, 比如 /dev/fb0 就代表第一个帧缓存.事实上, 它们
-属于 *字符设备*.
+一般来说, 在用户空间中, 设备节点为 =/dev/fb*=, 比如 /dev/fb0 就代表第一个帧缓存.事实上, 它们属于 *字符设备*.
 
 由于此节点代表的就是一个显示所映射的内存, 所以用户可以进行如下操作.
 - 保存显示内存 : cp /dev/fb0 filename
@@ -25,6 +51,49 @@ pu8_disBuf = mmap(NULL, 800 * 480 , PORT_READ | POER_WRITE, MAP_SHARED, fb, 0);
 /// 清屏
 memset(pu8_disBuf, 0, 800 * 480);
 #+END_SRC
+*** 时序
+LCD的扫描遵从以前老式的电子显像技术，从左到右从上到下显示． 
+- 当扫描完一行以后，需要回到行头并到下一行，称为行回扫。(horizontal retrace)
+  - 在每扫描完一行后，还需要时钟同步，称为行同步。(horizontal sync)
+- 当扫描完整屏以后，需要回到左上角，称为垂直回扫。(vertical retrace)
+  - 在每扫描完一屏后，还需要时钟同步，称为垂直同步。(vertical sync)
+以上这些参数，都需要用来设置时钟发生器以让其产生正常的时序。
+#+BEGIN_EXAMPLE
+    +----------+---------------------------------------------+----------+-------+
+    |          |                ↑                            |          |       |
+    |          |                |upper_margin                |          |       |
+    |          |                ↓                            |          |       |
+    +----------###############################################----------+-------+
+    |          #                ↑                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |   left   #                |                            #  right   | hsync |
+    |  margin  #                |       xres                 #  margin  |  len  |
+    |<-------->#<---------------+--------------------------->#<-------->|<----->|
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |yres                        #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                |                            #          |       |
+    |          #                ↓                            #          |       |
+    +----------###############################################----------+-------+
+    |          |                ↑                            |          |       |
+    |          |                |lower_margin                |          |       |
+    |          |                ↓                            |          |       |
+    +----------+---------------------------------------------+----------+-------+
+    |          |                ↑                            |          |       |
+    |          |                |vsync_len                   |          |       |
+    |          |                ↓                            |          |       |
+    +----------+---------------------------------------------+----------+-------+
+#+END_EXAMPLE
 *** 内核空间
 与 framebuffer 相关的代码位于 =drivers/video= 文件夹下.提供给用户空间的 file_operations 结构体由 
 =fbdev/core/fbmem.c= 中的file_operations 提供, 而特定的帧缓冲设备驱动由 =xxxfb.c= 实现, 此文件的主要
@@ -35,8 +104,9 @@ memset(pu8_disBuf, 0, 800 * 480);
 - drivers/video/fbdev/core/fbmem.c
 
 其中 fbmem.c 其实已经完成了驱动的大部份工作, xxxfb.c 仅仅提供一些必要的操作函数即可.
-** 文件分析
-*** fbmem.c
+- 这完全体现了软件工程中的分层思想
+* 文件分析
+** fbmem.c
 此文件为 xxxfb.c 提供了如下功能函数:
 #+BEGIN_SRC c
 /**
@@ -68,7 +138,6 @@ int remove_conflicting_framebuffers(struct apertures_struct *a, const char *name
  ,* @retval 0则成功, 非0则有错误
  ,*/
 int unlink_framebuffer(struct fb_info *info);
-
 /**
  ,* @brief 为设备上锁
  ,* @para info -> 设备的信息结构体
@@ -147,78 +216,78 @@ static long fb_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 - 函数 =static int fb_check_var(struct fb_var_screeninfo *, struct fb_info)=
 
 以上的函数, 其实都是通过填充结构体 =struct fb_ops= 来达到此目的的.
-** 编写
-*** 逻辑结构
-通过以上的分析, 可以得出此驱动调用的结构如下图所示: [[./fb_struct.jpg][程序结构]]
-*** 数据结构
+* 编写
+** 逻辑结构
+通过以上的分析, 可以得出此驱动调用的结构如下图所示: 
+[[./fb_struct.jpg]]
+
+** 数据结构
 framebuffer 有几个重要的数据结构需要填充:
-**** struct fb_fix_screeninfo & struct fb_var_screeninfo
+*** struct fb_fix_screeninfo & struct fb_var_screeninfo
 =fb_fix_screeninfo= 存储了显示器的固定信息, =struct fb_var_screeninfo= 存储了显示器可变信息.
 
-显示时序参数入下图:
-[[./fb_timing.jpg][fb_timing]]
 #+BEGIN_SRC c
-struct fb_fix_screeninfo{
-        char id[16];              /// 显示器名称
-        unsigned long smem_start; /// 显示缓存的地址
-        __u32 smem_len;           /// 显示缓存的大小
-        __u32 type;
-        __u32 type_aux;
-        __u32 visual;
-        __u16 xpanstep;
-        __u16 ypanstep;
-        __u16 ywrapstep;
-        __u32 line_length;        /// 长度所占用的字节数
-        unsigned long mmio_start; /// IO物理地址
-        __u32 mmio_len;
-        __u32 accel;
-        __u16 capabilities;
-        __u16 reserved[2];
-};
+  struct fb_fix_screeninfo{
+          char id[16];              /// 显示器名称
+          unsigned long smem_start; /// 显示缓存的地址
+          __u32 smem_len;           /// 显示缓存的大小
+          __u32 type;
+          __u32 type_aux;
+          __u32 visual;
+          __u16 xpanstep;
+          __u16 ypanstep;
+          __u16 ywrapstep;
+          __u32 line_length;        /// 长度所占用的字节数
+          unsigned long mmio_start; /// IO物理地址
+          __u32 mmio_len;
+          __u32 accel;
+          __u16 capabilities;
+          __u16 reserved[2];
+  };
 
-struct fb_var_screeninfo{
-        __u32 xres;               /// 显示尺寸
-        __u32 yres;
-        __u32 xres_virtual;       /// 缓存尺寸
-        __u32 yres_virtual;
-        __u32 xoffset;            /// 实际显示在缓存的偏移
-        __u32 ypffset;
+  struct fb_var_screeninfo{
+          __u32 xres;               /// 显示尺寸
+          __u32 yres;
+          __u32 xres_virtual;       /// 缓存尺寸
+          __u32 yres_virtual;
+          __u32 xoffset;            /// 实际显示在缓存的偏移
+          __u32 ypffset;
 
-        __u32 bits_per_pixel;     /// 每个像素占用的位数
-        __u32 grayscale;          /// 0 = color, 1 = grayscale >1 = FOURCC
+          __u32 bits_per_pixel;     /// 每个像素占用的位数
+          __u32 grayscale;          /// 0 = color, 1 = grayscale >1 = FOURCC
 
-        struct fb_bitfield red;  /// 指定RGB偏移及注释
-        struct fb_bitfield green;
-        struct fb_bitfield blue;
-        struct fb_bitfield transp;
+          struct fb_bitfield red;  /// 指定RGB偏移及注释
+          struct fb_bitfield green;
+          struct fb_bitfield blue;
+          struct fb_bitfield transp;
 
-        __u32 nonstd;
+          __u32 nonstd;
 
-        __u32 activate;
+          __u32 activate;
 
-        __u32 height;            /// 显示器尺寸,单位是毫米
-        __u32 width;
+          __u32 height;            /// 显示器尺寸,单位是毫米
+          __u32 width;
 
-        __u32 accel_flags;
+          __u32 accel_flags;
 
-/**
- ,* @brief 此部分用于设置显示时序, 包括了行同步,场同步,行延迟,场延迟等
- ,*/
-        __u32 pixclock;         /// pixclock = 1000000 / DCF; (DCF即刷新频率)
-        __u32 left_margin;      /// time from sync to picture = HFL - SH2
-        __u32 right_margin;     /// time from picture to sync = SH1 - HR
-        __u32 upper_margin;     /// time from sync to picture = VFL - SV2
-        __u32 lower_margin;     /// time from picture to sync = SV1 - VR
-        __u32 hsync_len;        /// length of horizontal sync = SH2 - SH1
-        __u32 vsync_len;        /// length of vertical sync = SV2 - SV1
-        __u32 sync;
-        __u32 vmode;
-        __u32 rotate;
-        __u32 colorspace;
-        __u32 reserved[4];
-};
+  /**
+   ,* @brief 此部分用于设置显示时序, 包括了水平同步,垂直同步,水平回扫,垂直回扫等
+   ,*/
+          __u32 pixclock;         /// pixclock = 1000000 / DCF; (DCF即刷新频率)
+          __u32 left_margin;      /// time from sync to picture = HFL - SH2
+          __u32 right_margin;     /// time from picture to sync = SH1 - HR
+          __u32 upper_margin;     /// time from sync to picture = VFL - SV2
+          __u32 lower_margin;     /// time from picture to sync = SV1 - VR
+          __u32 hsync_len;        /// length of horizontal sync = SH2 - SH1
+          __u32 vsync_len;        /// length of vertical sync = SV2 - SV1
+          __u32 sync;
+          __u32 vmode;
+          __u32 rotate;
+          __u32 colorspace;
+          __u32 reserved[4];
+  };
 #+END_SRC
-**** struct fb_info
+*** struct fb_info
 =struct fb_fix_screeninfo= 和 =struct fb_var_screeninfo= 集成在 =fb_info= 中, 最终填充的都是此结构体
 #+BEGIN_SRC c
 struct fb_info{
@@ -241,7 +310,7 @@ struct fb_info{
         
 };
 #+END_SRC
-*** 用户编写流程
+** 用户编写流程
 通过参考其他 xxxfb.c 文件, 以及模板 =skeleton.c= ,可以得出流程如下:
 - 编写显示器对应的设备树描述符, 用于设置必要显示参数
 - 编写对于当前显示所必须的一些 ops 函数, 并初始化 =fb_ops= 结构体
@@ -251,7 +320,7 @@ struct fb_info{
 *注意*:
 1. 此部分仅仅是对显示缓存的操作, 而对于具体缓存应该如何作用于LCD,则需要编写LCD驱动.
 2. 如果不需要与 console 联合使用, 则需要关闭宏 =CONFIG_VT_HW_CONSOLE_BINDING=, 具体操作则是在 menuconfig 中关闭对应选项即可.
-**** 对于zynq
+*** 对于zynq
 zynq 的显示需要动用 VDMA以及VTC来产生合适的时序.
 - vtc
 vtc 中需要对应增加相应的设备树节点. 然后使用函数 =struct vtc_device
@@ -259,39 +328,610 @@ vtc 中需要对应增加相应的设备树节点. 然后使用函数 =struct vt
 
 然后通过函数 =int xvtc_generator_start(struct xvtc_device *xvtc, const struct xvtc_config *config)= 来配置并启动.
 
-对于结构体 =xvtc_config= 需要说明一下:
+对于结构体 =xvtc_config= 需要说明一下(参考前面的时序图一起看):
 #+BEGIN_SRC c
-/**
- ,* @brief vtc 时序配置结构体
- ,*
- ,* @para hblank_start: generated horizontal active frame size. the width of the frame without blanking in number of pixels/clocks(xres)
- ,*
- ,* @para hsync_start :generated horizontal sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(xres + 最右回扫)
-
- ,*
- ,* @para hsync_end: generated horizontal sync end end cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(xres + 最右回扫 + 最左回扫)
-
- ,*
- ,* @para hsize  : 物理一行的所有像素点(xres + 回扫 + 同步)
- ,*
- ,* @para vblank_start : generated vertical acrive frame size.the height of the frame without blanking in number of lines(yres)
- ,*
- ,* @para vsync_start : generated vertical sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(yres + 最下回扫)
- ,*
- ,* @para vsync_end :generated vertical sync end start cycle index of horizontal sync.denotes the first cycle hsync_in is asserted(yres + 回扫)
-
- ,* @para vsize : 物理一列的像素点(yres + 回扫 + 同步)
- ,*/
-struct xvtc_config{
-        unsigned int hblank_start;
-        unsigned int hsync_start;
-        unsigned int hsync_end;
-        unsigned int hsize;
-        unsigned int vblank_start;
-        unsigned int vsync_start;
-        unsigned int vsync_end;
-        unsigned int vsize;
-};
+  /**
+   ,* @brief vtc 时序配置结构体
+   ,* @para hblank_start: 行像素点
+   ,* @para hsync_start : 行像素点 + 右回扫
+   ,* @para hsync_end: 行像素点 + 右回扫 + 同步
+   ,* @para hsize  : 行像素点 + 行回扫 + 同步
+   ,* @para vblank_start : 垂直像素点
+   ,* @para vsync_start : 垂直像素点 + 下回扫
+   ,* @para vsync_end : 垂直像素点 + 下回扫 + 同步
+   ,* @para vsize : 垂直像素点 + 垂直回扫 + 同步
+   ,*/
+  struct xvtc_config{
+          unsigned int hblank_start;
+          unsigned int hsync_start;
+          unsigned int hsync_end;
+          unsigned int hsize;
+          unsigned int vblank_start;
+          unsigned int vsync_start;
+          unsigned int vsync_end;
+          unsigned int vsize;
+  };
 #+END_SRC
+** 实例
+*** 设备树
+#+BEGIN_SRC c
+  display_label: display{
+    compatible = "vendor,boardfb";
+    resolution = <480 800>;
+    virtual-resolution = <480 800>;
+    phys-size = <500 1000>;
+    htiming = <480 496 512 536>;
+    vtiming = <800 801 803 808>;
+    dmas = <&lcd_module_axi_vdma_0 0>;
+    dma-names = "vdma-tx";
+    xlnx,num-fstores = <1>;
+    xlnx,vtc = <&lcd_module_v_tc_0>;
+  };
+#+END_SRC
+*** 客户端驱动
+#+BEGIN_SRC c
+  /**
+   ,* @brief 基于zynq vdma 的 framebuffer 驱动
+   ,*/
+  #define pr_fmt(fmt)     "[driver] boardfb:" fmt
+  #include <linux/device.h>
+  #include <linux/module.h>
+  #include <linux/kernel.h>
+  #include <linux/errno.h>
+  #include <linux/mm.h>
+  #include <linux/fb.h>
+  #include <linux/init.h>
+  #include <linux/dma-mapping.h>
+  #include <linux/slab.h>
+  #include <linux/io.h>
 
-[[https://github.com/KcMeterCEC/linux_exercise/tree/master/device_framebuffer][参考代码]]
+  #include <linux/of_address.h>
+  #include <linux/of_device.h>
+  #include <linux/of_platform.h>
+
+  #include <linux/dmaengine.h>
+  #include <linux/dma-mapping.h>
+  #include <linux/dma/xilinx_dma.h>
+  //#include <drivers/media/platform/xilinx/xilinx-vtc.h>
+  #include <linux/xilinx-vtc.h>
+  #include <linux/delay.h>
+  #include <linux/kthread.h>
+  #include <linux/of_dma.h>
+  #include <linux/platform_device.h>
+  #include <linux/random.h>
+  #include <linux/slab.h>
+  #include <linux/wait.h>
+
+  MODULE_LICENSE("GPL");
+  MODULE_AUTHOR("kcmetercec");
+  MODULE_DESCRIPTION("boardfb - zyqn framebuffer driver with vdma");
+
+  #define DRIVER_NAME "boardfb"
+
+  /**
+   ,* @brief 此驱动默认只支持RGBA8888(8880)格式
+   ,*/
+  #define BYTES_PER_PIXEL     (3)
+  #define BITS_PER_PIXEL       (BYTES_PER_PIXEL * 8)
+  #define RED_SHIFT           (16)
+  #define GREEN_SHIFT         (8)
+  #define BLUE_SHIFT          (0)
+  #define PALETTE_ENTRIES_NO  (16)
+
+
+  /**
+   ,* @brief 从设备树获取的配置
+   ,*/
+  struct boardfb_platform_data{
+      uint32_t    u32_xres;
+      uint32_t    u32_yres;
+      uint32_t    u32_xvirt;
+      uint32_t    u32_yvirt;
+      uint32_t    u32_height;
+      uint32_t    u32_width;
+  };
+
+  /**
+   ,* @beirf 参考 skeletonfb.c 所使用的默认设置
+   ,*/
+  static struct fb_fix_screeninfo boardfb_fix = {
+      .id =       "kcl",
+      .type = FB_TYPE_PACKED_PIXELS,
+      .visual = FB_VISUAL_PSEUDOCOLOR,
+      .xpanstep = 1,
+      .ypanstep = 1,
+      .ywrapstep = 1,
+      .accel = FB_ACCEL_NONE,
+  };
+  /**
+   ,* @brief 设置显示器的显示格式
+   ,*/
+
+  static struct fb_var_screeninfo boardfb_var = {
+      .bits_per_pixel = BITS_PER_PIXEL,
+
+      .red =      {RED_SHIFT, 8, 0},
+      .green =    {GREEN_SHIFT, 8, 0},
+      .blue =     {BLUE_SHIFT, 8, 0},
+      .transp =   {0, 0, 0},
+
+      .activate = FB_ACTIVATE_NOW
+  };
+
+  /**
+   ,* @brief 驱动数据结构体
+   ,*/
+  struct boardfb_drvdata{
+      struct fb_info  str_info;       /// 包括framebuffer设备的全部信息
+      phys_addr_t     u32_regsPhys;   /// 控制寄存器的物理地址
+      void __iomem    *p_regsVirt;    /// 控制寄存器的虚拟地址
+      dma_addr_t      u32_fbPhys;     /// framebuffer 物理地址
+      void            *p_fbVirt;      /// framebuffer 虚拟地址
+      uint32_t        u32_pseudoPalette[PALETTE_ENTRIES_NO]; ///调色板
+      struct dma_chan *str_dmaChannel;
+      struct completion str_cmp;
+      dma_cookie_t    str_dmaCookie;
+      dma_addr_t      dmaHandle;
+      struct dma_async_tx_descriptor *str_dmaDesc;
+      struct xvtc_device *pstr_vtc;
+      struct xvtc_config  str_vtcCfg;
+  };
+
+  static int boardfb_display(bool b_on, struct boardfb_drvdata *pstr_drvData);
+  static int boardfb_blank(int blank_mode, struct fb_info *fbi)
+  {
+      struct boardfb_drvdata *pstr_drvData = container_of(fbi, struct boardfb_drvdata, str_info);
+      switch(blank_mode)
+      {
+          case FB_BLANK_NORMAL:
+              {
+                  boardfb_display(true, pstr_drvData);
+              }break;
+          case FB_BLANK_POWERDOWN:
+              {
+                  boardfb_display(false, pstr_drvData);
+              }break;
+          default:break;
+
+      }
+      return 0;
+  }
+  static int boardfb_setcolreg(unsigned regno, unsigned red, unsigned green, unsigned blue, unsigned transp, struct fb_info *fbi)
+  {
+      u32 *palettle = fbi->pseudo_palette;
+
+      if(regno >= PALETTE_ENTRIES_NO)
+      {
+          return -EINVAL;
+      }
+      if(fbi->var.grayscale)
+      {
+          red = green = blue = (red * 77 + green * 151 + blue * 28 + 127) >> 8;
+      }
+
+      red >>= 8;
+      green >>= 8;
+      blue >>= 8;
+      palettle[regno] = (red << RED_SHIFT) | (green << GREEN_SHIFT) | (blue << BLUE_SHIFT);
+
+      return 0;
+  }
+
+  static struct fb_ops boardfb_ops =
+  {
+      .owner      = THIS_MODULE,
+      .fb_setcolreg = boardfb_setcolreg,
+      .fb_fillrect = cfb_fillrect,
+      .fb_copyarea = cfb_copyarea,
+      .fb_imageblit = cfb_imageblit,
+      .fb_blank = boardfb_blank,
+  };
+
+  /**
+   ,* @brief get platform data
+   ,*/
+  static int boardfb_platformData_get(struct device *pstr_dev, struct boardfb_platform_data *pstr_platform)
+  {
+      uint32_t                  u32_dataBuf[2];
+
+      if(of_property_read_u32_array(pstr_dev->of_node, "resolution", u32_dataBuf, 2) != 0)
+      {
+          dev_err(pstr_dev, "can not get <resolution>");
+          return -EIO;
+      }
+      pstr_platform->u32_xres = u32_dataBuf[0];
+      pstr_platform->u32_yres = u32_dataBuf[1];
+
+      if(of_property_read_u32_array(pstr_dev->of_node, "virtual-resolution", u32_dataBuf, 2) != 0)
+      {
+          dev_err(pstr_dev, "can not get <virtual resolution>");
+          return -EIO;
+      }
+      pstr_platform->u32_xvirt = u32_dataBuf[0];
+      pstr_platform->u32_yvirt = u32_dataBuf[1];
+
+      if(of_property_read_u32_array(pstr_dev->of_node, "phys-size", u32_dataBuf, 2) != 0)
+      {
+          dev_err(pstr_dev, "can not get <phys-size>");
+          return -EIO;
+      }
+      pstr_platform->u32_height = u32_dataBuf[0];
+      pstr_platform->u32_width = u32_dataBuf[1];
+
+      pr_info("get display resolution is %u:%u, \nthe virtual resolution is %u:%u, \nphys: %u:%u\n",
+              pstr_platform->u32_xres, pstr_platform->u32_yres,
+              pstr_platform->u32_xvirt, pstr_platform->u32_yvirt,
+              pstr_platform->u32_height, pstr_platform->u32_width);
+
+      return 0;
+  }
+  /**
+   ,* @brief set driver data
+   ,*/
+  static int boardfb_driverData_set(struct platform_device *pdev,
+          struct boardfb_drvdata *pstr_drvData, struct boardfb_platform_data *pstr_platform)
+  {
+      struct device                   *pstr_dev = &pdev->dev;
+      uint32_t u32_fbSize = pstr_platform->u32_xvirt * pstr_platform->u32_yvirt * BYTES_PER_PIXEL;
+      int             rc;
+      /// allocate the framebuffer memory
+      if(dma_set_coherent_mask(pstr_dev,DMA_BIT_MASK(32)) != 0)
+      {
+          dev_err(pstr_dev," set memory address limit error!\n");
+          return -1;
+      }
+      pstr_drvData->p_fbVirt = dmam_alloc_coherent(pstr_dev, PAGE_ALIGN(u32_fbSize),
+              &pstr_drvData->u32_fbPhys, GFP_KERNEL);
+      if(pstr_drvData->p_fbVirt == NULL)
+      {
+          dev_err(pstr_dev, "can not allocate frame buffer memory\n");
+          return -ENOMEM;
+      }
+      dev_info(pstr_dev, "allocated the framebuffer virtual address -> %#x\nphy address -> %#x\n",
+              pstr_drvData->p_fbVirt,
+              pstr_drvData->u32_fbPhys);
+      ///clear (turn to black) the framebuffer
+      memset(pstr_drvData->p_fbVirt, 0xff, u32_fbSize);
+      dev_info(pstr_dev, "clear framebuffer successed!\n");
+      /// fill struct fb_info
+      pstr_drvData->str_info.device = pstr_dev;
+      pstr_drvData->str_info.screen_base = (void __iomem *)pstr_drvData->p_fbVirt;
+      pstr_drvData->str_info.fbops = &boardfb_ops;
+      pstr_drvData->str_info.fix = boardfb_fix;
+      pstr_drvData->str_info.fix.smem_start = pstr_drvData->u32_fbPhys;
+      pstr_drvData->str_info.fix.smem_len = u32_fbSize;
+      pstr_drvData->str_info.fix.line_length = pstr_platform->u32_xvirt * BYTES_PER_PIXEL;
+
+      pstr_drvData->str_info.pseudo_palette = pstr_drvData->u32_pseudoPalette;
+      pstr_drvData->str_info.flags = FBINFO_DEFAULT;
+      pstr_drvData->str_info.var = boardfb_var;
+      pstr_drvData->str_info.var.height = pstr_platform->u32_height;
+      pstr_drvData->str_info.var.width = pstr_platform->u32_width;
+      pstr_drvData->str_info.var.xres = pstr_platform->u32_xres;
+      pstr_drvData->str_info.var.yres = pstr_platform->u32_yres;
+      pstr_drvData->str_info.var.xres_virtual = pstr_platform->u32_xvirt;
+      pstr_drvData->str_info.var.yres_virtual = pstr_platform->u32_yvirt;
+      pstr_drvData->str_info.var.xoffset = 0;
+      pstr_drvData->str_info.var.yoffset = 0;
+
+      pstr_drvData->str_info.skip_vt_switch = true;
+
+      /// allocate a colour map
+      rc = fb_alloc_cmap(&pstr_drvData->str_info.cmap, PALETTE_ENTRIES_NO, 0);
+      if(rc)
+      {
+          dev_err(pstr_dev, "can not allocate color map!\n");
+          goto err_cmap;
+      }
+      dev_info(pstr_dev, "allocate color map successed!\n");
+      /// register new frame buffer
+      rc = register_framebuffer(&pstr_drvData->str_info);
+      if(rc)
+      {
+          dev_err(pstr_dev, "can not register new frame buffer\n");
+          goto err_regfb;
+      }
+      dev_info(pstr_dev, "register new frame buffer successed!\n");
+  err_regfb:
+      fb_dealloc_cmap(&pstr_drvData->str_info.cmap);
+  err_cmap:
+
+      return rc;
+  }
+
+  static void boardfb_callback(void *completion)
+  {
+      pr_info("vdma callback!\n");
+      complete(completion);
+  }
+
+  static int boardfb_vdmaStartStop(bool b_startStop, struct boardfb_drvdata *pstr_drvData)
+  {
+      if(b_startStop == true)
+      {
+          init_completion(&pstr_drvData->str_cmp);
+          pstr_drvData->str_dmaCookie = dmaengine_submit(pstr_drvData->str_dmaDesc);
+          pr_info("start vdma!\n");
+          if(dma_submit_error(pstr_drvData->str_dmaCookie))
+          {
+              pr_err("vdma submit error!\n");
+              return -1;
+          }
+          dma_async_issue_pending(pstr_drvData->str_dmaChannel);
+      }
+      else
+      {
+          pr_info("stop vdma!\n");
+          if(dmaengine_terminate_all(pstr_drvData->str_dmaChannel) != 0)
+          {
+              pr_err("can not terminate vdma!\n");
+          }
+      }
+
+      return 0;
+  }
+  static int boardfb_vdmaInit(struct platform_device *pdev, struct boardfb_drvdata *pstr_drvData)
+  {
+      struct device                   *pstr_dev = &pdev->dev;
+      struct xilinx_vdma_config       str_config;
+      enum dma_ctrl_flags en_flags = DMA_CTRL_ACK | DMA_PREP_INTERRUPT;
+      size_t buf_len = pstr_drvData->str_info.fix.line_length * pstr_drvData->str_info.var.yres_virtual;
+      struct dma_interleaved_template str_tx;
+      int rc = 0;
+
+      pstr_drvData->str_dmaChannel = dma_request_slave_channel(pstr_dev, "vdma-tx");
+      if(pstr_drvData->str_dmaChannel == NULL)
+      {
+          dev_err(pstr_dev, "can not get vdma channel!\n");
+          return -1;
+      }
+      ///config
+      //pstr_drvData->dmaHandle = (dma_addr_t)pstr_drvData->u32_fbPhys;
+      //dev_info(pstr_dev, "get vdma dst addr = %#x\n", pstr_drvData->dmaHandle);
+      pstr_drvData->dmaHandle = dma_map_single(pstr_drvData->str_dmaChannel->device->dev,
+              pstr_drvData->p_fbVirt, buf_len, DMA_MEM_TO_DEV);
+      dev_info(pstr_dev, "get vdma dst addr = %#x\n", pstr_drvData->dmaHandle);
+      if(dma_mapping_error(pstr_drvData->str_dmaChannel->device->dev, pstr_drvData->dmaHandle))
+      {
+          dev_err(pstr_dev, "can not get vdma dst addr!\n");
+          rc = -1;
+          goto maperror;
+      }
+
+      memset(&str_tx, 0, sizeof(struct dma_interleaved_template));
+      memset(&str_config, 0, sizeof(struct xilinx_vdma_config));
+      dev_info(pstr_dev, "config clear successed!\n");
+      str_config.frm_cnt_en = 0;
+      str_config.coalesc = 1;
+      str_config.park = 0;
+      str_config.reset = 1;
+      str_config.gen_lock = 0;
+      if(xilinx_vdma_channel_set_config(pstr_drvData->str_dmaChannel, &str_config) != 0)
+      {
+          dev_err(pstr_dev, "can not config vdma channel!\n");
+          return -1;
+      }
+      dev_info(pstr_dev, "config channel successed!\n");
+      ///description
+      dev_info(pstr_dev, "config description channel = %p, addr = %p, size = %u, dir = %d, flag = %x\n",
+              pstr_drvData->str_dmaChannel, pstr_drvData->dmaHandle, buf_len, DMA_MEM_TO_DEV, en_flags);
+      str_tx.src_start = pstr_drvData->dmaHandle;
+      str_tx.dir = DMA_MEM_TO_DEV;
+      str_tx.numf = pstr_drvData->str_info.var.yres;
+      str_tx.sgl[0].size = pstr_drvData->str_info.var.xres * BYTES_PER_PIXEL;
+      str_tx.sgl[0].icg = 0;
+      str_tx.frame_size = 1;
+      pstr_drvData->str_dmaDesc = dmaengine_prep_interleaved_dma(pstr_drvData->str_dmaChannel,
+              &str_tx, en_flags);
+
+      /// zynq vdma 驱动没有提供这个函数
+      //pstr_drvData->str_dmaDesc = dmaengine_prep_dma_cyclic(pstr_drvData->str_dmaChannel,
+              //pstr_drvData->dmaHandle, buf_len,buf_len, DMA_MEM_TO_DEV, en_flags);
+
+      dev_info(pstr_dev, "config description successed!\n");
+      pstr_drvData->str_dmaDesc->callback = boardfb_callback;
+      pstr_drvData->str_dmaDesc->callback_param = &pstr_drvData->str_cmp;
+
+      if(boardfb_vdmaStartStop(true, pstr_drvData) != 0)
+      {
+          dev_err(pstr_dev, "vdma start error!\n");
+      }
+
+  maperror:
+      return rc;
+  }
+  static int boardfb_vtcStartStop(bool b_startStop, struct boardfb_drvdata *pstr_drvData);
+  static int boardfb_display(bool b_on, struct boardfb_drvdata *pstr_drvData)
+  {
+      if(b_on == true)
+      {
+          if(boardfb_vdmaStartStop(true, pstr_drvData) != 0)
+          {
+              pr_err("vdma start error!\n");
+              return -1;
+          }
+          boardfb_vtcStartStop(true, pstr_drvData);
+      }
+      else
+      {
+          if(boardfb_vdmaStartStop(false, pstr_drvData) != 0)
+          {
+              pr_err( "vdma stop error!\n");
+              return -1;
+          }
+          boardfb_vtcStartStop(false, pstr_drvData);
+      }
+      return 0;
+  }
+  static int boardfb_vtcStartStop(bool b_startStop, struct boardfb_drvdata *pstr_drvData)
+  {
+      if(b_startStop == true)
+      {
+          if(xvtc_generator_start(pstr_drvData->pstr_vtc, &pstr_drvData->str_vtcCfg))
+          {
+              pr_info("vtc start failed!\n");
+              return -1;
+          }
+      }
+      else
+      {
+          if(xvtc_generator_stop(pstr_drvData->pstr_vtc) != 0)
+          {
+              pr_err("vtc stop failed!\n");
+          }
+          return -1;
+      }
+      return 0;
+  }
+
+  static int boardfb_vtcInit(struct platform_device *pdev, struct boardfb_drvdata *pstr_drvData)
+  {
+      struct device                   *pstr_dev = &pdev->dev;
+      uint32_t                        u32_dataBuf[4];
+      uint16_t hblank_start, hsync_start, hsync_end, hsize;
+      uint16_t vblank_start, vsync_start, vsync_end, vsize;
+      pstr_drvData->pstr_vtc = xvtc_of_get(pdev->dev.of_node);
+      if(pstr_drvData->pstr_vtc == NULL)
+      {
+          dev_err(pstr_dev, "can not find vtc node!\n");
+          return -1;
+      }
+      dev_info(pstr_dev, "find vtc node successed!\n");
+      if(of_property_read_u32_array(pstr_dev->of_node, "htiming", u32_dataBuf, 4) != 0)
+      {
+          dev_err(pstr_dev, "can not get <htiming>");
+          return -EIO;
+      }
+      hblank_start = u32_dataBuf[0];
+      hsync_start = u32_dataBuf[1];
+      hsync_end = u32_dataBuf[2];
+      hsize = u32_dataBuf[3];
+
+      if(of_property_read_u32_array(pstr_dev->of_node, "vtiming", u32_dataBuf, 4) != 0)
+      {
+          dev_err(pstr_dev, "can not get <vtiming>");
+          return -EIO;
+      }
+      vblank_start = u32_dataBuf[0];
+      vsync_start = u32_dataBuf[1];
+      vsync_end = u32_dataBuf[2];
+      vsize = u32_dataBuf[3];
+
+      dev_info(pstr_dev, "h : %d, %d, %d, %d\n v: %d, %d, %d, %d\n", hblank_start, hsync_start, hsync_end, hsize,
+              vblank_start, vsync_start, vsync_end, vsize);
+
+      pstr_drvData->str_vtcCfg.hblank_start = hblank_start ;
+      pstr_drvData->str_vtcCfg.hsync_start =  hsync_start;
+      pstr_drvData->str_vtcCfg.hsync_end =  hsync_end;
+      pstr_drvData->str_vtcCfg.hsize = hsize;
+      pstr_drvData->str_vtcCfg.vblank_start =  vblank_start;
+      pstr_drvData->str_vtcCfg.vsync_start =  vsync_start;
+      pstr_drvData->str_vtcCfg.vsync_end =  vsync_end;
+      pstr_drvData->str_vtcCfg.vsize =  vsize;
+
+      if(boardfb_vtcStartStop(true, pstr_drvData))
+      {
+          dev_err(pstr_dev, "vtc start failed!\n");
+          return -1;
+      }
+      return 0;
+  }
+
+  static int boardfb_probe(struct platform_device *pdev)
+  {
+    struct boardfb_platform_data    str_platform;
+      struct boardfb_drvdata          *pstr_drvData;
+      struct device                   *pstr_dev = &pdev->dev;
+      int                             rc;
+
+      dev_info(pstr_dev, "device tree probing!\n");
+
+      /// allocate the driver data region
+      pstr_drvData = (struct boardfb_drvdata *)devm_kzalloc(pstr_dev, sizeof(struct boardfb_drvdata), GFP_KERNEL);
+      if(pstr_drvData == NULL)
+      {
+          dev_err(pstr_dev, "can not allocate framebuffer driver data!\n");
+          return -ENOMEM;
+      }
+      /// get platform data
+      if((rc = boardfb_platformData_get(pstr_dev, &str_platform)) != 0)
+      {
+          return rc;
+      }
+      dev_set_drvdata(pstr_dev, pstr_drvData);
+      /// set driver data and register framebuffer
+      if((rc = boardfb_driverData_set(pdev, pstr_drvData, &str_platform)) != 0)
+      {
+          return rc;
+      }
+      dev_info(pstr_dev, "probe successed!\n");
+      /// request vdma channel
+      if((rc = boardfb_vdmaInit(pdev, pstr_drvData)) != 0)
+      {
+          return rc;
+      }
+      dev_info(pstr_dev, "initialization vdma successed!\n");
+
+      if((rc = boardfb_vtcInit(pdev, pstr_drvData)) != 0)
+      {
+          return rc;
+      }
+      dev_info(pstr_dev, "initialization vtc successed!\n");
+
+    return 0;
+  }
+
+  static int boardfb_remove(struct platform_device *pdev)
+  {
+      struct device                   *pstr_dev = &pdev->dev;
+      struct boardfb_drvdata          *pstr_drvData = (struct boardfb_drvdata *)dev_get_drvdata(pstr_dev);
+      size_t buf_len = pstr_drvData->str_info.fix.line_length * pstr_drvData->str_info.var.yres_virtual;
+      dev_info(pstr_dev, "frame buffer removing!\n");
+
+      dma_unmap_single(pstr_drvData->str_dmaChannel->device->dev, pstr_drvData->dmaHandle,buf_len, DMA_MEM_TO_DEV);
+      dma_release_channel(pstr_drvData->str_dmaChannel);
+      unregister_framebuffer(&pstr_drvData->str_info);
+      fb_dealloc_cmap(&pstr_drvData->str_info.cmap);
+    return 0;
+  }
+
+  #ifdef CONFIG_OF
+  static struct of_device_id boardfb_of_match[] = {
+    { .compatible = "vendor,boardfb", },
+    { /* end of list */ },
+  };
+  MODULE_DEVICE_TABLE(of, boardfb_of_match);
+  #else
+  # define boardfb_of_match
+  #endif
+
+
+  static struct platform_driver boardfb_driver = {
+    .driver = {
+      .name = DRIVER_NAME,
+      .owner = THIS_MODULE,
+      .of_match_table	= boardfb_of_match,
+    },
+    .probe		= boardfb_probe,
+    .remove		= boardfb_remove,
+  };
+
+  static int __init boardfb_init(void)
+  {
+    pr_info("Hello framebuffer.\n");
+
+    return platform_driver_register(&boardfb_driver);
+  }
+
+
+  static void __exit boardfb_exit(void)
+  {
+    platform_driver_unregister(&boardfb_driver);
+    pr_info("Goodbye framebuffer.\n");
+  }
+
+  module_init(boardfb_init);
+  module_exit(boardfb_exit);
+
+
+#+END_SRC
