@@ -1,4 +1,4 @@
-#+TITLE: [What]A Tour of Computer Systems --> Information is Bits + Context
+#+TITLE: [What]A Tour of Computer Systems 
 #+DATE: <2018-05-31 四> 
 #+TAGS: CS
 #+LAYOUT: post
@@ -24,4 +24,7 @@
   - 不同的语言，不同的编译器，到了这一步都是一样的汇编语言。
 - 汇编(Assembly):将 =.s= 结尾的文件翻译为机器语言，并将内容打包为可以重定位的 =.o= 文件。
 - 链接(Linking):将可重定位文件中的外部引用符号与其定义建立地址链接，重新梳理为一个可执行文件。
+
+* 计算机系统的硬件组成
+[[./hd_organization.jpg]]
 
