@@ -118,6 +118,15 @@ size_t fwrite( const void *buffer, size_t size, size_t count,
 int fseek( FILE *stream, long offset, int origin );
 #+END_SRC
 详解： [[http://zh.cppreference.com/w/c/io/fseek][fseek]]
+*** 截断文件
+- linux
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 从文件末尾到文件头的顺序截断length字节
+   ,*/
+  int truncate(const char *path, off_t length);
+  int ftruncate(int fd, off_t length);
+#+END_SRC
 *** 文件关闭
 - linux
 #+BEGIN_SRC c
@@ -456,6 +465,21 @@ int fclose( FILE *stream );
   int access(const char *pathname, int mode);
   int faccessat(int dirfd, const char *pathname, int mode, int flags);
 #+END_SRC
+*** 修改权限
+#+BEGIN_SRC c
+  //修改文件权限
+  int chmod(const char *pathname, mode_t mode);
+  int fchmod(int fd, mode_t mode);
+  int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
+  //改变用户id和组id
+  int chown(const char *pathname, uid_t owner, gid_t group);
+  int fchown(int fd, uid_t owner, gid_t group);
+  int lchown(const char *pathname, uid_t owner, gid_t group);
+  int fchownat(int dirfd, const char *pathname,
+               uid_t owner, gid_t group, int flags);
+
+#+END_SRC
+** 链接
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。
 - 每打开一个文件，在内核空间中就有与之关联的 file 结构体

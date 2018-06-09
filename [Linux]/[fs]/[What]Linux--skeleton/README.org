@@ -23,13 +23,433 @@
 - 通过此索引，就可以在 =fd_arrary= 中获取一个文件的 =struct file= 整体描述，此结构体中就得到了与此文件所对应的 =inode= 。
 - inode中就有文件系统所填充好的 =file_operations= ，此时就可以映射到VFS的file_operations 操作
 ** 由inode到硬盘
-- 当应用层调用文件操作接口时，首先从 =inode= 的 =page cache= 中寻找其要读的部分是否已经被读取缓存，如果缓存命中，则读取缓存并返回。
+- 当应用层调用文件操作接口时，首先从 =inode= 的 =page cache= 中寻找其要读的部分是否已经被缓存，如果缓存命中，则读取缓存并返回。
 在写过程中，如果写是以异步方式执行的话，也是先写入 =page cache= ，然后内核再在合适的时机同步到硬盘。
   + 此部如果正确执行，那就不会访问硬盘
 - 当缓存不命中，再调用 =address_space_operations= 来对硬盘进行真正的读写操作。并将其对应的 =page= 写入 =page cache= 中
   + 这个过程和CPU的数据缓存和指令缓存类似
+** 关于page cache 与 block 与 sector
+- page cache 是内存管理的基本单元，而block是文件系统存储的基本单元，这两个都是逻辑单元 ，硬盘上的sector 是由其硬件而决定的物理存储单元
+- 所以根据大小不同，一个 page cache 可能对应多个 block，而一个block一般对应硬盘上的多个 sector
+  
+使用命令 =free -w= 可以看到其中有 =buffers,cached= 两项，其值对应于内核函数 =void si_meminfo(struct sysinfo *val)= 。
+#+BEGIN_SRC c
+  void si_meminfo(struct sysinfo *val)
+  {
+    val->totalram = totalram_pages;
+    val->sharedram = global_page_state(NR_SHMEM);
+    val->freeram = global_page_state(NR_FREE_PAGES);
+    val->bufferram = nr_blockdev_pages();
+    val->totalhigh = totalhigh_pages;
+    val->freehigh = nr_free_highpages();
+    val->mem_unit = PAGE_SIZE;
+  }
+  long nr_blockdev_pages(void)
+  {
+    struct block_device *bdev;
+    long ret = 0;
+    spin_lock(&bdev_lock);
+    //从所有的块设备中，获取已经进入page cache的数量
+    list_for_each_entry(bdev, &all_bdevs, bd_list) {
+      ret += bdev->bd_inode->i_mapping->nrpages;
+    }
+    spin_unlock(&bdev_lock);
+    return ret;
+  }
+#+END_SRC
+- buffers 是站在硬盘的角度来看cache的个数，与文件系统无关
+- cached 是站在文件系统的角度来看 page cache 的个数
+** O_DIRECT 与 O_SYNC 的区别
+[[./direct_sync.jpg]]
+- 普通方式下，数据读写都是暂存在cache中的
+- 当设置为 =O_SYNC= 方式时，数据会同时写到 cache 与硬盘中
+- 当设置为 =O_DIRECT= 方式时，取消了硬盘的cache直接对硬盘写入
+  + 这种方式不推荐
+
+以上这些概念和在硬件层次的 CPU cache 类似，只是一个是站在硬件角度，一个是在软件抽象角度。
 * 访问硬盘的细节
+前面的图可以看出，最终访问硬盘的接口都是通过操作 =address_space_operations= 里的方法来实现的。
+
+在从操作函数到最终访问到硬盘这中间经过了多次排序打包(都是为了尽量批量化、整块的操作I/O,以提高吞吐量)：
+1. 单次读写文件时，将要访问的数据转换为对应的block并缓存到 plug 队列
+   + 内存中的 page cache 与 block 的对应关系通过 bio(block io) 来实现，它链接了硬盘的block和内存的page cache
+     + 如果对应的block不连续，那么会生成多个bio来实现多个小块
+2. 将此进程的读写数据的plug队列中的bio尽量拼接为多个连续的块
+   + 此时会多个将bio合并为多个 request
+3. 将多个进程多个连续的块再次拼接为多个大块
+   + 将多个request再次排序是由电梯调度算法来完成的
+4. 最后将排序后的request放入 dispatch队列生成数据包
+5. 块设备驱动取出数据包写入硬盘
+
+如下图所示：
+[[./io_hd.jpg]]
+
+** 使用 ftrace 捕捉访问硬盘的函数流程
+*** 准备工作
+- 准备带有内容的文件 =file= 
+- 编写读代码，并将其编译为名称是 =read= 的可执行文件
+#+BEGIN_SRC c
+  #include <unistd.h>
+  #include <fcntl.h>
+  #include <stdio.h>
+
+  #define READ_SIZE 4096
+  int main(void)
+  {
+    int fd = 0;
+    char buf[READ_SIZE];
+
+    sleep(30); //waiting for run ftrace shell
+    if((fd = open("./file", O_RDONLY)) == -1)
+      {
+        perror("can not open file:");
+      }
+    read(fd, buf, READ_SIZE);
+    read(fd, buf, READ_SIZE);
+
+    return 0;
+  }
+#+END_SRC
+- 编写 ftrace 脚本：
+#+BEGIN_SRC sh
+  #! /bin/bash
+
+  debugfs=/sys/kernel/debug
+
+  echo nop > ${debugfs}/tracing/current_tracer
+  echo 0 > ${debugfs}/tracing/tracing_on
+  echo `pidof read` > ${debugfs}/tracing/set_ftrace_pid
+  echo function_graph > ${debugfs}/tracing/current_tracer
+  echo vfs_read > ${debugfs}/tracing/set_graph_function
+  echo 1 > ${debugfs}/tracing/tracing_on
+
+#+END_SRC
+*** 运行
+- 首先运行 read , =./read= 
+- 然后使用root身份启动脚本 =./ftrace.sh= 
+- 待 read 退出后，将捕捉到的结果存入文件： =cat /sys/kernel/debug/tracing/trace > result=
 
 
 
 
+*** 最终如下所示
+#+BEGIN_EXAMPLE
+  # tracer: function_graph
+  #
+  # CPU  DURATION                  FUNCTION CALLS
+  # |     |   |                     |   |   |   |
+   2)               |  vfs_read() {
+   2)               |    rw_verify_area() {
+   2)               |      security_file_permission() {
+   2)               |        apparmor_file_permission() {
+   2)               |          common_file_perm() {
+   2)   0.270 us    |            aa_file_perm();
+   2)   1.821 us    |          }
+   2)   2.813 us    |        }
+   2)               |        __fsnotify_parent() {
+   2)   0.221 us    |          dget_parent();
+   2)               |          dput() {
+   2)   0.124 us    |            _cond_resched();
+   2)   1.166 us    |          }
+   2)   3.238 us    |        }
+   2)   0.190 us    |        fsnotify();
+   2)   9.296 us    |      }
+   2) + 10.466 us   |    }
+   2)               |    __vfs_read() {
+   2)               |      new_sync_read() {
+   2)               |        ext4_file_read_iter() {
+   2)               |          generic_file_read_iter() {
+   2)   0.125 us    |            _cond_resched();
+   2)               |            pagecache_get_page() {
+   2)   0.966 us    |              find_get_entry();
+   2)   2.109 us    |            }
+   2)               |            mark_page_accessed() {
+   2)   0.368 us    |              activate_page();
+   2)   0.699 us    |              workingset_activation();
+   2)   3.181 us    |            }
+   2)   0.120 us    |            _cond_resched();
+   2)   0.130 us    |            _cond_resched();
+   2)               |            pagecache_get_page() {
+   2)   0.180 us    |              find_get_entry();
+   2)   1.072 us    |            }
+   2)               |            touch_atime() {
+   2)               |              __atime_needs_update() {
+   2)               |                current_time() {
+   2)   0.203 us    |                  current_kernel_time64();
+   2)   0.120 us    |                  timespec_trunc();
+   2)   2.380 us    |                }
+   2)   3.742 us    |              }
+   2)   0.307 us    |              __sb_start_write();
+   2)               |              __mnt_want_write() {
+   2)   0.106 us    |                __mnt_is_readonly.part.10();
+   2)   1.453 us    |              }
+   2)               |              current_time() {
+   2)   0.117 us    |                current_kernel_time64();
+   2)   0.120 us    |                timespec_trunc();
+   2)   2.082 us    |              }
+   2)               |              generic_update_time() {
+   2)               |                __mark_inode_dirty() {
+   2)               |                  ext4_dirty_inode() {
+   2)               |                    __ext4_journal_start_sb() {
+   2)               |                      ext4_journal_check_start() {
+   2)   0.108 us    |                        _cond_resched();
+   2)   1.427 us    |                      }
+   2)               |                      jbd2__journal_start() {
+   2)               |                        kmem_cache_alloc() {
+   2)   0.114 us    |                          _cond_resched();
+   2)   0.188 us    |                          memcg_kmem_put_cache();
+   2)   2.576 us    |                        }
+   2)               |                        start_this_handle() {
+   2)               |                          kmem_cache_alloc() {
+   2)   0.117 us    |                            _cond_resched();
+   2)               |                            __slab_alloc() {
+   2)   1.082 us    |                              ___slab_alloc();
+   2)   2.228 us    |                            }
+   2)   0.186 us    |                            memcg_kmem_put_cache();
+   2)   5.606 us    |                          }
+   2)   0.154 us    |                          _raw_read_lock();
+   2)   0.144 us    |                          _raw_write_lock();
+   2)   0.227 us    |                          ktime_get();
+   2)   0.107 us    |                          round_jiffies_up();
+   2)               |                          add_timer() {
+   2)               |                            lock_timer_base() {
+   2)   0.120 us    |                              _raw_spin_lock_irqsave();
+   2)   1.260 us    |                            }
+   2)   0.127 us    |                            detach_if_pending();
+   2)   0.217 us    |                            get_nohz_timer_target();
+   2)   0.118 us    |                            _raw_spin_lock();
+   2)               |                            __internal_add_timer() {
+   2)   0.164 us    |                              calc_wheel_index();
+   2)   1.387 us    |                            }
+   2)   0.168 us    |                            trigger_dyntick_cpu.isra.34();
+   2)   0.168 us    |                            _raw_spin_unlock_irqrestore();
+   2) + 10.763 us   |                          }
+   2)   0.116 us    |                          _raw_read_lock();
+   2)   0.321 us    |                          add_transaction_credits();
+   2) + 25.502 us   |                        }
+   2) + 30.493 us   |                      }
+   2) + 33.955 us   |                    }
+   2)               |                    ext4_mark_inode_dirty() {
+   2)   0.114 us    |                      _cond_resched();
+   2)               |                      ext4_reserve_inode_write() {
+   2)               |                        __ext4_get_inode_loc() {
+   2)   0.578 us    |                          ext4_get_group_desc();
+   2)   0.194 us    |                          ext4_inode_table();
+   2)               |                          __getblk_gfp() {
+   2)               |                            __find_get_block() {
+   2)               |                              pagecache_get_page() {
+   2)   1.988 us    |                                find_get_entry();
+   2)   0.148 us    |                                mark_page_accessed();
+   2)   4.000 us    |                              }
+   2)   0.221 us    |                              _raw_spin_lock();
+   2)   0.241 us    |                              __brelse();
+   2)   8.981 us    |                            }
+   2)   0.111 us    |                            _cond_resched();
+   2) + 10.986 us   |                          }
+   2) + 15.584 us   |                        }
+   2)               |                        __ext4_journal_get_write_access() {
+   2)   0.110 us    |                          _cond_resched();
+   2)               |                          jbd2_journal_get_write_access() {
+   2)   0.555 us    |                            jbd2_write_access_granted.part.9();
+   2)   0.367 us    |                            jbd2_journal_add_journal_head();
+   2)               |                            do_get_write_access() {
+   2)   0.114 us    |                              _cond_resched();
+   2)               |                              unlock_buffer() {
+   2)               |                                wake_up_bit() {
+   2)   0.287 us    |                                  __wake_up_bit();
+   2)   1.353 us    |                                }
+   2)   2.439 us    |                              }
+   2)   0.121 us    |                              _raw_spin_lock();
+   2)               |                              __jbd2_journal_file_buffer() {
+   2)   0.178 us    |                                jbd2_journal_grab_journal_head();
+   2)   1.533 us    |                              }
+   2)   0.250 us    |                              jbd2_journal_cancel_revoke();
+   2)   9.387 us    |                            }
+   2)   0.177 us    |                            jbd2_journal_put_journal_head();
+   2) + 14.261 us   |                          }
+   2) + 16.562 us   |                        }
+   2) + 34.309 us   |                      }
+   2)               |                      ext4_mark_iloc_dirty() {
+   2)               |                        ext4_do_update_inode() {
+   2)   0.110 us    |                          _raw_spin_lock();
+   2)   0.307 us    |                          from_kuid();
+   2)   0.287 us    |                          from_kgid();
+   2)   0.287 us    |                          from_kprojid();
+   2)   0.124 us    |                          ext4_inode_csum_set();
+   2)               |                          __ext4_handle_dirty_metadata() {
+   2)   0.117 us    |                            _cond_resched();
+   2)               |                            jbd2_journal_dirty_metadata() {
+   2)   0.117 us    |                              _raw_spin_lock();
+   2)               |                              __jbd2_journal_file_buffer() {
+   2)   0.334 us    |                                __jbd2_journal_temp_unlink_buffer();
+   2)   1.564 us    |                              }
+   2)   3.876 us    |                            }
+   2)   5.908 us    |                          }
+   2)   0.110 us    |                          __brelse();
+   2) + 14.648 us   |                        }
+   2) + 15.784 us   |                      }
+   2) + 53.235 us   |                    }
+   2)               |                    __ext4_journal_stop() {
+   2)               |                      jbd2_journal_stop() {
+   2)               |                        __wake_up() {
+   2)   0.227 us    |                          _raw_spin_lock_irqsave();
+   2)   0.138 us    |                          __wake_up_common();
+   2)   0.164 us    |                          _raw_spin_unlock_irqrestore();
+   2)   3.204 us    |                        }
+   2)   0.254 us    |                        kmem_cache_free();
+   2)   5.818 us    |                      }
+   2)   6.960 us    |                    }
+   2) + 97.127 us   |                  }
+   2)   0.113 us    |                  _raw_spin_lock();
+   2)               |                  locked_inode_to_wb_and_lock_list() {
+   2)   0.224 us    |                    _raw_spin_lock();
+   2)   1.363 us    |                  }
+   2)               |                  inode_io_list_move_locked() {
+   2)   0.237 us    |                    wb_io_lists_populated.part.53();
+   2)   1.461 us    |                  }
+   2)               |                  wb_wakeup_delayed() {
+   2)   0.127 us    |                    __msecs_to_jiffies();
+   2)   0.197 us    |                    _raw_spin_lock_bh();
+   2)               |                    queue_delayed_work_on() {
+   2)               |                      __queue_delayed_work() {
+   2)               |                        add_timer() {
+   2)               |                          lock_timer_base() {
+   2)   0.121 us    |                            _raw_spin_lock_irqsave();
+   2)   1.096 us    |                          }
+   2)   0.114 us    |                          detach_if_pending();
+   2)   0.113 us    |                          get_nohz_timer_target();
+   2)   0.117 us    |                          _raw_spin_lock();
+   2)               |                          __internal_add_timer() {
+   2)   0.113 us    |                            calc_wheel_index();
+   2)   0.988 us    |                          }
+   2)   0.138 us    |                          trigger_dyntick_cpu.isra.34();
+   2)   0.160 us    |                          _raw_spin_unlock_irqrestore();
+   2)   8.363 us    |                        }
+   2)   9.550 us    |                      }
+   2) + 10.489 us   |                    }
+   2)               |                    _raw_spin_unlock_bh() {
+   2)   0.188 us    |                      __local_bh_enable_ip();
+   2)   1.213 us    |                    }
+   2) + 15.785 us   |                  }
+   2) ! 122.297 us  |                }
+   2) ! 123.500 us  |              }
+   2)   0.127 us    |              __mnt_drop_write();
+   2)   0.160 us    |              __sb_end_write();
+   2) ! 138.075 us  |            }
+   2) ! 153.201 us  |          }
+   2) ! 154.442 us  |        }
+   2) ! 155.671 us  |      }
+   2) ! 156.784 us  |    }
+   2)               |    __fsnotify_parent() {
+   2)   0.170 us    |      dget_parent();
+   2)               |      dput() {
+   2)   0.111 us    |        _cond_resched();
+   2)   1.090 us    |      }
+   2)   3.040 us    |    }
+   2)   0.184 us    |    fsnotify();
+   2) ! 174.753 us  |  }
+   2)               |  vfs_read() {
+   2)               |    rw_verify_area() {
+   2)               |      security_file_permission() {
+   2)               |        apparmor_file_permission() {
+   2)               |          common_file_perm() {
+   2)   0.221 us    |            aa_file_perm();
+   2)   1.180 us    |          }
+   2)   2.028 us    |        }
+   2)               |        __fsnotify_parent() {
+   2)   0.196 us    |          dget_parent();
+   2)               |          dput() {
+   2)   0.170 us    |            _cond_resched();
+   2)   1.159 us    |          }
+   2)   3.187 us    |        }
+   2)   0.198 us    |        fsnotify();
+   2)   8.079 us    |      }
+   2)   9.001 us    |    }
+   2)               |    __vfs_read() {
+   2)               |      new_sync_read() {
+   2)               |        ext4_file_read_iter() {
+   2)               |          generic_file_read_iter() {
+   2)   0.123 us    |            _cond_resched();
+   2)               |            pagecache_get_page() {
+   2)   0.298 us    |              find_get_entry();
+   2)   1.280 us    |            }
+   2)               |            touch_atime() {
+   2)               |              __atime_needs_update() {
+   2)               |                current_time() {
+   2)   0.123 us    |                  current_kernel_time64();
+   2)   0.114 us    |                  timespec_trunc();
+   2)   1.988 us    |                }
+   2)   3.053 us    |              }
+   2)   4.029 us    |            }
+   2)   8.182 us    |          }
+   2)   9.162 us    |        }
+   2) + 10.298 us   |      }
+   2) + 11.295 us   |    }
+   2) + 22.191 us   |  }
+#+END_EXAMPLE
+可以发现：第一次读所花的时间比第二次多得多，因为第一次内存并没有此文件的cache，所以需要到硬盘读取，而第二次直接从内存读取了。
+** 使用blktrace(捕捉),blkparse(分析) blk io操作流程
+- 使用 =blktrace -d /dev/sda1 -o - |blkparse -i - > 1.trace= 来监视 =/dev/sda1= 
+- 在这个分区中的路径中使用命令 :
+#+BEGIN_EXAMPLE
+  #使用sync方式写入 barry 文件，这样保证硬盘确实被访问到了
+  dd if=read.c of=barry oflag=sync
+#+END_EXAMPLE
+- 停止 =blktrace= 后查看文件 =1.trace=
+- 发现与 =dd= 命令相关的有这么一行:
+#+BEGIN_EXAMPLE
+  //dd 命令将数据写入到了 181857104扇区，前面知道器扇区是512字节，那么block也就是 22732138
+    8,0    2        9    42.366779547  7055  A  WS 181859152 + 8 <- (8,1) 181857104
+    8,1    2       10    42.366782026  7055  Q  WS 181859152 + 8 [dd]
+#+END_EXAMPLE
+使用[[https://kcmetercec.github.io/2018/05/29/linux_fs_struct_detail/][工具]] 就可以查出其文件内容。
+
+** 电梯调度算法
+常用的电梯调度算法包括：
+- Noop : 最简单的调度器，把邻近的bio进行了合并处理
+- Deadline: 保证读优先的前提下，写不会饿死
+- CFQ: 考虑进程被公平调度
+  + 通过指定NICE值确定优先级，与进程调度策略一致
+*** 体验
+- 查看当前算法,并将其修改为cfq
+#+BEGIN_EXAMPLE
+  cat /sys/block/sda/queue/scheduler
+  #使用 echo noop/deadline/cfg > scheduler 来改变其调度算法
+#+END_EXAMPLE
+- 使用 ionice 命令来启动两个优先级不同的进程
+#+BEGIN_EXAMPLE
+  ionice -c 2 -n 0 cat /dev/sda > /dev/null &
+  ionice -c 2 -n 7 cat /dev/sda > /dev/null &
+#+END_EXAMPLE
+- 使用 iotop 来查看io占用,可以看到高优先级的占用磁盘量会大一点
+  + 如果将io设为 rt 模式，那么rt占用会更大。
+*** cgroup -> 用于CFQ调度算法
+与进程调度中的概念类似，使用cgroup来将多个进程加入一个群组以从整体上限制群组使用率。
+
+与IO相关的group位于路径 =/sys/fs/cgroup/blkio= ,在此目录下每新建一个文件夹就代表新建了一个组。
+
+- 修改权重使用 =echo <num> > blkio.weight=
+- 为进程分配IO组使用 =cgexec -g blkio:<group_name> <process>=
+#+BEGIN_EXAMPLE
+  #在 /sys/fs/cgroup/blkio 中新建组 A 和 B
+  mkdir A
+  mkdir B
+  #修改A的权重为100，B的权重为10
+  echo 100 > A/blkio.weight
+  echo 10 > B/blkio.weight
+  #启动两个进程
+  cgexec -g blkio:A dd if=/dev/sda of=/dev/null &
+  cgexec -g blkio:B dd if=/dev/sda of=/dev/null &
+  #通过iotop可以观察到权重高的io进程硬盘占有率更高
+#+END_EXAMPLE
+- 限制读硬盘的速度使用 =echo "<device_num> <speed>" blkio.throttle.read_bps_device=
+- 限制写硬盘的速度使用 =echo "<device_num> <speed>" blkio.throttle.write_bps_device=
+#+BEGIN_EXAMPLE
+  #限制A group 对硬盘 /dev/sda 的读写速度为1M字节每秒
+  #8:0 代表设备号
+  echo "8:0 1048576" >  blkio.throttle.read_bps_device 
+  #cgroup v1 写限制只能限制direct模式，cgroup v2 写限制通过观察dirty pages以得到write back速度来限制
+  echo "8:0 1048576" >  blkio.throttle.write_bps_device 
+#+END_EXAMPLE
+** 观察硬盘状态
+使用 =iostat= 观察硬盘的全局状态。
