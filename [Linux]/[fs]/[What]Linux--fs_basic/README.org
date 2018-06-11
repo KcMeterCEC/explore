@@ -496,6 +496,7 @@ int fclose( FILE *stream );
   //移除文件时，与 unlink 一致，移除文件夹时，与 rmdir 一致
   int remove(const char *pathname);
 #+END_SRC
+** 名称
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。
 - 每打开一个文件，在内核空间中就有与之关联的 file 结构体
