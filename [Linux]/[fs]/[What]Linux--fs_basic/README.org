@@ -480,6 +480,22 @@ int fclose( FILE *stream );
 
 #+END_SRC
 ** 链接
+其实无论是硬链接还是符号链接，都是建立一个用户空间到文件inode的映射关系。
+
+  每增加一个链接，文件的链接数量加1.
+#+BEGIN_SRC c
+  int link(const char *oldpath, const char *newpath);
+  int linkat(int olddirfd, const char *oldpath,
+             int newdirfd, const char *newpath, int flags);
+#+END_SRC
+  每取消一个链接，文件的链接数量减1，当一个文件的链接数量减至0 *并且没有进程打开此文件时* ，文件既被删除。
+- 当有进程打开了文件，那么当进程退出或关闭文件时，内核检查引用计数为0，才删除文件。
+#+BEGIN_SRC c
+  int unlink(const char *pathname);
+  int unlinkat(int dirfd, const char *pathname, int flags);
+  //移除文件时，与 unlink 一致，移除文件夹时，与 rmdir 一致
+  int remove(const char *pathname);
+#+END_SRC
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。
 - 每打开一个文件，在内核空间中就有与之关联的 file 结构体
