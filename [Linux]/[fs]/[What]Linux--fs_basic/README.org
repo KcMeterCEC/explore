@@ -137,6 +137,16 @@ int fseek( FILE *stream, long offset, int origin );
 int fclose( FILE *stream );
 #+END_SRC
 详解： [[http://zh.cppreference.com/w/c/io/fclose][fclose]]
+*** 文件夹操作
+- 新建
+#+BEGIN_SRC c
+  int mkdir(const char *pathname, mode_t mode);
+  int mkdirat(int dirfd, const char *pathname, mode_t mode);
+#+END_SRC
+- 移除
+#+BEGIN_SRC c
+  int rmdir(const char *pathname);
+#+END_SRC
 *** 实例
 #+BEGIN_SRC c
   /*!
@@ -382,6 +392,18 @@ int fclose( FILE *stream );
   //flags 用于控制是否读取符号链接本身
   int fstatat(int dirfd, const char *pathname, struct stat *buf,
               int flags);
+
+  /**
+   ,* @brief 也可以使用下面的函数修改时间戳
+   ,*/
+  int futimes(int fd, const struct timeval tv[2]);
+
+  int lutimes(const char *filename, const struct timeval tv[2]);
+
+  int utimensat(int dirfd, const char *pathname,
+                const struct timespec times[2], int flags);
+
+  int futimens(int fd, const struct timespec times[2]);
 #+END_SRC
 如下代码所示，使用lstat来判断文件类型:
 #+BEGIN_SRC c
@@ -479,16 +501,14 @@ int fclose( FILE *stream );
                uid_t owner, gid_t group, int flags);
 
 #+END_SRC
-** 链接
-其实无论是硬链接还是符号链接，都是建立一个用户空间到文件inode的映射关系。
-
-  每增加一个链接，文件的链接数量加1.
+** 硬链接
+  每增加一个硬链接，文件的链接数量加1，以表示有多少个文件引用到同一个inode.
 #+BEGIN_SRC c
   int link(const char *oldpath, const char *newpath);
   int linkat(int olddirfd, const char *oldpath,
              int newdirfd, const char *newpath, int flags);
 #+END_SRC
-  每取消一个链接，文件的链接数量减1，当一个文件的链接数量减至0 *并且没有进程打开此文件时* ，文件既被删除。
+  每取消一个硬链接，文件的链接数量减1，当一个文件的链接数量减至0 *并且没有进程打开此文件时* ，文件既被删除。
 - 当有进程打开了文件，那么当进程退出或关闭文件时，内核检查引用计数为0，才删除文件。
 #+BEGIN_SRC c
   int unlink(const char *pathname);
@@ -496,7 +516,27 @@ int fclose( FILE *stream );
   //移除文件时，与 unlink 一致，移除文件夹时，与 rmdir 一致
   int remove(const char *pathname);
 #+END_SRC
+** 符号链接
+- 创建
+#+BEGIN_SRC c
+  int symlink(const char *target, const char *linkpath);
+  int symlinkat(const char *target, int newdirfd, const char *linkpath);
+#+END_SRC
+- 读取符号链接本身内容(可以看到其block内容为其引用文件路径)
+#+BEGIN_SRC c
+  ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
+  ssize_t readlinkat(int dirfd, const char *pathname,
+                     char *buf, size_t bufsiz);
+#+END_SRC
 ** 名称
+#+BEGIN_SRC c
+  int rename(const char *oldpath, const char *newpath);
+  int renameat(int olddirfd, const char *oldpath,
+               int newdirfd, const char *newpath);
+
+  int renameat2(int olddirfd, const char *oldpath,
+                int newdirfd, const char *newpath, unsigned int flags);
+#+END_SRC
 * 文件系统与设备驱动(include/linux/fs.h)
 在设备驱动中，会关心file和inode这两个结构体。
 - 每打开一个文件，在内核空间中就有与之关联的 file 结构体

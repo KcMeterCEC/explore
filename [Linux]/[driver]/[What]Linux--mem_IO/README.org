@@ -107,27 +107,76 @@ meltdown漏洞使得用户空间可以访问内核空间中的内容，详细解
 - 在Linux系统中,进程的 *虚拟4GB内存空间* 被分为两个部分---用户空间和内核空间.
 - 用户空间的地址一般分布为0~3GB(即PAGE_OFFSET),剩下的3~4GB为内核空间.  
   + *用户进程只有通过系统调用(代表用户进程在内核态执行)等方式才可以访问到内核空间*.
-  + 每个进程的用户空间都是完全独立,互不相干的, *用户进程各自由不同的页表*.而内核空间是由内核负责映射,它并不会跟着进程改变,是固定的.
+  + 每个进程的用户空间都是完全独立,互不相干的, *用户进程各自有不同的页表*.而内核空间是由内核负责映射,它并不会跟着进程改变,是固定的.
   + *内核空间的虚拟地址到物理地址的映射是被所有进程共享的,内核虚拟空间独立于其他程序*.
+** 对物理内存条的分配
+- 请注意： *这里说的是物理内存条，不是内存空间*
+Linux一般将内存条分为DMA_ZONE, NORMAL_ZONE, HIGH_ZONE3个区, [[https://mp.weixin.qq.com/s/5K7rlPXo2yIcoIXXgqqLfQ][跑马场]]上有清晰的说明,[[https://www.quora.com/In-reference-to-Linux-Kernel-what-is-the-difference-between-high-memory-and-normal-memory][quora]] 上对此也有解释。
+[[./mem_area.jpg]]
 
-** x86 架构下的分配
-Linux中1GB的内核地址空间又被划分为:
-| 区域名称       | 虚拟地址位置                | 相关代码             |
-|----------------+-----------------------------+----------------------|
-| 保留区         | FIXADDR_TOP ~ 4GB           | 搜索宏 FIXADDR_TOP   |
-| 专用页面映射区 | FIXADDR_START ~ FIXADDR_TOP | 搜索宏 FIXADDR_START |
-| 高端内存映射区 | PKMAP_BASE ~ FIXADDR_START  | 搜索宏 PKMAP_BASE    |
-| 隔离区         |                             |                      |
-| vmalloc分配区  | VMALLOC_START ~ VMALLOC_END | 搜索宏 VMALLOC_START |
-| 隔离区         |                             |                      |
-| 物理内存映射区 | 3GB起始最大长度896M         |                      |
+*** DMA_ZONE
+DMA_ZONE 是为特定DMA划分的区域，某些芯片的DMA控制器无法访问全部内存条(有些仅能访问有限的十几兆空间)，所以Linux为此类DMA规划一片内存.
+
+当实际编写内核代码时，申请DMA缓存时使用 =GFP_DMA= 标记，以告知Linux在那片固定区域申请。
+
+在内核代码中也有关于此标记的注释(提到了还可以作为紧急后备内存来使用):
+#+BEGIN_EXAMPLE
+   GFP_DMA exists for historical reasons and should be avoided where possible.
+   The flags indicates that the caller requires that the lowest zone be
+   used (ZONE_DMA or 16M on x86-64). Ideally, this would be removed but
+   it would require careful auditing as some users really require it and
+   others use the flag to avoid lowmem reserves in ZONE_DMA and treat the
+   lowest zone as a type of emergency reserve.
+#+END_EXAMPLE
+
+DMA_ZONE 的设置一般在构架目录下的Kconfig中设置，比如 =arch/arm/Kconfig= 具有其使能标记，但在设置前一定要搞清楚具体硬件！
+*** NORMAL_ZONE
+前面说过，在虚拟地址中3~4G为内核空间。 *Linux将物理内存的0~1G线性映射到3G~4G虚拟地址空间* ，而这1G的空间减去DMA_ZONE剩下的部分就是 NORMAL_ZONE。 
+
+所谓的线性映射指的就是页表的简单映射关系，一般这种情况下仅仅是一个简单的偏移即可转换，内核提供了函数以相互转换：
+#+BEGIN_SRC c
+  /**
+   ,* @note ： 在内核中物理地址都是一个数值，它能以指针操作的只有虚拟地址，
+   ,* 所以此处物理地址都是 unsigned long 型
+   ,*/
+  unsigned long virt_to_phys(volatile void *address);
+  void *phys_to_virt(unsigned long address);
+#+END_SRC
+
+注意： *线性映射并不是内核已经占用了内存，而是提前映射好以便后面操作,而无需使用时再来映射。*
+*** HIGH_ZONE
+当实际的物理内存大于1G时，多于的部分就是HIGH_ZONE.
+
+当内核空间要使用此段内存时，由于没有提前映射，则需要经过以下步骤使用：
+1. 映射HIGH_ZONE到 高端页面映射区
+2. 使用
+3. 释放映射
+注意： 内核对HIGH_ZONE 不能使用 =virt_to_phys,phys_to_virt= 来转换，因为它们不是简单的线性映射!
+
+对于用户空间而言，用户申请内存时，Linux搜寻内存的路径为： HIGH_ZONE -> NORMAL_ZONE -> DMA_ZONE.
+** 对内核虚拟空间的分配
+*** x86-32 架构下的分配
+Linux中1GB的虚拟内核地址空间又被划分为:
+| 区域名称              | 虚拟地址位置                            | 相关代码             |
+|-----------------------+-----------------------------------------+----------------------|
+| 保留区                | FIXADDR_TOP ~ 4GB                       | 搜索宏 FIXADDR_TOP   |
+| 专用页面映射区        | FIXADDR_START ~ FIXADDR_TOP             | 搜索宏 FIXADDR_START |
+| 高端内存映射区        | PKMAP_BASE ~ FIXADDR_START              | 搜索宏 PKMAP_BASE    |
+| 隔离区                |                                         |                      |
+| vmalloc虚拟内存分配区 | VMALLOC_START ~ VMALLOC_END             | 搜索宏 VMALLOC_START |
+| 隔离区                |                                         |                      |
+| 物理内存映射区        | 3GB起始最大长度896M(对应物理内存的896M) |                      |
+
 #+begin_example
-直接映射的896M物理内存分为两个区域：
+直接映射的最大896M物理内存分为两个区域：
 - 0 ~ 16M : ISA设备用作DMA申请
 - 16M ~ 896M : 常规区域
 #+end_example
 - 当系统物理内存超过4GB时，必须使用CPU的扩展分页(PAE)模式所提供的64位页目录才能取到4GB以上的物理内存。
-** arm linux 下的分配
+
+由上表可以看出：此片虚拟区域一共1G，但实际物理内存映射区不足1G(还有其他区域占用了地址空间)。
+*如果我们将vmalloc分配区设置得大一点，那么对应物理内存映射区就会小一点。对应的反应到物理内存上，那就是可映射的低端内存区变小了，相应的高端内存区就变大了。*
+*** arm32 linux 下的分配
 | 区域名称             | 虚拟地址位置                   | 相关代码                            |
 |----------------------+--------------------------------+-------------------------------------|
 | 向量表               | 0xfff0000~0xfff0fff            | 文档 Documentation/arm/memory.txt   |
@@ -138,12 +187,19 @@ Linux中1GB的内核地址空间又被划分为:
 | 高端内存映射区       | PKMAP_BASE ~ PAGE_OFFSET -1    | 宏 PKMAP_BASE                       |
 | 内核模块             | MODULES_VADDR ~ MODULES_END -1 | 宏 MODULES_VADDR                    |
 
+由上表可以看出: 
+ - 对于arm32 来说， *从内核模块开始的地方就已经是内核空间了！*
+ - 此片虚拟区域一共1G，但实际物理内存映射区不足1G(还有其他区域占用了地址空间)。
+   + *如果我们将vmalloc分配区设置得大一点，那么对应物理内存映射区就会小一点。对应的反应到物理内存上，那就是可映射的低端内存区变小了，相应的高端内存区就变大了。*
 #+begin_example
-在编译内核的时候可以选择：
-- VMSPLIT_3G : 用户空间3G，内核空间1G。内核模块范围为 3GB-16MB ~ 3GB-2MB
-- VMSPLIT_2G : 用户空间2G，内核空间2G。内核模块范围为 2GB-16MB ~ 2GB-2MB
+  在编译内核的时候可以选择：
+  - VMSPLIT_3G : 用户空间3G，内核空间1G。内核模块范围为 3GB-16MB ~ 3GB-2MB,高端内存映射 3GB-2MB ~ 3GB
+  - VMSPLIT_2G : 用户空间2G，内核空间2G。内核模块范围为 2GB-16MB ~ 2GB-2MB,高端内存映射 2GB-2MB ~ 2GB
 
-ARM系统的Linux之所以把内核模块放在16MB范围内，主要是为了内核模块和内核本身的代码段之间的短跳转。
+  ARM系统的Linux之所以把内核模块放在16MB范围内，是因为ARM指令在32M以内是短跳转。
+
+  而内核代码位于 3G~3G+6M 的位置，所以将内核模块放在3G-2M ~ 3G-16M之间的内存差异在32M以内，
+  这样就实现了内核模块和内核本身的代码段之间的短跳转，以最小的开销实现函数的调用.
 #+end_example
 ** DMA、常规、高端内存分布
 有以下4种可能的情况分布(地址由低到高)：
@@ -156,13 +212,26 @@ ARM系统的Linux之所以把内核模块放在16MB范围内，主要是为了�
 - DMA区域
   + 内存较小，硬件DMA可以访问全部地址，且内核可以完全映射物理内存
 
-DMA、常规、高端内存分布区使用的是 =buddy= 算法进行管理，它将空闲页面以 2 的 n次方进行分配，而内存申请也是也 2 的 n 次方申请，
-这样就避免了内存碎片。
+*** buddy 算法
+DMA、常规、高端内存分布区 *最底层* 使用的是 =buddy= 算法进行管理，它将空闲页面以 2 的 n次方进行分配，而内存申请也是也 2 的 n 次方申请。
+- buddy 在不断的拆分和合并，其空闲页面以 1,2,4,8,16... 这种形式组织起来
+  + 从16个页面中取出一页后，buddy会拆分为 1,2,4,8 空闲页
+  + 如果原来是1,2,8的空闲，现在又释放了2页,buddy会合并为1,4,8空闲页
+- 与此同时， *用户每次申请也只能是2的n次方！*
 #+begin_example
-在 /proc/buddyinfo 会显示这些区域的空闲页面分布情况
+在 /proc/buddyinfo 会显示这些区域的空闲页面分布情况,依次从左到右显示 1,2,4,8,16 空闲页数量
 #+end_example
 
-*对于内核物理内存映射区的虚拟内存(即从DMA和常规区域映射过来的),使用 =virt_to_phys()= 实现内核虚拟地址转化为物理地址.与之相对的函数为 =phys_to_virt()=*
+在内核编程时，可以使用以下函数来申请buddy页(一般不会直接使用)：
+#+BEGIN_SRC c
+  /**
+   ,* @brief file: /include/linux/gfp.h
+   ,* @note 此处的order就代表2的次方
+   ,*/
+  struct page * alloc_pages(gfp_t gfp_mask, unsigned int order);
+  void free_pages(unsigned long addr, unsigned int order);
+#+END_SRC
+
 * 内存申请实际操作
 ** 用户空间内存动态申请
 用户空间的内存申请和释放使用标准的c库即可：

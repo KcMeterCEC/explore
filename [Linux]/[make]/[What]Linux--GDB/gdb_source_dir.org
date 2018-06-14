@@ -1,0 +1,57 @@
+#+TITLE: [What]GDB 设置源文件路径
+#+DATE: <2018-06-14 四>
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, gdb
+#+NAME: <linux_debug_gdb_sourcedir.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+在gdb无法找到源文件时，为gdb指定源文件的路径。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+有些时候，gdb无法根据当前可执行文件中的符号表找到其对应的源文件，这导致调试无法看到代码内容。
+- 比如在嵌入式上用gdb时，仅有其可执行文件而无源码。
+
+* 搜寻规则
+gdb 默认维护了一个 =source path= 列表，当启动执行程序会按照这个列表来依次搜寻直到找到文件,否则输出错误信息。
+
+其搜寻规则一般按照以下3步依次进行：
+1. 搜寻编译时指定路径
+2. 将指定路径拼接到当前路径搜寻
+3. 去掉指定路径前缀，仅搜寻当前路径
+   
+gdb在启动时，保存保留路径路径保存在环境变量 =cdir= 和 =cwd= 中。
+- cdir : compilation directory
+- cwd : current working directory
+
+#+BEGIN_EXAMPLE
+  比如源码路径位于 /usr/src/foo-1.0/lib/foo.c 而可执行文件位于 /mnt/cross/ 路径，其搜寻依次为:
+  1. /usr/src/foo-1.0/lib/foo.c (编译指定路径)
+  2. /mnt/cross/usr/src/foo-1.0/lib/foo.c (当前路径 + 指定路径)
+  3. /mnt/cross/foo.c (当前路径)
+#+END_EXAMPLE
+* 路径修改
+** 命令
+*** substitute-path(推荐)
+此命令将编译时指定的路径替换为其他路径，当路径中有多重文件夹时会 *递归搜寻。*
+
+也可以添加多个替换路径，如果源路径有重复的，那么原来的设置将会被覆盖。
+- 设置路径使用格式 : set substitute-path <source> <dist>
+  - 对于交叉编译而言，就是其在主机的编译路径
+  + *疑问* : 当我向使用 $cdir 来表示编译路径时，设置无效，原因不明
+#+BEGIN_EXAMPLE
+  #将源搜寻路径/foo/bar 替换为 /mnt/cross
+  set substitute-path /foo/bar /mnt/cross
+#+END_EXAMPLE
+- 显示已经设置的路径 : show substitute-path [path]
+- 取消设置的路径: unset substitute-path [path]
+*** directory / dir 
+此命令将个文件夹加入搜寻路径， *但并不会搜寻其子文件夹* , 所以如果源码路径有多层，则需要递归加入路径
+- 加入路径使用: dir <dir_path>
+  + 要添加多个路径时，使用冒号做分隔
+- 显示已经加入的路径使用: show dir
+- 删除添加的路径使用: dir
+** 选项
+*** --with-relocated-sources=dir
