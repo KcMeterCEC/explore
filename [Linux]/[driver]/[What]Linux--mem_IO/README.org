@@ -111,7 +111,7 @@ meltdown漏洞使得用户空间可以访问内核空间中的内容，详细解
   + *内核空间的虚拟地址到物理地址的映射是被所有进程共享的,内核虚拟空间独立于其他程序*.
 ** 对物理内存条的分配
 - 请注意： *这里说的是物理内存条，不是内存空间*
-Linux一般将内存条分为DMA_ZONE, NORMAL_ZONE, HIGH_ZONE3个区, [[https://mp.weixin.qq.com/s/5K7rlPXo2yIcoIXXgqqLfQ][跑马场]]上有清晰的说明,[[https://www.quora.com/In-reference-to-Linux-Kernel-what-is-the-difference-between-high-memory-and-normal-memory][quora]] 上对此也有解释。
+Linux一般将内存条分为DMA_ZONE, NORMAL_ZONE, HIGH_ZONE3个区, [[https://mp.weixin.qq.com/s/5K7rlPXo2yIcoIXXgqqLfQ][阅码场]]上有清晰的说明,[[https://www.quora.com/In-reference-to-Linux-Kernel-what-is-the-difference-between-high-memory-and-normal-memory][quora]] 上对此也有解释。
 [[./mem_area.jpg]]
 
 *** DMA_ZONE
