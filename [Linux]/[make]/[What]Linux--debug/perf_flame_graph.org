@@ -1,0 +1,45 @@
+#+TITLE: [What]perf 与 Flame Graph联立显示
+#+DATE: <2018-06-15 五> 
+#+TAGS: debug 
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, perf 
+#+NAME: <linux_debug_perf_flameGraph.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+perf 是Linux(2.6+)内置的强大的分析工具，但是其输出并不直观，配合火焰图更能总览全局。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 简易步骤
+** 基本命令
+*** perf
+数据的采集使用以下两种基本命令:
+- 采集某个进程一段时间
+#+BEGIN_EXAMPLE
+  #-F 后的99代表1秒内采样99次
+  #-p 后跟要采集进程的pid
+  #-g 代表采样函数调用栈
+  #注意 -- 和 sleep 之间的空格!
+  #sleep 后的数字代表采集多长的时间
+  perf record -F 99 -p <pid> -g -- sleep 60
+#+END_EXAMPLE
+- 采集整个系统
+#+BEGIN_EXAMPLE
+  #也就是说取消pid选项换为 -a
+  perf record -F 99 -a -g -- sleep 60
+#+END_EXAMPLE
+** 步骤
+*** 采样数据
+- 在目标板上运行被采样的进程，并使用 =ps= 命令取得其pid
+- 使用 =perf= 指定其pid进行采集
+*** 传输数据文件
+使用 =perf script > out.perf= 生成数据文件 =out.perf= ，并通过网口，串口或USB口传输给主机。
+*** 生成火焰图
+- 在 [[https://github.com/brendangregg/FlameGraph][github]] 拷贝代码
+- 使用命令 =./stackcollapse-perf.pl out.perf > out.folded= 生成中间文件 =out.folded= 
+- 使用命令 =./flamegraph.pl out.folded > kernel.svg= 生成图形
+
+
+
+
