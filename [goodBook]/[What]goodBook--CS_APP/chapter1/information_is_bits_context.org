@@ -111,3 +111,28 @@ CPU要先将硬盘的代码载入内存中执行，而后CPU要通过内部寄�
 [[./amdahl_pic.jpg]]
 
 可以看出，只有前面的线性增长区才是投入与回报成正比。
+** Concurrency and Parallelism
+计算机的发展一直都存在以下两个需求：
+1. concurrency : 多重的，并发的处理能力
+2. parallelism : 处理速度尽量的快
+
+根据以上两个需求将硬件系统分为3个等级，分别由高到低。
+*** Thread-Level Concurrency
+并发是宏观上的同时运行任务，并行是真实的同时进行，并行属于并发。
+
+最开始的计算机都是都是由单核处理器通过分时复用来达到宏观上的同时处理任务的能力，这种系统称为单机系统(uniprocessor system)
+
+后来出现了可以同时处理多个任务的多处理系统(multiprocessor)，这其中包括多核(multi-core)和超线程(hyperthreading).
+- 多核使得系统可以同时处理多个进程，满足了concurrency的需求
+- 而超线程使得在运行一个进程时，可以使用多线程编程技术使得一个进程运行得更快，满足了parallelism需求。
+
+多核是指在一个单芯片上集成了多个核心，它们具有独立的缓存，也有共用的外部缓存和内存，如下图。
+[[./multi_core.jpg]]
+
+而超线程指的是在一个核心的基础上，其内部有多个寄存器的拷贝(比如有多个PC计数器，寄存器等)，这样使得单核可以切换多组寄存器来运行不同的线程。
+*** Instruction-Level Parallelism
+现在计算机可以在一个时钟周期执行多条指令，这是在指令执行的维度来提高处理速度。
+*** single-instruction,Multiple-Data(SIMD) Parallelism
+处理器提供硬件支持单个指令可以同时处理多个数据，这样也可以提高处理速度。
+** The importance of acstractions in computer systems
+在计算机学科中，需要学会以抽象的方式提现系统的一部分或整体架构，这既能理解其中的概念，还能隐藏其中复杂的细节。

@@ -1,0 +1,13 @@
+#+TITLE: [What]Information storage
+#+DATE: <2018-06-18 一> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,CS:APP
+#+NAME: <book_csapp_chapter_2_1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+重新认识计算机系统。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
