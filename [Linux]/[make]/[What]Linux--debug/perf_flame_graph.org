@@ -22,7 +22,9 @@ perf 是Linux(2.6+)内置的强大的分析工具，但是其输出并不直观�
   #-g 代表采样函数调用栈
   #注意 -- 和 sleep 之间的空格!
   #sleep 后的数字代表采集多长的时间
-  perf record -F 99 -p <pid> -g -- sleep 60
+  #--call-graph dwarf 解压缩栈
+  #注意：监视的程序需要具有符号表，也就是编译的时候需要使用 -g 选项
+  perf record -F 99 -p <pid> -g --call-graph dwarf -- sleep 60
 #+END_EXAMPLE
 - 采集整个系统
 #+BEGIN_EXAMPLE

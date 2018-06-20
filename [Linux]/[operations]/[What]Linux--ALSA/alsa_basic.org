@@ -41,10 +41,12 @@ sudo make install
 一般交叉编译需要安装 =alsa-lib= 以及 =alsa-utils= ，一个是库一个是工具。
 安装的顺序为： *先编译安装 alsa-lib,然后才是 alsa-utils*.
 
+- 关于autotools中的 =build,host,target= 三个参数的意义参见 [[https://stackoverflow.com/questions/5139403/whats-the-difference-of-configure-option-build-host-and-target][stackoverflow]],[[https://stackoverflow.com/questions/21990021/how-to-determine-host-value-for-configure-when-using-cross-compiler][stackoverflow_1]]
+
 #+begin_example
 #编译及安装库
 #其中 CC 指定编译器,host 指定目标机系统 
-CC=arm-linux-gnueabihf-gcc ./configure --host=arm-linux 
+CC=arm-linux-gnueabihf-gcc ./configure --host=arm 
 
 make
 #DESTDIR 指定在主机上的安装路径
@@ -54,7 +56,7 @@ make install DESTDIR=/home/cec/Downloads/alsa-utils-1.1.6/test
 #工具的安装需要为其指定库的路径
 #依次为主机库路径,主机头文件路径,编译器,目标机系统,取消部分安装包
 #如果不取消 alsamixer 和 xmlto 那么还需要 libcurses 和 ncurses 库
-LDFLAGS=-L/home/cec/Downloads/alsa-utils-1.1.6/test/lib CPPFLAGS=-I/home/cec/Downloads/alsa-utils-1.1.6/test/include CC=arm-linux-gnueabihf-gcc ./configure --host=arm-linux --disable-alsamixer --disable-xmlto
+LDFLAGS=-L/home/cec/Downloads/alsa-utils-1.1.6/test/lib CPPFLAGS=-I/home/cec/Downloads/alsa-utils-1.1.6/test/include CC=arm-linux-gnueabihf-gcc ./configure --host=arm --disable-alsamixer --disable-xmlto
 
 make
 make install DESTDIR=/home/cec/Downloads/alsa-utils-1.1.6/test
