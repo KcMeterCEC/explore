@@ -13,7 +13,6 @@ perf 是Linux(2.6+)内置的强大的分析工具，但是其输出并不直观�
 #+END_HTML
 * 简易步骤
 ** 基本命令
-*** perf
 数据的采集使用以下两种基本命令:
 - 采集某个进程一段时间
 #+BEGIN_EXAMPLE
@@ -30,6 +29,30 @@ perf 是Linux(2.6+)内置的强大的分析工具，但是其输出并不直观�
 #+BEGIN_EXAMPLE
   #也就是说取消pid选项换为 -a
   perf record -F 99 -a -g -- sleep 60
+#+END_EXAMPLE
+*** 为什么采样频率是每秒99次而不是100次？
+这里涉及到一个 =lockstep= 的概念。
+
+#+BEGIN_EXAMPLE
+  假设要测试某个路段一天的全局拥堵情况，如果我们设置每隔24个小时采样一次车况，这会导致结果不准确。
+  因为当采样时间固定，假设你是在每天上午8点或下午5点开始采样，那么得到的结果是全天拥堵。但如果是凌晨3点采样，得到的结果是全天畅通。
+
+  为了解决这个问题，可以每天采样时间随机，或者提高采样频率。相对来讲，修改采样频率是一个最简单的办法。
+
+  比如每隔23个小时采样，那么按照理论讲，无论起始采样时间是什么时候，24天后就可以轮转全天每个小时的采样。
+#+END_EXAMPLE
+所以将 =perf= 采样率设为99也是基于这个原理，若设置得太高则会导致采样程序占用太多资源，太低则会容易漏掉短信号。
+*** perf interrupt took too long
+当启动 =perf= 时有时会得到这样的警告，其产生于函数 =static void perf_duration_warn(struct irq_work *w)= 。
+
+不过kernel内部给了如下注释，意思是说这个是内核自动调整机制，用户不用担心此提示。
+#+BEGIN_EXAMPLE
+  /*
+   ,* perf samples are done in some very critical code paths (NMIs).
+   ,* If they take too much CPU time, the system can lock up and not
+   ,* get any real work done.  This will drop the sample rate when
+   ,* we detect that events are taking too long.
+   ,*/
 #+END_EXAMPLE
 ** 步骤
 *** 采样数据
