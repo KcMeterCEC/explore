@@ -19,5 +19,65 @@ kernel通过读取由bootloader传入的r2寄存器中的设备树物理地址�
 
 kernel为了识别设备树一个全局的信息，当然就需要一个头来描述此对象:
 #+BEGIN_SRC c
+  /* Definitions used by the flattened device tree */
+  #define OF_DT_HEADER		0xd00dfeed	/* marker */
+  /**
+   ,* @brief 设备树结构头(以大端模式的格式存储)
+   ,* @param magic:此魔数用于标识设备树的开头
+   ,* @param totalsize:设备树所占用的内存大小，包含头
+   ,* @param off_dt_struct:设备树结构偏移
+   ,* @param off_dt_strings:设备树字符串偏移
+   ,* @param off_mem_rsvmap:内存保留区，由 物理地址+大小 组成一个列表表示，避免kernel将其用于其他用途
+   ,* @param version:指明当前设备树版本，版本越高新增的属性越多
+   ,* @param last_comp_verson:向后兼容的版本号，代表老版本编译的内核也可以使用此新版本的设备树
+   ,* @param boot_cpuid_phys:启动的CPU id 号
+   ,* @param size_dt_strings: 设备树字符串大小
+   ,* @param size_dt_struct : 设备树结构描述大小
+   ,*/
+  struct boot_param_header {
+    u32     magic;                  /* magic word OF_DT_HEADER */
+    u32     totalsize;              /* total size of DT block */
+    u32     off_dt_struct;          /* offset to structure */
+    u32     off_dt_strings;         /* offset to strings */
+    u32     off_mem_rsvmap;         /* offset to memory reserve map
+                                     ,*/
+    u32     version;                /* format version */
+    u32     last_comp_version;      /* last compatible version */
 
+    /* version 2 fields below */
+    u32     boot_cpuid_phys;        /* Which physical CPU id we're
+                                       booting on */
+    /* version 3 fields below */
+    u32     size_dt_strings;        /* size of the strings block */
+
+    /* version 17 fields below */
+    u32	size_dt_struct;		/* size of the DT structure block */
+  };
 #+END_SRC
+根据上面头的描述，可以得出设备树在内存中的结构如下:
+#+BEGIN_EXAMPLE
+               ------------------------------
+       base -> |  struct boot_param_header  |
+               ------------------------------
+               |      (alignment gap)       |
+               ------------------------------
+               |      memory reserve map    |
+               ------------------------------
+               |      (alignment gap)       |
+               ------------------------------
+               |                            |
+               |    device-tree structure   |
+               |                            |
+               ------------------------------
+               |      (alignment gap)       |
+               ------------------------------
+               |                            |
+               |     device-tree strings    |
+               |                            |
+        -----> ------------------------------
+        |
+        |
+        --- (base + totalsize)
+
+  对齐区域根据实际情况决定有没有。
+#+END_EXAMPLE

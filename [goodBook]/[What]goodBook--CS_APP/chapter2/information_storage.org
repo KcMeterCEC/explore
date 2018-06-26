@@ -43,3 +43,42 @@
 * 数据与大小
 计算机系统中的字长，也就是一个指针的大小，也决定了其虚拟地址的范围大小。
 目前32位与64位机共存，为了使得代码具有移植性，关于整型的操作还是应该使用 =stdint.h= 中的定义。
+** 地址与大小端
+代码中的对象，在内存中以两个方面来反应：
+1. 对象存储的地址
+2. 对象的字节序：字节序分为小端模式(低字节在前)和大端模式(高字节在前)
+  - 跟多处理器都具有大小端选择控制
+
+字节序的问题在以下几种情况下需要注意：
+1. 与其他主机通信
+  - 在通过socket通信时，需要调用标准的socket接口以转换统一的字节序
+  - 在嵌入式系统上多个不同处理器通信时，需要统一确认大小端
+2. 在代码中嵌入汇编时，当需要给某个地址写一个类似整型的多字节对象时，需要注意大小端
+   
+判断当前系统的大小端使用下面代码即可:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdbool.h>
+  #include <stdint.h>
+
+  bool is_big_endian(void)
+  {
+    uint32_t val = 0x12345678;
+    char *str = (char *)&val;
+
+    if(*str == 0x12)
+      {
+        return true;
+      }
+
+    return false;
+  }
+
+
+  int main(void)
+  {
+    printf("your system is %s endian\n", is_big_endian() ? "big" : "little");
+
+    return 0;
+  }
+#+END_SRC
