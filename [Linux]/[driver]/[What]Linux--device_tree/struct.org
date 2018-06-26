@@ -1,0 +1,23 @@
+#+TITLE: [What]linux -> 设备树数据结构
+#+DATE:  <2018-06-26 二> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, devicetree
+#+NAME: <linux_driver_devicetree_struct.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+
+参考文档: =/Documentation/devicetree/booting-without-of.txt=
+
+只有知道了设备树的数据结构，才能进一步分析设备树相关的操作代码。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* kernel获取设备树
+kernel通过读取由bootloader传入的r2寄存器中的设备树物理地址，来获取设备树的内容。
+
+kernel为了识别设备树一个全局的信息，当然就需要一个头来描述此对象:
+#+BEGIN_SRC c
+
+#+END_SRC

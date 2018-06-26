@@ -8,6 +8,7 @@
 #+OPTIONS: ^:{}
 
 参考书籍: =Linux设备驱动开发详解=
+参考文档: =/Documentation/devicetree/booting-without-of.txt=
 
 设备树的基本操作
 #+BEGIN_HTML
@@ -26,6 +27,9 @@
 - 时钟控制器和时钟使用情况
 它基本上就是画一棵电路板上CPU,总线,设备组成的树, *Bootloader会将这棵树传递给内核*,然后内核可以识别这棵树,并根据它展开出linux内核中
 的 platform_device, i2c_client, spi_device等设备,而这些设备用到的内存,IRQ等资源,也被传递给了内核,内核会将这些资源绑定给展开的相应设备.
+
+既然设备树包含了这些板级信息，可以知道：对于同一个内核代码，我们只需要修改设备树便可以支持不同的开发板。
+- 当然，内核中包含了这些开发板的驱动代码。
 * 设备树的组成和结构
 ** DTS,DTC和DTB
 *** DTS(Device Tree Source)
@@ -40,29 +44,37 @@
 
 设备树结构的模板:
 #+begin_example
-/{
-    node1{
-      a-string-property = "A string";
-      a-string-list-property = "first string", "second string";
-      a-byte-data-property = [0x01 0x23 0x34 0x56];
-      child-node1{
-       first-child-property;
-       second-child-property = <1>;
-       a-string-property = "Hello, world";
-      };
-      child-node2{
+  /{
+      /**
+       ,* @brief device tree example
+       ,*/
+      node1{
+        //<property> = <value>
+        a-string-property = "A string";
+        a-string-list-property = "first string", "second string";
+        a-byte-data-property = [0x01 0x23 0x34 0x56];
+        child-node1{
+         first-child-property;
+         second-child-property = <1>;
+         a-string-property = "Hello, world";
+        };
+        child-node2{
       
+        };
       };
-    };
-    node2{
-    an-empty-property;
-    a-cell-property = <1 2 3 4>;
-    child-node1{
-    };
-    };
-};
+      node2{
+      an-empty-property;
+      a-cell-property = <1 2 3 4>;
+      child-node1{
+      };
+      };
+  };
 #+end_example
-1. 每个文件中的设备树都是以根节点"/"为起始,根节点可以包含多个子节点,子节点也可以包含子节点.节点的基本元素就是属性.
+1. 每个文件中的设备树都是以根节点"/"为起始(或引用其他的label),根节点可以包含多个子节点,子节点也可以包含子节点.节点的基本元素就是属性.
+2. 属性的定义非常灵活
+  - 可以只有属性名，没有对应的值
+  - 值可以是字符串、字符串数组、整数、整数数组、16进制、16进制数组
+3. 注释和c规则一致
 
 假设硬件拓扑如下:
 
@@ -70,105 +82,150 @@
 SPI控制器(位于0x10170000),中断控制器(位于0x10140000)和一个外部总线桥;外部总线桥上又连接了 SMC SMC91111 以太网(位于 0x10100000), I2C控制器(位于0x10160000),
 64MB NOR Flash(位于0x30000000);外部总线桥上连接的I2C控制器所对应的I2C总线上又连接了Maxim DS1338 实时钟(I2C地址为0x58).
 #+begin_example
-/{
-  compatible = "acme,coyotes-revenge";
-  #address-cells = <1>;
-  #size-cells = <1>;
-  interrupt-parent = <&intc>;
-  cpus{
+  /{
+    //指定生产厂商和对应的产品
+    compatible = "acme,coyotes-revenge";
     #address-cells = <1>;
-    #size-cells = <0>;
-    cpu@0{
-      compatible = "arm,cortex-a9";
-      reg = <0>;
-    };
-    cpu@1{
-      compatible = "arm,cortex-a9";
-      reg = <1>;
-    };
-  };
-  serial@0x101f1000{
-    compatible = "arm,pl0111";
-    reg = <0x101f1000 0x1000>;
-    interrupts = <1 0>;
-  };
-  serial@0x101f2000{
-    compatible = "arm,pl0111";
-    reg = <0x101f2000 0x1000>;
-    interrupts = <2 0>;
-  };
-  gpio@101f3000{
-    compatible = "arm,pl1061";
-    reg = <0x101f3000 0x1000
-           0x101f4000 0x0010>;
-    interrupts = <3 0>;
-  };
-  intc:interrupt-controller@10140000{
-    compatible = "arm,pll90";
-    reg = <0x10140000 0x1000>;
-    interrupt-controller;
-    interrupt-cells = <2>;
-  };
-  spi@10115000{
-    compatible = "arm,pl022";
-    reg = <0x10170000 0x1000>;
-    interrupts = <4 0>;
-  };
-  external-bus{
-    #address-cells = <2>;
     #size-cells = <1>;
-    ranges = < 0 0 0x10100000 0x10000 //Chipselect 1, Ethernet
-               1 0 0x10160000 0x10000 //Chipselect 2, i2c controller
-               2 0 0x30000000 0x1000000>; //Chipselect 3, NOR Flash
-
-    ethernet@0,0{
-      compatible = "smc, smc91c111";
-      reg = <0 0 0x1000>;
-      interrupts = <5 2>;
-    };
-    i2c@1,0{
-      compatible = "acme,a1234-i2c-bus";
+    interrupt-parent = <&intc>;
+    //一般指定CPU只需要通过compatible匹配即可，其构架的具体信息一般在芯片相关代码中配置了
+    cpus{
       #address-cells = <1>;
       #size-cells = <0>;
-      reg = <1 0 0x1000>;
-      interrupts = <6 2>;
-      rtc@58{
-        compatible = "maxim,ds1338";
-        reg = <58>;
-        interrupts = <7 3>;
+      cpu@0{
+        compatible = "arm,cortex-a9";
+        reg = <0>;
+      };
+      cpu@1{
+        compatible = "arm,cortex-a9";
+        reg = <1>;
       };
     };
-    flash@2,0{
-    compatible = "samsung,k8f1315ebm","cfi-flash";
-    reg = <2 0 0x40000000>;
+    serial@0x101f1000{
+      compatible = "arm,pl0111";
+      reg = <0x101f1000 0x1000>;
+      interrupts = <1 0>;
+    };
+    serial@0x101f2000{
+      compatible = "arm,pl0111";
+      reg = <0x101f2000 0x1000>;
+      interrupts = <2 0>;
+    };
+    gpio@101f3000{
+      compatible = "arm,pl1061";
+      reg = <0x101f3000 0x1000
+             0x101f4000 0x0010>;
+      interrupts = <3 0>;
+    };
+    intc:interrupt-controller@10140000{
+      compatible = "arm,pll90";
+      reg = <0x10140000 0x1000>;
+      interrupt-controller;
+      interrupt-cells = <2>;
+    };
+    spi@10170000{
+      compatible = "arm,pl022";
+      reg = <0x10170000 0x1000>;
+      interrupts = <4 0>;
+    };
+    external-bus{
+      #address-cells = <2>;
+      #size-cells = <1>;
+      ranges = < 0 0 0x10100000 0x10000 //Chipselect 1, Ethernet
+                 1 0 0x10160000 0x10000 //Chipselect 2, i2c controller
+                 2 0 0x30000000 0x1000000>; //Chipselect 3, NOR Flash
+
+      ethernet@0,0{
+        compatible = "smc, smc91c111";
+        reg = <0 0 0x1000>;
+        interrupts = <5 2>;
+      };
+      i2c@1,0{
+        compatible = "acme,a1234-i2c-bus";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg = <1 0 0x1000>;
+        interrupts = <6 2>;
+        rtc@58{
+          compatible = "maxim,ds1338";
+          reg = <58>;
+          interrupts = <7 3>;
+        };
+      };
+      flash@2,0{
+      compatible = "samsung,k8f1315ebm","cfi-flash";
+      reg = <2 0 0x40000000>;
+      };
     };
   };
-};
 #+end_example
-
 *** DTC(Device Tree Compiler)
-DTC是将 .dts 文件编译为 .dtb 的工具.其源代码位于 =scripts/dtc=,在内核使能了设备树的情况下,
-此工具会被编译出来.DTC 也可以在ubuntu中安装 =sudo apt install device-tree-compiler=.
+DTC是将 .dts 文件编译为 .dtb 的工具.其源代码位于 =scripts/dtc=,在内核使能了设备树的情况下, 此工具会被编译出来.
+- DTC 也可以在ubuntu中安装 =sudo apt install device-tree-compiler=.
 
-也可以单独编译设备树: =make dtbs=,或者反编译: =./scripts/dtc/dtc -I dtb -O dts -o xxx.dts /arch/arm/boot/dts/xxx.dtb=
+对于arm而言，路径 =arch/arm/boot/dts/Makefile= 中指出了对应不同SOC所需要哪些 .dtb 文件。
 
+也可以单独编译设备树: =make dtbs= (需要先设置 =ARCH= 以让其分析Makefile找到对应需要的dtb),或者反编译: =./scripts/dtc/dtc -I dtb -O dts -o xxx.dts /arch/arm/boot/dts/xxx.dtb=
 *** DTB(Device Tree Blob)
 .dtb文件是由.dts文件通过DTC工具编译过来的,此文件可以被linux内核和u-boot识别.
 此文件可以与内核镜像单独存放,也可以与内核镜像打包.编译内核时,使能 =CONFIG_ARM_APPENDED_DTB= 便可以打包.
 *** 绑定(Binding)
-设备树的说明文档位于 =Documentation/devicetree/bindings=.
+设备树针对不同设置的绑定说明文档位于 =Documentation/devicetree/bindings=, 在使用内核提供的驱动时，需要查看此文件以知道哪些属性是必须的，哪些是可选的。
+
 *Linux内核下的 =scripts/checkpath.pl= 会运行一个检查,如果有人在设备树中新添加了 compatible 字符串,而没有添加相应的文档进行解释, checkpatch 程序会报出警告 =UNDOCUMENTED_DT_STRINGDT compatible string xxx
 apperars un-documented*.
 *** Bootloader
 在u-boot中使能设备树使用: =CONFIG_OF_LIBFDT=
 
+以前u-boot将启动参数发送给内核使用的是 ATAGS 方式：
+- r0 : 0
+- r1 : Machine type number
+- r2 : 存储tagged list的物理内存地址
+
+现在一般使用设备树来传递启动参数:
+- r0 : 0
+- f1 : 一类SOC号
+- f2 : 存储device-tree的物理内存地址(需要64位对齐)
+
+kernel通过区分 ATAG 和 device-tree 的标记来知道当前传递的是哪种类型。
 ** 根节点兼容性
 前面的根节点兼容性为 :  compatible = "acme,coyotes-revenge";定义了整个系统的名称,它的组织形式为: <manufacturer>,<model>.
 
-Linux内核通过此兼容性来判断启动的是哪类设备,此属性译本包括两个及以上的兼容性字符串,*首个兼容性字符串是板子级别的名称,后面一个兼容性是芯片级别(或者芯片系列级别)的名字.
-比如在 zynq-zc702.dts 中: compatible = "xlnx,zynq-zc702","xlnx,zynq-7000";
+Linux内核通过此兼容性来判断启动的是哪类设备,此属性一般包括两个及以上的兼容性字符串,首个兼容性字符串是板子级别的名称,后面一个兼容性是芯片级别(或者芯片系列级别)的名字.
+- 比如在 zynq-zc702.dts 中: compatible = "xlnx,zynq-zc702","xlnx,zynq-7000";
+- 对于根节点兼容性的设置，一般也会有对应bind文档，比如 =/Documentation/devicetree/bindings/arm= 中具有对arm类各SOC的兼容说明
+#+BEGIN_EXAMPLE
+  Xilinx Zynq Platforms Device Tree Bindings
+
+  Boards with Zynq-7000 SOC based on an ARM Cortex A9 processor
+  shall have the following properties.
+
+  Required root node properties:
+      - compatible = "xlnx,zynq-7000";
+#+END_EXAMPLE
 
 在Linux2.6内核中,是通过匹配 bootloader 传入的 MACHINE_ID 来执行相应的初始化函数. *在引入设备树后,就是通过根节点兼容性和内核中的 .dt_compat 来实现匹配*.
+#+BEGIN_SRC c
+  //file arch/arm/mach-zynq/common.c
+  static const char * const zynq_dt_match[] = {
+    "xlnx,zynq-7000",
+    NULL
+  };
+
+  DT_MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+  /* 64KB way size, 8-way associativity, parity disabled */
+  .l2c_aux_val    = 0x00400000,
+    .l2c_aux_mask	= 0xffbfffff,
+    .smp		= smp_ops(zynq_smp_ops),
+    .map_io		= zynq_map_io,
+    .init_irq	= zynq_irq_init,
+    .init_machine	= zynq_init_machine,
+    .init_late	= zynq_init_late,
+    .init_time	= zynq_timer_init,
+    .dt_compat	= zynq_dt_match,
+    .reserve	= zynq_memory_init,
+    MACHINE_END
+#+END_SRC
 
 Linux 倡导针对多个SOC,多个电路板的通用DT设备,即一个设备的 .dt_compat 包含多个电路板的.dts文件的根节点兼容属性字符串.之后如果这多个电路板的初始化序列不一样,可以
 通过 =int of_machine_is_compatible(const char *compat)= API判断具体的电路板是什么.
@@ -239,13 +296,13 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
 通过这种方法,驱动可以把与某个设备兼容的私有数据寻找出来,体现了一种面向对象的设计思想,避免了大量的 if,else.
 
 ** 设备节点及lable命名
-[[https://www.power.org][命名规范]]
 节点命名的格式: <name>[@<unit-address>]; <>中的内容是必选,[]中作为可选.
 - <name> 为ASCII 字符串,多个同类设备节点的name可以一样,但unit-address要不一样.
-- @<unit-address> 为设备的起始地址.也经常在对应节点的 reg 属性中给出.对于挂在内存空间的设备,此地址直接代表在内存中的地址.
-对于挂在I2C总线上的外设,@后面一般跟的是从设备的I2C地址.
+- @<unit-address> 为设备的起始地址.也经常在对应节点的 reg 属性中给出.
+  - 对于挂在内存空间的设备,此地址直接代表在内存中的地址.
+  - 对于挂在I2C总线上的外设,@后面一般跟的是从设备的I2C地址.
 
-可以给设备节点添加 label,之后可以通过 &label 的形式访问这个节点以获取该节点的设备地址.
+可以给设备节点添加 label,之后可以通过 &label 的形式访问这个节点以获取该节点的设备地址(通过phandle,pointer handle进行的).
 - 比如在音频machine 驱动中的，设备树中节点定义
 #+begin_example
 audio_speaker{
@@ -278,10 +335,7 @@ static int audio_speaker_probe(struct platform_device *pdev)
                 audio_speaker_link.cpu_of_node)->dev;
 }
 #+END_SRC
-
-
-同时设备树支持C语言的预处理过程,所以设备树中可以包含头文件并使用宏定义.
-
+- 同时设备树支持C语言的预处理过程,所以设备树中可以包含头文件并使用宏定义.
 ** 地址编码
 *** address-cells,size-cells
 #+begin_example
@@ -289,13 +343,13 @@ static int audio_speaker_probe(struct platform_device *pdev)
 #size-cells = <num>;
 #+end_example
 代表 reg 属性的 *每一对表现格式*,是由几个地址配几个范围.
+
 *注意*:
 在当前节点下所设置的这两个属性, *只影响到子节点*.
 
 *** reg
 - 格式: reg = <address1 length1 [address2 length2] [address3 length3] ..>;
-其中 address length 代表设备的起始地址及其使用范围.
-address 为一个或多个的32位整型(即 cell),length则意味着从 address 到 address+length-1.
+  + 其中 address length 代表设备的起始地址及其使用范围.address 为一个或多个的32位整型(即 cell),length则意味着从 address 到 address+length-1.
 *** ranges
 如果设备经过总线桥与CPU连接,其 address 往往需要经过转换才能对应CPU的内存映射.
 如之前的 external-bus 所示:
@@ -314,10 +368,12 @@ ranges 是地址转换表,其中的每个项目是一个子地址,父地址以�
 对于中断控制器而言,它提供如下属性:
 - interrupt-controller 此属性为空,中断控制器应该加上此属性表明自己的身份
 - #interrupt-cells = <num> 与#address-cells 和 #size-cells 相似,表明连接此中断控制器的设备的中断属性的cell大小
+
 对于普通设备,与中断相关的属性还包括:
 - interrupt-parent = <&intc> 指定此设备所依附的中断控制器的 phandle,当节点没有此属性时,则从父节点继承.
 - interrupt = <val> 指定中断号,触发方式等.其值的个数由 interrupt-cells 指定,而具体的意义由驱动决定.在相应的绑定文档也会说明
-一个设备还可能会用到多个中断号.对于ARM GIC而言,若某设备使用了 SPI的168,169号两个中断,且都是高电平触发,则定义为 interrupts = <0 168 4>,<0 169 4>;
+  + 一个设备还可能会用到多个中断号.对于ARM GIC而言,若某设备使用了 SPI的168,169号两个中断,且都是高电平触发,则定义为 interrupts = <0 168 4>,<0 169 4>;
+
 获取中断号可以通过 =platform_get_irq= 直接获取,也可以通过名称获取,如下:
 #+BEGIN_SRC C
 edma0: dma-controller@40018000{
@@ -341,7 +397,7 @@ fsl_edma_irq_init(struct platform_device *pdev,struct fsl_edma_engine *fsl_edma)
 }
 
 #+END_SRC
-** GPIO,时钟,pinmux连接
+** GPIO,时钟连接
 *** GPIO
 对于CPIO控制器而言,其对应的设备节点需要声明 =gpio-controller= 属性,并设置 =#gpio-cells= 大小.
 #gpio-cells 中第一个cell为GPIO号,第2个为GPIO极性.

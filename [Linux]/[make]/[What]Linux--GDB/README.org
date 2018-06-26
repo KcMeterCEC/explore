@@ -25,6 +25,7 @@ cmake -DCMAKE_BUILD_TYPE=Debug ....
 #+END_HTML
 ** 为文件输入参数
 在启动gdb后 =gdb ./hello= ，很多程序需要带入口参数，那么就需要使用命令 =set args= 
+- 如果要监视后台进程，则需要先使用 =ps -aux= 或 =pidof= 来获取Pid，然后使用 "gdb -pid=<pid>" 来连接后台进程
 #+begin_example
 #设置入口参数为 1 2 3
 set args 1 2 3
@@ -97,9 +98,6 @@ show args
 | set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a' |
 | info                       | 查看寄存器、断点等信息                                                  |
 | disassemble                | 查看汇编代码                                                            |
-
-
-
 * 捕捉 core dump
 在用户空间捕捉core dump之前，用户需要在当前shell使用命令使程序崩溃后产生 =core= 文件:
 #+begin_example
