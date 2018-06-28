@@ -82,3 +82,27 @@
     return 0;
   }
 #+END_SRC
+** 位运算
+c中可用的位运算有: |(或)，&(与)，~(按位取返),!(取返),^(异或,两个数不同的位求或，相同的位置0)
+
+下面的代码可以不需要临时变量temp来实现二者的交换:
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+  void inplace_swap(int *x, int *y)
+  {
+    ,*y = *x ^ *y; // *y = a ^ b
+    ,*x = *x ^ *y; // *x = a ^ a ^ b = 0 ^ b = b
+    ,*y = *x ^ *y; // *y = b ^ a ^ b = 0 ^ a = a
+  }
+
+  int main(void)
+  {
+    int a = 123;
+    int b = 456;
+
+    printf("the result swap a = %d, b = %d, ", a, b);
+    inplace_swap(&a, &b);
+    printf("is a = %d, b = %d\n", a, b);
+  }
+#+END_SRC
