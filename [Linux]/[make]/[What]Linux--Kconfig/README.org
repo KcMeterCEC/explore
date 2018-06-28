@@ -7,7 +7,20 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-u-boot 或者 Linux 在进行 =make menuconfig= 时,配置工具都会提取 =./Kconfig= 文件,此文件再通过 =source= 读取其他文件夹下的 Kconfig ,层层调用来完成整个界面的映射.配置界面的显示,也是层层显示的.
+u-boot 或者 Linux 在进行配置内核时，其调用步骤如下:
+1. make ARCH=<arch> <xxx_defconfig> menuconfig 
+  - ARCH : 指定要配置的构架
+  - <xxx_defconfig> : 指定默认的参考配置,比如arm默认配置位于 =arch/arm/configs/= 
+    + 一般都可以参考这些配置，不然内核的配置项太多了。比如 "make ARCH=arm s3c2410_defconfig menuconfig"
+2. 配置工具都会提取 =./Kconfig= 文件,此文件 =source= 读取 =arch/${ARCH}/Kconfig=
+3. =arch/${ARCH}/Kconfig= 再source其他文件夹下的 Kconfig ,层层调用来完成整个界面的映射.配置界面的显示,也是对应层层显示的.
+4. 在完成配置后，在内核根目录下会生成文件 .config(新配置) 和 .config.old(之前配置)，用户根据查看这两个文件可以以一个全局视野查看内核配置以及相对上次修改的配置
+
+经过上面的配置，然后分别编译内核文件和模块文件:
+1. make ARCH=<arch> CROSS_COMPILE=<arm-gcc> zImage :编译内核文件(比如 make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- zImage)
+  + 编译完成后，在内核根目录会有未压缩的 vmlinux 和符号表 System.map,以及在 arch/xxx/boot/ 目录下会有已经压缩的zImage
+2. make ARCH=<arch> CROSS_COMPILE=<arm-gcc> modules : 编译内核模块
+  + 内核模块对应的存在于其源码的路径中
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML

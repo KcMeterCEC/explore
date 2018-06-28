@@ -14,7 +14,6 @@
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
-* kernel获取设备树
 kernel通过读取由bootloader传入的r2寄存器中的设备树物理地址，来获取设备树的内容。
 
 kernel为了识别设备树一个全局的信息，当然就需要一个头来描述此对象:
@@ -81,3 +80,12 @@ kernel为了识别设备树一个全局的信息，当然就需要一个头来�
 
   对齐区域根据实际情况决定有没有。
 #+END_EXAMPLE
+* device-tree structure
+设备树的结构以4字节对齐的方式来排列，如下图所示:
+[[./struct_block.jpg]]
+
+* device-tree strings
+字符区域就是按顺便存储的字符串，通过 strucure block 中的 offset来获取。
+
+可以看出这种结构方式和编译器在生成目标文件中的结构类似，将字符串单独存放，
+以规避一些具有重复字符串而占用多于空间的情况。

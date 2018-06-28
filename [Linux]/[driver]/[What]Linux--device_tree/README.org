@@ -71,10 +71,42 @@
   };
 #+end_example
 1. 每个文件中的设备树都是以根节点"/"为起始(或引用其他的label),根节点可以包含多个子节点,子节点也可以包含子节点.节点的基本元素就是属性.
+  - 一个节点的完整名字就是其节点路径
 2. 属性的定义非常灵活
   - 可以只有属性名，没有对应的值
   - 值可以是字符串、字符串数组、整数、整数数组、16进制、16进制数组
 3. 注释和c规则一致
+#+BEGIN_EXAMPLE
+  / {
+    property1 = "string_value";	/* define a property containing a 0
+                                ,* terminated string
+                                ,*/
+
+    property2 = <0x1234abcd>;	/* define a property containing a
+                              ,* numerical 32-bit value (hexadecimal)
+                              ,*/
+
+    property3 = <0x12345678 0x12345678 0xdeadbeef>;
+                                  /* define a property containing 3
+                                   ,* numerical 32-bit values (cells) in
+                                   ,* hexadecimal
+                                   ,*/
+    property4 = [0x0a 0x0b 0x0c 0x0d 0xde 0xea 0xad 0xbe 0xef];
+                                  /* define a property whose content is
+                                   ,* an arbitrary array of bytes
+                                   ,*/
+
+    childnode@address {	/* define a child node named "childnode"
+                                   ,* whose unit name is "childnode at
+                                   ,* address"
+                                   ,*/
+
+      childprop = "hello\n";      /* define a property "childprop" of
+                                   ,* childnode (in this case, a string)
+                                   ,*/
+    };
+  };
+#+END_EXAMPLE
 
 假设硬件拓扑如下:
 
@@ -164,8 +196,35 @@ DTC是将 .dts 文件编译为 .dtb 的工具.其源代码位于 =scripts/dtc=,�
 - DTC 也可以在ubuntu中安装 =sudo apt install device-tree-compiler=.
 
 对于arm而言，路径 =arch/arm/boot/dts/Makefile= 中指出了对应不同SOC所需要哪些 .dtb 文件。
+- 工具在编译 dts 时会检查dts的格式
 
-也可以单独编译设备树: =make dtbs= (需要先设置 =ARCH= 以让其分析Makefile找到对应需要的dtb),或者反编译: =./scripts/dtc/dtc -I dtb -O dts -o xxx.dts /arch/arm/boot/dts/xxx.dtb=
+也可以单独编译设备树: =make dtbs= (需要先设置 =ARCH= 以让其分析Makefile找到对应需要的dtb),或者反编译: 
+#+BEGIN_EXAMPLE
+  #  Input formats:
+  #  -------------
+  #
+  #     - "dtb": "blob" format, that is a flattened device-tree block
+  #       with header all in a binary blob.
+  #     - "dts": "source" format. This is a text file containing a
+  #       "source" for a device-tree. The format is defined later in this
+  #        chapter.
+  #     - "fs" format. This is a representation equivalent to the
+  #        output of /proc/device-tree, that is nodes are directories and
+  #	properties are files
+  #
+  # Output formats:
+  # ---------------
+  #
+  #     - "dtb": "blob" format
+  #     - "dts": "source" format
+  #     - "asm": assembly language file. This is a file that can be
+  #       sourced by gas to generate a device-tree "blob". That file can
+  #       then simply be added to your Makefile. Additionally, the
+  #       assembly file exports some symbols that can be used.
+  #dtc [-I <input-format>] [-O <output-format>] [-o output-filename] [-V output_version] input_filename
+
+  ./scripts/dtc/dtc -I dtb -O dts -o xxx.dts /arch/arm/boot/dts/xxx.dtb
+#+END_EXAMPLE
 *** DTB(Device Tree Blob)
 .dtb文件是由.dts文件通过DTC工具编译过来的,此文件可以被linux内核和u-boot识别.
 此文件可以与内核镜像单独存放,也可以与内核镜像打包.编译内核时,使能 =CONFIG_ARM_APPENDED_DTB= 便可以打包.
@@ -188,6 +247,36 @@ apperars un-documented*.
 - f2 : 存储device-tree的物理内存地址(需要64位对齐)
 
 kernel通过区分 ATAG 和 device-tree 的标记来知道当前传递的是哪种类型。
+
+对于arm而言，它们具有共用的设备树文件为 =skeleton.dtsi= ，此文件规定了最基本的几个节点:
+- chosen : 传递给内核的启动参数、控制命令等
+- aliases : 对一些节点的重命名
+- memory : 对系统物理内存的说明
+- model : 当前目标板名称
+
+比如zynq下对这几个节点的填充如下:
+#+BEGIN_EXAMPLE
+  /include/ "skeleton.dtsi"
+  /include/ "zynq-7000.dtsi"
+  /include/ "pcw.dtsi"
+  /include/ "pl.dtsi"
+
+  / {
+    model = "kc_sdr";
+    aliases {
+      serial0 = &uart1;
+      spi0 = &qspi;
+    };
+    chosen {
+      bootargs = "console=ttyPS0,460800 earlyprintk";
+      stdout-path = "serial0:460800ns";
+    };
+    memory {
+      device_type = "memory";
+      reg = <0x0 0x40000000>;
+    };
+  };
+#+END_EXAMPLE
 ** 根节点兼容性
 前面的根节点兼容性为 :  compatible = "acme,coyotes-revenge";定义了整个系统的名称,它的组织形式为: <manufacturer>,<model>.
 
@@ -302,6 +391,8 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
   - 对于挂在内存空间的设备,此地址直接代表在内存中的地址.
   - 对于挂在I2C总线上的外设,@后面一般跟的是从设备的I2C地址.
 
+*注意：节点名和属性名(@符号左边的字符)不能超过31个字符*
+
 可以给设备节点添加 label,之后可以通过 &label 的形式访问这个节点以获取该节点的设备地址(通过phandle,pointer handle进行的).
 - 比如在音频machine 驱动中的，设备树中节点定义
 #+begin_example
@@ -342,7 +433,8 @@ static int audio_speaker_probe(struct platform_device *pdev)
 #address-cells = <num>;
 #size-cells = <num>;
 #+end_example
-代表 reg 属性的 *每一对表现格式*,是由几个地址配几个范围.
+代表 reg 属性的 *每一对表现格式*,是由多长地址配多大范围.
+- 比如当两个都为1时，代表32位地址配32位大小，当 #address-cells=2 #size-cells=1 代表64位地址配32位大小
 
 *注意*:
 在当前节点下所设置的这两个属性, *只影响到子节点*.
