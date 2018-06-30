@@ -556,13 +556,12 @@ struct map_desc{
 };
 #+END_SRC
 * DMA内存
-** DMA与Cache一致性
-在DMA不工作的情况下或者DMA与Cache相对应的主存没有重叠区, 那么Cache 与主存中的数据具有一致性特点.二者并不会起冲突.
-
-*当DMA与Cache相对应的主存有重叠区时,当DMA更新了重叠区的内容,而Cache并没有对应的更新.此时CPU仍然使用的是陈旧的cache的数据,就会发生Cache与内存之间数据"不一致性"的错误!*
-在发生Cache与内存不一致性错误后,驱动将无法正常运行.
-
-Cache的不一致问题并不是只发生在DMA的情况下,实际上,它还存在于Cache使能和关闭的时刻.例如,对于带MMU功能的ARM处理器,在开启 *MMU之前需要先置Cache无效,否则在开启MMU之后,Cache里面有可能保存的还是之前的物理地址,这也会造成不一致性的错误!*.
+** DMA与硬件Cache一致性
+1. 在DMA不工作的情况下或者DMA与Cache相对应的主存没有重叠区, 那么Cache 与主存中的数据具有一致性特点.二者并不会起冲突.
+2. *当DMA与Cache相对应的主存有重叠区时,当DMA更新了重叠区的内容,而Cache并没有对应的更新.此时CPU仍然使用的是陈旧的cache的数据,就会发生Cache与内存之间数据"不一致性"的错误!*
+  + 当CPU向内存写数据时，此时也是先写到了cache，DMA传输数据到外置依然是原来陈旧的数据
+  + 在发生Cache与内存不一致性错误后,驱动将无法正常运行.
+3. Cache的不一致问题并不是只发生在DMA的情况下,实际上,它还存在于Cache使能和关闭的时刻.例如,对于带MMU功能的ARM处理器,在开启 *MMU之前需要先置Cache无效,否则在开启MMU之后,Cache里面有可能保存的还是之前的物理地址,这也会造成不一致性的错误!*.
 ** Linux 下的DMA编程(*DMA只是一种外设与内存的交互方式*)
 内存中用于外设交互数据的一块区域称为 DMA 缓冲区, *在设备不支持scatter/gather操作的情况下,DMA缓冲区在物理上必须上连续的.*
 *** DMA区域
@@ -579,38 +578,40 @@ int dma_set_mask(struct device *dev, u64 mask)
 如果DMA只能操作24位地址,那么就应该调用 =dma_set_mask(dev,0xffffff)=
 *** 一致性DMA缓冲区
 为了能够避免 *DMA与Cache一致性问题*,使用如下函数分配一个DMA一致性的内存区域:
+- 操作此函数的过程是不用关心CMA区域设置，这个是内核底层完成的。
 #+BEGIN_SRC C
-/*
-  申请一致性DMA缓冲区
- ,*/
-//返回申请到的DMA缓冲区的虚拟地址
-//handle 代表总线地址
-void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
+  /*
+    申请一致性DMA缓冲区(一般不带cache)
+   ,*/
+  //返回申请到的DMA缓冲区的虚拟地址
+  //handle 代表总线地址
+  void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
 
-//释放申请的内存
-void dma_free_coherent(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
+  //释放申请的内存
+  void dma_free_coherent(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
 
-/*
-  分配一个写合并(writecombining)的DMA缓冲区
- ,*/
-void *dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
+  /*
+    分配一个写合并(writecombining)的DMA缓冲区
+   ,*/
+  void *dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp);
 
-//释放
-void dma_free_writecombine(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
+  //释放
+  void dma_free_writecombine(struct device *dev,size_t size, void *cpu_addr, dma_addr_t handle);
 
-/*
-  PCI设备申请缓冲区
-,*/
-void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_addrp);
+  /*
+    PCI设备申请缓冲区
+  ,*/
+  void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_addrp);
 
-//释放
-void pci_free_consisten(struct pci_dev *pdev, size_t size, void *cpu_addr, dma_addr_t dma_addr);
+  //释放
+  void pci_free_consisten(struct pci_dev *pdev, size_t size, void *cpu_addr, dma_addr_t dma_addr);
 
 #+END_SRC
 *注意*:
 =dma_alloc_xxx()= 函数虽然是以 dma_alloc_开头, *但是其申请的区域不一定在DMA区域里面*.以32位ARM处理器为例,当conherent_dma_mask小于0xffffffff时,才会设置GFP_DMA标记,并从DMA区域去申请内存.
 *** 流式DMA映射
-在许多情况下缓冲区来自内核的较上层，上层很可能以普通的 kmalloc() 等方申请内存，这时就需要使用流式DMA。
+在许多情况下缓冲区来自内核的较上层，上层很可能以普通的 kmalloc() 等方式申请内存，
+也就是说这段内存是具有硬件cache的，这时就需要使用流式DMA。
 
 流式DMA操作在本质上大多就是进行关闭Cache操作，以解决一致性问题。
 

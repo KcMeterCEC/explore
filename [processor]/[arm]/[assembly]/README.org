@@ -1,0 +1,24 @@
+#+TITLE: [What]arm -> assembly overview
+#+DATE:  <2018-06-29 五> 
+#+TAGS: arm
+#+LAYOUT: post 
+#+CATEGORIES: processor, arm, assembly
+#+NAMA: <processor_arm_as_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考网站: [[https://www.coranac.com/tonc/text/asm.htm]]
+
+整理ARM汇编下的一些基本概念及操作。
+
+个人认为，读懂汇编只要多写多画，只要能够清晰的将汇编的操作逻辑以流程图的形式画出来，就算明白整体架构了。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
+
+  
+
+
+
+

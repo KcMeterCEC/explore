@@ -1,0 +1,14 @@
+#+TITLE: [What]Linux 内存应用
+#+DATE:  <2018-06-30 六> 
+#+TAGS: memory
+#+LAYOUT: post 
+#+CATEGORIES: linux, memory, overview
+#+NAME: <linux_memory_overview_usage.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+理解了内存概念后再来看应用方面的知识就会比以前深入得多。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
