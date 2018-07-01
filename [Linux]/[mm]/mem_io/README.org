@@ -61,10 +61,6 @@ free 命令的输出如下：
     + buffers 和 cached 所使用掉的page cache是可以释放掉的
   + free = 第一行free + buffers + cached
     + 同理，实际上还可以通过释放 buffers 和 cached 获取空间内存
-   
-
-
-
 * file-backed 和 anonymous page
 - file-backed pages : 称为有文件背景的page cache，指的是在硬盘中有对应的文件，为了提高执行效率，内存读取了一段作为副本
   + 当内核需要更多的内存时，这些 file-backed pages 可以被取消映射而不会影响进程的正常执行(*这个动作称为swap*)

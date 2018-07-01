@@ -581,7 +581,8 @@ int dma_set_mask(struct device *dev, u64 mask)
 - 操作此函数的过程是不用关心CMA区域设置，这个是内核底层完成的。
 #+BEGIN_SRC C
   /*
-    申请一致性DMA缓冲区(一般不带cache)
+    申请一致性DMA缓冲区(一般不带cache, 但如果有 cache coherent interconnect 硬件支持，则就可以带cache)
+    note: 这段缓存区一般是连续的，但如果硬件带IOMMU,则也可以是不连续的
    ,*/
   //返回申请到的DMA缓冲区的虚拟地址
   //handle 代表总线地址
@@ -613,10 +614,21 @@ int dma_set_mask(struct device *dev, u64 mask)
 在许多情况下缓冲区来自内核的较上层，上层很可能以普通的 kmalloc() 等方式申请内存，
 也就是说这段内存是具有硬件cache的，这时就需要使用流式DMA。
 
-流式DMA操作在本质上大多就是进行关闭Cache操作，以解决一致性问题。
+流式DMA操作在本质上大多就是进行flush或invalidate Cache操作，以解决一致性问题。
+- flush 是指将cache内容写入内存，invalidate是指让CPU再次从内存读取数据来刷新一次cache
+- 如果有 =cache coherent interconnect= 硬件，则不需要关闭cache，从应用编程的角度来讲，只要按照规矩来操作即可。
 
 操作步骤为：
 1. 进行流式DMA映射
 2. 执行DMA操作
 3. 取消映射
+#+BEGIN_SRC c
+  //一片内存操作
+  #define dma_map_single(d, a, s, r) dma_map_single_attrs(d, a, s, r, NULL)
+  #define dma_unmap_single(d, a, s, r) dma_unmap_single_attrs(d, a, s, r, NULL)
+
+  //多片非连续内存操作
+  #define dma_map_sg(d, s, n, r) dma_map_sg_attrs(d, s, n, r, NULL)
+  #define dma_unmap_sg(d, s, n, r) dma_unmap_sg_attrs(d, s, n, r, NULL)
+#+END_SRC
 
