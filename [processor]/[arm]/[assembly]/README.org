@@ -1,13 +1,13 @@
-#+TITLE: [What]arm -> assembly overview
-#+DATE:  <2018-06-29 五> 
+#+TITLE: [What]arm -> gnu assembly overview
+#+DATE:  <2018-07-02 一> 
 #+TAGS: arm
 #+LAYOUT: post 
 #+CATEGORIES: processor, arm, assembly
-#+NAMA: <processor_arm_as_overview.org>
+#+NAME: <processor_arm_as_overview.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-参考网站: [[https://www.coranac.com/tonc/text/asm.htm]]
+学习于网站: [[https://www.coranac.com/tonc/text/asm.htm]]
 
 整理ARM汇编下的一些基本概念及操作。
 
@@ -15,6 +15,67 @@
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* 概览
+** 格式
+汇编是与硬件之间相关的，所以不同的架构其汇编指令往往不一样。
+
+除此之外对于同一架构下所使用的不同的汇编器其格式还有细微的差别。
+
+但它们每条指令的基本格式类似： =operation operand1,operand2,...=
+** 变量
+在汇编中，可用的变量类型有:
+1. 寄存器变量，属于全局变量
+2. 内存变量，属于全局变量
+3. 栈变量，属于局部变量
+  + 可用将当前部分寄存器或内存变量压入SP所指向的地址处
+
+如下伪代码示例所示:
+#+BEGIN_SRC asm
+    // Use of stack in pseudo-asm
+
+    // Function foo
+    foo:
+        // Push A, B, C, D onto the stack, saving their original values
+        push    {A, B, C, D}
+
+        // Use A-D
+        mov     A, #1        // A= 1
+        mov     B, #2        // B= 2
+        mov     C, #3        // well, you get the idea
+        call    bar
+        mov     D, global_var0
+
+        // global_var1 = A+B+C+D
+        add     A, B
+        add     A, C
+        add     A, D
+        mov     global_var1, A
+
+        // Pop A-D, restoring then to their original values
+        pop     {A-D}
+        return
+
+    // Function bar
+    bar:
+        // push A-C: stack now holds 1, 2, 3 at the top
+        push    {A-C}
+
+        // A=2; B=5; C= A+B;
+        mov     A, #2
+        mov     B, #5
+        mov     C, A
+        add     C, B
+
+        // global_var0= A+B+C (is 2*C)
+        add     C, C
+        mov     global_var, C
+
+        // A=2, B=5, C=14 here, which would be bad when we 
+        // return to foo. So we restore A-C to original values.
+        // In this case to: A=1, B=2, C=3
+        pop     {A-C}
+        return
+#+END_SRC
 
 
   
@@ -22,3 +83,45 @@
 
 
 
+** 分支与条件
+program counter(PC) 寄存器中记录着下一条指令的地址，CPU读取PC指向地址的指令并执行，并增加PC的值以让其指向下一个指令地址。
+
+所以，只要能够修改PC的值，那么就可以实现代码的分支或循环执行。
+#+BEGIN_SRC asm
+  // Asm version of the while(1) { ... } endless loop
+
+  // Label for (possible) branching destination
+  endless:
+
+      ...         // stuff
+
+      b endless // Branch to endless, for an endless loop.
+#+END_SRC
+
+处理器中的程序状态寄存器(Program Status Register, PSR),保存了计算一般包含的以下几种状态:
+- Zero(Z) : 是否结果为0
+- Negative(N) : 是否结果为负
+- Carry bit set(C): 是否有进位
+- Arithmetic overflow(V) : 是否结果溢出
+
+汇编中可以利用这些标记来决定跳转:
+#+BEGIN_SRC asm
+  // Asm version of for(A=0; A != 16; A++)
+
+      mov     A, #0
+  // Start of for-loop.
+  for_start:
+
+      ...             // stuff
+
+      add     A, #1
+      //cmp的结果对应Z标记位
+      cmp     A, #16  // Compare A to 16
+      //通过判断Z标记位来判断是否跳转
+      bne for_start   // Branch to beginning of loop if A isn't 16
+#+END_SRC
+* ARM7 汇编 
+ARM其指令集属于精简指令集(RISC)，同时指令又分为32位的ARM模式和16位的THUMB模式。
+- 关于ARM模式和THUMB模式的理解，参考[[https://stackoverflow.com/questions/28669905/what-is-the-difference-between-the-arm-thumb-and-thumb-2-instruction-encodings][stackoverflow]]
+
+thumb模式因为只有16位，所以最终编译的目标代码大小会比ARM模式小，但其指令也有一些限制。(参考[[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0068b/ch02s02s09.html][ARM文档]])
