@@ -8,9 +8,7 @@
 #+OPTIONS: ^:{}
 
 
-音频速率不匹配是很正常的事，所以在将源输出到声卡时，需要重采样。
-
-这里使用[[https://github.com/erikd/libsamplerate][libsamplerate]]库来实现，如果有其他更好的库请告诉我。
+音频速率不匹配是很正常的事，所以在将源输出到声卡时，需要重采样。这里使用[[https://github.com/erikd/libsamplerate][libsamplerate]]库来实现。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
