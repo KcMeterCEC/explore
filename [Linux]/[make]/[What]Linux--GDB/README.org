@@ -86,18 +86,18 @@ show args
   + <f> 显示格式可以使用: x(16进制),u(16进制无符号),d(十进制),o(八进制),t(二进制),c(字符),s(字符串),f(浮点)
 - examine(打印内存), 缩写 x
   + <u> 字节对齐可以使用: b(单字节),h(双字节),w(4字节),g(8字节)
-| 命令                       | 说明                                                                    |
-|----------------------------+-------------------------------------------------------------------------|
-| p <variable>               | 查看变量 <variable> 的值                                                |
-| p <addr>@<len>             | 查看地址<addr>开始的值，打印<len>个长度                                 |
-| p /<f> <variable>          | 以 <f> 格式显示变量<variable>                                           |
-| p <variable>=<value>       | 修改变量 <variable>的值为<value>                                        |
-| watch  <expr>              | 当表达式(变量)的值有变化时则停止运行                                    |
-| rwatch <expr>              | 当表达式(变量)被读时则停止运行                                          |
-| x/<num><f><u> <address>    | 在地址<address>开始处显示<num>个单位，每个单位以<f>格式以<u>字节对齐    |
-| set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a' |
-| info                       | 查看寄存器、断点等信息                                                  |
-| disassemble                | 查看汇编代码                                                            |
+| 命令                       | 说明                                                                                                          |
+|----------------------------+---------------------------------------------------------------------------------------------------------------|
+| p <variable>               | 查看变量 <variable> 的值                                                                                      |
+| p <var>@<len>              | 查看地址<var>地址开始的值，打印<len>个长度                                                                    |
+| p /<f> <variable>          | 以 <f> 格式显示变量<variable>                                                                                 |
+| p <variable>=<value>       | 修改变量 <variable>的值为<value>                                                                              |
+| watch  <expr>              | 当表达式(变量)的值有变化时则停止运行                                                                          |
+| rwatch <expr>              | 当表达式(变量)被读时则停止运行                                                                                |
+| x/<num><f><u> <address>    | 在地址<address>开始处显示<num>个单位，每个单位以<f>格式以<u>字节对齐,关于<u>的取值，在gdb中使用 =help x= 查看 |
+| set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a'                                       |
+| info                       | 查看寄存器、断点等信息                                                                                        |
+| disassemble                | 查看汇编代码                                                                                                  |
 * 捕捉 core dump
 在用户空间捕捉core dump之前，用户需要在当前shell使用命令使程序崩溃后产生 =core= 文件:
 #+begin_example

@@ -136,8 +136,8 @@ close_the_device();
 使用此代码运行后将会听到一段音输出
 ** 编码
 *注意：*
-1. 发送的数据都是以fream为单位
-2. 发送缓存大小(buufer size)和段的大小(period size)必须设置
+1. 发送的数据都是以frame 为单位
+2. 发送缓存大小(buffer size)和段的大小(period size)必须设置
 #+BEGIN_SRC c
   // file:send.c
   #include <stdio.h>
@@ -146,7 +146,10 @@ close_the_device();
   #include <math.h>
   #include <alsa/asoundlib.h> //包含库头文件
 
-  #define PLAY_BUF_SIZE (10240) //frame 个数
+  #define PLAY_BUF_SIZE (4410) //frame 个数
+  /**
+   ,* @note: 此值需要能够整除采样频率，否则当循环发送波形时会听到杂音
+   ,*/
 
   #define PI  (3.141592653) 
 
@@ -156,7 +159,7 @@ close_the_device();
           int err;
           snd_pcm_t *playback_handle; //PCM流 句柄
           snd_pcm_hw_params_t *hw_params;//PCM流设置参数
-        
+
           int16_t *short_buf = (int16_t *)malloc(PLAY_BUF_SIZE * sizeof(int16_t) * 2);
           float f = 600.0f; 
           unsigned int rate = 44100;
@@ -205,7 +208,6 @@ close_the_device();
                   exit (1);
           }
           //采样数据 44.1k
-          rate = 44100;
           if ((err = snd_pcm_hw_params_set_rate_near (playback_handle, hw_params, &rate, 0)) < 0) {
                   fprintf (stderr, "cannot set sample rate (%s)\n",
                            snd_strerror (err));

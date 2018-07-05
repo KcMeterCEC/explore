@@ -1,0 +1,96 @@
+#+TITLE: [What]Linux ALSA重采样
+#+DATE:  <2018-07-05 四> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, ALSA
+#+NAME: <linux_operations_alsa_resample.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+
+音频速率不匹配是很正常的事，所以在将源输出到声卡时，需要重采样。
+
+这里使用[[https://github.com/erikd/libsamplerate][libsamplerate]]库来实现，如果有其他更好的库请告诉我。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 编译
+** 交叉编译到目标板
+#+BEGIN_EXAMPLE
+  #获取源码
+  git clone https://github.com/erikd/libsamplerate
+  cd libsamplerate
+
+  #编译以及安装
+  ./autogen.sh
+  ./configure CC=arm-linux-gnueabihf-gcc --host=arm --prefix=/usr
+  make
+  make install DESTDIR=/home/cec/libsamplerate/
+
+  #对应拷贝入根文件系统 /usr 即可
+#+END_EXAMPLE
+* 编写
+在 =doc= 文件夹下具有此库的完整说明，以 =index.html= 为起始索引页打开即可。
+** 数据结构与操作函数
+*** 错误输出
+很多函数都具有错误标记，使用以下函数可以打印错误字符串:
+#+BEGIN_SRC c
+  const char* src_strerror (int error) ;
+#+END_SRC
+*** 重采样数据类型
+重采样具有以下几种数据类型，其精度依次由高到低:
+#+BEGIN_SRC c
+  enum
+    {    
+      SRC_SINC_BEST_QUALITY       = 0,
+      SRC_SINC_MEDIUM_QUALITY     = 1,
+      SRC_SINC_FASTEST            = 2,
+      SRC_ZERO_ORDER_HOLD         = 3,
+      SRC_LINEAR                  = 4
+    } ;
+
+  //通过下面函数获取转换类型名及描述
+  const char *src_get_name (int converter_type) ;
+  const char *src_get_description (int converter_type) ;
+#+END_SRC
+
+*** 数据描述
+输入输出数据通过 =SRC_DATA= 来描述:
+#+BEGIN_SRC c
+  /**
+   ,* @param data_in :指向输入数据缓存，当是双通道时，数据应该是交替存放
+   ,* @param data_out :指向输出数据缓存
+   ,* @param input_frames,output_frames : 输入输出的帧数，当为双通道时此值应该是缓存长度的一半
+   ,* @param end_of_input :用于全功能采样，为0代表后面还有数据，为1代表这是最后一次
+   ,* @param src_ratio : 输入采样率与输出采样率的比值
+   ,* @param input_frames_used,output_frames_gen : 用于全功能采样，处理函数向此变量赋值以表示使用了多少帧并生成了多少帧
+   ,*/
+  typedef struct
+  {
+    const float  *data_in;
+    float *data_out ;
+
+    long   input_frames, output_frames ;
+    long   input_frames_used, output_frames_gen ;
+
+    int    end_of_input ;
+
+    double src_ratio ;
+  } SRC_DATA ;
+#+END_SRC
+
+由于 =SRC_DATA= 的缓存为浮点型，而很多音频采样是16位双通道，所以此库还提供了类型转换函数:
+#+BEGIN_SRC c
+  void src_short_to_float_array (const short *in, float *out, int len) ;
+  void src_float_to_short_array (const float *in, short *out, int len) ;
+  void src_int_to_float_array (const int *in, float *out, int len) ;
+  void src_float_to_int_array (const float *in, int *out, int len) ;
+#+END_SRC
+** 简易重采样
+简易重采样文档中有说明: =src_simple= API仅适用于预先知道音频数据的总长度，然后进行一次性转换的场合。
+
+也就是说这个API适用于播放音频文件，而不适用于播放连续产生的音频流!
+** 全功能重采样(full api)
+
+
+

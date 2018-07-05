@@ -76,13 +76,6 @@
         pop     {A-C}
         return
 #+END_SRC
-
-
-  
-
-
-
-
 ** 分支与条件
 program counter(PC) 寄存器中记录着下一条指令的地址，CPU读取PC指向地址的指令并执行，并增加PC的值以让其指向下一个指令地址。
 
@@ -125,3 +118,106 @@ ARM其指令集属于精简指令集(RISC)，同时指令又分为32位的ARM模
 - 关于ARM模式和THUMB模式的理解，参考[[https://stackoverflow.com/questions/28669905/what-is-the-difference-between-the-arm-thumb-and-thumb-2-instruction-encodings][stackoverflow]]
 
 thumb模式因为只有16位，所以最终编译的目标代码大小会比ARM模式小，但其指令也有一些限制。(参考[[http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0068b/ch02s02s09.html][ARM文档]])
+** 寄存器
+
+更为详细的说明，需要参考文档(Procedure Call Standard for the ARM Architecture, AAPCS)
+
+ARM具有16个32位寄存器r0~r15，其中:
+- r13为栈指针寄存器(stack pointer, SP)
+- r14为链接寄存器(link register, LR) : 用于保存函数返回后的运行地址
+- r15为程序计数器(program counter, PC)
+
+一般在函数调用中：
+- r0 ~ r3  : 用于函数参数和返回
+- r4 ~ r11 : 用于变量
+- r12 : 用于内部变量
+
+如下表所示:
+| std     | gcc     | arm synonym | description                                                                  |
+|---------+---------+-------------+------------------------------------------------------------------------------|
+| r0~r3   | r0~r3   | a1~a4       | r0~r1 : argument/result/scratch resigter , r2 ~ r3 argument/scratch register |
+| r4~r8   | r4~r8   | v1-v5       | variable register                                                            |
+| r9      | r9      | V6/SB/TR    | Platform register.This register is defined by the platform standard          |
+| r10~r11 | r10~r11 | v7-v8       | variable register                                                            |
+| r12     | ip      | IP          | The Intra-Procedure-call scratch register.                                   |
+| r13     | sp      | SP          | The Stack Pointer                                                            |
+| r14     | lr      | LR          | The Link Register                                                            |
+| r15     | pc      | PC          | The Program Counter                                                          |
+** 指令
+汇编指令可总结为以下3类:
+1. 数据操作类: 进行算术和为操作
+2. 内存操作类: 进行内存的读写
+3. 分支操作类: 进行判断、循环跳转或函数调用
+
+*** 所有的指令都可以有条件判断
+ARM中的汇编指令都可以将运算和分支集合到一起，这样一句汇编就可以描述其逻辑，相比传统需要单独的分支指令，其效率更高。
+- 这是由ARM中的指令格式决定的，其具有条件判断位
+[[./instruction_format.jpg]]
+
+如下所示:
+#+BEGIN_SRC asm
+    @ // r2= max(r0, r1):
+    @ r2= r0>=r1 ? r0 : r1;
+
+    @ Traditional code
+        cmp     r0, r1
+        blt .Lbmax      @ r1>r0: jump to r1=higher code
+        mov     r2, r0  @ r0 is higher
+        b   .Lrest      @ skip r1=higher code
+    .Lbmax:
+        mov     r2, r1  @ r1 is higher
+    .Lrest:
+        ...             @ rest of code
+	    
+    @ With conditionals; much cleaner
+        cmp     r0, r1
+        movge   r2, r0  @ r0 is higher
+        movlt   r2, r1  @ r1 is higher
+        ...             @ rest of code
+#+END_SRC
+*** 移位操作
+ARM包含以下几种移位操作:
+1. lsl : 逻辑左移(left shift) : 丢弃最高位，低位补0
+2. lsr : 逻辑右移(right shift): 丢弃最低位，高位补0
+3. ror : 循环右移(rotate right): 数据不会丢弃，形成一个环
+4. asr : 算术右移(arithmetic right shift) : 对有符号型整数根据算术的逻辑进行除二运算
+  + 比如 -4 算术右移一次就是 -2
+  + c标准中也规定对有符号整数的右移使用算术右移
+
+在汇编中巧妙的运用移位操作可以提高运行效率，如下:
+#+BEGIN_SRC asm
+    @ Multiplication by shifted add/sub
+
+    add r0, r1, r1, lsl #3      @ r0= r1+(r1<<3) = r1*9
+    rsb r0, r1, r1, lsl #4      @ r0= (r1<<4)-r1 = r1*15
+
+    @ word-array lookup: r1= address (see next section)
+    ldr r0, [r1, r2, lsl #2]    @ u32 *r1; r0= r1[r2]
+#+END_SRC
+*** 立即数
+根据前面的指令格式可以知道其立即数最多占用也只有12位，也就是说最大值只能到4095。
+
+为了能够表示更大的数，设计者将12位分为 *低8位数值和高4位循环右移位* ，以此来表示32位立即数。
+#+BEGIN_EXAMPLE
+  value = <number> ror 2 * <rortation_field>
+  #比如当Number小于或等于255，rortation_field为0时，此时表示的就是正常数值
+
+  #当number 为6，rotation为4时，其12位数为: 0x406
+  #对应于将6循环右移 8 位（2*4）,以32位数表示其刚好移动到了最高8位去，那就是0x06000000
+#+END_EXAMPLE
+
+根据上面的规则可以看出这种方式的使用范围: *当数值位不大于255时，才不会损失精度，也就是说最终的立即数只有最高8位，其他低位都为0*
+- 比如根据前面的例子，想表示立即数为 0x06010000 是无法通过这种方式来实现的。
+
+为了能够保持其他的立即数，有以下两种方式:
+- 将立即数拆分为多个字节依次写入寄存器
+- 从内存某地址处读取值
+
+为了避免这种烦人的操作，建议使用使用伪指令 =ldr= ，让汇编器来生成这个过程：
+#+BEGIN_SRC asm
+    @ ldr Rd,=num (数值前没有'#')
+
+    @load 511 from memory with special ldr
+    @Note: no '#'
+    ldr   r0,=511
+#+END_SRC
