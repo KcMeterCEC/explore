@@ -113,7 +113,7 @@ program counter(PC) 寄存器中记录着下一条指令的地址，CPU读取PC�
       //通过判断Z标记位来判断是否跳转
       bne for_start   // Branch to beginning of loop if A isn't 16
 #+END_SRC
-* ARM7 汇编 
+** 指令模式
 ARM其指令集属于精简指令集(RISC)，同时指令又分为32位的ARM模式和16位的THUMB模式。
 - 关于ARM模式和THUMB模式的理解，参考[[https://stackoverflow.com/questions/28669905/what-is-the-difference-between-the-arm-thumb-and-thumb-2-instruction-encodings][stackoverflow]]
 
@@ -143,13 +143,13 @@ ARM具有16个32位寄存器r0~r15，其中:
 | r13     | sp      | SP          | The Stack Pointer                                                            |
 | r14     | lr      | LR          | The Link Register                                                            |
 | r15     | pc      | PC          | The Program Counter                                                          |
-** 指令
+** 指令类型
 汇编指令可总结为以下3类:
 1. 数据操作类: 进行算术和为操作
 2. 内存操作类: 进行内存的读写
 3. 分支操作类: 进行判断、循环跳转或函数调用
-
-*** 所有的指令都可以有条件判断
+* 常用指令
+** 所有的指令都可以有条件判断
 ARM中的汇编指令都可以将运算和分支集合到一起，这样一句汇编就可以描述其逻辑，相比传统需要单独的分支指令，其效率更高。
 - 这是由ARM中的指令格式决定的，其具有条件判断位
 [[./instruction_format.jpg]]
@@ -175,7 +175,7 @@ ARM中的汇编指令都可以将运算和分支集合到一起，这样一句�
         movlt   r2, r1  @ r1 is higher
         ...             @ rest of code
 #+END_SRC
-*** 移位操作
+** 移位操作
 ARM包含以下几种移位操作:
 1. lsl : 逻辑左移(left shift) : 丢弃最高位，低位补0
 2. lsr : 逻辑右移(right shift): 丢弃最低位，高位补0
@@ -194,7 +194,7 @@ ARM包含以下几种移位操作:
     @ word-array lookup: r1= address (see next section)
     ldr r0, [r1, r2, lsl #2]    @ u32 *r1; r0= r1[r2]
 #+END_SRC
-*** 立即数
+** 立即数
 根据前面的指令格式可以知道其立即数最多占用也只有12位，也就是说最大值只能到4095。
 
 为了能够表示更大的数，设计者将12位分为 *低8位数值和高4位循环右移位* ，以此来表示32位立即数。
@@ -221,3 +221,508 @@ ARM包含以下几种移位操作:
     @Note: no '#'
     ldr   r0,=511
 #+END_SRC
+** 数据操作指令
+数据操作指令如下表所示:
+[[./data_operation.jpg]]
+上面这个表格中关于乘法指令需要注意的是: 
+1. 乘法指令操作数中不能有立即数，需要先写入寄存器后再操作
+2. 操作数中不能嵌入移位操作
+3. 同一个指令中 Rd,Rm不能为同一个寄存器
+4. mull和mlal用于操作64位数
+  + 其中 =smal,smull= 操作有符号数(signed), =umlal,umull= 操作无符号数(unsigned)
+
+ARM执行指令操作都是以寄存器为暂存进行操作的，所以其很多指令都是前面一个寄存器，后面跟两个操作数组成的。
+
+第一个操作数也一般是寄存器，第二个操作数有以下几种情况:
+1. 立即数
+2. 寄存器
+3. 移位指令后跟立即数
+4. 移位指令后根寄存器
+   
+#+BEGIN_SRC asm
+  @ Possible variations of data instructions
+  add     r0, r1, #1          @ r0 = r1 + 1
+  add     r0, r1, r2          @ r0 = r1 + r2
+  add     r0, r1, r2, lsl #4  @ r0 = r1 + r2<<4
+  add     r0, r1, r2, lsl r3  @ r0 = r1 + r2<<r3
+
+  @ op= variants
+  add     r0, r0, #2          @ r0 += 2;
+  add     r0, #2              @ r0 += 2; alternative  (but not on all assemblers)
+
+  @ Multiplication via shifted add/sub
+  add     r0, r1, r1, lsl #4  @ r0 = r1 + 16*r1 = 17*r1
+  rsb     r0, r1, r1, lsl #4  @ r0 = 16*r1 - r1 = 15*r1
+  rsb     r0, r1, #0          @ r0 =     0 - r1 = -r1
+
+  @ Difference between asr and lsr
+  mvn     r1, #0              @ r1 = ~0 = 0xFFFFFFFF = -1
+  mov     r0, r1, asr #16     @ r0 = -1>>16 = -1
+  mov     r0, r1, lsr #16     @ r0 = 0xFFFFFFFF>>16 = 0xFFFF = 65535
+
+
+  @ Signed division using shifts. r1= r0/16
+  @ if(r0<0)
+  @     r0 += 0x0F;
+  @  r1= r0>>4;
+  mov     r1, r0, asr #31         @ r0= (r0>=0 ? 0 : -1);
+  add     r0, r0, r1, lsr #28     @ += 0 or += (0xFFFFFFFF>>28 = 0xF)
+  mov     r1, r0, asr #4          @ r1 = r0>>4;
+#+END_SRC
+** 内存操作指令
+由于ARM是以寄存器为直接操作媒介，所以其对内存的操作也是通过下面两个途径来完成的:
+1. 从内存中读取数值到寄存器
+  + 使用基础指令 =ldr= (LoaD Register)
+2. 从寄存器中取出值存储到内存中
+  + 使用基础指令 =str= (STore Register)
+
+这两个基础指令使用以下格式:
+#+BEGIN_EXAMPLE
+  op{cond}{type} Rd, [Rn, Op2]
+  # op : 代表ldr 或　str
+  # cond: 代表执行条件
+  # type: 代表数据类型，可以是字，半字和一字节
+  #       对应的符号为:
+  #       字　: 无
+  #       半字: h / sh (分别代表无符号和有符号型)
+  #       字节: b / sb (分别代表无符号和有符号型)
+  # Rd : 被操作的寄存器
+  # Rn,Op2 : 内存地址，其中Rn代表基础寄存器,Op2代表偏移
+#+END_EXAMPLE
+关于指令中的地址格式有以下几种表示方式(前面已经提到过，无法用立即数直接表示所有的32位地址，所以一般都是以寄存器存储地址):
+1. 直接访问寄存器中的地址
+  + 比如 =ldr Rd, [Rn]= 代表从寄存器 Rn 中保存的地址处取值写入到寄存器 Rd
+2. 以寄存器中的值为偏移访问
+  + 比如 =ldr Rd, [Rn, Op2]= 代表从寄存器Rn中保存的地址偏移Op2后取值写入到寄存器Rd
+    + =ldr r1, [r0, r2, lsl #2]= 代表将 r2 中的值左移两位作为r0的索引，然后取索引处的值写入到r1
+3. 以相对PC位置来访问，这种方式不能得到绝对地址，而是相对于PC的偏移地址来访问
+#+BEGIN_EXAMPLE
+  在嵌入式开发中，位置无关代码主要是为了bootloader的前期加载:
+  - 链接脚本指定的是在SDRAM中的运行地址
+  - 最开始bootloader从ROM固定位置启动，在将自身代码放入SDRAM前的代码都必须是位置无关的
+  - 只要将代码载入SDRAM后便可以跳到SDRAM中执行绝对位置代码了
+
+
+  当然对于有二级bootloader的场合，前期的位置无关就不重要了。
+
+  比如zynq的启动顺序为:
+  1. zynq固化在内部的ROM代码根据启动引脚配置从存储介质中读取fsbl(first stage bootloader)到内部RAM运行
+  2. fsbl 再来将 ssbl(second stage bootloader) 从存储介质直接拷贝到SDRAM中
+  3. fsbl 跳转到SDRM 执行ssbl
+#+END_EXAMPLE
+#+BEGIN_SRC asm
+  @ Basic load/store examples. Assume r1 contains a word-aligned address
+  ldr     r0, [r1]    @ r0= *(u32*)r1; //or r0= r1_w[0]; 
+  str     r0, [r1]    @ *(u32*)r1= r0; //or r1_w[0]= r0; 
+#+END_SRC
+
+对于类似数组的写入，可以先事先定义好一个 label 填充数据，然后通过 ldr 载入数据，
+在指定偏移时，不会改变原来的寄存器，但也可以通过 write-back格式来修改原寄存器。
+#+BEGIN_SRC asm
+    @ Examples of addressing modes
+    @ NOTE: *(u32*)(address+ofs) is the same as ((u32*)address)[ofs/4]
+    @   That's just how array/pointer offsets work
+        mov     r1, #4
+        mov     r2, #1
+        adr     r0, fooData     @ u32 *src= fooData;
+    @ PC-relative and indirect addressing
+        ldr     r3, fooData             @ r3= fooData[0];   // PC-relative
+        ldr     r3, [r0]                @ r3= src[0];       // Indirect addressing
+        ldr     r3, fooData+4           @ r3= fooData[1];   // PC-relative
+        ldr     r3, [r0, r1]            @ r3= src[1];       // Pre-indexing
+        ldr     r3, [r0, r2, lsl #2]    @ r3= src[1]        // Pre-index, via r2
+    @ Pre- and post-indexing write-back
+        ldr     r3, [r0, #4]!           @ src++;    r3= *src;
+        ldr     r3, [r0], #4            @ r3= *src; src++;
+    @ u32 fooData[3]= { 0xF000, 0xF001, 0xF002 };
+    fooData:
+        .word   0x0000F000
+        .word   0x0000F001
+        .word   0x0000F002
+#+END_SRC
+#+BEGIN_SRC asm
+        mov     r2, #1
+    @ Byte loads
+        adr     r0, bytes
+        ldrb    r3, bytes       @ r3= bytes[0];     // r3= 0x000000FF= 255
+        ldrsb   r3, bytes       @ r3= (s8)bytes[0]; // r3= 0xFFFFFFFF= -1
+        ldrb    r3, [r0], r2    @ r3= *r0_b++;      // r3= 255, r0++;
+    @ Halfword loads
+        adr     r0, hwords
+        ldrh    r3, hwords+2    @ r3= words[1];     // r3= 0x0000FFFF= 65535
+        ldrsh   r3, [r0, #2]    @ r3= (s16)r0_h[1]; // r3= 0xFFFFFFFF= -1
+
+    @ Byte array: u8 bytes[3]= { 0xFF, 1, 2 };
+    bytes:
+        .byte   0xFF, 1, 2
+    @ Halfword array u16 hwords[3]= { 0xF001, 0xFFFF, 0xF112 };
+        .align  1    @ align to even bytes REQUIRED!!!
+    hwords:
+        .hword  0xF110, 0xFFFF, 0xF112
+#+END_SRC
+** 一大块的内存操作
+可以通过 =ldm/stm= 来实现多个数据的载入和读出,其格式如下:
+#+BEGIN_EXAMPLE
+  op{cond}{mode} Rd{!}, {Rlist}
+
+  # op : ldm 从 Rd 读取写入到 Rlist , stm 从 Rlist 读取写入到 Rd
+
+  # mode : 指定了 Rd 寄存器的增减方式,有以下几种取值
+  # ia (increment after): 赋值后增加地址
+  # ib (increment before): 先增加地址后赋值
+  # da (decrement after) : 赋值后减少地址
+  # db (decrement before) : 先减少地址后赋值
+
+  # Rlist : 寄存器列表，可以指定一个范围也可以单独列出寄存器
+  # 但真实的执行顺序是依照列表内存地址排列的，编号低寄存器对应低内存
+  # 比如 {r4-r7, lr} 代表 r4,r5,r6,r7,r14
+#+END_EXAMPLE
+#+BEGIN_SRC asm
+      adr     r0, words+16    @ u32 *src= &words[4];
+                              @             r4, r5, r6, r7
+      ldmia   r0, {r4-r7}     @ *src++    :  0,  1,  2,  3
+      ldmib   r0, {r4-r7}     @ *++src    :  1,  2,  3,  4
+      ldmda   r0, {r4-r7}     @ *src--    : -3, -2, -1,  0 //注意此处，编号低寄存器对应低地址!!!!!
+      ldmdb   r0, {r4-r7}     @ *--src    : -4, -3, -2, -1
+      .align  2//2 ^ 2对齐
+  words:
+      .word   -4, -3, -2, -1
+      .word    0,  1,  2,  3, 4
+#+END_SRC
+
+=ldm/stm= 通常还用于栈操作，栈有以下几种类型:
+1. 栈指针的指向
+  + full: 指向已经写入值的地址(就是栈顶)，先移动新写入值的地址，然后写入数据
+  + empty : 指向还未写入值的地址，写入新值后，指针指向下一个空位
+2. 栈的增长方向
+  + Descending : 向地址低的方向增长，也就是向下增长
+  + Ascending : 向地址高的方向增长，也就是向上增长
+
+对应上面就可以组合出4中类型的栈:
+- full Descending : ldmfd, stmfd
+- full Ascending : ldmfa, stmfa
+- empty Descending : ldmed, stmed
+- empty Ascending : ldmea, stmea
+  
+对于以上操作，还有简化的栈命令 =push,pop=
+
+** 条件与分支
+无论是分支、循环还是函数调用，其本质都是通过修改PC来实现的。
+
+ARM提供了3个基本的跳转指令:
+- b : 用 =label= 作为参数，一般用于判断及循环
+- bl : 用 =label= 作为参数，一般用于函数调用
+- bx : 用寄存器作为参数，一般用于 ARM 和 THUMB 指令转换，函数返回和段外跳转
+*** 状态标记
+ARM处理器中的程序状态寄存器(Program Status Register, PSR) CPSR 和 SPSR,保存了计算一般包含的以下几种状态:
+- Zero(Z) : 是否结果为0
+- Negative(N) : 是否结果为负
+- Carry bit set(C): 是否有进位
+- Arithmetic overflow(V) : 是否结果溢出
+
+条件判断都是依据这些标记为为根本的，跳转指令后都可以加入下表的后缀以代表判断条件:
+| affix | flags        | description                                          |
+|-------+--------------+------------------------------------------------------|
+| eq    | Z=1          | zero(equal to 0)                                     |
+| ne    | Z=0          | not zero(not equal to 0)                             |
+| cs/hs | C=1          | carry set/unsigned higher or same(无符号数大于/等于) |
+| cc/lo | C=0          | carry clear / unsigned lower(无符号数小于)           |
+| mi    | N=1          | negative(minus)                                      |
+| pl    | N=0          | positive or zero(plus)                               |
+| vs    | V=1          | sign overflow(overflow set)                          |
+| vc    | V=0          | no sign overflow(overflow clear)                     |
+| hi    | C=1 & Z=0    | unsigned higher(无符号数大于)                        |
+| ls    | C=0 or Z = 1 | unsigned lower or same(无符号数小于或等于)           |
+| ge    | N=V          | signed greater or equal(有符号数大于或等于)          |
+| lt    | N != V       | signed less than(有符号数小于)                       |
+| gt    | Z = 0 & N=V  | signed greater than(有符号数大于)                    |
+| le    | Z=1 or N!=V  | signed less or equal(有符号数小于或等于)             |
+| al    | -            | always(default)(总是执行)                            |
+| nv    | -            | never(从不执行)                                      |
+*** 跳转格式
+跳转的基本格式如下伪代码所示:
+#+BEGIN_EXAMPLE
+  @ Branch example, pseudo code
+      data-ops, Rd, Rn, Op2   @ Data operation to set the flags
+      bcnd-code .Llabel       @ Branch upon certain conditions
+
+      @ more code A
+
+  .Llabel:                    @ Branch goes here
+      @ more code B
+#+END_EXAMPLE
+
+#+BEGIN_SRC asm
+    @ int DivSafe(int num, int den);
+    @ \param num    Numerator (in r0)
+    @ \param den    Denominator (in r1)
+    @ \return       r0= r0/r1, or INT_MAX/INT_MIN if r1 == 0
+    DivSafe:
+        cmp     r1, #0
+        beq     .Ldiv_bad   @ Branch on r1 == 0
+        swi     0x060000
+        bx      lr
+    .Ldiv_bad:
+        mvn     r1, #0x80000000     @ \
+        sub     r0, r1, r0, asr #31 @ - r0= r0>=0 ? INT_MAX : INT_MIN;
+        bx      lr
+#+END_SRC
+
+下面是一些示例:
+- if else
+#+BEGIN_SRC asm
+  @	// wrap(int x, int mn, int mx), C version:
+  @	int res;
+  @	if(x >= mx)
+  @	    res= mn + x-mx;
+  @	else if(x < mn)
+  @	    res= mx + x-mn;
+  @	else
+  @	    res= x;
+
+
+  @ r0= x ; r1= mn ; r2= mx
+      cmp     r0, r2
+      blt     .Lx_lt_mx       @ if( x >= mx )
+      add     r3, r0, r1      @   r0= mn + x-mx
+      sub     r0, r3, r2
+      b       .Lend
+  .Lx_lt_mx:
+      cmp     r0, r1          @
+      bge     .Lend           @ if( x < mn )
+      add     r3, r0, r2      @   r0= mx + x-mn;
+      sub     r0, r3, r1
+  .Lend:
+      ...
+
+
+  @	// === if(x && y) { /* clause */ } ===
+  @	if(x)
+  @	{
+  @	    if(y)
+  @	    { /* clause */ }
+  @	}
+  @
+  @	// === if(x || y) { /* clause */ } ===
+  @	if(x)
+  @	{ /* clause */ }
+  @	else if(y)
+  @	{ /* clause */ }
+
+
+  @ if(r0 != 0 && r1 != 0) { /* clause */ }
+      cmp     r0, #0
+      beq     .Lrest
+      cmp     r1, #0
+      beq     .Lrest
+      @ clause
+  .Lrest:
+      ...
+
+  @ Alternative
+      cmp     r0, #0
+      cmpne   r1, #0
+      beq     .Lrest
+      @ clause
+  .Lrest:
+  ...
+
+  @ if( r0 != 0 || r1 != 0 ){ /* clause */ }
+      cmp     r0, #0
+      bne     .Ltrue
+      cmp     r1, #0
+      beq     .Lrest
+  .Ltrue:
+      @ clause
+  .Lrest:
+  ...
+#+END_SRC
+- loop
+#+BEGIN_SRC asm
+    @ Asm equivalents of copying 16 words.
+    @ u32 *dst=..., *src= ..., ii    // r0, r1, r2
+
+    @ --- Incrementing for-loop ---
+    @ for(ii=0; ii<16; ii++)
+    @     dst[ii]= src[ii];
+        mov     r2, #0
+    .LabelF:
+        ldr     r3, [r1, r2, lsl #2]
+        str     r3, [r0, r2, lsl #2]
+        add     r2, r2, #1
+        cmp     r2, r2, #16
+        blt .LabelF
+
+    @ --- Decrementing while-loop ---
+    @ ii= 16;
+    @ while(ii--)
+    @     *dst++ = *src++;
+        mov     r2, #16
+    .LabelW:
+        ldr     r3, [r1], #4
+        str     r3, [r0], #4
+        subs    r2, r2, #1
+        bne .LabelW
+#+END_SRC
+** 函数调用
+函数调用的规则如下:
+1. r0~r3 : 存储函数4个参数，其他多于的参数存储于栈中
+  + 子程序不需要在返回前恢复这几个寄存器内容
+2. 使用 r0 作为返回
+3. r0~r3,r12 : 作为临时寄存器使用，所以在调用新函数后，它们的值很可能以及被改变了
+4. 新函数在执行前需要将其他通用寄存器(r4~r11)压栈，在退出函数时需要出栈，以保护父调用函数的环境
+5. r13为栈指针寄存器，子函数不能用作其他用途
+6. r14为链接寄存器，保存子程序的返回地址。
+  + 作为父程序在调用子程序前也需要将 lr 压栈
+7. r15就是PC，不能用作其他用途
+
+#+BEGIN_SRC asm
+  @ Function calling example: oamcpy
+  @ void oamcpy(OBJ_ATTR *dst, const OBJ_ATTR *src, u32 nn);
+  @ Parameters: r0= dst; r1= src; r2= nn;
+      .align  2
+  oamcpy:
+      cmp     r2, #0
+      bxeq    lr          @ Nothing to do: return early
+      push    {r4}        @ Put r4 on stack
+  .Lcpyloop:
+          ldmia   r1!, {r3, r4}
+          stmia   r0!, {r3, r4}
+          subs    r2, #1
+          bne     .Lcpyloop
+      pop     {r4}        @ Restore r4 to its original value
+      bx      lr          @ Return to calling function
+
+  @ Using oamcpy.
+      @ Set arguments
+      mov     r0, #0x07000000
+      ldr     r1,=obj_buffer
+      mov     r2, #128
+      push    {lr}        @ Save lr
+      bl      oamcpy      @ Call oamcpy (clobbers lr; assumes clobbering of r0-r3,r12)
+      pop     {lr}        @ Restore lr
+#+END_SRC
+* THUMB
+THUMB是普通ARM汇编的子集，由于其指令长度只有16位所以其生成的代码体积小于ARM汇编，并且在16位数据总线上也是立即执行指令，效率很高。
+
+当然与此同时，thumb也无法实现ARM汇编的一些功能，比如:
+- 跳转指令中，只能使用 =b=
+- 无法在同一个指令中嵌入移位操作
+- 大多数指令只能用 r0~r7 寄存器
+* GNU汇编器
+GAS 的汇编文件规则相对比较灵活，也可以在其中使用宏定义或包含头文件。
+
+对于此汇编器的规则只需要记住通用的一些规则即可，其他的遇到的时候查手册。
+** 符号
+如同c一样，变量名、常量名、函数名称、label都被称为符号(symbols).
+
+关于符号相关的规则如下:
+- =.global <name>= : 代表此符号是一个全局符号，可以跨文件访问
+- =.L <name>= : 代表此符号是一个本地符号，实际使用时可以省略 =.L= 标记
+- =.extern <name>= : 表示要使用一个外部符号
+- =.type <src>= : 指定一个符号所表示对象的类型，比如整型、函数等
+- =.arm= (or =.code 32= ), =.thumb= (or =.code 16=) : 指明当前汇编指令模式
+- =.thumb_func= : 指定下面的函数使用 thumb 指令模式
+- =.align n= : 指令和数据以 2^n 对齐
+- =.balign m= : 指令和数据以 m 字节对齐
+  
+#+BEGIN_SRC asm
+  @ ARM and THUMB versions of m5_plot
+  @ extern u16 *vid_page;
+  @ void m5_plot(int x, int y, u16 clr)
+  @ {   vid_page[y*160+x]= clr;    }
+
+  @ External declaration
+  @ NOTE: no info on what it's a declaration of!
+      .extern vid_page            @ extern u16 *vid_page;
+
+  @ ARM function definition
+  @ void m5_plot_arm(int x, int y, u16 clr)
+      .align 2                    @ Align to word boundary
+      .arm                        @ This is ARM code
+      .global m5_plot_arm         @ This makes it a real symbol
+      .type m5_plot_arm STT_FUNC  @ Declare m5_plot_arm to be a function.
+  m5_plot_arm:                    @ Start of function definition
+      add     r1, r1, lsl #2
+      add     r0, r1, lsl #5
+      ldr     r1,=vid_page
+      ldr     r1, [r1]
+      mov     r0, r0, lsl #1
+      strh    r2, [r1, r0]
+      bx      lr
+
+  @ THUMB function definition
+  @ void m5_plot_thumb(int x, int y, u16 clr)
+      .align 2                    @ Align to word boundary
+      .thumb_func                 @ This is a thumb function
+      .global m5_plot_thumb       @ This makes it a real symbol
+      .type m5_plot_thumb STT_FUNC    @ Declare m5_plot_thumb to be a function.
+  m5_plot_thumb:                  @ Start of function definition
+      lsl     r3, r1, #2
+      add     r1, r3
+      lsl     r1, #5
+      add     r0, r1
+      ldr     r1,=vid_page
+      ldr     r1, [r1]
+      lsl     r0, #1
+      strh    r2, [r1, r0]
+      bx      
+#+END_SRC
+** 变量
+#+BEGIN_SRC asm
+        .align 2
+    word_var:               @ int word_var= 0xCAFEBABE
+        .word   0xCAFEBABE
+    word_array:             @ int word_array[4]= { 1,2,3,4 }
+        .word   1, 2, 3, 4      @ NO comma at the end!!
+    byte_var:               @ char byte_var= 0;
+        .byte   0
+    hword_var:              @ NOT short hword_var= 0xDEAD;
+        .hword  0xDEAD      @   due to bad alignment!
+    str_array:                 @ Array of NULL-terminated strings:
+        .string "Hello", "Nurse!"
+#+END_SRC
+** 段
+链接器最终会将代码段数据段统一放在各自的位置，定义一个段使用 =.section <secname>= 的格式。
+
+还有简易的定义方式:
+- =.text= : 代码段
+- =.data= : 读写数据段
+- =.bss= : 初始化为0的数据段
+- =.rodata= : 只读数据段
+- =.space <n>= : 指定bss段占用内存n字节
+
+#+BEGIN_SRC asm
+  // C symbols and their asm equivalents
+
+  // === C versions ===
+  int var_data= 12345678;
+  int var_zeroinit= 0;
+  int var_uninit;
+  const u32 cst_array[4]= { 1, 2, 3, 4 };
+  u8 charlut[256] EWRAM_BSS;
+
+  @ === Assembly versions ===
+  @ Removed alignment and global directives for clarity
+
+  @ --- Non-zero Initialized data ---
+      .data
+  var_data:
+      .word   12345678
+
+  @ -- Zero initialized data ---
+      .bss
+  var_zeroinit:
+      .space	4
+
+  @ --- Uninitialized data ---
+  @ NOTE: .comm takes care of section, label and alignment for you
+  @   so those things need not be explicitly mentioned
+      .comm var_uninit,4,4
+
+  @ --- Constant (initialized) data ---
+      .section .rodata
+  cst_array:
+      .word 1, 2, 3, 4
+#+END_SRC
+

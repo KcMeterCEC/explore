@@ -60,7 +60,7 @@
    ,* @param data_out :指向输出数据缓存
    ,* @param input_frames,output_frames : 输入输出的帧数，当为双通道时此值应该是缓存长度的一半
    ,* @param end_of_input :用于全功能采样，为0代表后面还有数据，为1代表这是最后一次
-   ,* @param src_ratio : 输入采样率与输出采样率的比值
+   ,* @param src_ratio : 输出采样率与输入采样率的比值
    ,* @param input_frames_used,output_frames_gen : 用于全功能采样，处理函数向此变量赋值以表示使用了多少帧并生成了多少帧
    ,*/
   typedef struct
@@ -78,6 +78,8 @@
 #+END_SRC
 
 由于 =SRC_DATA= 的缓存为浮点型，而很多音频采样是16位双通道，所以此库还提供了类型转换函数:
+- 在转换为浮点数时，库进行了归一化处理
+- 在转换为整数时，库又进行了还原
 #+BEGIN_SRC c
   void src_short_to_float_array (const short *in, float *out, int len) ;
   void src_float_to_short_array (const float *in, short *out, int len) ;
@@ -89,6 +91,63 @@
 
 也就是说这个API适用于播放音频文件，而不适用于播放连续产生的音频流!
 ** 全功能重采样(full api)
+全功能重采样适用于连续的数据流，按照以下步骤编写即可:
+*** 设置重采样质量及通道
+#+BEGIN_SRC c
+  int err = 0;
+  //SRC_LINEAR目前来看可以满足要求
+  str_demo.state = src_new(SRC_LINEAR, 2, &err);
+  if((str_demo.state == NULL) || (err != 0))
+  {
+    ERR("src new failed: %s\n", src_strerror(err));
+  }
+  //申请归一化缓存
+  str_demo.resample_in = (float *)malloc(str_demo.iqPairNum * sizeof(IQ_TYPE));
+  ASSERT(str_demo.resample_in != NULL);
+  str_demo.resample_out = (float *)malloc(str_demo.iqPairNum * sizeof(IQ_TYPE));
+  ASSERT(str_demo.resample_out != NULL);
+#+END_SRC
+*** 归一化处理
+#+BEGIN_SRC c
+  #define PI      (3.141592653f)
+  float f = 600.0f;
+  unsigned int rate = 48000;
+  double temp = 2 * PI * f / (double)rate;
+  //模拟产生双通道音频
+  for(uint16_t i = 0; i < 480;i++)
+    {
+      int16_t temp1 = cos(i * temp) * 32760;
+      int16_t temp2 = sin(i * temp) * 32760;
+      out[2 *i] = temp1 ;
+      out[2 *i + 1] = temp2;
+    }
+  //归一化
+  src_short_to_float_array(out, str_demo.resample_in, 480 * 2);
+#+END_SRC
+*** 设置转换参数
+#+BEGIN_SRC c
+  SRC_DATA  src_data =
+    {
+      .data_in = str_demo.resample_in,
+      .data_out = str_demo.resample_out,
+      .input_frames = 480,
+      .output_frames = SIMULATE_FRAME_COUNT,
+      .src_ratio = 44100 / (double)rate, //此处比例关系别搞错
+      .end_of_input = 0,
+    };
+#+END_SRC
+*** 开始转换
+#+BEGIN_SRC c
+  int err = 0;
+  if((err = src_process(str_demo.state, &src_data)) != 0)
+    {
+      ERR("src process failed %s!\n", src_strerror(err));
+    }
+#+END_SRC
+*** 信号还原
+#+BEGIN_SRC c
+  src_float_to_short_array(str_demo.resample_out, out, SIMULATE_FRAME_COUNT * 2);
+#+END_SRC
 
 
 
