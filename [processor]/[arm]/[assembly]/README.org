@@ -668,6 +668,34 @@ GAS 的汇编文件规则相对比较灵活，也可以在其中使用宏定义�
       strh    r2, [r1, r0]
       bx      
 #+END_SRC
+*** lazy 写法
+在一个文件中，经常看到用数字 0~9表示的label，其跳转命令一般在label名称后加 =b= (backwards)或 =f= (forwards) 分别代表向前查找和向后查找。
+如下示例:
+#+BEGIN_SRC asm
+  __vet_atags:
+    tst	r2, #0x3			@ aligned?
+    bne	1f
+
+    ldr	r5, [r2, #0]
+    #ifdef CONFIG_OF_FLATTREE
+    ldr	r6, =OF_DT_MAGIC		@ is it a DTB?
+    cmp	r5, r6
+    beq	2f
+    #endif
+    cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
+    cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+    bne	1f
+    ldr	r5, [r2, #4]
+    ldr	r6, =ATAG_CORE
+    cmp	r5, r6
+    bne	1f
+
+  2:	ret	lr				@ atag/dtb pointer is ok
+
+  1:	mov	r2, #0
+    ret	lr
+    ENDPROC(__vet_atags)
+#+END_SRC
 ** 变量
 #+BEGIN_SRC asm
         .align 2
@@ -726,3 +754,54 @@ GAS 的汇编文件规则相对比较灵活，也可以在其中使用宏定义�
       .word 1, 2, 3, 4
 #+END_SRC
 
+** 常用规则
+*** assembler directives
+- =.equ symbol,expression= : 将expression的值赋值给symbol, 等同于 =.set symbol,expression= 
+- =.if absolute expression= : 当 =absolute expression= 为真时，其包含的代码才被编译进汇编，类似于c中的 =#if=
+#+BEGIN_SRC asm
+    .if <absolute expression>
+    <code>
+    .else
+    <code>
+    .endif
+
+    @还可以直接判断宏定义
+    .ifdef <symbol>
+    <code>
+    .endif
+
+    .ifndef <symbol>
+    <code>
+    .endif
+
+    .ifnotdef <symbol>@等同于 .ifndef
+    <code>
+    .endif
+#+END_SRC
+- =.macro= : 定义一块宏命令
+#+BEGIN_SRC asm
+    .macro <macname> [macargs1[=default value],macargs2[=default value],...]
+    \macargs1 @参数的调用前要加斜杠
+    .exitm @可以提前退出宏
+    .endm
+
+
+    @比如定义如下宏
+    .macro  sum from=0, to=5
+    .long   \from
+    .if     \to-\from
+    sum     "(\from+1)",\to
+    .endif
+    .endm
+
+    @然后调用
+    sum 0,5
+
+    @最终输出
+    .long   0
+    .long   1
+    .long   2
+    .long   3
+    .long   4
+    .long   5
+#+END_SRC
