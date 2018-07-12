@@ -359,8 +359,6 @@
 #+END_EXAMPLE
 
 通过匹配就可以找出对应的 =struct machine_desc= ,也就可以找到对于当前machine的初始化回调函数了。
-
-
 *** 获取启动参数
 设备树结构中，通过 =chosen= 节点来传递启动参数已及一些配置命令，关于这些配置参数的详细描述位于文档 =/Documentation/kernel-parameters.txt=
 
@@ -445,7 +443,6 @@
     of_scan_flat_dt(early_init_dt_scan_memory, NULL);
   }
 #+END_SRC
-
 ** 映射 device_node
 在函数 =unflatten_device_tree()= 中调用了函数 =__unflatten_device_tree()= :
 #+BEGIN_SRC c
@@ -507,4 +504,242 @@
     pr_debug(" <- unflatten_device_tree()\n");
   }
 #+END_SRC
+由此可见，是由 =unflatten_dt_node()= 来完成了 =device_node= 的填充，关于此数据结构中各项的意义，需要结合函数一起来看才比较明白:
+- 要完全看懂 =unflatten_dt_node()= 需要对照 [[https://kcmetercec.github.io/2018/06/26/linux_driver_devicetree_struct/][设备树数据结构]] 一章来仔细分析。
+#+BEGIN_SRC c
+  /**
+   ,* unflatten_dt_node - Alloc and populate a device_node from the flat tree
+   ,* @blob: The parent device tree blob
+   ,* @mem: Memory chunk to use for allocating device nodes and properties
+   ,* @poffset: pointer to node in flat tree
+   ,* @dad: Parent struct device_node
+   ,* @nodepp: The device_node tree created by the call
+   ,* @fpsize: Size of the node path up at the current depth.
+   ,* @dryrun: If true, do not allocate device nodes but still calculate needed
+   ,* memory size
+   ,*/
+  static void * unflatten_dt_node(const void *blob,
+          void *mem,
+          int *poffset,
+          struct device_node *dad,
+          struct device_node **nodepp,
+          unsigned long fpsize,
+          bool dryrun)
+  {
+    const __be32 *p;
+    struct device_node *np;
+    struct property *pp, **prev_pp = NULL;
+    const char *pathp;
+    unsigned int l, allocl;
+    static int depth;
+    int old_depth;
+    int offset;
+    int has_name = 0;
+    int new_format = 0;
 
+    //获取节点名称
+    pathp = fdt_get_name(blob, *poffset, &l);
+    if (!pathp)
+      return mem;
+
+    allocl = ++l;
+
+    /* version 0x10 has a more compact unit name here instead of the full
+     ,* path. we accumulate the full path size using "fpsize", we'll rebuild
+     ,* it later. We detect this because the first character of the name is
+     ,* not '/'.
+     ,*/
+    //使用 fpsize 保存路径名称包含的字符数(包括结尾的空字符)
+    if ((*pathp) != '/') {
+      new_format = 1;
+      if (fpsize == 0) {
+        /* root node: special case. fpsize accounts for path
+         ,* plus terminating zero. root node only has '/', so
+         ,* fpsize should be 2, but we want to avoid the first
+         ,* level nodes to have two '/' so we use fpsize 1 here
+         ,*/
+        fpsize = 1;
+        allocl = 2;
+        l = 1;
+        pathp = "";
+      } else {
+        /* account for '/' and path size minus terminal 0
+         ,* already in 'l'
+         ,*/
+        fpsize += l;
+        allocl = fpsize;
+      }
+    }
+
+    np = unflatten_dt_alloc(&mem, sizeof(struct device_node) + allocl,
+          __alignof__(struct device_node));
+    //路径拼接
+    if (!dryrun) {
+      char *fn;
+      of_node_init(np);
+      np->full_name = fn = ((char *)np) + sizeof(*np);
+      if (new_format) {
+        /* rebuild full path for new format */
+        if (dad && dad->parent) {
+          strcpy(fn, dad->full_name);
+  #ifdef DEBUG
+          if ((strlen(fn) + l + 1) != allocl) {
+            pr_debug("%s: p: %d, l: %d, a: %d\n",
+              pathp, (int)strlen(fn),
+              l, allocl);
+          }
+  #endif
+          fn += strlen(fn);
+        }
+        ,*(fn++) = '/';
+      }
+      memcpy(fn, pathp, l);
+
+      prev_pp = &np->properties;
+      if (dad != NULL) {
+        np->parent = dad;
+        np->sibling = dad->child;
+        dad->child = np;
+      }
+    }
+    /* process properties */
+    /* 依次遍历此节点下的属性 */
+    for (offset = fdt_first_property_offset(blob, *poffset);
+         (offset >= 0);
+         (offset = fdt_next_property_offset(blob, offset))) {
+      const char *pname;
+      u32 sz;
+
+      if (!(p = fdt_getprop_by_offset(blob, offset, &pname, &sz))) {
+        offset = -FDT_ERR_INTERNAL;
+        break;
+      }
+
+      if (pname == NULL) {
+        pr_info("Can't find property name in list !\n");
+        break;
+      }
+      if (strcmp(pname, "name") == 0)
+        has_name = 1;
+      pp = unflatten_dt_alloc(&mem, sizeof(struct property),
+            __alignof__(struct property));
+      if (!dryrun) {
+        /* We accept flattened tree phandles either in
+         ,* ePAPR-style "phandle" properties, or the
+         ,* legacy "linux,phandle" properties.  If both
+         ,* appear and have different values, things
+         ,* will get weird.  Don't do that. */
+        if ((strcmp(pname, "phandle") == 0) ||
+            (strcmp(pname, "linux,phandle") == 0)) {
+          if (np->phandle == 0)
+            np->phandle = be32_to_cpup(p);
+        }
+        /* And we process the "ibm,phandle" property
+         ,* used in pSeries dynamic device tree
+         ,* stuff */
+        if (strcmp(pname, "ibm,phandle") == 0)
+          np->phandle = be32_to_cpup(p);
+        pp->name = (char *)pname;
+        pp->length = sz;
+        pp->value = (__be32 *)p;
+        ,*prev_pp = pp;
+        prev_pp = &pp->next;
+      }
+    }
+    /* with version 0x10 we may not have the name property, recreate
+     ,* it here from the unit name if absent
+     ,*/
+    if (!has_name) {
+      const char *p1 = pathp, *ps = pathp, *pa = NULL;
+      int sz;
+
+      while (*p1) {
+        if ((*p1) == '@')
+          pa = p1;
+        if ((*p1) == '/')
+          ps = p1 + 1;
+        p1++;
+      }
+      if (pa < ps)
+        pa = p1;
+      sz = (pa - ps) + 1;
+      pp = unflatten_dt_alloc(&mem, sizeof(struct property) + sz,
+            __alignof__(struct property));
+      if (!dryrun) {
+        pp->name = "name";
+        pp->length = sz;
+        pp->value = pp + 1;
+        ,*prev_pp = pp;
+        prev_pp = &pp->next;
+        memcpy(pp->value, ps, sz - 1);
+        ((char *)pp->value)[sz - 1] = 0;
+        pr_debug("fixed up name for %s -> %s\n", pathp,
+          (char *)pp->value);
+      }
+    }
+    if (!dryrun) {
+      ,*prev_pp = NULL;
+      np->name = of_get_property(np, "name", NULL);
+      np->type = of_get_property(np, "device_type", NULL);
+
+      if (!np->name)
+        np->name = "<NULL>";
+      if (!np->type)
+        np->type = "<NULL>";
+    }
+
+    old_depth = depth;
+    ,*poffset = fdt_next_node(blob, *poffset, &depth);
+    if (depth < 0)
+      depth = 0;
+    while (*poffset > 0 && depth > old_depth)
+      mem = unflatten_dt_node(blob, mem, poffset, np, NULL,
+            fpsize, dryrun);
+
+    if (*poffset < 0 && *poffset != -FDT_ERR_NOTFOUND)
+      pr_err("unflatten: error %d processing FDT\n", *poffset);
+
+    /*
+     ,* Reverse the child list. Some drivers assumes node order matches .dts
+     ,* node order
+     ,*/
+    if (!dryrun && np->child) {
+      struct device_node *child = np->child;
+      np->child = NULL;
+      while (child) {
+        struct device_node *next = child->sibling;
+        child->sibling = np->child;
+        np->child = child;
+        child = next;
+      }
+    }
+
+    if (nodepp)
+      ,*nodepp = np;
+
+    return mem;
+  }
+  struct device_node {
+    const char *name; //节点对应的 "name" 属性值
+    const char *type; //节点对应的 "device type"属性值
+    phandle phandle;  //节点对应的 "phandle"或"linux,phandle"或"ibm,phandle"
+    const char *full_name; //从根路径开始的全路径
+    struct fwnode_handle fwnode; //暂时没搞明白
+
+    struct	property *properties; //属性列表
+    struct	property *deadprops;	/* removed properties */
+    struct	device_node *parent; //父节点
+    struct	device_node *child;  //子节点
+    struct	device_node *sibling; //同级节点
+    struct	kobject kobj; 
+    unsigned long _flags;
+    void	*data;
+  #if defined(CONFIG_SPARC)
+    const char *path_component_name;
+    unsigned int unique_id;
+    struct of_irq_controller *irq_trans;
+  #endif
+  };
+#+END_SRC
+** 各个设备子系统分析设备树
+到目前为止 =of_root= 就成为了设备树根节点的起始节点了,至于不同的子系统如何来分析设备树那就需要在对应的子系统下在仔细分析了。

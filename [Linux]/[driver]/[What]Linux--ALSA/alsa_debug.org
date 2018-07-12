@@ -32,7 +32,8 @@ Device Drivers -> Sound card support -> Advanced Linux Sound Architecture
 有些芯片的配置默认是静音，有些复杂的芯片(比如AD1761)内部还有很多通路，这些都可以先通过 =amixer= 命令配置, 再确定参数后再使用程序配置。
 - 首先使用 =amixer contents= 列出其默认配置
 - 根据芯片的datasheet来查看其中一些不合适的配置罗列出来
-- 根据需要配置的id号(numid=xx)，使用命令配置 =amixer cset numid=xx <value>=
+- 根据需要配置的id号(numid=xx)，使用命令配置 =amixer cset numid=xx <value>= 
+  + 当有几个音频芯片时，为了找出对应芯片的设置，可以在芯片驱动中找到对应字符串并进行反向搜寻
 * ALSA中的生产者和消费者模型
 ** 问题描述
 一般来说是需要消费者的平均速度大于生产者的平均数据才能保证数据不丢失，但是在音频
@@ -62,3 +63,22 @@ ALSA出现此错误的根本原因就是这个特殊的消费者需要时刻都�
 目前发现有两个库都具有重采样的功能:
 1. [[http://liquidsdr.org/doc/resamp/][liquid]]
 2. [[https://github.com/erikd/libsamplerate][libsamplerate]]
+
+在实际应用中发现，重采样只是解决了其中一环，还有其他环！
+
+让我们来好好梳理一下在类似于解调产生的音频数据这种应用:
+1. 在数据送往ALSA接口前，需要进行以下两步:
+  - 接收数据
+  - 重采样
+  - 解调
+2. 为了不让ALSA接收不到数据(只要中间没有接收到数据，最终听到的声音里面就会有咔、咔、咔...)，需要:
+  - 让 =接收数据和解调数据以及重采样的一周期= 所消耗的时间小于ALSA播放完一周期的时间
+3. 仅仅这样还不够，因为ALSA内部具有环形缓存，ALSA将一个period发送给DMA后会立即返回接收下一帧数据(如果缓存有空位的话)
+  - 所以需要将解调数据输出到一个[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/ring_buffer][中间环形缓存]]， *并且延时启动ALSA*
+    + 延时是为了让缓存中有足够的数据可以满足ALSA前期的突发读取
+4. 经过以上3步，从宏观上来看，解调数据会写满缓存，这个时候还需要抽样丢掉数据(就是间隔一段数据丢掉一小帧)
+  - 因为音频芯片内部有滤波器，所以当抽样丢数据时，对听声音不会有影响。但如果连续丢数据，也会咔、咔、咔...
+
+这样整个方案就如下图所示:
+[[./audio_play.jpg]]
+

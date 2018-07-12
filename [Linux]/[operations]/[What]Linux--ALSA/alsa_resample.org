@@ -8,11 +8,11 @@
 #+OPTIONS: ^:{}
 
 
-音频速率不匹配是很正常的事，所以在将源输出到声卡时，需要重采样。这里使用[[https://github.com/erikd/libsamplerate][libsamplerate]]库来实现。
+音频速率不匹配是很正常的事，所以在将源输出到声卡时，需要重采样。这里分别使用[[https://github.com/erikd/libsamplerate][libsamplerate]] 以及 [[https://github.com/jgaeddert/liquid-dsp][liquid-dsp]] 库来实现。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
-* 编译
+* libsamplerate编译
 ** 交叉编译到目标板
 #+BEGIN_EXAMPLE
   #获取源码
@@ -27,7 +27,7 @@
 
   #对应拷贝入根文件系统 /usr 即可
 #+END_EXAMPLE
-* 编写
+* libsamplerate编写
 在 =doc= 文件夹下具有此库的完整说明，以 =index.html= 为起始索引页打开即可。
 ** 数据结构与操作函数
 *** 错误输出
@@ -148,6 +148,61 @@
 #+BEGIN_SRC c
   src_float_to_short_array(str_demo.resample_out, out, SIMULATE_FRAME_COUNT * 2);
 #+END_SRC
+* liquid-dsp编写
+- 关于liquid-dsp的编译参考[[https://kcmetercec.github.io/2018/05/17/rf_dsp_liquid_base/][liquid-dsp体验]]。
+- 重采样的官方资料位于[[http://liquidsdr.org/doc/resamp/][此链接]]。
 
+对于音频而言其步骤依次为:
+** 生成滤波器
+注意：生成滤波器的过程消耗的时间很长，所以建议在初始化时生成一次即可，而不是每次重采样都生成一次。
 
+#+BEGIN_SRC c
+  //速率配比
+  float r = (float)44100 / (float)48000;
+  //边带抑制
+  float slsl = 80.0f;
 
+  resamp_crcf q = msresamp_crcf_create(r, slsl);
+  unsigned int nx = 2048 ;
+  unsigned int ny = 2 * (float)nx * r;
+  float complex *x;
+  float complex *y;
+
+  //用于存储输入输出数据
+  x = (float complex *)realloc(x, sizeof(float complex) * nx);
+  y = (float complex *)realloc(y, sizeof(float complex) * ny);
+#+END_SRC
+** 归一化数据并转为complex
+#+BEGIN_SRC c
+  static void src_short_to_float_array (const short *in, float *out, int len)
+  {
+    while (len)
+      {	len -- ;
+        out [len] = (float) (in [len] / (1.0 * 0x8000)) ;
+      } ;
+
+    return ;
+  }
+  static void demodulate(void)
+  {
+    src_short_to_float_array(out_buf, resample_in, 4096);
+    for(uint16_t i = 0; i < 2048; i++)
+      {
+        x[i] = resample_in[2*i] + resample_in[2*i + 1]*I;
+      }
+  }
+#+END_SRC
+** 进行重采样处理
+#+BEGIN_SRC c
+  unsigned int num_written;
+  msresamp_crcf_execute(q, x,2048, y,&num_written);
+#+END_SRC
+** 还原信号
+#+BEGIN_SRC c
+  for(uint16_t i = 0; i < num_written; i++)
+  {
+      resample_out[2 * i] = creal(y[i]);
+      resample_out[2 * i + 1] = cimag(y[i]);
+  }
+  src_float_to_short_array(resample_out, out, num_written * 2);
+#+END_SRC

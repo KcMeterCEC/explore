@@ -381,6 +381,7 @@ fork()的作用是在一个进程的基础上为其分裂出一个子进程，�
 - 此父进程有可能是init进程，也可能是具有subreaper属性的进程。
   + 这要根据子进程是否挂接在各自的链表中
 [[./orphan.jpg]]
+
 *** subreaper
 subrepaer 是在3.4后引入的，当将进程设置为 repaer 时需要注意wait子进程，以回收它的PCB。
 #+BEGIN_SRC c
