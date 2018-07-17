@@ -3,7 +3,7 @@
 #+TAGS: CS
 #+LAYOUT: post
 #+CATEGORIES: book,CS:APP
-#+NAMA: <book_csapp_chapter_2_2.org>
+#+NAME: <book_csapp_chapter_2_2.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -11,3 +11,16 @@
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
+* 无符号整型编码
+无符号整型使用的编码方式为 B2U{_w}(binary to unsigned, length w)，其公式为:
+[[./b2uw_equation.jpg]]
+
+- w 代表整数一共有w位
+- x_{i} 分别代表每一位的索引
+
+所以上面的意思就是说，无符号整数可以通过每一位的值乘以一个2的n次方总和来表示。
+- 任何一个非负整数都可以表示为2的n次方的和，这让我想到了linux kernel 中的buddy算法。
+
+#+BEGIN_EXAMPLE
+  B2U4([0111]) = 0*2^3 + 1*2^2 + 1*2^1 + 1*2^0 = 0 + 4 + 2 + 1 = 7
+#+END_EXAMPLE

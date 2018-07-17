@@ -3,7 +3,7 @@
 #+TAGS: driver
 #+LAYOUT: post 
 #+CATEGORIES: linux, driver, overview
-#+NAME: <linux_driver_overview_kobject.org>
+#+NAMA: <linux_driver_overview_kobject.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
