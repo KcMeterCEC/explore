@@ -1,0 +1,16 @@
+#+TITLE: [What]Linux --> kobject
+#+DATE:  <2018-07-16 一> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, overview
+#+NAME: <linux_driver_overview_kobject.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考文档: =/Documentation/kobject.txt=
+
+Everything you never wanted to know about kobjects, ksets, and ktypes.
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+

@@ -9,6 +9,28 @@
 
 在PC上如果一个代码需要经常调试的话，那么建议为GDB单独开一个窗口然后不退出，这样gdb就可以保持断点等一些设置，
 而使用 =r= 运行时，又会调用最新编译的可执行文件，这样就不用每次重新启动又设置很多配置了。
+* 基础必备知识
+** gdb完整调试的必备条件
+要让gdb能够完整的调试一个程序，必须具备:
+- dwarf(debugging with attributed record formats) : 编译每个源码必须加上 =-g= 选项以包含 =dwarf= 信息
+- symbol table : 默认的不加任何参数编译出的可执行文件都带有symbol table
+- source code : 源代码
+
+[[http://dwarfstd.org][dwarf]] 格式中包含了对程序中函数名、变量名等符号的详细描述(比如在源码中的位置，大小，名称等等)。可以使用 =dwarfdump <execfile>= 来查看其格式。
+
+但 dwarf 中并不包含实际的代码，所以为了让gdb可以跟踪代码，还需要整个源码。
+默认情况下源码路径即为编译路径，如果移动了可执行文件位置到别处，需要[[https://kcmetercec.github.io/2018/06/14/linux_debug_gdb_sourcedir/][设置源文件路径]]。
+
+为了明确一个可执行文件中是否含有dwarf和symbol table，可以使用 =readelf -S <execfile= 的方式查看是否有对应的段。
+
+#+BEGIN_EXAMPLE
+  其实在嵌入式调试中，即使gdb没有源码，只要有dwarf也可以抓取到很多有用的信息。
+
+  需不需要源码需要根据实际情况而定。
+#+END_EXAMPLE
+
+在产品出厂时，就不需要 =dwarf= 和 =symbol table= 信息了，这时使用 =strip <execfile>= 来瘦身。
+- 在嵌入式中使用对应的工具，比如在arm-linux中使用 =arm-linux-gnueabihf-strip <execfile>= 
 * 正式调试前的准备工作
 ** 生成带调试信息的可执行文件
 在使用 GDB前,需要让编译器 *将代码的调试信息包含在可执行文件中* ，以C为例,gcc编译器需要加上 =-g= 选项:
@@ -37,6 +59,7 @@ show args
 ** 启动视窗
 个人认为带有视窗的操作方式能更加清楚的反应代码上下文，启动或退出图形化窗口使用：
 - =CTRL + X A= 或 =layout src=
+  + 在调试过程中如果需要看汇编代码，可以使用 =CTRL + X 2= , 退出汇编窗口使用 =CTRL + X 1=
 ** 输入和输出重映射
 很多程序都带有用户交互，如果在调试终端则操作不便，可以将输入输出映射到另一个终端：
 - 打开一个新的控制台,使用命令 =tty=,记住当前文件路径,比如 =/dev/pts/19=
@@ -64,25 +87,28 @@ show args
 | b *<address>           | 在地址处设定断点                                     |
 | b if<condition>        | 神命令，一般在循环体中特定时候打断点，比如 b if i=10 |
 | info breakpoints       | 查看当前设定的所有断点                               |
+| delete <index>         | 删除在 =info breakpoints= 中索引处的断点             |
 | clear <linenum>        | 删除在linenum处的断点                                |
-| clear [<file:>]<func>  | 删除（某个文件中）某个函数的断点                     |
+| clear [file:]<func>    | 删除（某个文件中）某个函数的断点                     |
 | clear                  | 删除当前行所在的断点                                 |
 ** 执行
 - next，缩写 n
 - step,  缩写 s
 - continue,缩写 c
 - until，缩写 u
-| 命令             | 说明                                                    |
-|------------------+---------------------------------------------------------|
-| s                | 单步执行，如果有函数则进入该函数                        |
-| s <count>        | 执行 <count> 条后停止，如果有函数则进入                 |
-| set step-mode on | 打开step-mode模式，当函数没有调试信息时，则进入汇编模式 |
-| n                | 单步执行，不会进入函数                                  |
-| n <count>        | 执行<count> 条后停止，不会进入函数                      |
-| finish           | 退出当前函数并停止                                      |
-| u                | 退出循环语句后停止                                      |
-| c                | 全速运行，直到程序退出或遇到下一个断点                  |
-| c <count>        | 全速运行并跳过<count>个断点                             |
+| 命令             | 说明                                                       |
+|------------------+------------------------------------------------------------|
+| s                | 单步执行，如果有函数则进入该函数                           |
+| si               | 以汇编执行单步执行，会进入函数(一般在汇编窗口打开时使用)   |
+| s <count>        | 执行 <count> 条后停止，如果有函数则进入                    |
+| set step-mode on | 打开step-mode模式，当函数没有调试信息时，则进入汇编模式    |
+| n                | 单步执行，不会进入函数                                     |
+| ni               | 以汇编执行单步执行，不会进入函数(一般在汇编窗口打开时使用) |
+| n <count>        | 执行<count> 条后停止，不会进入函数                         |
+| finish           | 退出当前函数并停止                                         |
+| u                | 退出循环语句后停止                                         |
+| c                | 全速运行，直到程序退出或遇到下一个断点                     |
+| c <count>        | 全速运行并跳过<count>个断点                                |
 ** 查看以及修改
 - print, 缩写 p
   + <f> 显示格式可以使用: x(16进制),u(16进制无符号),d(十进制),o(八进制),t(二进制),c(字符),s(字符串),f(浮点)
@@ -91,17 +117,18 @@ show args
 | 命令                       | 说明                                                                                                          |
 |----------------------------+---------------------------------------------------------------------------------------------------------------|
 | p <variable>               | 查看变量 <variable> 的值                                                                                      |
+| bt                         | 查看调用关系                                                                                                  |
 | p <var>@<len>              | 查看地址<var>地址开始的值，打印<len>个长度                                                                    |
 | p /<f> <variable>          | 以 <f> 格式显示变量<variable>                                                                                 |
 | p <variable>=<value>       | 修改变量 <variable>的值为<value>                                                                              |
 | watch  <expr>              | 当表达式(变量)的值有变化时则停止运行                                                                          |
 | rwatch <expr>              | 当表达式(变量)被读时则停止运行                                                                                |
 | x/<num><f><u> <address>    | 在地址<address>开始处显示<num>个单位，每个单位以<f>格式以<u>字节对齐,关于<u>的取值，在gdb中使用 =help x= 查看 |
-| set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a'                                       |
+| set *(type *)(point)=value | 指针以type类型指定位置处的值为 value, ex: set *(unsigned char *)p = 'a' , <pointer> 也可以是内存中的地址      |
 | info                       | 查看寄存器、断点等信息                                                                                        |
 | disassemble                | 查看汇编代码                                                                                                  |
 * 捕捉 core dump
-在用户空间捕捉core dump之前，用户需要在当前shell使用命令使程序崩溃后产生 =core= 文件:
+在用户空间捕捉core dump之前，用户需要在当前shell使用命令使程序崩溃后产生无大小限制的 =core= 文件:
 #+begin_example
 ulimit -c unlimited
 #+end_example
@@ -115,3 +142,9 @@ gdb [exec file name] [core file]
 比如 =gdb ./a.out core= 
 
 在 gdb 载入 core 文件以后就获得了当时崩溃的环境，于是可以查看当时的调用栈，寄存器状态等等信息。
+* 捕捉多线程栈
+- 使用 =info threads= 查看当前创建的线程信息
+- 使用 =thread <index>= 跳转到对应线程id
+  + 可以使用 =set scheduler-locking on= 来锁住调度器，禁止线程切换，以单独运行当前线程
+    + 使用 =set scheduler-locking off= 来恢复调度器
+- 使用 =bt= 查看当前线程栈
