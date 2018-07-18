@@ -1,0 +1,41 @@
+#+TITLE: [What]使用USB模拟网口从主机传输文件到目标板
+#+DATE: <2018-07-18 三> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, usage
+#+NAME: <linux_debug_usage_usb_eth_transfer.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+之前提到过，当目标板没有网口或网口用作其他用途时，我[[https://kcmetercec.github.io/2018/02/05/linux_debug_usage_serial_transfer/][使用串口传输文件]]，但这遇到两个问题：
+1. 传输文件稍微大一点，就会等很久，慢得要死。。。
+2. 使用gdb remote 调试经常的情况是你要调试的程序还没有崩溃，串口先崩溃了。。。
+  + 无奈只能在busybox中加入gdb，在目标板调试，但依然很麻烦
+
+所以当有usb时，就可以使用usb来虚拟网卡，以上两个问题都可以解决。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 目标板编译
+在编译内核时，需要加上对应的编译选项，这些在网上都有[[https://developer.ridgerun.com/wiki/index.php/How_to_use_USB_device_networking][详细说明]]
+  - 但具体配置还需要参考原厂的文档，比如[[http://www.wiki.xilinx.com/Zynq%2520Linux%2520USB%2520Device%2520Driver][zynq usb]].
+* 与linux主机连接
+** 目标板配置
+- 目标板需要先配置ip以及将主机ip配置为网关:
+  + 目标板配置可以写入启动脚本中以自动化
+#+BEGIN_EXAMPLE
+  ifconfig usb0 192.168.7.2 netmask 255.255.255.0 up
+  route add default gw 192.168.7.3
+
+  #查看配置
+  route
+#+END_EXAMPLE
+- 将USB与linux主机连接后，主机会出现一个新的网卡
+  + 比如我的ubuntu16.04中出现了 =enp0s20u6=
+- 设置主机IP
+  + 主机设置可以设为 alias 以简化操作
+#+BEGIN_EXAMPLE
+  sudo ifconfig enp0s20u6 192.168.7.3 netmask 255.255.255.0
+#+END_EXAMPLE
+
+enjoy ^_^

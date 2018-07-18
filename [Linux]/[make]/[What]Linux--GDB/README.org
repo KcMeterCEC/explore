@@ -148,3 +148,14 @@ gdb [exec file name] [core file]
   + 可以使用 =set scheduler-locking on= 来锁住调度器，禁止线程切换，以单独运行当前线程
     + 使用 =set scheduler-locking off= 来恢复调度器
 - 使用 =bt= 查看当前线程栈
+* 远程与目标板连接
+当目标板具有gdbserver时，可以远程链接主机gdb进行调试。
+- 这种时候在传给目标板程序前，可以先将其 =strip= 一下减小体积。
+** 目标板
+- 首先使用 =gdbserver --version= 查看此server对应的编译器,这样主机端才能对应。
+- 启动一个进程使用: =gdbserver :<port> <execfile>= 
+- 挂载正在运行的进程使用 =gdbserver :<port> --attach <pid>=
+** 主机
+- 主机的gdb版本需要与目标机对应，在对应程序的编译目录使用 =arm-linux-gnueabihf-gdb <execfile>=
+- 然后连接目标机: =target remote <target ip>:<port>=
+

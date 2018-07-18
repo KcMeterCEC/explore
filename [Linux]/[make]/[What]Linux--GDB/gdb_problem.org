@@ -25,3 +25,9 @@ python组件的源码路径位于 =gdb/python/lib/gdb= ,拷贝此目录下的所
 #+begin_example
 sudo cp -R ./* /usr/local/share/gdb/python/gdb/
 #+end_example
+* Error opening terminal: xterm-256color
+当使用gdb调试目标板代码时可能会出现此处错误，需要在 =~/.bash_aliases= 中进行如下设置即可:
+#+BEGIN_EXAMPLE
+  export TERMINFO=/usr/share/terminfo
+  export TERM=xterm-basic
+#+END_EXAMPLE
