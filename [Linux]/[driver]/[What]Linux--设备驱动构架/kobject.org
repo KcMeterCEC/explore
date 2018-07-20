@@ -1,9 +1,9 @@
 #+TITLE: [What]Linux --> kobject
-#+DATE:  <2018-07-16 一> 
+#+DATE:  <2018-07-19 四> 
 #+TAGS: driver
 #+LAYOUT: post 
 #+CATEGORIES: linux, driver, overview
-#+NAMA: <linux_driver_overview_kobject.org>
+#+NAME: <linux_driver_overview_kobject.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
@@ -13,4 +13,249 @@ Everything you never wanted to know about kobjects, ksets, and ktypes.
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+[[https://lwn.net/Articles/51437/][kobject]] 首次出现于kernel 2.5.45，用于:
+1. 管理一个对象的引用计数，当计数为0时该对象所占用的内存将会被释放。
+2. 以层次化的方式显示在 sysfs 中(文件夹)以表明对象之间的关系
+  - 相关的示例位于 =samples/kobject/{kobject-example.c,kset-example.c}= 
+    + 可以选中 =CONFIG_SAMPLE_KOBJECT= 来将示例编译为模块以查看效果
 
+一般驱动开发人员不会直接使用 =kobject= 而是使用其上层封装的API.
+
+kobject是一个基类，要发展出其他的类则需要继承自此基类，而在c的语法中是无法直接支持继承特性的，
+所以一般都是将 kobject 放入一个结构体中以代表继承。
+  
+kobject 的定义如下:
+#+BEGIN_SRC c
+  /**
+   ,* @note: 由于kobject是内嵌在对象结构体中的，所以其无法直接通过kobject的操作函数进行释放
+   ,* 而是通过 ktype中的 release() 函数来释放此对象的，release函数的填充便是由对象来主动完成的
+   ,*/
+  struct kobj_type {
+    void (*release)(struct kobject *kobj);//释放对象时的动作
+    const struct sysfs_ops *sysfs_ops;
+    struct attribute **default_attrs; //默认创建的文件列表
+    const struct kobj_ns_type_operations *(*child_ns_type)(struct kobject *kobj);
+    const void *(*namespace)(struct kobject *kobj);
+  };
+  /**
+   ,* @param parent :指向父kobject，可以让object以层次的方式展现
+   ,* @param kset : 用于链接一组kobject，这些kobject可以具有相同或不同的ktype
+   ,* @param ktype : 指明了此对象的属性，释放时的动作，在sysfs中的表现形式等
+   ,* @param kref : 此对象被引用的次数
+   ,*/
+  struct kobject {
+    const char		      *name;
+    struct list_head	  entry;
+    struct kobject		  *parent;
+    struct kset		      *kset;
+    struct kobj_type	  *ktype;
+    struct kernfs_node	*sd; /* sysfs directory entry */
+    struct kref		      kref;
+  #ifdef CONFIG_DEBUG_KOBJECT_RELEASE
+    struct delayed_work	release;
+  #endif
+    unsigned int state_initialized:1;
+    unsigned int state_in_sysfs:1;
+    unsigned int state_add_uevent_sent:1;
+    unsigned int state_remove_uevent_sent:1;
+    unsigned int uevent_suppress:1;
+  };
+#+END_SRC
+
+其中的 =kref= 在内核应用编程时可以单独拿来使用，用于自己所创建对象的引用计数，相关的文档是 =Documentation/kref.txt= 
+* kobject 继承
+#+BEGIN_SRC c
+  struct cdev {
+    struct kobject kobj;
+    struct module *owner;
+    const struct file_operations *ops;
+    struct list_head list;
+    dev_t dev;
+    unsigned int count;
+  };
+#+END_SRC
+在使用 =kobject= 的函数中，是通过 [[https://kcmetercec.github.io/2018/04/12/linux_kernel_data_structure_containerof/][container_of]] 宏来反推出包含它的结构体:
+#+BEGIN_SRC c
+  static void kset_release(struct kobject *kobj)
+  {
+    struct kset *kset = container_of(kobj, struct kset, kobj);
+    pr_debug("kobject: '%s' (%p): %s\n",
+             kobject_name(kobj), kobj, __func__);
+    kfree(kset);
+  }
+#+END_SRC
+* kobject 初始化与设置
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 因为kobject最后是需要被释放的，所以其必须是动态申请的
+   ,* @note : 这种方式使用内部默认的ktype
+   ,*/
+  struct kobject * __must_check kobject_create(void);
+  /**
+   ,* @brief 申请内存并初始化
+   ,* @note 默认的引用计数为1
+   ,*/
+  void kobject_init(struct kobject *kobj, struct kobj_type *ktype);
+  /**
+   ,* @brief 设置名称
+   ,* @note : 此名称即为显示在sysfs中的名称
+   ,*/
+  int __must_check kobject_rename(struct kobject *, const char *new_name);
+  /**
+   ,* @brief 获取名称
+   ,*/
+  const char *kobject_name(const struct kobject *kobj);
+#+END_SRC
+* kobject 引用计数
+引用计数每增加一次代表该对象被引用一次，计数每减少一次则代表该对象被取消引用一次，但计数为0时则释放该对象。
+#+BEGIN_SRC c
+  /**
+   ,* @note: 引用成功则计数值加一，并返回kboject地址。
+   ,* 但如果该kobject已经准备被释放，则返回NULL
+   ,*/
+  struct kobject *kobject_get(struct kobject *kobj);
+
+  /**
+   ,* @note : 计数值减一，到0时便释放该对象
+   ,*/
+  void kobject_put(struct kobject *kobj);
+#+END_SRC
+cdev的get和put示例如下:
+#+BEGIN_SRC c
+  static struct kobject *cdev_get(struct cdev *p)
+  {
+    struct module *owner = p->owner;
+    struct kobject *kobj;
+
+    if (owner && !try_module_get(owner))
+      return NULL;
+    kobj = kobject_get(&p->kobj);
+    if (!kobj)
+      module_put(owner);
+    return kobj;
+  }
+
+  void cdev_put(struct cdev *p)
+  {
+    if (p) {
+      struct module *owner = p->owner;
+      kobject_put(&p->kobj);
+      module_put(owner);
+    }
+  }
+#+END_SRC
+* 显示在sysfs中
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 将kobj加入 parent所在的文件夹，其名称由后面的字符串指定
+   ,*/
+  int kobject_add(struct kobject *kobj, struct kobject *parent,
+                  const char *fmt, ...);
+  //相当于先后调用了 kobject_init() kobject_add()
+  int kobject_init_and_add(struct kobject *kobj,
+                           struct kobj_type *ktype, struct kobject *parent,
+                           const char *fmt, ...);
+  /**
+   ,* @brief 相当于先后调用了 kobject_create() kobject_add()
+   ,* @note : 此函数创建的是一个空的文件夹,这种情况下就是一个裸的kobject，不用再嵌入到其他数据结构中
+   ,*/
+  struct kobject *kobject_create_and_add(const char *name, struct kobject *parent);
+  /**
+   ,* @brief 创建文件使用以下函数
+   ,* 具体是使用示例位于 samples/kobject/kobject-example.c
+   ,*/
+  int __must_check sysfs_create_file(struct kobject *kobj,
+                                     const struct attribute *attr);
+  int __must_check sysfs_create_group(struct kobject *kobj,
+                                      const struct attribute_group *grp);
+  int __must_check sysfs_create_groups(struct kobject *kobj,
+                                       const struct attribute_group **groups);
+
+
+
+  /**
+   ,* @brief : 删除
+   ,*/
+  void kobject_del(struct kobject *kobj);
+#+END_SRC
+* kobject 事件
+当kobject被加入sysfs中后，可以主动向用户空间发送一个事件消息:
+#+BEGIN_SRC c
+  /*
+   ,* The actions here must match the index to the string array
+   ,* in lib/kobject_uevent.c
+   ,*
+   ,* Do not add new actions here without checking with the driver-core
+   ,* maintainers. Action strings are not meant to express subsystem
+   ,* or device specific properties. In most cases you want to send a
+   ,* kobject_uevent_env(kobj, KOBJ_CHANGE, env) with additional event
+   ,* specific variables added to the event environment.
+   ,*/
+  enum kobject_action {
+    KOBJ_ADD,
+    KOBJ_REMOVE,//KOBJECT_REMOVE会在kobject被detele时由内核自动发出，用户可以不用主动发出
+    KOBJ_CHANGE,
+    KOBJ_MOVE,
+    KOBJ_ONLINE,
+    KOBJ_OFFLINE,
+    KOBJ_MAX
+  };
+  int kobject_uevent(struct kobject *kobj, enum kobject_action action);
+  int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
+                         char *envp[]);
+
+#+END_SRC
+* kset
+kset有以下3个用途:
+1. 将同类的设备或驱动聚集在一起，内核可以对这些同类对象进行批量操作
+2. 将一个kobject以及其父kobject以层级的形式展现出来，最终会以目录树的形式展示在 sysfs 中
+3. 支持对象的热拔插，并且可以设置向用户空间发送对应的事件
+   
+kset以链表的形式链接起这些对象，与此同时这些对象中也包含了该kset的地址.
+
+并且kset本身也是一个对象，所以其内部也包含一个kobject来描述此kset:
+[[./kobject_kset.jpg]]
+
+#+BEGIN_SRC c
+  /**
+   ,* struct kset - a set of kobjects of a specific type, belonging to a specific subsystem.
+   ,*
+   ,* A kset defines a group of kobjects.  They can be individually
+   ,* different "types" but overall these kobjects all want to be grouped
+   ,* together and operated on in the same manner.  ksets are used to
+   ,* define the attribute callbacks and other common events that happen to
+   ,* a kobject.
+   ,*
+   ,* @list: the list of all kobjects for this kset
+   ,* @list_lock: a lock for iterating over the kobjects
+   ,* @kobj: the embedded kobject for this kset (recursion, isn't it fun...)
+   ,* @uevent_ops: the set of uevent operations for this kset.  These are
+   ,* called whenever a kobject has something happen to it so that the kset
+   ,* can add new environment variables, or filter out the uevents if so
+   ,* desired.
+   ,*/
+  struct kset {
+    struct list_head list;
+    spinlock_t list_lock;
+    struct kobject kobj;
+    const struct kset_uevent_ops *uevent_ops;
+  };
+  /**
+   ,* kset_create_and_add - create a struct kset dynamically and add it to sysfs
+   ,*
+   ,* @name: the name for the kset
+   ,* @uevent_ops: a struct kset_uevent_ops for the kset
+   ,* @parent_kobj: the parent kobject of this kset, if any.
+   ,*
+   ,* This function creates a kset structure dynamically and registers it
+   ,* with sysfs.  When you are finished with this structure, call
+   ,* kset_unregister() and the structure will be dynamically freed when it
+   ,* is no longer being used.
+   ,*
+   ,* If the kset was not able to be created, NULL will be returned.
+   ,*/
+  struct kset *kset_create_and_add(const char *name,
+                                   const struct kset_uevent_ops *uevent_ops,
+                                   struct kobject *parent_kobj)
+#+END_SRC
+kset相关的操作函数与 kobject类似，这里就不列出了。kset相关的操作示例位于 =samples/kobject/kset-example.c=
