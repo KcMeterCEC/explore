@@ -205,10 +205,13 @@ cdev的get和put示例如下:
                          char *envp[]);
 
 #+END_SRC
+
+那啥，其实看到这里我还是对这个事件的概念很模糊啊......还好[[http://www.wowotech.net/device_model/uevent.html][窝窝网站已经讲得很详细了]]。
 * kset
 kset有以下3个用途:
 1. 将同类的设备或驱动聚集在一起，内核可以对这些同类对象进行批量操作
 2. 将一个kobject以及其父kobject以层级的形式展现出来，最终会以目录树的形式展示在 sysfs 中
+   + 这些kobject的父object一般都是kset中的kobject
 3. 支持对象的热拔插，并且可以设置向用户空间发送对应的事件
    
 kset以链表的形式链接起这些对象，与此同时这些对象中也包含了该kset的地址.

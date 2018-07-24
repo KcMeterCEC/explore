@@ -17,9 +17,26 @@ LEP软件是CS架构，分为LEPD(LEP Daemon，资源占用少，用于运行在
 
 所以这个软件一般的使用方式为：
 - 在嵌入式板或服务器中运行 LEPD，在普通PC上运行LEPV以远程查看目标运行状态。
-  + 目标机上需要有网口
+  + 目标机上需要有网口(或者可以使用[[https://kcmetercec.github.io/2018/07/18/linux_debug_usage_usb_eth_transfer/][usb虚拟网口]])
 - 在PC本机运行LEPD和LEPV，以监视自身的状态。
   + 对于监视一些占用量比较大的程序时，建议在其它设备上连接LEPV服务，因为浏览器也要占用不少资源。
+* 准备工作
+** 使能 TASKSTATS
+#+BEGIN_EXAMPLE
+  General setup --->
+
+  CPU/Task time and stats accounting --->
+
+  [*] Export task/process statistics through netlink
+
+  [*] Enable per-task delay accounting
+
+  [*] Enable extended accounting over taskstats
+
+  [*] Enable per-task storage I/O accounting
+#+END_EXAMPLE
+** 使能perf
+[[https://kcmetercec.github.io/2018/02/11/linux_debug_perf_tutorial/][此链接说明如何安装]]
 * LEP在 ubuntu16.04 上运行步骤
 ** 编译并运行LEPD
 - 首先安装必要的依赖库：
@@ -48,9 +65,9 @@ ps -aux | grep lepd
 sudo kill -s 9 <lepd PID>
 
 #######对于嵌入式ARM上运行来说#######
-#需要特别指定目标板类型来编译,默认Makefile中指定的编译器为 arm-linux-gnueabi-gcc,
-#或许需要根据编译器不同而修改Makefile，比如zynq中的编译器为 arm-linux-gnueabihf-gcc 
-make ARCH=arm
+#需要特别指定目标板类型来编译,默认Makefile中指定的编译器为 arm-linux-gnueabi-,
+#目前仅支持软件浮点编译器!!!!! 最简单粗暴的安装方式 : sudo apt install gcc-arm-linux-gnueabi
+make ARCH=arm 
 #然后将生成的文件 lepd 拷贝到嵌入式Linux的文件系统中并启动
 #+end_example
 ** 运行LEPV

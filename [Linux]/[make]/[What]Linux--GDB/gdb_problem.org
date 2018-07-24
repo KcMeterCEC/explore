@@ -31,3 +31,7 @@ sudo cp -R ./* /usr/local/share/gdb/python/gdb/
   export TERMINFO=/usr/share/terminfo
   export TERM=xterm-basic
 #+END_EXAMPLE
+*注意:* 以上的设置可能会影响 =menuconfig= 的使用，最终导致在 =menuconfig= 界面中无法使用方向键，解决方法是:
+#+BEGIN_EXAMPLE
+  export TERM=xterm-256color
+#+END_EXAMPLE

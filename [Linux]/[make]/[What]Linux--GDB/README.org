@@ -21,7 +21,7 @@
 但 dwarf 中并不包含实际的代码，所以为了让gdb可以跟踪代码，还需要整个源码。
 默认情况下源码路径即为编译路径，如果移动了可执行文件位置到别处，需要[[https://kcmetercec.github.io/2018/06/14/linux_debug_gdb_sourcedir/][设置源文件路径]]。
 
-为了明确一个可执行文件中是否含有dwarf和symbol table，可以使用 =readelf -S <execfile= 的方式查看是否有对应的段。
+为了明确一个可执行文件中是否含有dwarf和symbol table，可以使用 =readelf -S <execfile>= 的方式查看是否有对应的段。
 
 #+BEGIN_EXAMPLE
   其实在嵌入式调试中，即使gdb没有源码，只要有dwarf也可以抓取到很多有用的信息。
