@@ -1,0 +1,31 @@
+digraph pic{
+    graph [label="协议的标准化流程"];
+
+    start[label="草案"];
+    experimental[label="实验性协议"];
+    proposed[label="提议标准"];
+    start -> experimental;
+    experimental -> start;
+    start -> proposed;
+    
+    historic[label="历史性协议"];
+    experimental -> historic;
+
+    six_month[label="大约6个月的讨论"]
+    proposed -> historic;
+    proposed -> six_month;
+
+    draft[label="草案标准"];
+    six_month -> proposed;
+    six_month -> draft;
+
+    four_month[label="大约4个月的讨论"];
+    draft -> historic;
+    draft -> four_month;
+
+    standard[label="标准协议"];
+    four_month -> draft;
+    four_month -> standard;
+
+    standard -> historic;
+}
