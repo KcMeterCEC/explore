@@ -1,0 +1,15 @@
+#+TITLE: [What]图解TCPIP_TCPIP概览
+#+DATE: <2018-07-26 四> 
+#+TAGS: tcpip
+#+LAYOUT: post
+#+CATEGORIES: book,图解TCPIP(入门)
+#+NAME: <book_图解TCPIP_chapter2_tcpip_struct.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+理解了OSI模型后，再来看TCPIP的总体结构。
+[[./OSI_2_tcpip.jpg]]
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
