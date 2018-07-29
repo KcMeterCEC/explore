@@ -48,9 +48,6 @@ MAC地址由6字节48位来组成，其格式如下(LSB模式发送):
 ** 非共享介质网络
 对介质采取专用，网络中的每个站直连交换机，由交换机负责转发数据帧，发送端与接收端不共享通信介质，
 因此很多情况下采用全双工通信方式。
-
-
-
 ** 根据MAC地址转发
 以太网交换机根据数据链路层中每个帧的目标MAC地址，决定从哪个网口发送数据，
 这时所参考的、用以记录发送接口的表就叫做转发表(Forwarding Table)
@@ -62,5 +59,118 @@ MAC地址由6字节48位来组成，其格式如下(LSB模式发送):
   
 随着接入的设备越多，转发表越大，检索的时间就越长。所以有必要将网络分为多个数据链路，分层管理，提高检索效率。
 ** 环路检测计数
+为了应对网桥故障，具有生成树和源路由两种方式。
+
+- 生成树: 每个网桥必须在每1~10秒内相互交换BPDU(Bridge Protocol Data Unit)包，从而判断哪些端口使用哪些不使用，
+一旦发生故障，则自动切换通信线路，利用那些没有被使用的端口继续运行传输。
+  + 这种方式切换网络时需要几十秒时间，可以使用RSTP(Rapid Spanning Tree Protocol)的方法，将切换时间缩短到几秒内。
+- 源路由法: 判断发送数据的源地址是通过哪个网桥实现传输的，并将帧写入RIF(Routing Information Field).
+网桥根据这个RIF信息发送帧给目标地址。
+  + 即使网桥中出现了环路，数据帧也不会被反复转发
 ** VLAN
+将不同设备按照其端口区分了多个网段，从而区分了广播数据传播范围、减少了网络负载并提高了网络的安全性。
+
+* 以太网
+#+BEGIN_EXAMPLE
+以太网(Ethernet)一词源于Ether(以太)，意为介质。在爱因斯坦提出量子力学之前，人们普遍认为宇宙空间充满以太，并以波的形式传送着光。
+#+END_EXAMPLE
+** 以太网连接形式
+目前都采用终端与交换机之间独占的电缆方式实现以太网通信。
+** 以太网分类
+100BASE中的"100"代表100Mbps，而后追加的"5,2,T,F"表示的是传输介质。
+- 在传输速度相同而传输所用电缆不同的情况下，可以连接那些允许更换传输介质的中继器或集线器。
+- 在传输速度不同的情况下，则必须采用那些允许变更速度的设备(网桥、交换集线器、路由器)。
+
+注意: *以太网中以时钟频率决定传输速度，也就是说1K=1000 而不是计算机中的1024!*
+** 以太网帧格式
+*** 前导码(Preamble)
+以太网在发送每一帧的前面会附加8字节的前导码，以表示一个以太网帧的开始，也是对端网卡能够确保与其同步的标志。
+[[./preamble.jpg]]
+
+如上图所示，前7字节都是 10101010，最后一字节的低两位是"11"，IEEE802.3将其称为起始域SFD，以代表接下来是帧本体。
+*** 帧本体
+[[./eth_frame.jpg]]
+
+- 帧本体的前端是以太网首部，总共占用14字节：6字节目标MAC地址、6字节源MAC地址、2字节上层协议类型。
+- 帧本体中的数据范围是46~1500字节，若上层发送的数据大于这个范围，那么会将数据拆分为多个帧发送。
+- 帧尾部有4字节的FCS(Frame Check Sequence, 帧检查序列),用于检查帧是否有误码。
+
+其中的上层协议类型用于表明网络层的协议类型，如下表:
+| 类型编号(16进制) | 协议                                         |
+|------------------+----------------------------------------------|
+|      0000 ~ 05DC | IEEE802.3 Length Field(01500)                |
+|      0101 ~ 01FF | 实验用                                       |
+|             0800 | Internet IP(IPv4)                            |
+|             0806 | Address Resolution Protocol(ARP)             |
+|             8035 | Reverse Address Resolution Protocol (RARP)   |
+|             8037 | IPX(Novell NetWare)                          |
+|             805B | VMTP(Versatile Message Transaction Protocol) |
+|             809B | AppleTalk(EtherTalk)                         |
+|             80F3 | AppleTale Address Resolution Protocol(AARP)  |
+|             8100 | IEEE802.1Q Customer VLAN                     |
+|             814C | SNMP over Ethernet                           |
+|             8191 | NetBIOS/NetBEUI                              |
+|             817D | XTP                                          |
+|             86DD | IP version6(IPV6)                            |
+|      8847 ~ 8848 | MPLS(Multi-protocol Label Switching)         |
+|             8863 | PPPoE Discovery Stage                        |
+|             8864 | PPPoE Session Stage                          |
+|             9000 | Loopback(Configuration Test Protocol)        |
+
+IEEE802.3中帧格式有些不同:
+[[./ieee_frame.jpg]]
+
+- 其中SNAP用于标识上一层的协议类型。
+
+* 无线通信
+** 无线通信的种类
+无线通信依据通信距离进行分类:
+| 分类       | 通信距离         | 标准化组织          | 相关其他组织即技术           |
+|------------+------------------+---------------------+------------------------------|
+| 短距离无线 | 数米             | 个别组织            | RF-ID                        |
+| 无线PAN    | 10米左右         | IEEE802.15          | 蓝牙                         |
+| 无线LAN    | 100米左右        | IEEE802.11          | Wi-Fi                        |
+| 无线MAN    | 数千米～100千米  | IEEE802.16/20       | WiMAX                        |
+| 无线RAN    | 200千米～700千米 | IEEE802.22          |                              |
+| 无线WAN    |                  | GSM,CDMA2000,W-CDMA | 3G,LTE,4G,下一代移动通信网络 |
+** IEEE802.11
+IEEE802.11定义了无线LAN协议中的物理层与数据链路层的一部分，
+其是所有IEEE802.11相关标准的基础，最常听到的是 IEEE802.11b/g/a/n标准。
+| 标准名称 | 概要                                                                                           |
+|----------+------------------------------------------------------------------------------------------------|
+| 802.11   | IEEE Standard for Wireless LAN Medium Access Control(MAC) and Physical LAY(PHY) Specifications |
+| 802.11a  | Higher Speed PHY Extension in the 5GHz Band                                                    |
+| 802.11b  | Higher Speed PHY Extension in the 2.4GHz Band                                                  |
+| 802.11g  | Futher Higher Data Rate Extension in the 2.4GHz Band                                           |
+| 802.11n  | High Throughput                                                                                |
+
+
+* PPP
+PPP(Point to Point Protocol)指点对点计算机通信协议，PPP相当于OSI模型中的第二层数据链路层。
+- *PPP属于纯粹的数据链路，与物理层没有任何关系。*
+  
+PPP主要功能包括两个协议:
+- 不依赖上层的LCP(Link Control Protocol)协议
+  + 主要负责建立和断开连接、设置最大接收单元(MRU,Maximum Receive Unit)、设置验证协议(PAP/CHAP)以及设置是否进行通信质量的监控
+- 依赖上层的NCP(Network Control Protocol)协议(如果上层为IP，此时的NCP也叫做IPCP(IP Control Protocol)).
+  + 负责IP地址设置以及是否进行TCP/IP首部压缩
+    
+PPP在连接时，需要进行用户名和密码验证，其验证协议有:
+- PAP(Password Authentication Protocol):通过两次握手验证，密码以明文发送，用于安全要求不高的场合
+- CHAP(Challenge Handshake Authentication Protocol):使用一次性密码OTP(One Time Password),保证安全
+** 帧格式
+[[./ppp_frame.jpg]]
+
+- 前后的标志码用于区分每个帧：在两个标识码中间不允许出现连续6个以上的"1"
+  + 所以在发送帧时，当出现连续5个"1"时后面必须插入一个0,接收时如果连续5个1且后面跟着的是0，则将0删除
+** PPPoE(PPP over Ethernet)
+在以太网上利用PPPoE提供PPP功能，单纯的以太网没有验证功能，也没有建立和断开连接处理，因此无法按时计费。
+
+如果采用PPPoE就可以有效验证用户使用。
+
+
+
+
+
+
 
