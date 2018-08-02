@@ -686,10 +686,7 @@ vtc 中需要对应增加相应的设备树节点. 然后使用函数 =struct vt
           return -1;
       }
       ///config
-      //pstr_drvData->dmaHandle = (dma_addr_t)pstr_drvData->u32_fbPhys;
-      //dev_info(pstr_dev, "get vdma dst addr = %#x\n", pstr_drvData->dmaHandle);
-      pstr_drvData->dmaHandle = dma_map_single(pstr_drvData->str_dmaChannel->device->dev,
-              pstr_drvData->p_fbVirt, buf_len, DMA_MEM_TO_DEV);
+      pstr_drvData->dmaHandle = (dma_addr_t)pstr_drvData->u32_fbPhys;
       dev_info(pstr_dev, "get vdma dst addr = %#x\n", pstr_drvData->dmaHandle);
       if(dma_mapping_error(pstr_drvData->str_dmaChannel->device->dev, pstr_drvData->dmaHandle))
       {

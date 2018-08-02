@@ -1,0 +1,52 @@
+#+TITLE: [What]图解TCPIP_ip protocol
+#+DATE: <2018-07-31 二> 
+#+TAGS: tcpip
+#+LAYOUT: post
+#+CATEGORIES: book,图解TCPIP(入门)
+#+NAME: <book_图解TCPIP_chapter5_tcpip_ip_protocol.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+在实际通信中，仅凭IP远远不够，还需要众多支持IP的相关技术才能实现最终通信。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* DNS
+DNS(Domain Name System)功能将上层字符串自动转换为具体的IP地址。
+
+DNS所管理的信息不仅仅是这些主机名和对应的IP地址，还要管理其他信息。
+** 域名的构成
+#+BEGIN_EXAMPLE
+  域名是指为了识别主机名称和组织机构名称的一种具有分层的名称。
+#+END_EXAMPLE
+- 域名按照树形组织进行分层，但在排列时是从底向上排列，比如 =kcmetercec.github.io=
+- 每级域名都有对应的服务器与之匹配，各层域名服务器都了解根域名服务器IP地址以及其下层域名服务器IP地址。
+  + DNS根据IP地址进行检索时，需要从根域名服务器开始顺序进行，这就类似linux下的文件系统一样，以树形结构组织
+  + 修改该层的域名或重设IP地址，还需要在其上层的域名服务器中进行追加或修改
+- 进行DNS查询的主机和软件叫做DNS解析器(Resolver),用户所使用的工作站或个人电脑都属于解析器。
+  + 一个解析器至少要注册一个以上域名服务器的IP地址，通常至少包括组织内部的域名服务器的IP地址。
+** DNS查询机制
+- 解析器为了查询IP地址，向域名服务器发送查询请求，如果域名服务器在自己数据库找到对应的IP地址就会返回
+  + 如果没有找到对应IP则向上一层根域名服务器进行查询处理
+- 根域名服务器则按照顺序进行遍历查询，直到找到对应的IP地址
+- 解析器和域名服务器会将新信息保存在缓存里，以避免每次都向根域名服务器请求
+  + 这和CPU内部的Cache类似，Cache命中就直接读Cache否则读内存并刷新Cache
+
+
+* ARP(Address Resolution Protocol)
+ARP以目标IP地址为线索，用来定位下一个应该接收数据分包的网络设备对应的MAC地址。
+
+如果目标主机不在同一个链路上时，可以通过ARP查找下一跳路由器的MAC。
+
+ARP只使用于IPv4，IPv6中使用ICMPv6替代ARP发送邻居探索消息。
+** 工作机制
+ARP是借助ARP请求与ARP响应两种类型的包确定MAC地址的。
+- 从一个IP地址发送ARP请求包以了解其MAC地址，目标地址将自己的MAC地址填入其中的ARP响应包返回到IP地址
+  + 可以通过ARP从IP地址获得MAC地址，实现链路内的IP通信
+
+发送端和接收端都会通过ARP对MAC地址缓存一段时间，保存在ARP表中。
+- unix/windows 使用 =arp -a= 查看此表信息
+
+ARP包格式如下:
+[[./arp_protocol.jpg]]
+

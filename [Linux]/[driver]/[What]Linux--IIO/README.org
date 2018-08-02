@@ -1,22 +1,30 @@
-* [What] driver --> IIO(Industrial I/O Subsystem)
+#+TITLE: [What]linux -> IIO(Industrial I/O Subsystem) 使用
+#+DATE:  <2018-08-01 三> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, IIO
+#+NAME: <linux_driver_IIO_client.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
 参考网站: [[https://wiki.analog.com/software/linux/docs/iio/iio][Analog Wiki]]
 
-参考文档: Documentation/iio/     Documentation/ABI/testing/sysfs-bus-iio
+参考文档: Documentation/iio/     Documentation/ABI/testing/sysfs-bus-iio*
 
 参考代码: drivers/iio/**
-** 概览
-*** 基本概念
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 概览
+** 基本概念
 IIO 子系统主要包含一些传感器, AD ,DA 等器件的操作.此系统的目的是为了填补hwmon 和 input 子系统之间的
 空隙.一般此子系统下的设备是通过 SPI 或者 I2C 通信.
-
-此子系统为这类设备提供了统一的函数接口和数据结构, 这些的具体实现位置是 =drivers/iio/industrialio-xxx.c=.
-
 - hwmon(硬件监视) : 主要用于低速的设备监视
 - input(输入子系统): 主要专注于与用户交互的设备(比如: 按键, 鼠标, 触摸等).
 
+此子系统为这类设备提供了统一的函数接口和数据结构, 这些的具体实现位置是 =drivers/iio/industrialio-xxx.c=.
 
-包含以下种类:
+包含以下种类(说实话，哪些设备该在 =hwmon= 哪些该在 =iio= 我还是有点晕):
 - ADC 以及 DAC
 - 加速度计
 - 陀螺仪
@@ -29,47 +37,56 @@ IIO 子系统主要包含一些传感器, AD ,DA 等器件的操作.此系统的
 - 直接数字合成器(DDS)
 - 锁相环(PLL)
 - 可变/可编程增益放大器(VGA, PGA)
+- FPGA外设
+- 由DMA传输的高速串口或并口
 
-**** ring buffer 
-环形队列缓存, 也就是先进先出缓存, 从尾部写入, 从头部读出.
-**** event
-可以认为是一些标识, 以向用户表示一些状态发生了.
-**** trigger 
-一个引导信号, 只要此信号产生后便会导致另一些处理程序的运行(类似于中断), 比如产生一个事件标志.
-**** channel
-一个通道, 代表一种信号(数据). 比如气压计具有测量气压和温度的功能, 则它具有一个气压通道和一个温度通道.
-
-*** 构架
-[[./IIO_overview.bmp][IIO Subsystem Overview]] 
-一般来讲， =BUS Driver= 的驱动都有芯片厂商提供，用户需要：
-- 在设备树中对应总线方式增加设备节点
-- 实现设备驱动
-- 在设备驱动中使用 iio 提供的接口将配置映射到字符设备和 =sysfs= 中
-*** 功能
+包含以下功能:
 - 设备的注册及处理操作.
 - 可以通过 =sysfs= 来访问设备
 - 事件机制: 将设备的一些事件发送给用户空间.
 - 支持硬件环形队列
-- 大大降低采样缓存
 - ring buffer 存储事件, 可以查看buffer填充状态
-- 支持软件 ring buffer 以及 触发机制
-**** 软件 ring buffer 以及 触发机制
-在一些数据分析应用中, 可以使用触发机制来捕获外部信号,比如:
-- 数据准备信号
-- 外部中断信号
-- 周期中断信号
-- 用户空间读取 =sysfs= 中特定文件信号
 
-一次触发的产生, 就会引起其他的动作, 每次触发事件的产生都会被填充至 =ring buffer= 中.
- 
-[[./IIO_ringBuffer.bmp][IIO Ring Buffer]]
+*** ring buffer 
+环形队列缓存, 也就是先进先出缓存, 从尾部写入, 从头部读出，iio使用 =kfifo= 来实现，以应对生产者消费者模型。
+[[./IIO_ringBuffer.jpg]]
 
-** 使用
+*** event
+可以认为是一些标识, 以向用户表示一些状态发生了.
+*** trigger 
+一个引导信号, 只要此信号产生后便会导致另一些处理程序的运行(类似于中断), 比如产生一个事件标志.
+
+有如下几种trigger:
+- 数据已准备好
+- GPIO触发
+  + iio中使用 =iio-trig-gpio= 来完成此支持
+- 内部周期性触发
+  + iio中使用 =iio-trig-rtc= 来完成此支持
+- 用户空间读取特定文件的触发
+  + iio中使用 =iio-trig-sysfs= 来完成此支持
+
+IIO中使用trigger来填充ring buffer.
+*** channel
+一个通道, 代表一种信号(数据). 比如气压计具有测量气压和温度的功能, 则它具有一个气压通道和一个温度通道.
+
+** 构架
+[[./IIO_overview.jpg]] 
+
+根据设备驱动思想以及上面的说明可以知道需要以下软件的支持才能使用此子系统:
+- 总线控制器驱动及设备树
+- 芯片驱动(总线客户端驱动)及设备树
+- IIO子系统的接口填充
+
+一般来讲， =BUS Driver= 的驱动都有芯片厂商提供，用户需要：
+- 在设备树中对应总线方式增加设备节点
+- 实现设备驱动
+- 在设备驱动中使用 iio 提供的接口将配置映射到字符设备和 =sysfs= 中
+* 使用
 在驱动正常的情况下, 子系统会将设备映射到 :
 1. =sysfs= 下, 用于配置设备以及读取原始数据.
 2. 字符设备, 用于访问内核缓存事件等
 
-*** sysfs
+** sysfs
 路径位于: =/sys/bus/iio/devices/iio:deviceX= ,其目录下具有以下文件:
 - name: 设备号
 - dev: 设备节点(major:minor)
@@ -77,15 +94,14 @@ IIO 子系统主要包含一些传感器, AD ,DA 等器件的操作.此系统的
 - data channel access attributes(in_resistance_raw)
 - buffer/, events/, trigger/, scan_elements/
 
-以及文件 =/sys/bus/iio/devices/triggerY=
 
 通过读取 =iio:deviceX= 中的对应文件,其实会对应调用设备的回调函数
 (比如读取 "xxx_raw" 文件, 会调用 read_raw 函数).
 
-*** character device
+** character device
 路径位于: =/dev/iio:deviceX=
-** 分析
-*** 驱动编写步骤
+* 分析
+** 驱动编写步骤
 驱动的编写步骤为:
 1. 根据设备所属的通信总线, 实现其总线驱动, 以及对应的设备树节点.
 2. 创建 =struct iio_dev= 结构,并填充其内容
@@ -96,7 +112,7 @@ IIO 子系统主要包含一些传感器, AD ,DA 等器件的操作.此系统的
 3. 使用 =devm_iio_device_register= 将此设备注册至IIO框架.
 4. 完成对应的卸载功能函数
 
-*** iio_dev
+** iio_dev
 =iio_dev= 是最主要的结构体, 用于设备驱动, 主要提供一些信息和操作函数:
 - 该设备有多少通道可用
 - 此设置支持哪些操作模式
@@ -185,54 +201,54 @@ struct iio_event_interface{
         struct mutex read_lock;
 };
 #+END_SRC
-*** 设备的通道
+** 设备的通道
 通道的描述用 =channel= 结构体来完成:
 #+BEGIN_SRC c
-/**
- ,* @brief 定义一个通道
- ,* @param info_mask_separate: 指定当前channel 的属性
- ,* @param info_mask_shared_by_type: 所有同类通道所共有的的属性
- ,* @param info_mask_shared_by_dir: 所有同向通道的共有属性
- ,* @param info_mask_shared_by_all: 所有通道的共有属性
- ,*/
-struct iio_chan_spec{
-        enum iio_chan_type            type;
-        int                           channel;
-        int                           channel2;
-        unsigned long                 address;
-        int                           scan_index;
-        struct{
-                char sign;
-                u8   realbits;
-                u8   storagebits;
-                u8   shift;
-                u8   repeat;
-                enum iio_endian endianness;
-        }scan_type;
-        long                          info_mask_separate;
-        long                          info_mask_shared_by_type;
-        long                          info_mask_shared_by_dir;
-        long                          info_mask_shared_by_all;
-        const struct iio_event_spec   *event_spec;
-        unsigned int                  num_event_specs;
-        const struct iio_chan_spec_ext_info *ext_info;
-        const char                    *extend_name;
-        const char                    *datasheet_name;
-        unsigned                      modified:1;
-        unsigned                      indexed:1;
-        unsigned                      output:1;
-        unsigned                      differential;
-};
-static const struct iio_chan_spec ms5611_channels[] = {
-        {
-                .type = IIO_PRESSURE,
-                .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
-        },
-        {
-                .type = IIO_TEMP,
-                .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
-        },
-};
+  /**
+   ,* @brief 定义一个通道
+   ,* @param info_mask_separate: 指定当前channel 的属性
+   ,* @param info_mask_shared_by_type: 所有同类通道所共有的的属性
+   ,* @param info_mask_shared_by_dir: 所有同类通道的共有属性
+   ,* @param info_mask_shared_by_all: 所有通道的共有属性
+   ,*/
+  struct iio_chan_spec{
+          enum iio_chan_type            type;
+          int                           channel;
+          int                           channel2;
+          unsigned long                 address;
+          int                           scan_index;
+          struct{
+                  char sign;
+                  u8   realbits;
+                  u8   storagebits;
+                  u8   shift;
+                  u8   repeat;
+                  enum iio_endian endianness;
+          }scan_type;
+          long                          info_mask_separate;
+          long                          info_mask_shared_by_type;
+          long                          info_mask_shared_by_dir;
+          long                          info_mask_shared_by_all;
+          const struct iio_event_spec   *event_spec;
+          unsigned int                  num_event_specs;
+          const struct iio_chan_spec_ext_info *ext_info;
+          const char                    *extend_name;
+          const char                    *datasheet_name;
+          unsigned                      modified:1;
+          unsigned                      indexed:1;
+          unsigned                      output:1;
+          unsigned                      differential;
+  };
+  static const struct iio_chan_spec ms5611_channels[] = {
+          {
+                  .type = IIO_PRESSURE,
+                  .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
+          },
+          {
+                  .type = IIO_TEMP,
+                  .info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED),
+          },
+  };
 #+END_SRC
 
 当具有多个通道的时候, 有两种方式来生成不同的通道:
@@ -295,7 +311,7 @@ static const struct iio_chan_spec light_channels[] =
 
  /sys/bus/iio/devices/iio:deviceX/in_voltage1_raw,
 
-*** 设备缓存
+** 设备缓存
 当使用缓存时, 会在 =sysfs= 下建立文件夹 =/sys/bus/iio/device/iio:deviceX/buffer/= , 此目录下具有文件:
 - length : 缓存的大小
 - enable : 使能 buffer 捕捉事件
@@ -352,7 +368,7 @@ struct iio_buffer{
         unsigned int                waitermark;
 };
 #+END_SRC
-*** 设备触发
+** 设备触发
 通过触发来存储数据, 比用轮询的方式更加科学.
 
 触发对应的 =sysfs= 文件夹有两个位置:
@@ -400,7 +416,7 @@ trig->ops = &trigger_ops;
  ,*/
 iio_trigger_register(trig);
 #+END_SRC
-*** 触发与缓存连接
+** 触发与缓存连接
 #+BEGIN_SRC c
 /**
  ,* @note 用于在 buffer 在使能和失能前后的操作
@@ -442,7 +458,7 @@ iio_trigger_buffer_setup(indio_dev, sensor_iio_pollfunc,
                          sensor_trigger_handler,
                          sensor_buffer_setup_ops);
 #+END_SRC
-*** 设备的具体操作
+** 设备的具体操作
 设备的操作便是接收一个触发信号, 然后调用自己定义的回调函数, 回调函数通过 =iio_info= 来提供给框架.
 #+BEGIN_SRC c
 /**
@@ -528,7 +544,7 @@ static const sturct iio_info ms5611_info =
 };
 
 #+END_SRC
-*** 设备模式
+** 设备模式
 在 =linux/iio/iio.h= 中列出了设备所支持的模式:
 #+BEGIN_SRC c
 //设备可用于软件触发
@@ -546,7 +562,7 @@ static const sturct iio_info ms5611_info =
         (INDIO_BUFFER_TRIGGERED | INDIO_BUFFER_HARDWARE | INDIO_BUFFER_SOFTWARE)
 
 #+END_SRC
-*** 申请一个设备
+** 申请一个设备
 申请设备时,就需要申请一个 =iio_dev= 结构并存放其私有数据, 用于代表此设备,然后调用注册函数.
 #+BEGIN_SRC c
 /**
