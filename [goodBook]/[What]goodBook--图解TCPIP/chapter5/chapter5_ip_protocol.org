@@ -31,8 +31,6 @@ DNS所管理的信息不仅仅是这些主机名和对应的IP地址，还要管
 - 根域名服务器则按照顺序进行遍历查询，直到找到对应的IP地址
 - 解析器和域名服务器会将新信息保存在缓存里，以避免每次都向根域名服务器请求
   + 这和CPU内部的Cache类似，Cache命中就直接读Cache否则读内存并刷新Cache
-
-
 * ARP(Address Resolution Protocol)
 ARP以目标IP地址为线索，用来定位下一个应该接收数据分包的网络设备对应的MAC地址。
 
@@ -49,4 +47,99 @@ ARP是借助ARP请求与ARP响应两种类型的包确定MAC地址的。
 
 ARP包格式如下:
 [[./arp_protocol.jpg]]
+** RARP(Reverse Address Resolution Protocol)
+将ARP反过来，从MAC地址定位IP地址的一种协议。
+- 这常常用于当DHCP无法为设备分配IP地址时的情况
+  
+其流程如下:
+- 架设一台RARP服务器，在此服务器上注册设备的MAC地址及其IP地址
+- 设备接入网络后主动向服务器发送获取IP地址的请求
+** 代理ARP(Proxy ARP)
+采用代理ARP的路由器可以将ARP请求转发给邻近的网段，这样两个以上网段的节点之间可以像在同一个网段中一样通信。
 
+* ICMP
+ICMP主要用于：确认IP包是否成功送达了目标地址，通知在发送过程中IP包被废弃的具体原因，改善网络设置等。
+- 便于进行网络上的问题诊断
+  
+ICMP主要有以下几种消息:
+| 类型(10进制) | 内容                                |
+|--------------+-------------------------------------|
+|            0 | 回送应答(Echo Reply)                |
+|            3 | 目标不可达(Destination Unreachable) |
+|            4 | 原点抑制(Source Quench)             |
+|            5 | 重定向或改变路由(Redirect)          |
+|            8 | 回送请求(Echo Request)              |
+|            9 | 路由器公告(Router Advertisement)    |
+|           10 | 路由器请求(Router Solicitation)     |
+|           11 | 超时(Time Exceeded)                 |
+|           17 | 地址子网请求(Address Mask Request)  |
+|           18 | 地址子网应答(Address Mask Reply)    |
+** Destination Unreachable
+当路由器无法将IP数据包发送给目标地址时，会给发送端主机返回此消息，并会在消息中附加不可达的具体原因。
+** Redirect
+如果路由器发现发送端主机使用了次忧的路径发送数据，那么它会返回此消息给发送端主机。
+消息中包含了最合适的路由信息和源数据。
+** Time Exceeded
+当IP包中的TTL被减到0时，路由器将会发送此消息给发送端主机，以告知该包已被丢弃。
+- 在UNIX、MacOS中使用命令 =traceroute= 可以查看主机发送数据到目标之间经历了多少路由器
+  + Windows 中使用 =tracert= 
+** Echo Reply / Echo Request
+通过向对端主机发送回送请求消息(Echo Request)或接收对端主机发回来的回送应答消息(Echo Reply)，
+则可以判断数据包是否已经成功到达对端。
+- =ping= (Packet InterNetwork Groper) 就是利用这个消息实现的
+** Source Quench
+当出现网络拥堵时，路由器向发送端主机返回此消息，主机以此调整IP包的传输间隔。
+- 由于可能会引起不公平的网络通信，所以此消息一般不被使用
+** Router Advertisement / Solicitation
+用于发送与自己相连网络中的路由器，主机发送 Solicitation ，路由器返回 Advertisement
+** Address Mask Request / Reply
+用于获取子网掩码信息。
+** ICMPv6
+ICMP在IPv4中仅仅是一个辅助作用，没有它依然可以完成通信。而在IPv6中，如果没有ICMPv6则无法完成通信。
+- ICMP中使用邻居探索消息(Neighbor Discovery)来完成IPv4中的ARP协议。
+* DHCP(Dynamic Host Configuration Protocol)
+DHCP用于自动为主机分配必要的IP地址，其工作机制为:
+- 一般使用路由器作为DHCP服务器，然后将DHCP所要分配的IP地址设置到服务器上。
+  + 其中就包括IP地址、子网掩码、路由控制信息、DNS服务器等
+- DHCP客户端以广播的形式(源0.0.0.0 , 目的255.255.255.255)发送DHCP发现包，以要求设置IP地址和子网掩码
+- DHCP服务器接收到发现包后向客户端返回DHCP提供包，通知可以使用的网络设置
+- DHCP客户端使用设置并再次以广播的形式发送DHCP请求包
+- DHCP服务器返回DHCP提供包以告知允许设置
+  
+为了检查所要分配的IP地址以及已经分配的IP地址是否可用，DHCP服务器或DHCP客户端必须具备以下功能:
+- DHCP服务器: 在分配IP地址前发送ICMP回送请求包，确认没有返回应答
+- DHCP客户端: 针对从DHCP服务器获得的IP地址发送ARP请求包，确认没有返回应答
+  
+** DHCP中继代理
+在大规模组织机构的应用环境中，一般会有多个网段，如果为每个网段的路由器都设置DHCP那将是一件麻烦的事，
+通过使用DHCP中继代理来转发请求，让一个服务器统一管理的方式，能有效解决此问题。
+- 这样只需要在每个网段设置一个DHCP中继代理即可(一般为此网段内的路由器)
+  
+其流程如下:
+- DHCP客户端以广播的形式向DHCP中继代理发送DHCP请求包
+- DHCP中继代理收到请求包后以单播的形式转发给DHCP服务器
+- DHCP服务器再向DHCP中继代理返回应答
+- DHCP中继代理再将包转发给DHCP客户端
+* NAT(Network Address Translator)
+NAT用于在本地网络中使用私有地址，在连接互联网时转而使用全局IP地址的技术.
+- 使用NAPT(Network Address Ports Translator),还可以转换TCP,UDP端口号
+** 工作机制
+简单点说就是: 从局域网发送数据到外网时，由路由器将局域网的源地址转换为自己的地址。
+当从外网发送数据到局域网时，由路由器将自己的目标地址转换为局域网主机的私有地址。
+
+当局域网有多个主机与外网同一个主机通信时，路由器将它们联系到不同的端口号以此区分。
+** NAT-PT(NAPT-PT)
+NAT-PT是将IPv6的首部转换为IPv4首部的一种技术，这样IPv6主机也就能够与IPv4主机进行通信了。
+** NAT的潜在问题与解决
+由于转换表是由局域网向外网发送数据时才建立的，因此会有以下几点限制:
+- 无法从NAT的外部向内部服务器建立连接
+- 转换表的生成与转换操作都会产生一定的开销
+- 通信过程中一旦NAT遇到异常需要重新启动时，所有的TCP连接都将被重置
+- 即使备置两台NAT做容灾备份，TCP连接还是会被断开
+ 
+解决以上问题有两种方法:
+1. 使用IPv6为所有的设备分配一个公网地址
+2. NAT穿透技术
+* IP隧道
+IP隧道中可以将那些从IPv6发过来的包统一为一个数据，再为之追加一个IPv4首部，以IPv4的方式传输到最终的IPv6主机中,反之亦然
+- 这种在网络层的首部后面继续追加网络层首部的通信方法就叫做IP隧道

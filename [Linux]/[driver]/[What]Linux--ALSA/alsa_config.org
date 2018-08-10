@@ -1,0 +1,43 @@
+#+TITLE: [What]linux -> ALSA 配置
+#+DATE:  <2018-08-10 五> 
+#+TAGS: driver
+#+LAYOUT: post 
+#+CATEGORIES: linux, driver, ALSA
+#+NAME: <linux_driver_ALSA_config.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+记录ALSA库对声卡的配置。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 概览
+ALSA库具有配置文件位于 =/usr/share/alsa/alsa.conf= , 此文件用于载入其他网卡的配置。
+- 首先读取文件 =/usr/share/alsa/cards/aliases.conf= , 以得出声卡名称与其对应的配置文件的关系
+  + 其格式为 =<card name> cards.<config name>= 
+- 根据当前装载的网卡名去调用对应的配置文件
+  + 比如有格式 =au8810 cards.AU8810= 通过 =cat /proc/asound/cards= 得出声卡名为 "au8810"，则对应调用文件 =AU8810.conf=
+- 除此之外还会调用文件 =${HOME}/.asoundrc= （每个用户的单独配置）以及 =/etc/asound.conf= （全局配置）
+* 配置
+** 设置默认声卡
+编辑文件 =~/.asoundrc= 内容如下:
+#+BEGIN_EXAMPLE
+  # 在使用ALSA库编程时，默认的 default 对应的就是 hw:0,0
+  # hw:<soundcard number>,<device number>
+  pcm.!default {
+    type hw
+    card 0
+  }
+
+  ctl.!default {
+    type hw           
+    card 0
+  }
+#+END_EXAMPLE
+- 在路径 =/proc/asound/cardx= 下具有类似文件:
+  + pcm0c : 0设备输入端(capture)
+  + pcm0p : 0设备发送端(playback)
+
+
+** 待续...
+此部分配置内容与我所想的不一致，待忙完这段时间再来补充.
