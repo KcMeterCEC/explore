@@ -1,0 +1,170 @@
+#+TITLE: [What]Linux内核调试之initcall_debug
+#+DATE:  <2018-08-13 一> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, kernel
+#+NAME: <linux_debug_kernel_initcall_debug.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+initcall_debug的实现机制。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 传入参数的存储位置
+从[[https://kcmetercec.github.io/2018/06/28/linux_driver_devicetree_source/#org7f41388][之前的设备树分析]]可以知道，设备树的参数最终存储于数组 =boot_command_line= :
+#+BEGIN_SRC c
+  char __initdata boot_command_line[COMMAND_LINE_SIZE];
+
+  int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+                                       int depth, void *data)
+  {
+    int l;
+    const char *p;
+
+    //...
+
+    /* Retrieve command line */
+    p = of_get_flat_dt_prop(node, "bootargs", &l);
+    if (p != NULL && l > 0)
+      strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
+
+    //...
+
+    pr_debug("Command line is: %s\n", (char*)data);
+
+    /* break now */
+    return 1;
+  }
+
+  void __init early_init_dt_scan_nodes(void)
+  {
+    /* Retrieve various information from the /chosen node */
+    of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+
+    //...
+  }
+#+END_SRC
+* 截取 initcall_debug 设置
+** 作用
+在文档 =Documentation/kernel-parameters.txt= 中说明了 =initcall_debug= 命令参数的作用:
+#+BEGIN_EXAMPLE
+  initcall_debug	[KNL] Trace initcalls as they are executed.  Useful
+      for working out where the kernel is dying during
+      startup.
+#+END_EXAMPLE
+简单来说就是可以展示初始化函数的执行。
+** 定义
+在 =init/main.c= 中定义了标志位， =initcall_debug= :
+#+BEGIN_SRC c
+bool initcall_debug;
+core_param(initcall_debug, initcall_debug, bool, 0644);
+#+END_SRC
+将上面的宏 =core_param= 展开为如下代码:
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 检查 initcall_debug 变量的值
+   ,* @note : __always_unused 用于避免gcc编译器提示函数或变量没有被使用的警告
+   ,*/
+  #define __always_unused		__attribute__((unused))
+  static inline bool __always_unused *__check_initcall_debug(void) 
+  { 
+    return &initcall_debug; 
+  }
+
+  //此处指定了命令行的字符串
+  static const char __param_str_initcall_debug[] = "initcall_debug";	
+
+  struct kernel_param {
+    const char *name;
+    struct module *mod;
+    const struct kernel_param_ops *ops;
+    const u16 perm;
+    s8 level;
+    u8 flags;
+    union {
+      void *arg;
+      const struct kparam_string *str;
+      const struct kparam_array *arr;
+    };
+  };
+
+  const struct kernel_param_ops param_ops_bool = {
+    .flags = KERNEL_PARAM_OPS_FL_NOARG,
+    .set = param_set_bool,
+    .get = param_get_bool,
+  };
+
+  static struct kernel_param const __param_initcall_debug	__attribute__((__used__))
+  __attribute__ ((unused,__section__ ("__param"),aligned(sizeof(void *)))) 
+  = { 
+    __param_str_initcall_debug,//参数名称 
+    THIS_MODULE, 
+    &param_ops_bool, //对此参数可做的操作
+    VERIFY_OCTAL_PERMISSIONS(0644), //参数在sysfs中的权限
+    -1, 
+    0, 
+    { &initcall_debug } 
+  };	
+#+END_SRC
+根据以上代码可以推断出:
+- 可以查看 =/sys/module/kernel/parameters/initcall_debug= 值的方式以判定此参数是否已经被设置
+- 代码中一定有某处通过操作 =__param= 段来获取内核 param 的各项设置
+** 获取值
+注意到此变量以及其对应的链接脚本:
+#+BEGIN_SRC c
+  extern const struct kernel_param __start___param[], __stop___param[];
+
+  __param : AT(ADDR(__param) - LOAD_OFFSET) {			\
+    VMLINUX_SYMBOL(__start___param) = .;			\
+    ,*(__param)						\
+      VMLINUX_SYMBOL(__stop___param) = .;			\
+  }	
+#+END_SRC
+就可以知道，一定有代码来从 =__start___param= 到 =__stop___param= 中取出 =kernel_param= 依次解析变量。
+
+这就又回到了 =start_kernel= 函数中的一段:
+#+BEGIN_SRC c
+  pr_notice("Kernel command line: %s\n", boot_command_line);
+  parse_early_param();
+  //进行参数解析及对对应的标志赋值
+  after_dashes = parse_args("Booting kernel",
+                            static_command_line, __start___param,
+                            __stop___param - __start___param,
+                            -1, -1, NULL, &unknown_bootoption);
+#+END_SRC
+* 使用 initcall_debug
+在进行初始化执行之前会有对变量 =initcall_debug= 的判断:
+#+BEGIN_SRC c
+  int __init_or_module do_one_initcall(initcall_t fn)
+  {
+    //...
+    if (initcall_debug)
+      ret = do_one_initcall_debug(fn);
+    else
+      ret = fn();
+
+    //...
+    return ret;
+  }
+  static int __init_or_module do_one_initcall_debug(initcall_t fn)
+  {
+    ktime_t calltime, delta, rettime;
+    unsigned long long duration;
+    int ret;
+
+    printk(KERN_DEBUG "calling  %pF @ %i\n", fn, task_pid_nr(current));
+    calltime = ktime_get();
+    ret = fn();
+    rettime = ktime_get();
+    delta = ktime_sub(rettime, calltime);
+    duration = (unsigned long long) ktime_to_ns(delta) >> 10;
+    printk(KERN_DEBUG "initcall %pF returned %d after %lld usecs\n",
+           fn, ret, duration);
+
+    return ret;
+  }
+#+END_SRC
+- 当 =initcall_debug= 为 =true= 时则会打印函数名以及其执行的时间
+
+需要注意的是: *此处使用的printk 的等级是 KERN_DEBUG,所以为了能够打印信息通常是 "loglevel=8 initcall_debug" 结合使用!*
