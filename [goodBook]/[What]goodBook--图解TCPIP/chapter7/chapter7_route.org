@@ -1,0 +1,15 @@
+#+TITLE: [What]图解TCPIP_route
+#+DATE: <2018-08-16 四> 
+#+TAGS: tcpip
+#+LAYOUT: post
+#+CATEGORIES: book,图解TCPIP(入门)
+#+NAME: <book_图解TCPIP_chapter7_route.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+理解路由协议，以理解数据是如何传输的。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 路由控制的定义
+
