@@ -1,0 +1,64 @@
+#+TITLE: [What]GDB 使用 vscode 
+#+DATE:<2018-08-20 一> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, gdb
+#+NAME: <linux_debug_gdb_vscode.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+之前使用过[[https://kcmetercec.github.io/2018/03/09/linux_debug_gdb_ddd/][DDD]],奈何这货BUG太多，好多次程序还没有崩溃DDD先崩溃了......
+
+还好vscode具有很强的可定制性，将其与gdb结合也能满足大部分需求了。
+
+这篇主要整理在嵌入式板上使用gdbserver，然后在PC上通过vscode调试的配置。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 准备工作
+** 安装
+- 在嵌入式板上交叉编译gdbserver，以及PC上具有 *对应的gdb* ，一定要一一对应
+ + 在嵌入式板上使用: =gdbserver --version= 可以知道其对应gdb是什么
+- vscode上安装 =c/c++= 扩展插件
+** 配置
+主要的就是配置其 =launch.json= ，其主要的配置位于其[[https://github.com/Microsoft/vscode-cpptools/blob/master/launch.md][插件的github说明]]，这里列出我已验证过的正确配置:
+#+BEGIN_SRC c
+   {
+      // Use IntelliSense to learn about possible attributes.
+      // Hover to view descriptions of existing attributes.
+      // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+      "version": "0.2.0",
+      "configurations": [
+          {
+              "name": "(gdb) Launch",
+              "type": "cppdbg",
+              "request": "launch",
+              "program": "<path>/kcsdr_system",//指定可执行文件在PC上的绝对路径
+              "args": [],
+              "stopAtEntry": false,
+              "cwd": "<path>",//指定可执行文件的源码调试目录
+              "environment": [],
+              "externalConsole": true,
+              "MIMode": "gdb",
+              //指定交叉编译器的绝对路径
+              "miDebuggerPath": "<path>/arm-xilinx-linux-gnueabi-gdb",
+              //指定gdb需要载入的共享库路径，
+              "additionalSOLibSearchPath": "<path>/lib/;<path>/usr/lib/",
+              "setupCommands": [
+                  {
+                      "description": "Enable pretty-printing for gdb",
+                      "text": "-enable-pretty-printing",
+                      "ignoreFailures": true
+                  }
+              ],
+              //远程目标板的地址及端口
+              "miDebuggerServerAddress" : "192.168.7.2:1234",
+          }
+      ]
+  }
+#+END_SRC
+* 使用
+准备工作做好以后，在目标板使用 =gdbserver :<port> ./exec= 后PC端使用 =F5= 连接即可。
+
+其它的常用操作参考[[https://code.visualstudio.com/docs/editor/debugging][官方手册即可]]。
+- 对于一些高级命令，使用 =-exec <command>= 的方式在 =DEBUG CONSOLE= 输入gdb自带命令即可

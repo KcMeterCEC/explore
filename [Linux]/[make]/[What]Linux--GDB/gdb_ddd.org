@@ -8,6 +8,8 @@
 #+OPTIONS: ^:{}
 
 当gdb与ddd联合使用时，已经能够满足很多要求了.
+- *遗憾的是，DDD已经很久没有更新了，BUG有点多。其对应的替代方案是[[https://code.visualstudio.com/docs/editor/debugging][vscode debugging]].*
+
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML

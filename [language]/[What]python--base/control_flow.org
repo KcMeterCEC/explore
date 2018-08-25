@@ -1,0 +1,215 @@
+#+TITLE: [What] python分支、跳转、循环与函数定义
+#+DATE:<2018-08-24 五> 
+#+TAGS: python3
+#+LAYOUT: post
+#+CATEGORIES: language, python, basic
+#+NAME: <language_python_control_flow.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+学习网站: [[https://docs.python.org/3/tutorial/controlflow.html][official tutorial]]
+
+大体上与c/c++类似，主要回顾其语法。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* if 
+#+BEGIN_SRC python
+  >>> x = int(input("Please enter an integer: "))
+  Please enter an integer: 42
+  >>> if x < 0:
+  ...     x = 0
+  ...     print("Negative changed to zero")
+  ... elif x == 0:
+  ...     print("Zero")
+  ... elif x == 1:
+  ...     print("Single")
+  ... else:
+  ...     print("More")
+  ...
+  More
+#+END_SRC
+- if,elif 不加括号
+- 内部的代码块都使用 =Tab= 做为缩进
+* for
+for是从列表或字符串中依次取出一个元素来运行，这与c有些不同:
+#+BEGIN_SRC python
+  >>> words = ["cat", "window", "dog"]
+  >>> for w in words:
+  ...     print(w)
+  ... 
+  cat
+  window
+  dog
+#+END_SRC
+需要注意的是: *当需要改变列表中的内容时，不能直接对列表进行操作，而是操作其副本*
+- 如果操作其本体，比如为列表增加一个元素，那么这个列表很可能就会无限增大而无法退出当前循环
+#+BEGIN_SRC python
+  >>> for w in words[:] :
+  ...     if len(w) == 6:
+  ...             words.insert(0, w)
+  ...
+#+END_SRC
+通过上面的 =slice= 操作 =words[:]= 之后，实际上传入for语句的是words被 =slice= 后的副本
+- 很多时候for语句就是用来循环多少次的，这个时候可以直接使用 =range()= 函数来生成有序数列:
+  + 但将 =range()= 结果直接赋值给变量时，它并不能产生List,正确的做法是: val = list(range(5))
+#+BEGIN_SRC python
+  >>> for i in range(5):
+  ...     print(i)
+  ... 
+  0
+  1
+  2
+  3
+  4
+#+END_SRC
+* break , continue ,else
+python 中的 break 和 continue 与 c/c++中的意义一样。
+
+for和while语句可以与else配对，当 for 循环完毕或者 while 条件为 false 时，else语句便执行。
+*但for被break或continue打断而退出循环时,else不会执行*
+- 同理，while被break打断后，else也不会执行
+#+BEGIN_SRC python
+  >>> for n in range(2, 10):
+  ...     for x in range(2, n):
+  ...         if n % x == 0:
+  ...             print(n, 'equals', x, '*', n//x)
+  ...             break
+  ...     else:
+  ...         # loop fell through without finding a factor
+  ...         print(n, 'is a prime number')
+  ...
+  2 is a prime number
+  3 is a prime number
+  4 equals 2 * 2
+  5 is a prime number
+  6 equals 2 * 3
+  7 is a prime number
+  8 equals 2 * 4
+  9 equals 3 * 3
+#+END_SRC
+
+* pass
+pass语句更多的用于占位符，实际上就是一个空操作，但这在构建程序整体框架时是很有作用的，一开始不用去关注细节。
+#+BEGIN_SRC python
+  >>> while True:
+  ...     pass  # Busy-wait for keyboard interrupt (Ctrl+C)
+  ...
+  >>> def initlog(*args):
+  ...     pass   # Remember to implement this!
+  ...
+#+END_SRC
+* 函数定义及其规则
+#+BEGIN_SRC python
+  def func_name(parameter):
+      """this is the function's documentation string, it's optional"""
+      #statement
+      return val
+#+END_SRC
+- 在函数内部定义的变量都是局部变量，当有一个全局变量与局部变量同名时，也默认使用局部变量。
+  + 当变量使用 =global= 语句时便可访问全局变量
+- 与 c/c++ 一样，其参数为将实参拷贝一份，所以函数内的改变都是改变副本而不会改变实参的值
+- 函数名也可以赋值给一个变量，类似于给函数一个别名
+- 函数的说明可以通过工具生成一个独立的文档，其一般格式如下:
+  + 第一行用于简短的说明该函数的用途
+  + 第二行为空白行，之后的则为详细说明
+#+BEGIN_SRC python
+  >>> def my_function():
+  ...     """Do nothing, but document it.
+  ...
+  ...     No, really, it doesn't do anything.
+  ...     """
+  ...     pass
+  ...
+  >>> print(my_function.__doc__)
+  Do nothing, but document it.
+
+      No, really, it doesn't do anything.
+#+END_SRC
+** 形参的默认值
+和c++一样，可以为函数的形参定义默认值，这样在调用该函数时，那些设定了默认值的参数成为了可选输入参数。
+#+BEGIN_SRC python
+  def ask_ok(prompt, retries=4, reminder='Please try again!'):
+      while True:
+          ok = input(prompt)
+          if ok in ('y', 'ye', 'yes'):
+              return True
+          if ok in ('n', 'no', 'nop', 'nope'):
+              return False
+          retries = retries - 1
+          if retries < 0:
+              raise ValueError('invalid user response')
+          print(reminder)
+#+END_SRC
+以上调用此函数，可以有3种输入方式:
+1. ask_ok('Do you really want to quit?')
+2. ask_ok('OK to overwrite the file?', 2)
+3. ask_ok('OK to overwrite the file?', 2, 'Come on, only yes or no!')
+** 键值参数
+使用 "key=value" 的方式给调用的函数赋值，可以有选择的只改变其中几个默认参数:
+#+BEGIN_SRC python
+  def parrot(voltage, state='a stiff', action='voom', type='Norwegian Blue'):
+      print("-- This parrot wouldn't", action, end=' ')
+      print("if you put", voltage, "volts through it.")
+      print("-- Lovely plumage, the", type)
+      print("-- It's", state, "!")
+#+END_SRC
+以上函数可以这样调用:
+#+BEGIN_EXAMPLE
+  parrot(1000)                                          # 1 positional argument
+  parrot(voltage=1000)                                  # 1 keyword argument
+  parrot(voltage=1000000, action='VOOOOOM')             # 2 keyword arguments
+  parrot(action='VOOOOOM', voltage=1000000)             # 2 keyword arguments
+  parrot('a million', 'bereft of life', 'jump')         # 3 positional arguments
+  parrot('a thousand', state='pushing up the daisies')  # 1 positional, 1 keyword
+#+END_EXAMPLE
+*需要注意的是:* 如果前一个参数使用了键值方式赋值，后面的参数必须使用此方式
+** tuple 和 dictionary 参数
+- =**name= 代表 dictionary 参数，是以键值形成的集合
+- =*name= 代表tuple参数，是值的集合， *tuple参数必须在dictionary参数之前!*
+  + 可以在普通函数形参中放入 tuple 参数，用以表示可变参数
+#+BEGIN_SRC python
+  def cheeseshop(kind, *arguments, **keywords):
+      print("-- Do you have any", kind, "?")
+      print("-- I'm sorry, we're all out of", kind)
+      for arg in arguments:
+          print(arg)
+      print("-" * 40)
+      for kw in keywords:
+          print(kw, ":", keywords[kw])
+#+END_SRC
+按照如下方式调用:
+#+BEGIN_EXAMPLE
+  cheeseshop("Limburger",                            
+             "It's very runny, sir.",                #tuple
+             "It's really very, VERY runny, sir.",   #tuple
+             shopkeeper="Michael Palin",             #dictionary
+             client="John Cleese",                   #dictionary
+             sketch="Cheese Shop Sketch")            #dictionary
+#+END_EXAMPLE
+出现以下结果:
+#+BEGIN_EXAMPLE
+  cheeseshop("Limburger", "It's very runny, sir.",
+             "It's really very, VERY runny, sir.",
+             shopkeeper="Michael Palin",
+             client="John Cleese",
+             sketch="Cheese Shop Sketch")
+#+END_EXAMPLE
+** lambdas
+lambdas表达式用于创建一个匿名函数:
+#+BEGIN_SRC python
+  lambda parameters: expression
+  #等同于
+  def <lambda>(parameters):
+      return expression
+#+END_SRC
+#+BEGIN_SRC python
+  >>> def make_incrementor(n):
+  ...     return lambda x: x + n
+  ...
+  >>> f = make_incrementor(42)
+  >>> f(0)
+  42
+  >>> f(1)
+  43
+#+END_SRC

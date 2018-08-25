@@ -17,6 +17,10 @@
 
 除了异步通知外，应用还可以在发起I/O请求后立即返回。之后再查询I/O完成情况，或者I/O完成后被调回，这个过程叫做异步I/O。
 * 异步通知编程
+
+*注意* : 当一个驱动代码应用于多个设备时，也就是同一份驱动对应的多个设备发出异步通知的情况下应用程序端无法区分是哪个设备发出了消息。
+- 这种情况下还是只有使用Poll和select机制。
+
 Linux 中可用的信号如下表：
 | 信号      | 值 | 含义                       |
 |-----------+----+----------------------------|
@@ -63,7 +67,7 @@ typedef void (*sighandler_t)(int);
  ,* @param hander: 对应的处理函数 
  ,* 若为 SIG_IGN 则表示忽略信号
  ,* 若为 SIG_DFL 则表示采用系统默认方式处理
- ,* @ret 返回最后一次为信号 signum邦迪的处理函数的handler值
+ ,* @ret 返回最后一次为信号 signum绑定的处理函数的handler值
  ,* 失败则返回 SIG_ERR
  ,*/
 sighandler_t signal(int signum, sighandler_t handler));
@@ -121,8 +125,8 @@ int main()
         signal(SIGIO, input_handler);
         //2. 此进程为STDIN_FILENO 文件拥有者
         fcntl(STDIN_FILENO, F_SETOWN, getpid());
-        oflags = fcntl(STDIN_FILENO, F_GETFL);
         //3. 启动异步机制
+        oflags = fcntl(STDIN_FILENO, F_GETFL);
         fcntl(STDIN_FILENO, F_SETFL, oflags | FASYNC);
 
         while(1);

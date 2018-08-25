@@ -1,0 +1,162 @@
+#+TITLE: [What] python基础环境
+#+DATE:<2018-08-22 三> 
+#+TAGS: python3
+#+LAYOUT: post
+#+CATEGORIES: language, python, basic
+#+NAME: <language_python_basic_env.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+学习网站: [[https://docs.python.org/3/tutorial/interpreter.html][official tutorial]]
+
+熟悉linux 下 python3 基础运行环境。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+python是解释性语言，在ubuntu下使用apt即可简单粗暴地安装python3。
+- 要想知道python的安装位置，使用 =which python3= 即可
+  + 在windows下的安装位置默认在 C 盘，于此同时还要将此路径加入环境变量.(比如在命令下输入 =set path=%path%;C:\python36=)
+- 要想启动解释器直接命令行输入 =python3= 即可
+  + 在linux下退出使用 =Ctrl-D= 或输入 =quit()=
+  + 在windows下退出使用 =Ctrl-Z= 或输入 =quit()= 
+
+* 解析器的启动
+除了直接的输入 =python3= 启动交互界面的解释器外，还可以有以下两种方式来启动:
+- =python3 -c command [arg] ...= : 使用python解释器执行命令 =command= 并为命令传入参数 =args=
+  + =command= 首尾需要加单引号以指定命令的范围
+- =python3 -m module [arg] ...= : 使用python解释器启动脚本 =module= 并为其传入参数 =args=
+
+#+BEGIN_EXAMPLE
+  输入参数存储于 sys 内置模块中，为了调用参数需要先执行 "import sys" , 字符串列表存储于 sys.argv[i] 中(这点和c/c++中main入口类似)
+  - 当使用 -c 选项输入命令时， sys.argv[0] 为 '-c'
+  - 当使用 -m 选项输入模块时， sys.argv[0] 为脚本名字
+#+END_EXAMPLE
+
+- 在linux上也可以在执行脚本中加入运行路径，然后将其改为可执行状态后直接运行，与shell脚本类似。
+#+BEGIN_SRC python
+  #!/usr/bin/env python3
+#+END_SRC
+
+关于启动脚本更为详细的命令说明参考[[https://docs.python.org/3/using/cmdline.html#using-on-general][官方手册]]。
+* 编码
+python解析器默认编码为 utf-8 格式，为了养成良好的习惯，一般在linux下python文件以如下方式开头:
+#+BEGIN_SRC python
+  #!/usr/bin/env python3
+  # -*- coding: utf-8 -*-
+#+END_SRC
+- 在windows下没有第一行
+* 将解释器作为计算器
+这个功能在linux下特别方便:
+- 最基本的 +,-,*,/ 都是支持的
+- "//" 用于求整除， "%" 用于取余数
+- “**” 用于求平方
+- "_" 指代上一次运算的结果
+* 字符串的表示
+- python字符串可以用单引号或者双引号包含，为了兼容c/c++的习惯，还是直接用双引号包含，遇到特殊字符使用 "\" 转义即可
+  + 使用函数 =print= 来完成字符串的打印
+    - 如果字符串中的 "\" 想直接输出，可以使用 "\"转义此字符，也可以在字符串前加 =r= 
+    - 可以用多段双引号将字符串分行输入，最终会被解释为一行
+    - 可以在字符串前后加3段引号，来让引号中包含的字符串按原样格式输出。
+      #+BEGIN_SRC python
+        >>> print("""aldkjflfj
+        ... ldskfjlfj
+        ... slkdjfljf
+        ... """)
+        aldkjflfj
+        ldskfjlfj
+        slkdjfljf
+      #+END_SRC
+- 字符串的拼接依然可以使用 "+"
+- 字符串赋值给变量后，变量可以使用数组下标的形式访问: word[0] / word[-1] / word[0:2]
+  + 此时变量是一个 =immutable= ，不可再被赋值
+    
+其他关于字符串的详细解释位于:[[https://docs.python.org/3/tutorial/introduction.html#strings][strings tutorial]]
+* 列表(lists)
+- 列表类似于 c/c++ 中的数组和链表的结合，但其内部可以包含不同的数据类型，并且也可以通过 =slice= 操作:
+  + =slice= 就是将原对象进行一部分截取为 *副本*
+  + 有关List的方法以及更为深入的用法查看此[[https://docs.python.org/3/tutorial/datastructures.html#more-on-lists][tutorial]]
+#+BEGIN_SRC python
+  >>> word = [1,2,3,4,5]
+  >>> word
+  [1, 2, 3, 4, 5]
+  >>> word[0]
+  1
+  >>> word[-1]
+  5
+  >>> word[0:3]
+  [1, 2, 3]
+  >>> word[3:]
+  [4, 5]
+#+END_SRC
+- lists 也可以通过 "+" 进行拼接:
+#+BEGIN_SRC python
+  >>> word + [7,8,9]
+  [1, 2, 3, 4, 5, 7, 8, 9]
+#+END_SRC
+* 元组(tuples)
+tuples使用圆括号包含元素，元素之间使用逗号做分隔，且其元素无法被改变。
+- 当tuples元素只有一个时，元素后也需要跟逗号，否则会被解释为一般变量
+- 但其元素可以是一个list，那么 *这个元素的内容就可以被改变*
+#+BEGIN_SRC python
+  >>> t = 12345, 54321, 'hello!'
+  >>> t[0]
+  12345
+  >>> t
+  (12345, 54321, 'hello!')
+  >>> # Tuples may be nested:
+  ... u = t, (1, 2, 3, 4, 5)
+  >>> u
+  ((12345, 54321, 'hello!'), (1, 2, 3, 4, 5))
+  >>> # Tuples are immutable:
+  ... t[0] = 88888
+  Traceback (most recent call last):
+    File "<stdin>", line 1, in <module>
+  TypeError: 'tuple' object does not support item assignment
+  >>> # but they can contain mutable objects:
+  >>> v = ([1, 2, 3], [3, 2, 1])
+  >>> v
+  ([1, 2, 3], [3, 2, 1])
+  >>> v[0][1] = 5
+  >>> v
+  ([1, 5, 3], [3, 2, 1])
+#+END_SRC
+- tuples还可以单独拆分赋值:
+#+BEGIN_SRC python
+  >>> t = (1345,5487,"haha")
+  >>> t
+  (1345, 5487, 'haha')
+  >>> a,b,c=t
+  >>> a
+  1345
+  >>> b
+  5487
+  >>> c
+  'haha'
+#+END_SRC
+
+* sets
+sets用于创建一个无重复的列表:
+#+BEGIN_SRC python
+  >>> basket = {'apple', 'orange', 'apple', 'pear', 'orange', 'banana'}
+  >>> print(basket)                      # show that duplicates have been removed
+  {'orange', 'banana', 'pear', 'apple'}
+  >>> 'orange' in basket                 # fast membership testing
+  True
+  >>> 'crabgrass' in basket
+  False
+
+  >>> # Demonstrate set operations on unique letters from two words
+  ...
+  >>> a = set('abracadabra')
+  >>> b = set('alacazam')
+  >>> a                                  # unique letters in a
+  {'a', 'r', 'b', 'c', 'd'}
+  >>> a - b                              # letters in a but not in b
+  {'r', 'd', 'b'}
+  >>> a | b                              # letters in a or b or both
+  {'a', 'c', 'r', 'd', 'b', 'm', 'z', 'l'}
+  >>> a & b                              # letters in both a and b
+  {'a', 'c'}
+  >>> a ^ b                              # letters in a or b but not both
+  {'r', 'd', 'b', 'm', 'z', 'l'}
+#+END_SRC
