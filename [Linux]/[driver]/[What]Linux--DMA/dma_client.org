@@ -585,7 +585,7 @@ static inline int dmaengine_terminate_all(struct dma_chan *chan);
       struct device_node *of_node = pstr_dev->dev.of_node;
       char *request_name = NULL;
 
-      dmaStr *dma_user = (dmaStr *)devm_kzalloc(&pstr_dev->dev, sizeof(dmaStr *), GFP_KERNEL);
+      dmaStr *dma_user = (dmaStr *)devm_kzalloc(&pstr_dev->dev, sizeof(dmaStr), GFP_KERNEL);
       dma_user->dev = &pstr_dev->dev;
 
       if(of_property_read_string_index(of_node, "dma-names", 1, &request_name) != 0)
