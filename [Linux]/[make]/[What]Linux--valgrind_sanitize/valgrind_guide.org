@@ -1,0 +1,40 @@
+#+TITLE: [What]valgrind 基本安装与使用 
+#+DATE: <2018-09-03 一>
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, valgrind&sanitize
+#+NAME: <linux_debug_valgrind_tutorial.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+=valgrind= 主要用于监控应用代码的内存操作错误，应用代码运行于其环境之中，这会大大降低程序的运行速度。
+
+但其优点是不用修改原应用代码便可调试，所以在很多场合依然很实用。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 交叉编译
+- 在[[http://valgrind.org/downloads/current.html][下载地址]]下载最新源码包
+  + 推荐使用 =axel= 开通多线程下载以提高速度
+- 解压后，编译 =configure= 文件，找到 =armv7*= 一行修改为 =armv7*|arm*=
+  + 否则将配置失败
+- 按照如下命令配置
+#+BEGIN_EXAMPLE
+  #prefix根据在目标机上安装位置而定
+  CC=arm-linux-gnueabihf-gcc ./configure --host=arm-linux --prefix=/usr/
+#+END_EXAMPLE
+- 编译及安装,最后将生成的文件拷贝至目标机目录即可
+  + 编译生成的文件也忒大了,为了减小文件系统的大小， **建议将prefix指定为sd卡挂载目录，最后将软件包拷贝进sd卡即可**
+#+BEGIN_EXAMPLE
+  make
+  make install DESTDIR=/home/cec/valgrind
+#+END_EXAMPLE
+- 在目标机上使用 =valgrind ls -l= 来测试程序运行是否正常
+* 使用
+=valgrind= 默认的工具就是 memory leak检测，所以测试程序简单粗暴:
+#+BEGIN_EXAMPLE
+  valgrind --leak-check=yes <exec>
+#+END_EXAMPLE
+* 常见错误
+** a function redirection
+这种错误就是 =valgrind= 需要的动态链接库被 strip 掉了，这需要在制作根文件系统时不要对这个库进行 strip.

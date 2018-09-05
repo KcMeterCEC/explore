@@ -1,0 +1,56 @@
+#+TITLE: [What]sanitizer 基本安装与使用 
+#+DATE: <2018-09-04 二> 
+#+TAGS: debug
+#+LAYOUT: post 
+#+CATEGORIES: linux, debug, valgrind&sanitize
+#+NAME: <linux_debug_sanitize_tutorial.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+[[https://github.com/google/sanitizers/wiki][sanitizers]] 是google出的一套代码检测工具，其中应用最多的就是 =AddressSanitizer=.
+
+=AddressSanitizer= 是在gcc4.8以后被加入的功能，与 =valgrind= 不同的是，它需要重新编译后才能运行内存检查，但是不会像valgrind那样极度拖慢启动速度。
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* AddressSanitizer(ASan)
+ASan 是用于 c/c++ 下的内存错误检查工具。
+** 应用层
+*** 安装
+无论是在x86还是在ARM-linux上使用，只需要 **同时在编译和链接参数** 中加入以下参数即可:
+#+BEGIN_EXAMPLE
+  CFLAGS += -g -fsanitize=address -fno-omit-frame-pointer
+  LDFLAGS += -fsanitize=address -fno-omit-frame-pointer
+#+END_EXAMPLE
+- 对于嵌入式linux而言，还需要将动态库 =libasan.so= 添加进文件系统才行
+*** 使用
+一般先运行一次代码，然后在sanitizer报出错误以后，根据其所提供的位置，使用gdb打断点来抓取其执行过程。
+- 对于链表之类的操作尤其如此
+** 内核层(KASAN)
+KernelAddressSanitizer(KASAN)用于对内核动态内存的错误检测，linux内核在4.0之后被加入支持。
+
+说明文档:[[https://www.kernel.org/doc/html/latest/dev-tools/kasan.html][kasan.html]]
+*** 使能
+在使能之前需要保证gcc版本高于4.9.2，并且目前 *仅支持x86_64和arm64架构* 。
+
+- 使能配置选项 =CONFIG_KASAN=
+  + =CONFIG_KASAN_OUTLINE= : 产生的二进制代码更小
+  + =CONFIG_KASAN_INLINE= : 代码运行速度快1.1~2倍，但需要编译器版本至少为 5.0。
+- 使能配置选项 =CONFIG_STACKTRACE=
+  
+也可以修改Makefile对指定文件或文件夹关闭此功能:
+#+BEGIN_EXAMPLE
+  #对指定文件
+  KASAN_SANITIZE_main.o := n
+  #对指定文件夹
+  KASAN_SANITIZE := n
+#+END_EXAMPLE
+*** 使用
+* 常见问题
+** ASAN:SIGSEGV unknown address 0x00000000...
+当使用 =pthread_cond_init= 时 asan 会报出此错误，这是asan老版本的漏洞，解决办法是:
+1. 使用其他方式带条件变量的使用
+2. 使用新版本的gcc
+
+
