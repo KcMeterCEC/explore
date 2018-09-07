@@ -1,0 +1,25 @@
+#+TITLE: [What]ubuntu和win10双系统的问题及解决
+#+DATE:  <2018-09-07 五> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, enjoy
+#+NAME: <linux_operations_enjoy_win&linux.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理双系统过程中遇到的一些问题。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 在grub中启动win10卡在grub紫色界面
+
+解决方案:[[https://askubuntu.com/questions/433388/windows-7-hangs-at-grubs-purple-screen-when-dual-booting/695971#695971][askubuntu]]  
+
+一般是在先装win10然后装ubuntu，再次重启会遇到这种现象(其实虽然卡在紫色界面，但是win10依然在启动，其实是显卡驱动的问题)。
+
+解决步骤如下:
+- 进入ubuntu，使用root权限编辑文件 =/etc/default/grub= ,将 "GRUB_TERMINAL=console" 前的注释去掉
+- 运行命令 =sudo update-grub= 使更改生效
+- 进入win10，更新或安装显卡驱动
+- 进入ubuntu按照之前步骤将 "GRUB_TERMINAL=console" 前的注释重新加上
+- 运行命令 =sudo update-grub= 使更改生效

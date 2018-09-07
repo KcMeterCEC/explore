@@ -81,6 +81,7 @@ sudo smbpasswd -a cec
 #重新启动
 sudo systemctl restart smbd
 #+end_example
+- 有的时候windows无法直接发现ubuntu下的服务器地址，此时主动映射到本地磁盘即可
 *** 远程挂载
 在局域网下通过 linux 编辑 windows 下的文件，原因就是 vim 的强大编辑效率。
 - windows 设置相应的共享文件夹
