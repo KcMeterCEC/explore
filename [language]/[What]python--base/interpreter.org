@@ -160,3 +160,35 @@ sets用于创建一个无重复的列表:
   >>> a ^ b                              # letters in a or b but not both
   {'r', 'd', 'b', 'm', 'z', 'l'}
 #+END_SRC
+* dictionaries
+dictionary 由键(key)和值(value)组成：
+1. key在同一个dictionary中需要是独一无二的
+2. 键值对由 'key':value 格式组成，对于对之间使用逗号作分隔
+3. 整个dictionary使用大括号({})包含
+#+BEGIN_SRC python
+  >>> tel = {'jack': 4098, 'sape': 4139}
+  >>> tel['guido'] = 4127
+  >>> tel
+  {'jack': 4098, 'sape': 4139, 'guido': 4127}
+  >>> tel['jack']
+  4098
+  >>> del tel['sape']
+  >>> tel['irv'] = 4127
+  >>> tel
+  {'jack': 4098, 'guido': 4127, 'irv': 4127}
+  >>> list(tel)
+  ['jack', 'guido', 'irv']
+  >>> sorted(tel)
+  ['guido', 'irv', 'jack']
+  >>> 'guido' in tel
+  True
+  >>> 'jack' not in tel
+  False
+#+END_SRC
+在循环中，dictionary可以使用 =items()= 方法来取出其键值对:
+#+BEGIN_SRC python
+  >>> knights = {'gallahad': 'the pure', 'robin': 'the brave'}
+  >>> for k, v in knights.items():
+  ...     print(k, v)
+  ...
+#+END_SRC

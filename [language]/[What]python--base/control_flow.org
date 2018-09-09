@@ -63,6 +63,28 @@ for是从列表或字符串中依次取出一个元素来运行，这与c有些�
   3
   4
 #+END_SRC
+- 可以将元素倒置
+#+BEGIN_SRC python
+  >>> for i in reversed(range(1, 10, 2)):
+  ...     print(i)
+  ...
+  9
+  7
+  5
+  3
+  1
+#+END_SRC
+- 也可以将元素进行排序
+#+BEGIN_SRC python
+  >>> basket = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
+  >>> for f in sorted(set(basket)):
+  ...     print(f)
+  ...
+  apple
+  banana
+  orange
+  pear
+#+END_SRC
 * break , continue ,else
 python 中的 break 和 continue 与 c/c++中的意义一样。
 
