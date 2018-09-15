@@ -1,0 +1,229 @@
+#+TITLE: [What]Yocto Project --> OpenEmbedded 构建系统
+#+DATE: <2018-09-15 六> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAME: <linux_openembedded_build_system.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+全面熟悉OpenEmbedded构建系统，以及poky发行版框架。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 构建开源软件包
+传统的构建嵌入式Linux开源代码的步骤如下：
+1. 从开源网站获取压缩的源码包并解压
+2. 为当前获取的源码打补丁并增加自己的功能代码
+3. 进行交叉编译配置
+   - 有些包还需要修改其配置文件才能支持交叉编译
+4. 编译
+  - 此过程可能会由于依赖关系而编译失败，还需要先去编译并安装其依赖包(比如[[http://kcmetercec.top/2018/02/11/linux_debug_perf_tutorial/][当时我装perf...]])
+5. 将编译好的代码及配置文件拷贝到目标板根文件系统
+6. 进行验证
+  - 此过程可能发现此包依赖的其他动态链接库没有，则需要安装其他动态链接库(比如gdb需要的pthread库为非strip)
+7. 打包：如果嵌入式上有包管理器的话，还需要按照其格式制作
+
+针对上面的过程，一个自动化的构建系统应该这样做:
+1. 源码的获取： 根据用户写入的链接，自动使用对应的协议(http,https,ftp,sftp,git...)获取源码包
+2. 解压缩：根据下载的源码包压缩类型，自动使用对应的解压缩工具解压，并将其移动到构建目录之中
+3. 打补丁：用户使用构建系统要求的格式编写补丁文件，构建系统分析补丁文件自动完成源码的修改
+  - 这个过程还涉及到补丁的顺序，都是有统一的脚本格式来控制的
+4. 配置：很多开源包都使用 =autotools= 作为配置工具，但这个工具比较难用，构建系统需要提供更易用更为灵活的自动化配置工具
+5. 编译：构建系统可以识别当前源码的编译工具链并对应使用(make,cmake,qmake...)
+6. 安装：构建系统根据用户指定的安装目录，将编译好的文件拷贝到目标机文件系统中，包括修改文件的权限和拥有者
+  - 一般系统通用可执行代码安装在 =/usr/bin= ，用户安装的可执行代码安装在 =/usr/sbin= ，系统库放在 =/usr/lib= ，配置文件放在 =/etc= 
+7. 打包：构建系统根据用户决定是否打包
+  - yocto与OpenEmbedded 使用的是 opkg
+* OpenEmbedded 工作流
+[[./OpenEmbedded_workflow.jpg]]
+
+** metadata files
+图左边的红框就是metadata files(元文件)，它由以下几种文件组成：
+*** 配置文件(configuration files)
+配置文件是对构建系统的全局配置，文件内容是对全局变量进行赋值。其他的元文件可以获取或覆盖该变量的值，配置文件都是以 =.conf= 为扩展。
+
+**对于recipe文件中的变量属于局部变量，它可以修改全局变量的值，但仅在局部有效。**
+
+配置文件分为以下几种：
+- BitBake Master Configuration file(bitbake.conf) : bitbake.conf 文件为 =BitBake= 提供了默认配置以及metadata文件的搜寻路径。
+  - 其他的配置文件以及recipe文件可以根据需求覆盖此值
+  - =bitbake.conf= 文件位于 =meta/conf/=
+- Layer COnfiguration(layer.conf) : OpenEmbedded构建系统使用分层的形式来组织metadata， 实际表现形式为文件夹以层级分布。每层都有自己的layer.conf文件
+  - layer.conf 包含路径设置和当前层的recipe文件
+  - =layer.conf= 文件位于 =meta/conf/=
+- Build Environment Layer Configuration(bblayers.conf): bblayers.conf 告知 =BitBake= 哪些层会被编译，此文件包含了层的路径
+  - =bblayers.conf= 文件位于 =build/conf/=
+- Build Environment Configuration(local.conf) : local.conf 设置编译环境(比如：下载文件位置，输出位置，目标机架构等)
+  - =local.conf= 文件位于 =build/conf/= 
+- Distribution Configuration(<distribution-name>.conf) : 发行版配置文件用于设置发型版中包含的工具链、库、名称、环境变量等。
+  - =local.conf= 中的 =DISTRO= 变量用于选择发行版
+  - =<distribution-name>.conf= 位于其 =meta-<distribution-name>/conf/distro/= 下
+    + 比如默认的poky发行版配置 =poky.conf= 位于 =meta-poky/conf/distro/= 
+- Machine Configuration(<machine-name>.conf) : 目标板配置文件用于配置板级设置，这就将底层与上层完全分离了。
+  - 这样当需要更换目标板时，只需更换其BSP层即可，上层的其他设置都可以保持不变。
+  - =<machine-name>.conf= 位于其bsp的 =meta-yocto-bsp/conf/machine/= 下
+    + 比如默认的x86配置就位于 =meta-yocto-bsp/conf/machine/= (genericx86-64.conf, genericx86.conf)，对应 =local.conf= 中的 =MACHINE= 就设置其名称
+*** 菜谱(recipes)
+配置文件用于选择组件，而recipes 文件控制每个软件包的构建流程，后缀以 =.bb= 标识。
+
+recipes中具有的是控制 =BitBake= 的构建命令，也可以覆盖配置文件中的设置，但这些变量的设置都是本地变量(局部变量)，
+
+由于很多软件包的编译命令都有共同之处，于是 =BitBake= 提出了 class 的概念，这样相同的命令便放置于class文件中，
+其他 recipe 文件便继承于它，当要修改公有命令时，修改其class文件即可。class文件以 =.bbclass= 后缀标识。
+
+同时还有附加文件，以 =.bbappend= 后缀标识，表示对相同名称的 recipe 文件进行扩展或修改。
+
+
+
+** 工作流程
+OpenEmbedded就是来实现上面所说的自动化构建流程的。
+*** 源码获取
+recipes 文件中通过变量 =SRC_URI= 指定源码包的地址，这些地址格式可以是:
+- http,https
+- ftp,sftp
+- git,svn,Mercurial SCM(Hg),Bazar(BZR),CVS,Open Build Service(OSC),REPO,SVK
+- ssh
+  
+yocto项目组维护了一些文件服务器，这些服务器中包含了很多源码包。
+- 用户也可以自己搭建一个文件服务器，让yocto优先从此服务器下载源码包。
+  
+对应的BitBake的获取流程如下:
+- BitBake首先会判断本地 =downlods= 文件夹中是否已经具有相应源码包，有则不下载
+- 如果没有则从 =premirrors= 镜像服务器列表中下载此源码包。
+- 如果镜像服务器中没有此源码包，最后才会到 =SRC_URI= 所指定的地址下载源码包。
+- 如果下载失败， BitBake还会尝试从第二个镜像服务器中下载，叫做 =postmirrors= 
+*** 解压缩和打补丁
+当源码包被下载后，它将被解压缩到 =build= 目录中，如果有补丁设置，将使用 =Quilt= 来打补丁。
+*** 配置、编译、及安装
+OpenEmbedded提供了多种方案来配置及编译源码，包含 make,autotools,cmake等。
+
+安装步骤使用 =pseudo= 命令来获取root权限实现文件的安装、权限修改等。
+*** 输出分析及打包
+分析生成的文件类型，并按照包格式进行排列，最后再打包。
+
+用户可以设置 =local.conf= 中的 =PACKAGE_CLASSES= 变量来设置包类型，可以是 RPM,dpkg,ipkg.
+*** 镜像文件的生成
+通过 =core-image.bbclass= 来控制镜像文件的生成，其中的 =IMAGE_INSTALL= 变量来配置哪些软件包包安装进镜像文件。
+
+镜像文件也可以设置为不同的格式:ext2/3/4,jffs...
+*** SDK的生成
+software development kit(SDK)可以被创建，包含交叉编译工具链、QEMU仿真器、安装脚本等。
+
+此SDK可以被用于应用程序开发人员来在此基础上开发和验证应用程序，通常它与Eclipse联合使用。
+
+* OpenEmbedded构建系统组织框架
+OpenEmbedded构建系统由以下3部分组成:
+- 构建系统: yocto所提供的基础框架
+- 构建环境: 其实例就是通过 =oe-init-build-env= 所创建的 =build= 文件夹
+- 元数据层
+
+[[./OpenEmbedded_arch.jpg]]
+
+#+BEGIN_EXAMPLE
+  cec@box:~/github/poky$ ls
+  bitbake  documentation  LICENSE  meta-poky      meta-skeleton   oe-init-build-env  README.LSB   README.qemu  sstate-cache
+  build    downloads      meta     meta-selftest  meta-yocto-bsp  README.hardware    README.poky  scripts
+#+END_EXAMPLE
+
+OpenEmbedded构建系统提供了所有必须的组件，包含:
+- BitBake构建引擎(bitbake)
+- 一系列的集成脚本(scripts)
+- 工具集
+- BitBake所需要的核心metadata(meta)
+- DocBook格式的文档(documentation)
+- Poky所需要的基础BSP(meta-yocto-bsp)，以及其发行版的metadata(meta-poky)
+
+构建系统与构建环境是一对多的关系：一个构建系统可以对应多个构建环境，但一个构建环境只能对应一个构建系统。
+
+当新建一个构建环境时， =oe-init-build-env= 脚本会创建基本的配置文件，其中 =bblayers.conf= 文件会包含3个基本的层(指向文件夹):
+- meta
+- meta-poky
+- meta-yocto-bsp
+** 构建系统结构
+#+BEGIN_EXAMPLE
+  ├── bitbake         #BitBake构建引擎
+  ├── build           #构建环境
+  ├── documentation   #文档
+  ├── downloads       #构建过程中下载的软件包，放此处便于共享
+  ├── LICENSE
+  ├── meta            #BitBake所需要的核心metadata
+  ├── meta-poky       #poky发行版的metadata
+  ├── meta-selftest   #用于 oe-selftest 脚本测试 BitBake
+  ├── meta-skeleton   #metadata的框架，用户可以创建自己的metadata
+  ├── meta-yocto-bsp  #基础bsp
+  ├── oe-init-build-env #创建构建环境的脚本
+  ├── README.hardware -> meta-yocto-bsp/README.hardware
+  ├── README.LSB
+  ├── README.poky -> meta-poky/README.poky
+  ├── README.qemu
+  ├── scripts         #集成脚本
+  └── sstate-cache    #构建过程中的cache文件，放此处便于共享
+#+END_EXAMPLE
+- =bitbake/doc/= 中包含了BitBake的完整说明，可以用 =make= 来创建PDF和HTML格式的手册
+- =documentation= 中包含了yocto项目的完整文档，也可以用 "make DOC=<manual_name>" 来创建PDF和HTML格式的手册，有以下<manual_name>:
+  - adt-manual : Application Development Toolkit User's Guide
+  - brief-yoctoprojectqs
+  - bsp-guide : BSP Developer's Guide
+  - dev-manual : Development Manual
+  - kernel-dev : Linux Kernel Development Manual
+  - mega-manual 
+  - overview-manual
+  - profile-manual : Profiling and Tracing Manual
+  - ref-manual : Reference Manual
+  - sdk-manual : Software Development kit manual
+  - template
+  - toaster-manual : Toaster Manual
+- =oe-init-build-env= 有两种用法：
+  - 当在本机创建并初始化构建环境时使用 =source oe-init-build-env <buildenv>= 
+    + 当不带 =<buildenv>= 时，默认在当前目录创建 =build= 文件夹并进入
+    + 当目录已经存才时，脚本仅配置环境变量，然后切换到目录
+  - 当需要在远程服务器构建时使用 =source oe-init-build-env <buildenv> <port>= 
+    + 默认的 =<buildenv>= 是 =build= ，默认的 =<port>= 是 =12345= 
+- =scripts= 有一些常用的脚本:
+  - bitbake-whatchanged : 列出当前哪些组件需要被重新编译
+  - runqemu : 运行QEMU仿真器
+** 构建环境结构
+构建的所有输出都在此构建文件夹中进行的:
+#+BEGIN_EXAMPLE
+  build/
+  ├── bitbake-cookerdaemon.log
+  ├── cache
+  │   ├── bb_codeparser.dat
+  │   ├── bb_persist_data.sqlite3
+  │   └── local_file_checksum_cache.dat
+  ├── conf
+  │   ├── bblayers.conf
+  │   ├── local.conf
+  │   ├── sanity_info
+  │   └── templateconf.cfg
+  └── tmp    #编译输出文件夹
+      ├── abi_version #当前文件结构版本
+      ├── buildstats  #编译各项组件的详细信息
+      ├── cache       #对metadata的分析文件
+      ├── deploy      #部署用的文件
+      ├── hosttools
+      ├── log         #构建日志
+      ├── pkgdata
+      ├── saved_tmpdir #tmp目录的绝对路径
+      ├── sstate-control #
+      ├── stamps
+      ├── sysroots   #根文件系统
+      ├── sysroots-components
+      ├── sysroots-uninative
+      ├── work       #构建的软件包
+      └── work-shared  #共享软件包
+#+END_EXAMPLE
+- =bblayers.conf= 中的 :
+  - =BBLAYERS= 变量指定了构建需要哪些层
+  - =BBPATH= 变量指定编译顶层路径，就是当前文件夹
+  - =BBFILES= 指定recipes文件列表
+
+** 元数据层结构
+元数据层以层级的方式组织了recipes,classes,configuration文件

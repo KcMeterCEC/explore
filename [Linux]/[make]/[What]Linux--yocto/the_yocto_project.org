@@ -9,7 +9,9 @@
 
 参考书籍:Embedded Linux System with the Yocto Project
 
-运行环境:ubuntu18.04 amd64
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
 
 [[https://en.wikipedia.org/wiki/Yocto-][yocto]]代表 10^-24 的小数因子，是国际标准的最小小数精度。
 
