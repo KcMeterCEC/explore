@@ -8,6 +8,7 @@
 #+OPTIONS: ^:{}
 
 参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
 
 运行环境:
 - ubuntu18.04 amd64
@@ -226,4 +227,35 @@ OpenEmbedded构建系统提供了所有必须的组件，包含:
   - =BBFILES= 指定recipes文件列表
 
 ** 元数据层结构
-元数据层以层级的方式组织了recipes,classes,configuration文件
+元数据层以层级的方式组织了recipes,classes,configuration文件。
+
+OE Core(也就是meta文件夹)提供了:
+1. 对linux栈的通用配置，比如bootloader、kernel、ui、网络等等
+2. 对流行架构的仿真器，比如ARM,MIPS,POWERPC,X86,X86_64
+   
+一个典型的元数据层级关系如下图:
+[[./layer_arch.jpg]]
+
+每个层都有大致相同的结构：
+- 每个层文件夹名称格式为: =meta-<name>=
+- 具有以下基本文件夹:
+  - =conf= : 其中必有 =layer.conf= 文件来提供该层配置给 =BitBake= 
+    + =BBPATH= 提供该层的路径
+    + =BBFILES= 提供该层包含哪些recipe文件
+    + =BBFILE_COLLECTIONS= 提供该层的名称
+    + =BBFILE_PATTERN_<name>= 提供recipe文件的搜寻路径
+    + =BBFILE_PRIORITY_<name>= 提供该层的优先级，从1~10，数字越小优先级越低
+    + =LAYERVERSION_<name>= 提供层的版本，与 =LAYERDEPENDS_<name>= 联合使用以避免包含了其他不兼容的层
+  - 对于设置发行版的层， =conf= 目录下还会具有 =distro= 目录
+  - 对于设置BSP的层， =conf= 目录下还会具有 =machine= 目录
+  - 如果该层定义了自己的class，那么还会有 =classes= 文件夹
+- 对于OE core metadata(也就是meta文件夹)，其目录下具有很多 =recipes-<name>= 的配置文件夹对应于linux栈的不同层次配置
+*** 如何创建一个层
+当要使用新的BSP、应用程序、发行版配置等等，按照正规的开发流程，开发人员不应该直接修改默认提供的那些基础文件夹。
+而应该在此基础之上创建自己的层来对默认配置进行覆盖或增加（使用 append 文件）。
+#+BEGIN_EXAMPLE
+  #创建新的layer
+  #name 按照惯例为 meta-<name>
+  bitbake-layers create-layer <name>
+#+END_EXAMPLE
+创建新层后，就可以在 =build= 目录下(构建环境)的 =conf/bblayers.conf= 中增加此层。

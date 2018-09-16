@@ -8,6 +8,7 @@
 #+OPTIONS: ^:{}
 
 参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
 
 运行环境:
 - ubuntu18.04 amd64
