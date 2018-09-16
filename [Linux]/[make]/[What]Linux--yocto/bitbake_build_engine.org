@@ -1,0 +1,67 @@
+#+TITLE: [What]Yocto Project --> BitBake 构建引擎
+#+DATE: <2018-09-16 日> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAME: <linux_bitbake_build_engine.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+BitBake是由纯Python开发的构建工具，其灵活性、可扩展性和可移植性远远强于同类的 make 这类工具。
+
+其metadata构建规则文件就类似于make中的Makefile。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 获取和安装BitBake工具
+BitBake的代码位于[[http://git.openembedded.org/bitbake][OpenEmbedded bitbake库]]，并且这是个独立的组件，可以将此工具用于其他工程构建之中。
+
+yocto项目本身就已经包含了BitBake的下载和安装了，所以无需再来下载。
+
+下载及安装的方式也是很简单的:
+#+BEGIN_EXAMPLE
+  #获取源码
+  git clone git://git.openembedded.org/bitbake
+  #编译
+  ./setup.py build
+  #安装于 /usr/lib/python<version>/site-packages
+  #也可以不安装，就在当前目录使用
+  ./setup.py install
+#+END_EXAMPLE
+* 运行BitBake
+BitBake的启动命名为:
+#+BEGIN_EXAMPLE
+  #### 在构建环境的目录下执行命名 ###
+  #recipe_name 就是 recipe_name.bb 文件
+  bitbake <recipe_name / target_name>
+
+
+  #### 在构建环境的目录外执行命名 ###
+  #BBPATH需要是绝对路径!!!
+  BBPATH="/absolute/path/to/build_env" bitbake <recipe_name / target_name>
+#+END_EXAMPLE
+** 配置文件的搜寻
+*这个过程我感觉和Kconfig的解析流程好像*
+
+BitBake启动后会在当前目录下搜寻文件 =conf/bblayers.conf= 以获得一个基础构建环境。
+- 其中变量 =BBLAYERS= 指明了此次构建所包含的层的路径
+- 而在每个层的 =conf/layer.conf= 文件给出了当前层的配置文件路径
+  - =BBPATH= 指定了包含 =classes= 和 =conf= 文件夹的路径，多个路径通过冒号分隔
+  - =BBFILES= 给出了当前层的具体构建配置文件(recipes files and append files)的路径。
+- BitBake会用变量 =LAYERDIR= 来保存层的顶级路径，BitBake便顺藤摸瓜找到各个层的配置文件。
+- BitBake在遍历过程中，会根据 =BBFILE_COLLECTIONS=, =BBFILE_PATTERN_<name>= , =BBFILE_PRIORITY_<name>= 来整理配置
+  - =BBFILE_COLLECTIONS= 指定一个搜集器，将相同的文件聚集到一起
+  - =BBFILE_PATTERN_<name>= 以正则表达式的方式指定BitBake的起始搜寻路径
+  - =BBFILE_PRIORITY_<name>= 指定此层配置文件的优先级(1~10,数值越高优先级越高)
+    + 当有同名的recipe文件，BitBake使用优先级高的
+    + 当有多个append文件，BitBake先应用优先级高的append文件，再应用优先级低的
+- BitBake在解析完 =bblayers.conf= 文件后，还会去解析 =conf/bitbake.conf= 文件，以获取编译环境的设置。
+** BitBake命令行
+BitBake的命令参数很多，下面列举几个比较有用的命令。
