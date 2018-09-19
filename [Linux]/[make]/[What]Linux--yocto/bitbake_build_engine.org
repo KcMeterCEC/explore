@@ -64,4 +64,22 @@ BitBake启动后会在当前目录下搜寻文件 =conf/bblayers.conf= 以获得
     + 当有多个append文件，BitBake先应用优先级高的append文件，再应用优先级低的
 - BitBake在解析完 =bblayers.conf= 文件后，还会去解析 =conf/bitbake.conf= 文件，以获取编译环境的设置。
 ** BitBake命令行
-BitBake的命令参数很多，下面列举几个比较有用的命令。
+BitBake的命令参数很多，下面对它们进行分类整理。
+*** 以包含依赖的方式处理构建
+BitBake默认的构建任务是由变量 =BB_DEFAULT_TASK= 所指定的 =build= 任务。
+
+=build= 任何在正式启动编译之前会评估好各个软件包之间的依赖和编译顺序。
+
+一般情况下使用的 =bitbake <recipe_name / target_name>= 命令就是启动的 =build= 任务。
+- 当出现了错误时，bitbake将停止执行任务，可以使用 =-k= 选项让其继续执行。
+
+当编译软件包时，默认会编译其最新版本或者是由变量 =PREFERRED_VERSION= 指定的版本。
+可以在目标名称后加上版本名以指定编译特定版本:
+#+BEGIN_EXAMPLE
+  bitbake editor-1.0
+  bitbake editor-2.0-r3
+#+END_EXAMPLE
+
+
+*** 以不包含依赖的方式处理构建
+

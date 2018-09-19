@@ -12,7 +12,7 @@
 <!--more-->
 #+END_HTML
 * 准备工作
-- 字符串统一使用 =QString= 类型，因为此此类型支持 Unicode 编码。
+- 字符串统一使用 =QString= 类型，因为此类型支持 Unicode 编码。
 - 为了能够使应用程序中的显示字符串能够被翻译，需要使用 =tr()= 函数包含字符串。
 #+BEGIN_SRC c++
 error->showMessage(tr("File should have at least one!"));

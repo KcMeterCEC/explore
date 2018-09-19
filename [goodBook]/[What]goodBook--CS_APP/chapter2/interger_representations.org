@@ -79,18 +79,18 @@
   }
   else
   {
-    return ( x + 2^w)
+    return ( x + pow(2, w))
   }
 #+END_SRC
 同理无符号到有符号转换规律如下:
 #+BEGIN_SRC c
-    if(x <= Tmax) //Tmax 即为有符号型能表示的最大值, 2^(w -1) -1
-    {
-      return x;
-    }
-    else
-    {
-      return (x - 2^w);
-    }
+  if(x <= Tmax) //Tmax 即为有符号型能表示的最大值, 2^(w -1) -1
+  {
+    return x;
+  }
+  else
+  {
+    return (x - pow(2, w));
+  }
 #+END_SRC
 
