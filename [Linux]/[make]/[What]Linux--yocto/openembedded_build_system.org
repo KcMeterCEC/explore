@@ -185,8 +185,6 @@ OpenEmbedded构建系统提供了所有必须的组件，包含:
   - 当在本机创建并初始化构建环境时使用 =source oe-init-build-env <buildenv>= 
     + 当不带 =<buildenv>= 时，默认在当前目录创建 =build= 文件夹并进入
     + 当目录已经存才时，脚本仅配置环境变量，然后切换到目录
-  - 当需要在远程服务器构建时使用 =source oe-init-build-env <buildenv> <port>= 
-    + 默认的 =<buildenv>= 是 =build= ，默认的 =<port>= 是 =12345= 
 - =scripts= 有一些常用的脚本:
   - bitbake-whatchanged : 列出当前哪些组件需要被重新编译
   - runqemu : 运行QEMU仿真器

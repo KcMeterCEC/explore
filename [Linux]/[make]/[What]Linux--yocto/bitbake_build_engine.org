@@ -79,7 +79,145 @@ BitBake默认的构建任务是由变量 =BB_DEFAULT_TASK= 所指定的 =build= 
   bitbake editor-1.0
   bitbake editor-2.0-r3
 #+END_EXAMPLE
-
-
 *** 以不包含依赖的方式处理构建
+可以指定只编译某个recipe文件的规则，而不进行依赖编译。
+- 当编译出错时则退出
+#+BEGIN_EXAMPLE
+  bitbake -b <recipe_name>.bb
+  bitbake --buildfile=<recipe_name>.bb
+#+END_EXAMPLE
+*** 执行指定的任务
+有以下两种方式:
+- 包含依赖的方式执行
+#+BEGIN_EXAMPLE
+  bitbake <packet> -c <task_name>
+  bitbake <packet> --cmd=<task_name>
+#+END_EXAMPLE
+- 不包含依赖的方式执行
+#+BEGIN_EXAMPLE
+  bitbake -b <recipe_name>.bb -c <task>
+  bitbake -b <recipe_name>.bb --cmd=<task>
+#+END_EXAMPLE
+*** 强制执行
+BitBake会为每个完成的任务打上时间戳，以完成增量编译，用户可以取消此时间戳的判断以强制编译该任务
+#+BEGIN_EXAMPLE
+  bitbake <packet> -C <task>
+  bitbake <packet> --clear-stamp=<task>
+  bitbake <packet> -c <task> -f
+  bitbake <packet> -c <task> --force
+#+END_EXAMPLE
+BitBake将任务的输出放在 "shared state cache"中(也就是 =sstate-cache= 文件夹)，当任务输入并没有被改变时，
+BitBake直接从 =sstate-cache= 中取出结果，而不需要重新编译。
+- 这也是为什么建议将 =sstate-cache= 放在 =build= 之外的目的，多个 =build= 可以共享编译输出，减小编译时间
+  
+用户可以关闭 =sstate-cache= 的使用:
+#+BEGIN_EXAMPLE
+  bitbake <packet> -c <task> --no-setscene
+#+END_EXAMPLE
+*** 显示metadata
+当用于调试构建过程时，需要输出BitBake所分析到的元数据文件、变量、功能等等:
+#+BEGIN_EXAMPLE
+  #显示所有信息
+  bitbake -e
+  bitbake --environment
+  #仅显示关于此 <package>的信息
+  bitbake -e <package>
+  bitbake --environment <package>
+  #显示recipes的版本
+  bitbake -s
+  bitbake --show-versions
+#+END_EXAMPLE
+*** 创建依赖图
+BitBake基于[[http://kcmetercec.top/categories/editer/graphviz/][graphviz]]表示包之间的依赖图:
+#+BEGIN_EXAMPLE
+  #生成描述依赖的dot文件
+  bitbake -g <package>
+  bitbake --graphviz <package>
 
+  #生成描述依赖的dot文件，并忽略某个包
+  bitbake -g <package> -I <ignore_package>
+#+END_EXAMPLE
+最终会在构建目录下生成下面3种DOT语言描述文件:
+- task-depends.dot : 描述任务级之间的依赖
+- recipe-depends.dot : 包与包之间的依赖
+
+然后使用 =graphviz= 生成图片即可，例如:
+#+BEGIN_EXAMPLE
+  dot -Tpng -o pn-depends.png pn-depends.dot
+#+END_EXAMPLE
+
+**注意：这张图很大，建议使用 tred去掉中间依赖**
+#+BEGIN_EXAMPLE
+  tred recipe-depends.dot > recipe-depends-notrans.dot
+#+END_EXAMPLE
+
+也可以使用BitBake所自带的依赖描述工具:
+#+BEGIN_EXAMPLE
+  bitbake -g -u taskexp <package>
+#+END_EXAMPLE
+
+*** 配置的设置和覆盖
+用户可以在BitBake解析其他文件前后加入附加的配置文件:
+- 在解析其他文件前加入配置文件，一般用于设置环境变量
+#+BEGIN_EXAMPLE
+  bitbake -r <prefile>.conf <target>
+  bitbake --read <prefile>.conf <target>
+#+END_EXAMPLE
+- 在解析其他文件后加入配置文件，一般用于覆盖前面配置文件的设置
+#+BEGIN_EXAMPLE
+  bitbake -R <postfile>.conf <target>
+  bitbake --postread <postfile>.conf <target>
+#+END_EXAMPLE
+*** 服务器
+BitBake是一个典型的CS架构下的应用程序，每次启动BitBake时它都会启动一个服务端程序(叫做 =cooker= )，
+和一个客户端程序。
+
+服务器会启动多个线程分析元文件，并进行编译。服务器和客户端使用pipe来交互信息。
+
+当然，这种架构完全可以用于远程编译：小组里几个人共用一个强大的服务器，将自己客户端的代码放在服务器编译后取得结果。
+
+- 在服务器上启动BitBake服务端程序:
+#+BEGIN_EXAMPLE
+  bitbake --server-only --bind=<ip>:<port>
+#+END_EXAMPLE
+- 客户端连接 BitBake服务器构建:
+#+BEGIN_EXAMPLE
+  bitbake --remote-server=<ip>:<port> <target>
+#+END_EXAMPLE
+* BitBake元数据
+BitBake通过分析元数据来控制构建过程，元数据来描述软件包该如何构建以及它的依赖关系。
+
+BitBake将分析后的元文件放在一个缓存文件夹中，避免下次重复分析而浪费不需要的时间。
+
+BitBake分析以下两类元数据:
+- 变量(Variables)： 包括控制整体的全局变量，以及控制一小部分的局部变量
+- 可执行元数据(Executable Metadata)：在recipes和classes中嵌入的功能和命令
+
+元数据文件由以下5种文件组成：
+- 配置文件(.conf):配置文件中的变量都是全局变量，所以它们会影响全局。
+  - 如果多个配置文件中有多个相同的变量，那么使用优先级最高的那个。
+    + =bitbake.conf= 优先级最低，而构建目录下的 =local.conf= 优先级最高
+- recipe文件(.bb):recipe文件用于描述软件包以及该如何构建此软件包
+  - 对包的操作命令通常有:下载、解压缩、打补丁、编译、打包、安装
+- class文件(.bbclass):类文件主要包含很多recipe文件所共有的设置，以便它们继承。
+  - BitBake会搜寻当前层下的 =classes= 子文件以获取类文件
+  - recipe中使用 =inherit= 指令来继承类文件
+    + 类文件是全局的，所以recipe可以在任何位置继承
+- append 文件(.bbappend) : 附加文件是对recipe文件的扩展，附加文件的前缀名称必须与recipe文件一致
+  - append文件中包含的层路径也要与recipe文件一致
+  - 当不同层中有一样的append文件时，由层的优先级来决定使用哪一个
+- include 文件(.inc): 每中元数据文件都可以使用 =include=, =require= 指令包含其他文件,include文件表示其他元文件所共同包含的元文件
+  - 包含执行指令的元文件只能被 recipes,append,classes文件包含
+* 元数据的语法
+元数据的语法类似 Makefile和shell 脚本。
+** 注释
+使用 =#= 作为注释开头， **但注释分为普通注释和功能函数注释**
+- 普通注释(在函数之外)的 =#= 必须在 **行的第一列** 才符合语法规则
+- 元文件中可以包含 shell 和 python 功能函数，在函数内部的注释就比较随意了。
+** 变量
+元数据中的变量对于BitBake来说都是字符串。
+*** 变量名
+变量名中可以包含:大小写字母、数字、下划线(_)、横线(-)、点(.)、加号(+)、波浪线(~)
+
+为了与Makefile和shell保持一致的习惯，一般还是使用大写字母和下划线的形式来组成变量名。
+*** 变量的作用域
