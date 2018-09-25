@@ -568,3 +568,93 @@ BitBake提供 =fetch2= 库(位于 bitbake/lib/bb/fetch2),使用Python其 =Fetch=
 
 如果没有找到对应的文件，提取器就会报错。
 *** HTTP/HTTPS/FTP 源码的获取
+BitBake默认使用[[https://www.gnu.org/software/wget/][wget]]来完成http,https,ftp协议的文件下载。
+- 源码脚本位于 =bitbake/lib/bb/fetch2/wget.py=
+
+可以通过设置变量 =FETCHCMD_wget= 来设置 =wget= 的选项，可设置的值有:
+- =md5sum= : 使用md5校验，如果与提供的校验码不匹配则报错
+- =sha256sum= : 使用sha256sum校验，如果与提供的校验码不匹配则报错
+- =downloadfilename= : 将下载好的文件重命名为当前设定的文件名
+- =name= : 链接地址的别名
+
+**其中 =md5sum= 和 =sha256sum= 至少需要提供其中一个！**
+#+BEGIN_EXAMPLE
+  SRC_URI	=	"http://host.site.org/downloads/srcpkg.tar.gz;md5sum=12345"
+  SRC_URI	=	"https://host.site.org/downloads/srcpkg.tar.gz;sha256sum=6789"
+  SRC_URI	=	"ftp://user:pwd@host.site.org/repo/srcpkg.tar.gz;md5sum=12345"
+  SRC_URI	=	"ftp://host.site.org/srcpkg.tar.tgz;md5sum=12345;downloadfilename=file.tgz"
+#+END_EXAMPLE
+校验码一般都比较长，所以可以分离URL和校验码:
+#+BEGIN_EXAMPLE
+  #当只有一个下载包时
+  SRC_URI	=	"http://host.site.org/downloads/srcpkg.tar.gz"
+  SRC_URI[md5sum]	=	"12345"
+  SRC_URI[sha256sum]	=	"6789"
+
+  #当有多个下载包时，通过名称来区分
+  SRC_URI	=	"http://host.site.org/downloads/srcpkg1.tar.gz;name=pkg1
+             ftp://host.anothersite.org/downloads/srcpkg2.tgz;name=pkg2"
+  SRC_URI[pkg1.md5sum]	=	"12345"
+  SRC_URI[pkg2.sha256sum]	=	"6789"
+#+END_EXAMPLE
+*** SFTP 源码的获取
+在使用SFTP前，用户需要先用ssh key提前获取权限后，再来让bitbake以sftp的方式抓取，不能直接在URI中输入密码。
+- 源码脚本位于 =bitbake/lib/bb/fetch2/sftp.py=
+#+BEGIN_EXAMPLE
+  SRC_URI	=	“sftp://host.site.org/downloads/srcpkg.tgz;md5sum=12345”
+  SRC_URI	=	“sftp://user@host.site.org/downloads/srcpkg.tgz;md5sum=12345”
+#+END_EXAMPLE
+*** git 源码的获取
+
+git 抓取脚本位于 =bitbake/lib/bb/fetch2/git.py=
+
+抓取器提供了以下参数可以控制clone的过程:
+- =protocol= : 支持的协议有 git,file,ssh,http,https,rsync
+  - 默认的便是 git协议
+- =branch= : 要切换到哪个分支
+  - 默认为 master
+- =name= : 分支的名称
+- =tag= : 切换到哪个标记
+  - 默认为 HEAD
+- =rebaseable= ： 使用 "rebaseable=1" 告知上游库可能以后会有 rebase 操作，抓取器需要将当前工作目录缓存
+  - 默认为 0
+- =nocheckout= : 使用 "nocheckout=1" 告知不要切换到抓取后的分支
+  - 默认为 0
+- =bareclone= : 使用 "bareclone=1" 告知仅clone裸库而不释出源码
+  - 默认为0
+#+BEGIN_EXAMPLE
+  #注意：最开始的地址都是以默认的git协议写的，具体的protocol需要在后面更改
+  SRC_URI	=	"git://git.site.org/git/repo.git;branch=develop"
+  SRC_URI	=	"git://git.site/org/git/repo.git;tag=0C12ABD"
+  SRC_URI	=	"git://git.site.org/git/repo.git;protocol=http"
+#+END_EXAMPLE
+
+当库代码中有子模块时，提取器会在clone完基础代码后再clone子模块。
+git 抓取脚本位于 =bitbake/lib/bb/fetch2/gitsm.py=
+
+
+** 源码镜像
+BitBake支持从镜像站点下载软件包，其访问顺序为:
+1. 根据 =SRC_URI= 中提供的软件包，在 =DL_DIR= 指向的路径中寻找是否有匹配的文件。如果存在此文件，则无需从远程下载了。
+  - 当软件包使用了SCM仓库，那么BitBake会检查 =DL_DIR= 中的分支和tag是否对应。
+2. 当 =DL_DIR= 中没有对应的软件包时，BitBake根据 =PREMIRRORS= 中提供的镜像站点下载文件
+  - 如果不想使用此镜像站，那么将变量 =PREMIRRORS= 的值设置空字符串即可
+3. 如果在 =PREMIRRORS= 的镜像站点没有找到对应的包，BitBake则会在 =SRC_URI= 指向的路径下载软件包
+4. 如果在 =SRC_URI= 路径下载失败，那么BitBake会在 =MIRRORS= 指向的备用镜像站点下载文件
+  - 如果不想使用此镜像站，那么将变量 =MIRRORS= 的值设置空字符串即可
+5. 备用镜像下载文件都失败的话，BitBake则会报错。
+
+=PREMIRRORS= 和 =MIRRORS= 使用正则表达式来列出各种下载协议对应的站点:
+#+BEGIN_EXAMPLE
+  MIRRORS	=	"\
+  ftp://.*/.*				http://downloads.mirrorsite.org/mirror/sources/	\n	\
+  http://.*/.*			http://downloads.mirrorsite.org/mirror/sources/	\n	\
+  https://.*/.*		http://downloads.mirrorsite.org/mirror/sources/	\n	\
+  git://.*/.*				http://downloads.mirrorsite.org/mirror/sources/	\n	\
+  svn://.*/.*				http://downloads.mirrorsite.org/mirror/sources/	\n"
+#+END_EXAMPLE
+BitBake会根据 =SRC_URI= 对应的协议来找到镜像站点的链接并做替换。
+
+yocto为 poky也提供了[[http://downloads.yoctoproject.org/mirror/sources/][默认的镜像站]]。
+*** 创建自己的镜像站
+可以事先从yocto中下载好软件包，然后自己搭建一个内部局域网的ftp服务器，这样就可以小组内共享了。
