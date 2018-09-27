@@ -1,0 +1,64 @@
+#+TITLE: [What]Yocto Project --> BitBake HelloWorld
+#+DATE: <2018-09-16 日> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAME: <linux_make_yocto_bitbake_hello.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+前面讲了那么多的理论，现在就需要实际来控制BitBake完成构建，提高感性认知。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+在进行具体构建之前，先以文件夹的层次角度来看待构建流程:
+[[./yocto_build_struct.jpg]]
+
+可以看出，我们如果要编译一个软件包，需要:
+1. 新建软件包层 (meta-xxx)
+2. 配置软件包层(layer.conf,*.bb,*.bbappend)
+3. 在构建目录(build)的 =bblayers.conf= 中包含该层
+4. 启动bitbake构建并测试
+
+* 新建和配置软件包层
+通过前面的基础理论知识可以知道：要增加一个软件包，正规的做法是为其增加一个layer并配置构建规则。
+** 新建层
+#+BEGIN_EXAMPLE
+  bitbake-layers create-layer meta-nano
+#+END_EXAMPLE
+
+新建目录结构如下:
+#+BEGIN_EXAMPLE
+  meta-nano/
+  ├── conf
+  │   └── layer.conf
+  ├── COPYING.MIT
+  ├── README
+  └── recipes-example
+      └── example
+          └── example_0.1.bb
+#+END_EXAMPLE
+** 配置层
+* 新建构建环境
+为构建[[https://nano-editor.org/][nano]]新建一个构建环境:
+#+BEGIN_EXAMPLE
+  source oe-init-build-env build-nano
+#+END_EXAMPLE
+新建的目录结构如下:
+#+BEGIN_EXAMPLE
+  .
+  └── conf
+      ├── bblayers.conf
+      ├── local.conf
+      └── templateconf.cfg
+
+  1 directory, 3 files
+#+END_EXAMPLE
+
