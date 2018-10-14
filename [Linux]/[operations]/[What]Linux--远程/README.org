@@ -88,8 +88,8 @@ sudo systemctl restart smbd
 - ubuntu 新建挂载文件
 - ubuntu 在 /etc/rc.local 下挂载共享文件夹
 #+begin_example
-#username --> windows 用户名 password --> windows 访问密码 ip --> Windows 地址  //192.168.11.153/f --> windows 共享文件夹 /home/cec/windowsShare/work --> linux 下的挂载点
-mount -t cifs -o username=kcmetercec,password=@0924Whb092,ip=192.168.11.153,file\_mode=0777,dir\_mode=0777 //192.168.11.153/f /home/cec/windowsShare/work
+  #username --> windows 用户名 password --> windows 访问密码 ip --> Windows 地址  //192.168.11.153/f --> windows 共享文件夹 /home/cec/windowsShare/work --> linux 下的挂载点
+  mount -t cifs -o username=kcmetercec,password=789654ip=192.168.11.153,file\_mode=0777,dir\_mode=0777 //192.168.11.153/f /home/cec/windowsShare/work
 #+end_example
 ** 文件传输
 通过网线进行文件传输, 使用的软件为: [[https://filezilla-project.org][FileZilla]]
