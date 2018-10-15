@@ -37,6 +37,11 @@ echo 1 > /proc/sys/kernel/panic_on_oops
 * 显示使用 BUG_ON() 和 WARN_ON()
 BUG_ON() 和 WARN_ON() 是内核提供的警告宏。
 
+首先使能 =CONFIG_BUG= 宏:
+#+BEGIN_EXAMPLE
+  General setup -> Configure standard kernel features(expert users) -> BUG() support
+#+END_EXAMPLE
+
 其中BUG_ON()成立时主动抛出 Oops 的宏，WARN_ON() 成立时抛出栈调用。我们在必要的位置可以加上者两个宏,以达到：
 - 判断出了错误
 - 查看错误时的参数调用
