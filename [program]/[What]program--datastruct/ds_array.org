@@ -1,0 +1,16 @@
+#+TITLE: [What]数据结构与算法 -> 数组
+#+DATE:  <2018-10-16 二> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post 
+#+CATEGORIES: program,数据结构与算法
+#+NAMA: <program_DS_array.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程：王争 --> <数据结构与算法之美>
+
+以另一个角度看待数组。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+
