@@ -693,3 +693,178 @@ dd
 #在 Unix 中统计当前文件的单词数
 :write !wc 
 #+end_example
+* 快速配置
+[[https://github.com/spf13/spf13-vim][spf13]] 是比较全面的配置了，在按照其说明下载配置文件后，还需要做以下两点配置以优化操作。
+- 编辑文件(.vimrc.before.local)，安装ycm
+#+BEGIN_EXAMPLE
+  let g:spf13_bundle_groups=['general','youcompleteme','programming','misc']
+#+END_EXAMPLE
+- 编辑文件(.vimrc.local)，个性化配置
+#+BEGIN_EXAMPLE
+  """""""""""""""""""""""""""""""""""""""""""
+  "           说明（leader键是 ',')
+  """""""""""""""""""""""""""""""""""""""""""
+  "此文件与 spf13-vim(https://github.com/spf13/spf13-vim) 联合使用
+  "
+  "spf13的基本操作
+  "1. 本地定制个性化的设置， 写入到文件 ~/.vimrc.local ~/.gvimrc.local
+  "2. 在启动 spf13-vim 脚本前的设置， 写入到文件 ~/.vimrc.before.local
+  "3. 启动脚本的顺序为：
+  ".vimrc.before 
+  ".vimrc.before.fork
+  ".vimrc.before.local  插件加载选项, 修改完后使用(:BundleInstall!)
+  ".vimrc.bundles
+  ".vimrc.bundles.fork
+  ".vimrc.bundles.local 新装插件, 使用格式 Bundle
+  "'githubusername/githubprojectname'
+  ".vimrc
+  ".vimrc.fork
+  ".vimrc.local
+  "4. 使用 <leader>ev 来查看vim 配置文件脚本
+  "5. 使用 <leader>sv 来重新载入脚本
+
+
+  """""""""""""""""""""""""""""""""""""""""""
+  "           个性化配置说明
+  """""""""""""""""""""""""""""""""""""""""""
+  "设置终端版的主题(推荐 ir_black/molokai/peaksea)
+  colorscheme  atom
+  "取消拼写检查(因为很多缩写被报错...)
+  set nospell
+  "使用相对行号(神器)
+  set relativenumber
+
+  """""""按键映射""""""""""
+  "在行尾增加分号，并重新进入到 <normal> 模式
+  map <leader>; A;<ESC>
+
+  """""""""""""""""""""""""""""""""""""""""""
+  "           插件配置说明
+  """""""""""""""""""""""""""""""""""""""""""
+  """""""""""""""""""""""
+  " Undotree(撤销树)
+  " 默认使用方式:
+  " 1. <leader>u   启动撤销树
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " NERDTree(文件浏览器)
+  " 默认使用方式:
+  " 1. <leader>e   启动
+  " 2. <C-E>  启动或关闭
+  " 3. <leader>e 或 <leader>nt 查看当前文件的路径
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " ctrlp(快速打开文件)
+  " 默认使用方式:
+  " 1. <C-p>   启动
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " Surround(快速替换符号)
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " NERDCommenter(快速注释)
+  " 默认使用方式:
+  " 1. <leader>c<space>   添加注释
+  """""""""""""""""""""""
+  let g:NERDAltDelims_c = 1
+
+  """""""""""""""""""""""
+  " neocomplete(智能补全)
+  " 默认使用方式:
+  " 1. <C-k> 强制补全
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " YouCompleteMe(快速智能补全)
+  " 首次使用需要进入 youcompleteme 文件夹，然后进行编译
+  " ./install.py --clang-completer
+  "
+  " 在需要编辑的工程中，拷贝一份 .ycm_extra_conf.py 到目录并设置
+  """""""""""""""""""""""
+  "let g:ycm_global_ycm_extra_conf = '~/.vim/bundle/YouCompleteMe/third_party/ycmd/cpp/ycm/.ycm_extra_conf.py'
+  let g:ycm_confirm_extra_conf=0
+
+  """""""""""""""""""""""
+  " syntastic(语法检查)
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " autoclose(自动关闭)
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " Fugitive(git 状态)
+  " 默认使用方式:
+  " 1. <leader>gs 等于 git status
+  " 2. <leader>gd 查看修改
+  "
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " ack.vim()
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " Tabularize()
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " Tagbar(标记列表, 与 ctags 联合使用)
+  " 默认使用方式:
+  " 1. CTRL-] 跳到定义处
+  " 2. CTRL-T 跳回原处
+  " 2. <leader>tt 打开
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " EasyMotion()
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+  """""""""""""""""""""""
+  " airline(状态栏)
+  " 默认使用方式:
+  """""""""""""""""""""""
+
+
+  """""""""""""""""""""""
+  " minibufexpl(显示缓存)
+  " 默认使用方式:
+  """""""""""""""""""""""
+  "切换到下一个缓存区和上一个缓存区
+  map <leader>n :bn<CR>
+  map <leader>p :bp<CR>
+
+
+  """""""""""""""""""""""
+  " cscope(符号表查询)
+  " 默认使用方式:
+  """""""""""""""""""""""
+  "自动检测并设置
+  if has("cscope")
+  set csto=0
+  set cst
+  set nocsverb
+  " add any database in current directory
+  if filereadable("cscope.out")
+      cs add cscope.out
+  " else add database pointed to by environment
+  elseif $CSCOPE_DB != ""
+      cs add $CSCOPE_DB
+  endif
+  set csverb
+  endif
+  "查找调用这个函数的函数
+  map <leader>c :cs find 3 <C-R>=expand("<cword>")<CR><CR>
+  "查找这个符号出现的位置
+  map <leader>s :cs find 0 <C-R>=expand("<cword>")<CR><CR>
+#+END_EXAMPLE
