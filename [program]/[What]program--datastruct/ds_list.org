@@ -107,5 +107,41 @@
   1,2,3,4,5,6,13,14,17,99,19,20,7,8,15,9,11,12,21,22,23,24,25,26,27,10,28,29,
   free list succedded!
 #+END_EXAMPLE
+- LRU的实现逻辑为:
+  + 如果遍历链表发现有相同的节点，则将此节点移动到链表头
+  + 如果没有相同节点:
+    - 当链表未满，则将节点插入链表头
+    - 当链表已满，删除尾节点并将新节点插入链表头。
+#+BEGIN_EXAMPLE
+  insert member [A]
+  A,
+  insert member [B]
+  B,A,
+  insert member [C]
+  C,B,A,
+  insert member [A]
+  A,C,B,
+  insert member [E]
+  E,A,C,B,
+  insert member [D]
+  D,E,A,C,B,
+  insert member [B]
+  B,D,E,A,C,
+  insert member [F]
+  F,B,D,E,A,
+  insert member [G]
+  G,F,B,D,E,
+#+END_EXAMPLE
+- 判断字符串是否时回文串思路:
+  + 获取链表的头尾元素比较是否相等
+    - 相等则删除头尾元素，否则退出判断
+  + 最终链表为空或只剩下一个元素，则此字符串为回文串
+#+BEGIN_EXAMPLE
+  create list:
+  l,e,v,e,l,
+  parse string:
+  this string is a palindrome!
+  free list succedded!
+#+END_EXAMPLE
 
 
