@@ -16,7 +16,8 @@ linux 在 =linux/list.h= 中提供了 *双向环形链表* 和 *双向链表* �
 需要注意的是:
 1. linux是通过 *将此链表嵌入在其他数据结构中, 从而将很多不同的数据结构链接起来!*. (而不是链表中包含数据).
 2. 函数中的参数 =head= 代表的即为链表头!
-3. =typeof= 是GCC扩展的关键字, 所以不能在编译选项重添加 =-std=c99=!
+3. =typeof= 是GCC扩展的关键字, 所以不能在编译选项中添加 =-std=c99=!
+  - 为了兼容所有编译器，我在[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/list/circular][github]]中移植了通用版本。
 * 使用
 ** 双向环形链表
 内核提供了以下宏供操作:
