@@ -73,3 +73,75 @@
   7,
   sweep->index = 7,[survive]
 #+END_EXAMPLE
+* 双向链表
+双向链表由于其节点保存了前一个节点的地址，所以它的应用更为灵活，linux内核中的双向链表便是很为巧妙。
+
+下面移植内核中的链表，位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/list/circular][github]]，并来实现LRU算法和回文串的判断。
+
+- 链表的测试输出:
+#+BEGIN_EXAMPLE
+  ,**********************
+    This is list demo 
+
+  ,**********************
+  create a list:
+  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,
+  delete index 16
+  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,18,19,20,21,22,23,24,25,26,27,28,29,
+  replace 18 by 99
+  1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,99,19,20,21,22,23,24,25,26,27,28,29,
+  move 10 after 27
+  1,2,3,4,5,6,7,8,9,11,12,13,14,15,17,99,19,20,21,22,23,24,25,26,27,10,28,29,
+  move 15 before 9
+  1,2,3,4,5,6,7,8,15,9,11,12,13,14,17,99,19,20,21,22,23,24,25,26,27,10,28,29,
+  rotate left 21
+  1,2,3,4,5,6,7,8,15,9,11,12,13,14,17,99,19,21,20,22,23,24,25,26,27,10,28,29,
+  rotate right 21
+  1,2,3,4,5,6,7,8,15,9,11,12,13,14,17,99,19,20,21,22,23,24,25,26,27,10,28,29,
+  cut position 12 ~ 20, including 20 but not including 12
+  1,2,3,4,5,6,7,8,15,9,11,12,21,22,23,24,25,26,27,10,28,29,
+  13,14,17,99,19,20,
+  splice new list before 7
+  1,2,3,4,5,6,13,14,17,99,19,20,7,8,15,9,11,12,21,22,23,24,25,26,27,10,28,29,
+  free index:
+  1,2,3,4,5,6,13,14,17,99,19,20,7,8,15,9,11,12,21,22,23,24,25,26,27,10,28,29,
+  free list succedded!
+#+END_EXAMPLE
+- LRU的实现逻辑为:
+  + 如果遍历链表发现有相同的节点，则将此节点移动到链表头
+  + 如果没有相同节点:
+    - 当链表未满，则将节点插入链表头
+    - 当链表已满，删除尾节点并将新节点插入链表头。
+#+BEGIN_EXAMPLE
+  insert member [A]
+  A,
+  insert member [B]
+  B,A,
+  insert member [C]
+  C,B,A,
+  insert member [A]
+  A,C,B,
+  insert member [E]
+  E,A,C,B,
+  insert member [D]
+  D,E,A,C,B,
+  insert member [B]
+  B,D,E,A,C,
+  insert member [F]
+  F,B,D,E,A,
+  insert member [G]
+  G,F,B,D,E,
+#+END_EXAMPLE
+- 判断字符串是否时回文串思路:
+  + 获取链表的头尾元素比较是否相等
+    - 相等则删除头尾元素，否则退出判断
+  + 最终链表为空或只剩下一个元素，则此字符串为回文串
+#+BEGIN_EXAMPLE
+  create list:
+  l,e,v,e,l,
+  parse string:
+  this string is a palindrome!
+  free list succedded!
+#+END_EXAMPLE
+
+

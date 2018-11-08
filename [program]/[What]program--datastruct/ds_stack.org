@@ -1,0 +1,79 @@
+#+TITLE: [What]数据结构与算法 -> 栈与队列
+#+DATE:  <2018-11-04 Sun> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post 
+#+CATEGORIES: program,数据结构与算法
+#+NAME: <program_DS_stack.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程：王争 --> <数据结构与算法之美>
+
+- 当数据只需要在一端插入和删除操作，并且满足先进后出(FILO)、后进先出的特性时，就应该首选“栈”。
+- 当数据只需要在一端插入,另一端读取操作，并且满足先进先出(FIFO)、后进后出的特性时，就应该首选“队列”。
+  - 这种方式操作接口简单，易于维护和理解。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 栈
+栈的实现方式可以用数组(顺序栈)或单向链表(链式栈)来做。
+- 当栈操作不支持动态扩容时。
+|      | 数组 | 链表 |
+|------+------+------|
+| 入栈 | O(1) | O(1) |
+| 出栈 | O(1) | O(1) |
+- 当栈操作支持动态扩容时
+|      | 数组                       | 链表 |
+|------+----------------------------+------|
+| 入栈 | 最小O(1),最大O(n),均摊O(1) | O(1) |
+| 出栈 | O(1)                       | O(1) |
+
+数组栈代码位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/stack/array][github]]，其输出如下。
+#+BEGIN_EXAMPLE
+  stack contents:
+
+  push -> 0
+  stack contents:
+  0,
+  push -> 1
+  stack contents:
+  0,1,
+  push -> 2
+  stack contents:
+  0,1,2,
+  push -> 3
+  stack contents:
+  0,1,2,3,
+  push -> 4
+  stack contents:
+  0,1,2,3,4,
+  push -> 5
+  error: stack is full!
+  stack contents:
+  0,1,2,3,4,
+  stack contents:
+  0,1,2,3,
+  pop -> 4
+  stack contents:
+  0,1,2,
+  pop -> 3
+  stack contents:
+  0,1,
+  pop -> 2
+  stack contents:
+  0,
+  pop -> 1
+  stack contents:
+
+  pop -> 0
+  error: stack is empty!
+  stack contents:
+
+  pop -> 0
+#+END_EXAMPLE
+* 队列
+队列的实现方式同样也有数组(顺序队列)或双向链表(链式队列)来做。
+
+为了避免顺序队列在数组写满后的搬移操作，通常我们会使用循环队列(ring buffer)以达到O(1)的时间复杂度。
+- 代码位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/queue/ring_buffer][此处]]
+
