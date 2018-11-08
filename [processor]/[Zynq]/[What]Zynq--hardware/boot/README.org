@@ -1,0 +1,173 @@
+#+TITLE: zynq hardware -> boot
+#+DATE:  <2018-11-08 四> 
+#+TAGS: zynq
+#+LAYOUT: post 
+#+CATEGORIES: processor, zynq, hardware
+#+NAME: <processor_zynq_hd_boot.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理zynq的硬件启动流程。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 整体流程
+** 概览
+zynq的整体启动流程如下图:
+[[./boot.jpg]]
+
+- 除了以上的启动方式外，在调试阶段，可以通过JTAG接口以非安全模式下启动。
+  - 这样JTAG才可以访问ARM debug access port(DAP)以及 Xilinx test access port(TAP) 来分别调试ARM和PL.
+- 在安全模式下，代码是被事先加密过的，BootROM会通过DMA将fsbl读到OCM中后被CPU执行。
+  - 在这中间会经过AES(Advanced Encryption Standard)/HMAC(Hash-based Message Authentication Code)单元进行解密。
+- 在非安全模式下，BootROM根据包头来确定是否需要将fsbl拷贝到OCM中执行。
+- 如果BootROM没有在设备到找到合法的软件包头，它会依次寻找，直到找到了或遍历完这个设备空间。
+  + 只会在QSPI,NAND,NOR中这样做，在SD卡中如果失败了则不会寻找了。
+- PL启动分以下4个阶段:
+  + 上电启动
+  + 初始化:清空SRAM，准备烧写bit文件
+  + 配置: 配置PS-PL接口
+  + 使能: BOOTROM会读取PL的启动状态来确定何时使能PL端的JTAG。
+** PS端硬件启动
+PS端硬件启动包含上电时序、时钟获取、复位、启动管脚采样、PLL初始化。在PS启动时PL也可同时启动。
+
+在PS启动后的几个时钟周期，它将会读取MIO2~8的配置模式并将配置存储到只读存储器中。
+- 其中MIO6来决定是否使能PLL，如果使能了PLL，那么系统将要等待PLL稳定后才启动BOOTROM.
+如果没有使能则会直接使用外部晶振的频率。
+** PS端软件启动
+PS段软件上整体流程为：
+1. BootROM根据启动引脚决定从哪个介质读出BOOT包
+  - 在CPU0上运行，CPU1处于等待事件状态(WFE)
+  - BootROM是硬编码的代码，无法改变
+2. BootROM分析BOOT包头来确认是否要搬移代码到OCM
+3. 运行FSBL或裸机代码
+  - FSBL 是完全可更改的
+4. 运行SSBL或裸机代码或系统
+5. 运行系统
+** 启动介质的内容
+通常的启动包包含下面的内容:
+- bootrom 头，用于bootrom分析
+- fsbl/裸机代码，用于bootrom搬移
+- PL端的bit文件，用于后续代码给PL烧写
+- ssbl/裸机代码/或系统，用于fsbl跳转到此执行
+** 启动模式
+zynq支持4种主动启动方式：
+1. QSPI
+  - 可以选择是否直接在QSPI上执行代码，这样可以减少数据搬移而提高启动速度
+2. NOR
+  - 可以选择是否直接在NOR上执行代码，这样可以减少数据搬移而提高启动速度
+3. SD卡
+4. NAND
+
+可以在[[https://www.xilinx.com/support/answers/50991.html][AR#50991]]中挑选官方推荐的芯片。
+
+zynq也支持被动启动方式，这种方式是非加密模式：
+- cascade JTAG模式，默认是这种方式
+  + 可以通过PL JTAG访问DAP和TAP
+- 独立 JTAG模式1
+  + 使用PL JTAG访问TAP来控制PL
+  + 在配置完PL后，使用EMIO JTAG来访问DAP控制ARM
+- 独立 JTAG模式2
+  + 使用PL JTAG访问TAP来控制PL
+  + 使用MIO JTAG访问DAP来控制ARM
+** BootROM的执行
+根据前面的说明可以知道:
+1. 系统热启动的情况下会很快执行BootROM，所以其启动时间更短。
+2. BootROM在主动启动模式下，具有对应控制器的初始化功能，这样才能读取介质内容。
+   
+BootROM的头来决定是否为安全启动模式，如果为安全启动模式，BootROM会将代码从flash读出、解密、写入OCM。
+- 如果安全模式下热启动，头格式被非法修改为非安全模式，此时BootROM会停止锁死系统并报错 0x201A.
+  - 报错码会写入寄存器 =slcr.REBOOT_STATUS= 
+** PL的配置路径
+[[./pl_conf_path.jpg]]
+
+如上图所示PL有3种配置路径：
+1. JTAG连接TAP控制器
+  - 用于非安全模式
+  - 需要PL被配置于TAP接口
+2. PS PCAP 控制
+  - 用于安全和非安全模式
+  - 需要PL被配置于Devc接口
+3. ICAP控制
+  - 用于安全和非安全模式
+  - 需要PL已经被事先下载了bit流
+** 设备配置接口
+[[./devc_struct.jpg]]
+
+zynq具有3个设备接口(DevC, device configuration interface)来分别:
+1. 配置PL
+2. 管理设备安全性
+3. 访问XADC
+* 上电到bootrom
+** 电源需求
+在进入bootrom前，需要的电源需求如下图:
+[[./power_requirements.jpg]]
+
+** 时钟
+当使能PLL时，需确保外部晶振的稳定。当PLL旁路时系统运行速度会降低并且有些模块也无法使用（比如USB）。
+** 复位
+有以下两种复位：
+- POR Reset(冷启动复位):复位整个系统
+- Non-POR Resets(热启动复位):仅复位部分
+** 启动模式管脚
+[[./boot_mode.jpg]]
+
+在复位后硬件将会采样这几个管脚值，然后存储于只读寄存器:
+- BOOT_MODE[4:0] 存储于 =slcr.BOOT_MODE[BOOT_MODE],[PLL_BYPASS]= 中
+- VMODE[1:0] 存储于 =slcr.GPIOB_DRVR_BIAS_CTRL[RB_VCFG],[LB_VCFG]= 中
+  + VMODE[0] 控制MIO15:0管脚，VMODE[1]控制53:16管脚
+
+
+* bootrom
+[[./bootrom_flow.jpg]]
+
+- bootrom在执行期间DAP和TAP是不可用的。
+- fsbl/user code 的大小限制在192k，但如果是在flash上直接运行则没有这个限制
+  + 本来256k的OCM，有高64k在运行bootrom，所以bootrom在搬移fsbl代码期间只剩下192KB空间了。
+** bootrom头
+bootrom头只在flash启动下需要，在JTAG启动下不需要。
+[[./bootrom_header1.jpg]]
+
+[[./bootrom_header2.jpg]]
+
+*** 中断向量表的存储位置(0x00 ~ 0x1c, 8个4字节)
+当代码要运行在QSPI或NOR flash时，这部分空间用于存放ARM中的8种[[http://kcmetercec.top/2018/03/12/linux_kernel_irq_tutorial/#org622942e][异常中断]]。
+*** 数据宽度检测(0x20)
+当启动方式为QSPI时，此处内容必须为 =0xaa995566= 以告知bootrom可以检测数据宽度
+*** 文件标识(0x24)
+此处值恒定为 =0x584c4e58= 以对应字符串 "XLNX",以告知此文件为zynq的启动文件
+*** 加密配置(0x28)
+- =0xa5c3c5a3= : fsbl/user code 已被加密，使用 eFUSE key
+- =0x3a5c3c5a= : fsbl/user code 已被加密，使用电源维持的 RAM key
+- 其他值: 非加密模式
+*** fsbl/user 定义区(0x2c)
+此值可以被fsbl/user 所使用，bootrom并不使用
+*** source offset(0x30)
+指定源码相对文件起始位置的偏移，单位为字节。
+- 此值必须是64字节对齐，并且位置不能小于 =0x8c0=
+*** image长度(0x34)
+指定文件长度，单位为字节。
+- 当值为0时，bootrom不会拷贝代码到OCM中，而是直接在QSPI或NORflash上运行。
+*** 保留(0x38)
+值为0.
+*** 执行的起始地址(0x3c)
+指定代码的执行地址，必须64字节对齐。
+*** image的总大小(0x40)
+要载入OCM中的总大小。
+- 在非安全模式下，此值与image长度一致
+- 在安全模式下，此值会大于image长度
+*** 保留(0x44)
+值为0.
+*** 头校验(0x48)
+计算0x20~0x44之和，然后取反。
+*** fsbl/user 定义区(0x4c ~ 0x9c)
+此值可以被fsbl/user 所使用，bootrom并不使用
+*** 寄存器初始化参数(0xa0~0x89f)
+这里包含了256对 =地址，数据= 对，用于在启动fsbl/user code 之前先来初始化zynq.
+- 当地址为 =0xffffffff= 或遍历到列表尾时，bootrom退出初始化
+*** fsbl/user 定义区(0x8a0 ~ 0x8bf)
+此值可以被fsbl/user 所使用，bootrom并不使用
+*** 代码的起始地址(0x8c0)
+代码地址必须存放于大于或等于此处，并且以64位对齐。
+
+
