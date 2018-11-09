@@ -1,0 +1,22 @@
+#+TITLE: [What]Linux udev基础操作
+#+DATE:  <2018-11-09 五> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, udev
+#+NAME: <linux_operations_udev_basic.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+用户空间的udev可以接收内核设备发送的netlink消息，并根据当前状态动作。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 规则
+** 文件位置
+udev接收设备的消息后，其具体动作则是由规则文件所规定的。
+- 规则文件的后缀为 =.rules= ，以 root 权限可以将文件放在 =/etc/udev/rules.d= 中
+- 规则文件名称以一个数字开头代表其运行的先后顺序，比如 =52-xilinx-pcusb.rules= 
+** 语法
+规则文件的语法由两大部分组成：
+1. 设备匹配：此部分使用序列号与内核发送的消息匹配
+2. 后续动作：当设备匹配成功后，便执行当前的动作

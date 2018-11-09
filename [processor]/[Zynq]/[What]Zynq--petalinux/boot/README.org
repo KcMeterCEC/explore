@@ -1,0 +1,111 @@
+#+TITLE: zynq petalinux -> boot
+#+DATE:  <2018-11-09 五> 
+#+TAGS: zynq
+#+LAYOUT: post 
+#+CATEGORIES: processor, zynq, petalinux
+#+NAME: <processor_zynq_petalinux_boot.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理zynq的软件启动流程。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 整体流程
+软件启动流程如下：
+1. 固化的 bootrom 从启动介质中读取fsbl到OCM
+2. fsbl的代码大小不能大于192kb，但在fsbl在OCM上开始运行后，其可以用空间就是256kb了
+  - 因为高64kb的bootrom空间此时可以使用了
+3. fsbl便可以从其他介质中拷贝代码到ddr中运行
+* bootrom
+boortom载入fsbl的流程如下图:
+[[./bootrom2fsbl.jpg]]
+* fsbl
+fsbl流程如下图所示:
+[[./fsbl_flow.jpg]]
+
+fsbl默认的代码模板中，提供了以下函数可以让用户填充一些功能代码:
+- =FsblHookBeforeBitstreamDload= : 在下载bit流文件之前，此函数会被调用
+- =FsblHookAfterBitstreamDload= : 在下载完bit流文件之后，此函数会被调用
+- =FsblHookBeforeHandoff= : 在进入跳入下一阶段代码前，此函数会被调用
+- =FsblHookFallback= : 当fsbl退回到bootrom之前，此函数会被调用
+
+fsbl最开始会初始化系统硬件，这些代码是由SDK所产生的:
+- =ps7_init.c/h= : 用于初始化系统时钟、DDR、MIO
+  + 关系具体的配置结果，可以用浏览器打开 =ps7_init.html= 查看
+
+
+
+* boot image
+bootrom只将fsbl载入OCM,在之后的操作，便是fsbl来分析后续的文件格式。
+
+整个boot镜像文件的格式由以下几部分组成:
+1. BootROM 头
+2. FSBL 代码
+3. 一个或多个以区为单位的代码
+4. 未使用区域
+
+[[./boot_img.jpg]]
+
+** image header table
+此表紧跟着寄存器初始化列表，所以其起始地址为 =0x8a0= 。
+
+此处记录各个分区头，各个头的描述以非循环单链表的形式链接起来。
+
+此表形式如下:
+| 偏移 | 说明                                |
+|------+-------------------------------------|
+| 0x00 | 版本，固定为0x01020000              |
+| 0x04 | 指定有多少个文件头                  |
+| 0x08 | 到区头描述的偏移，4字节为单位       |
+| 0x0c | 到第一个镜像文件的偏移，4字节为单位 |
+| 0x10 | 到头加密的偏移，4字节为单位         |
+| 0x1c | 0xffffffff，以64字节对齐            |
+** 使用bootgen来生成boot image
+bootgen使用 BIF 文件来描述各个分区的组合方式:
+#+BEGIN_EXAMPLE
+  name ":" "{" "["attributes"]" datafile ... "}"
+#+END_EXAMPLE
+- attributes 是可选的，对于特定的文件才需要指定其属性
+  + 可以描述一个文件可以有多个属性，之间使用逗号","分隔
+- datafile 可以指定文件的路径
+- 支持c语言形式的注释
+
+[[./bif_example.jpg]]
+
+*** 属性
+具有两种属性类型：
+- =bootloader= : 代表此文件是fsbl
+  + 一个bif文件中，只能有一个文件标记此属性
+  + 文件类型必须是elf文件
+- =init= : 代表此文件是用于初始化寄存器列表的
+  
+| 属性                         | 说明                                                            |
+|------------------------------+-----------------------------------------------------------------|
+| aeskeyfile                   | AES key 文件                                                    |
+| alignment = <value>          | 按照多少字节对齐                                                |
+| authentication = <value>     | 加密类型，值为 =none= 或 =RSA=                                  |
+| bootimage                    | 从之前生成的镜像文件中加载数据到此分区                          |
+| bootloader                   | 指定此分区是fsbl                                                |
+| checksum = <value>           | 填入md5校验和                                                   |
+| headersignature = <filename> | 头签名文件                                                      |
+| load = <value>               | 装载地址                                                        |
+| offset = <value>             | 设定绝对偏移                                                    |
+| partition_owner = <value>    | 说明此部分分区是被fsbl还是uboot使用，值可以为 =fsbl= 或 =uboot= |
+| ppkfile                      | 指定此文件是 PPK 文件                                           |
+| ...                          | ...                                                             |
+| startup = <value>            | 此可执行文件最终在DDR中的执行地址                               |
+| xip_mode                     | 在flash上运行代码                                               |
+*** 文件类型
+bootgen支持以下文件类型
+| 扩展           | 说明                 |
+| .bin           | 最原始的二进制文件   |
+| .bit/.rbt      | bit流文件            |
+| .dtb           | 设备树二进制文件     |
+| image.gz       | 压缩文件             |
+| .elf           | 带符号表的可执行文件 |
+| .int           | 寄存器初始化列表     |
+| .nky           | AES key              |
+| .pk1/.pub/.pem | RAS key              |
+*** 命令
+创建好BIF文件后，便使用 =bootgen= 命令生成打包好的镜像文件。
