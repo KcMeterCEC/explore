@@ -1,3 +1,18 @@
+#+TITLE: [What]预备知识 
+#+DATE: <2018-05-31 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,程序员的自我休养
+#+NAMA: <book_link_chapter_1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+计算机硬件预备知识。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+
+
 * 程序员的自我休养 --> 链接装载与库
 这是 <<程序员的自我休养 --> 链接装载与库>> 的读书笔记.
 

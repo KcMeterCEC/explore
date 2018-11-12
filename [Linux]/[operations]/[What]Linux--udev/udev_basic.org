@@ -8,15 +8,125 @@
 #+OPTIONS: ^:{}
 
 用户空间的udev可以接收内核设备发送的netlink消息，并根据当前状态动作。
+
+运行下面的代码即可体验:
+#+BEGIN_SRC c
+  #include <linux/netlink.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <poll.h>
+
+  static void die(char *s)
+  {
+      write(2, s, strlen(s));
+      exit(1);
+  }
+
+  int main(int argc, char *argv[])
+  {
+      struct sockaddr_nl nls;
+      struct pollfd   pfd;
+      char buf[512];
+
+      //Open hotplug event netlink socket
+      memset(&nls, 0, sizeof(struct sockaddr_nl));
+      nls.nl_family = AF_NETLINK;
+      nls.nl_groups = -1;
+
+      pfd.events = POLLIN;
+      pfd.fd = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT);
+      if(pfd.fd == -1)
+      {
+          die("Not root\n");
+      }
+
+      //listen to netlink socket
+      if(bind(pfd.fd, (void *)&nls, sizeof(struct sockaddr_nl)))
+      {
+          die("Bind failed!\n");
+      }
+      while(-1 != poll(&pfd, 1, -1))
+      {
+          int i, len = recv(pfd.fd, buf, sizeof(buf), MSG_DONTWAIT);
+          if(len == -1)
+          {
+              die("recv\n");
+          }
+          //print the data to stdout
+          i = 0;
+          while(i < len)
+          {
+              printf("%s\n", buf + i);;
+              i += strlen(buf + i) + 1;
+          }
+      }
+      die("poll\n");
+
+      return 0;
+  }
+#+END_SRC
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
 * 规则
 ** 文件位置
 udev接收设备的消息后，其具体动作则是由规则文件所规定的。
-- 规则文件的后缀为 =.rules= ，以 root 权限可以将文件放在 =/etc/udev/rules.d= 中
+- 规则文件的后缀为 =.rules= ，以 root 权限用户可以将文件放在 =/etc/udev/rules.d= 中,或放在运行时文件夹 =/run/udev/rules.d=
+  + 系统的规则文件存在于 =/lib/udev/rules.d= 中，当用户文件中有与系统文件同名的文件时，则会覆盖系统文件的设置
+    + 同名文件覆盖时，优先级由高到低依次是 =/etc,/run,/lib=
 - 规则文件名称以一个数字开头代表其运行的先后顺序，比如 =52-xilinx-pcusb.rules= 
+  + udev 运行文件是以数值和字母排序来运行的
 ** 语法
-规则文件的语法由两大部分组成：
+*** 基本思想
+需要理解的是，规则文件的语法由两大部分组成：
 1. 设备匹配：此部分使用序列号与内核发送的消息匹配
 2. 后续动作：当设备匹配成功后，便执行当前的动作
+*** 基本规则
+- 空格行和注释行(以"#"开头)会被忽略
+- 规则每一行至少包含一对 "key=value" 的键值对，其中的key就包含设备匹配键和赋值键
+  + 首先得需要所有的设备匹配键 *完全匹配* 后，后面的赋值键才会生效
+- 一个规则文件是由多个键值对所组成的，它们之间通过逗号分隔
+*** 基本操作
+每个键值对可执行如下操作:
+- "==" : 判断是否相等
+- "!=" : 判断是否不等
+- "="  : 直接给key赋值，key之前的值将会被覆盖
+- "+=" : 给key追加赋值，新值会加入key的列表中
+- "-=" : 删除key列表中包含的此值
+- ":=" : 最终赋值，也就是将key的值定死为这个值了，它不会被之后的值覆盖了
+*** key的匹配
+有下面这些key匹配可以被使用:
+- 这些key名称在事件返回是也会有对应的名称
+| key name                                 | 与事件中的对应意义                                         |
+|------------------------------------------+------------------------------------------------------------|
+| ACTION                                   | 当前动作的名称，相当于一个大范围的筛选                     |
+| DEVPATH                                  | 设备的路径                                                 |
+| KERNEL                                   | 设备的名称                                                 |
+| NAME                                     | 网络接口的名称                                             |
+| SYMLINK                                  | 符号链接的名称                                             |
+| SUBSYSTEM                                | 子系统匹配                                                 |
+| DRIVER                                   | 与设备对应的驱动名称匹配                                   |
+| ATTR{filename}, SYSCTL{kernel parameter} | 分别对应sysfs中的属性值和内核中的参数值                    |
+| KERNELS                                  | 父设备名称                                                 |
+| SUBSYSTEMS                               | 父子系统名称                                               |
+| DRIVERS                                  | 父设备对应的驱动名称                                       |
+| ATTRS{filename}                          | 父设备对应的sysfs中的属性值                                |
+| TAGS                                     | 父设备标记                                                 |
+| ENV{key}                                 | 对应设备的属性值                                           |
+| TAG                                      | 设备的标记                                                 |
+| TEST{octal mode mask}                    | 测试当前文件的属性                                         |
+| PROGRAM                                  | 通过执行外部程序来判断是否匹配，如果程序运行成功则返回true |
+| RESULT                                   | 跟在 =PROGRAM= 后面以获取程序运行的返回值                  |
+
+key的字符串，也可以使用shell中的一些通配符:
+- "*" : 匹配0个或多个字符
+- "?" : 匹配1个字符
+- "[]" : 匹配括号中的一个字符
+  + 比如 "[0-9]" 表示匹配0-9中一个数字
+- "|" : 匹配左值或右值
+*** key的赋值
+

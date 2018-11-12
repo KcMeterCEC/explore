@@ -1,0 +1,328 @@
+#+TITLE: [What]数据结构与算法 -> 排序
+#+DATE:  <2018-11-07 Wed> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post 
+#+CATEGORIES: program,数据结构与算法
+#+NAME: <program_DS_sort.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程：王争 --> <数据结构与算法之美>
+
+整理常用的几种排序算法。
+| 算法             | 时间复杂度 | 是否基于比较 |
+|------------------+------------+--------------|
+| 冒泡、插入、选择 | O(n ^ 2)   | 是           |
+| 快排、归并       | O(nlogn)   | 是           |
+| 桶、计数、基数   | O(n)       | 否           |
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 分析一个排序算法
+要分析一个排序算法，需要从以下几个方面入手：
+** 排序算法的执行效率
+1. 为了比较不同的算法以及该算法在不同数据结构情况下的性能，需要得出：
+  - 最好情况时间复杂度
+  - 最坏情况时间复杂度
+  - 平均情况时间复杂度
+2. 为了能更精确的比较，在分析时间复杂度时，还需要包含其系数、常数、低阶
+3. 基于比较的算法，还需要包含其比较的次数和数据交换的次数
+** 排序算法的内存消耗
+通过空间复杂度分析其内存消耗。
+** 排序算法的稳定性
+所谓的 *稳定性* 是指：排序算法对一连串数据排序后，这里面的 *相同数据* 在排序前和排序后的 *相对位置关系没有变* 。
+
+当要对一组数据结构以不同的角度进行排序时，稳定性就尤为重要。
+- 不能让之后的几次排序把前面排序好的相同数据的相对位置关系给破坏了。
+* 冒泡排序(bubble sort)
+** 概念
+冒泡排序只会操作相邻的两个数据，当相邻的两个数据不满足大小关系时则互换它们的位置。
+- 每次冒泡都会使得至少一个数据移动到它应有的位置，所以最多重复n次就可将n个数据排序完成。
+ 
+在实际使用冒泡时，可以判断此次是否有冒泡操作，如果没有冒泡操作则代表已经排序完毕，即可退出循环。
+
+代码如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdbool.h>
+
+  #define SIZEOF_BUF  (10)
+
+  static int buf[SIZEOF_BUF] = {1,0,6,7,5,4,3,2,8,9};
+
+  static bool bubble_sort(int *in, int size)
+  {
+    bool ret = false;
+    for(int i = 0; i < (size - 1); i++)
+      {
+        if(in[i] > in[i + 1])
+          {
+            int tmp = in[i];
+            in[i] = in[i + 1];
+            in[i + 1] = tmp;
+            ret = true;
+          }
+      }
+
+    printf("buffer contents:\n");
+    for(int i = 0; i < size; i++)
+      {
+        printf("%d,", in[i]);
+      }
+    printf("\n");
+
+    return ret;
+  }
+
+  int main(int argc, char *argv[])
+  {
+    printf("sort buffer:");
+    for(int i = 0; i < SIZEOF_BUF; i++)
+      {
+        printf("%d,", buf[i]);
+      }
+    printf("\n");
+    for(int i = 0; i < SIZEOF_BUF; i++)
+      {
+        if(bubble_sort(buf, SIZEOF_BUF) == false)
+          {
+            break;
+          }
+      }
+    return 0;
+  }
+#+END_SRC
+
+输出结果如下:
+#+BEGIN_EXAMPLE
+  sort buffer:1,0,6,7,5,4,3,2,8,9,
+  buffer contents:
+  0,1,6,5,4,3,2,7,8,9,
+  buffer contents:
+  0,1,5,4,3,2,6,7,8,9,
+  buffer contents:
+  0,1,4,3,2,5,6,7,8,9,
+  buffer contents:
+  0,1,3,2,4,5,6,7,8,9,
+  buffer contents:
+  0,1,2,3,4,5,6,7,8,9,
+  buffer contents:
+  0,1,2,3,4,5,6,7,8,9,
+#+END_EXAMPLE
+** 分析
+*** 在执行效率上分析
+- 最好情况时间复杂度: 
+
+假设数据事先就已经排列好了，那么就没有冒泡操作，所以仅需要遍历1次缓存便退出。
+
+遍历一次的时间为 =n-1=, 其 *最好情况时间复杂度为 O(n)*
+
+- 最坏情况时间复杂度: 
+
+假设所有的数据都未按照相对大小排列，那么每次遍历都会有冒泡操作,对应的公式为:
+[[./bubble_sort_complication.jpg]]
+
+去掉常量、系数、低阶后，其 *最坏情况时间复杂度为: O(n^2)*
+
+- 平均情况时间复杂度:
+若要是按照概率论的方式来计算概率分布其公式有些复杂，而对排序的平均情况时间复杂度分析使用 *有序度* 来计算。
+
+有序度用于描述数据的有序程度，以有序元素对个数来量化，分为 有序度和逆有序度。
+#+BEGIN_EXAMPLE
+    有序度: a[i] <= a[j] ，且 i < j
+
+    逆有序度: a[i] > a[j] , 且 i < j
+
+    满有序度: n * ( n - 1) / 2
+
+    有序度 = 满有序度 - 逆有序度
+
+    当有序度等于满有序度时，则代表已经排序完成
+#+END_EXAMPLE
+比如一组数据排列为 "2,4,3,1,5,6"，那么其有序度对有11对
+#+BEGIN_EXAMPLE
+  (2,4) (2,3) (2,5) (2,6)
+  (4,5) (4,6)
+  (3,5) (3,6)
+  (1,5) (1,6)
+  (5,6)
+#+END_EXAMPLE 
+对应的其逆有序对有 6 * (6 - 1) / 2 - 11 = 4 对
+
+*而平均情况时间复杂度则为满有序度的一半，也就是 n * (n-1) / 4 ，去掉常量、低阶、系数后也是 O(n^2)* 
+*** 在空间复杂度上分析
+冒泡排序在进行数据交换时，仅需要一个变量做缓存即可，并且不随数据量的增大而有所改变。
+
+其 *空间复杂度为 O(1),也叫做原地排序算法*
+*** 在稳定性上分析
+由于数据的交换只发生在不满足既定顺序的情况下，也就是说当两个数据相同时，并不会发生交换。
+
+所以 *冒泡排序是稳定性排序* 。
+
+* 插入排序(insertion sort)
+** 概念
+插入排序将数组分为已排序和未排序两部分，每次从未排序部分取出一个数据插入已排序部分，直至未排序部分中的数据个数为0。
+- 初始情况下，已排序数只有数据第一个元素，而剩下的部分均为未排序数
+- 在将未排序数插入到已排序部分时，不仅有比较操作，还有数据的搬移操作
+- 数据的移动个数 = 满有序度 - 有序度
+  
+代码如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+  static void insertion_sort(int *buf, int size)
+  {
+    for(int i = 1; i < size; i++)
+      {
+        int tmp = buf[i];
+        //因为前面的数据都是有序数列，所以使用倒序比较效率最高
+        int j = i - 1;
+        for(; j >= 0; j--)
+          {
+            if(buf[j] > tmp)
+              {
+                buf[j + 1] = buf[j];
+              }
+            else
+              {
+                break;
+              }
+          }
+        buf[j + 1] = tmp;
+        for(int i = 0; i < size; i++)
+          {
+            printf("%d,", buf[i]);
+          }
+        printf("\n");
+      }
+  }
+
+  #define BUF_SIZE   (6)
+  static int sort_buf[BUF_SIZE] = {6,5,4,3,2,1};
+
+  int main(int argc , char *argv[])
+  {
+    printf("sort buffer is :\n");
+    for(int i = 0; i < BUF_SIZE; i++)
+      {
+        printf("%d,", sort_buf[i]);
+      }
+    printf("\n");
+
+    insertion_sort(sort_buf, BUF_SIZE);
+    return 0;
+  }
+#+END_SRC
+
+结果如下:
+#+BEGIN_EXAMPLE
+  sort buffer is :
+  6,5,4,3,2,1,
+  5,6,4,3,2,1,
+  4,5,6,3,2,1,
+  3,4,5,6,2,1,
+  2,3,4,5,6,1,
+  1,2,3,4,5,6,
+#+END_EXAMPLE
+** 分析
+*** 在执行效率上分析
+- 最好情况时间复杂度：
+当数据是已经排列好的有序数列时，那么并不要数据搬移，第二级for循环都只会执行一次。
+
+*最好情况时间复杂度为O(n)*
+- 最坏情况时间复杂度
+当数据是完全反序时，那么数据都需要搬移全部，也就是:
+[[./insertion_sort_complication.jpg]]
+
+所以其 *最坏情况时间复杂度为O(n^2)*
+- 平均情况时间复杂度
+与冒泡分析方法一样， *其复杂度也是O(n^2)*
+
+*** 在空间复杂度上分析
+无论数据序列如何，都消耗恒定的多余内存。
+
+其 *空间复杂度为 O(1),也叫做原地排序算法*
+*** 在稳定性上分析
+由于数据的交换只发生在不满足既定顺序的情况下，也就是说当两个数据相同时，并不会发生交换。
+
+所以 *插入排序是稳定性排序* 。
+* 选择排序(selection sort)
+** 概念
+选择排序将数组分为已排序和未排序两部分，每次从未排序部分取出最小数据插入已排序部分的末尾，直至未排序部分中的数据个数为0。
+- 初始情况下，已排序数只有数据第一个元素，而剩下的部分均为未排序数
+- 在将未排序数插入到已排序部分时，就是一个交换操作
+  
+代码如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+
+  void selection_sort(int *buf, int size)
+  {
+    for(int i = 1; i < size; i++)
+      {
+        //get minimum
+        int *minimum = &buf[i];
+        for(int j = i; j < size; j++)
+          {
+            if(*minimum > buf[j])
+              {
+                minimum = &buf[j];
+              }
+          }
+
+        if(*minimum < buf[i - 1])
+          {
+            //exchange
+            int tmp = buf[i - 1];
+            buf[i - 1] = *minimum;
+            ,*minimum = tmp;
+          }
+
+        printf("buffer:");
+        for(int k = 0; k < size; k++)
+          {
+            printf("%d,", buf[k]);
+          }
+        printf("\n");
+      }
+  }
+
+  #define BUF_SIZE  (6)
+  static int test_buf[6] = {6,5,4,3,1,2};
+
+  int main(int argc, char *argv[])
+  {
+    selection_sort(test_buf, BUF_SIZE);
+
+    return 0;
+  }
+#+END_SRC
+
+运行结果如下:
+#+BEGIN_EXAMPLE
+  buffer:1,5,4,3,6,2,
+  buffer:1,2,4,3,6,5,
+  buffer:1,2,3,4,6,5,
+  buffer:1,2,3,4,6,5,
+  buffer:1,2,3,4,5,6,
+#+END_EXAMPLE
+** 分析
+*** 在执行效率上分析
+无论数据是如何排列的，此算法都会需要依次做比较，公式如下:
+[[./bubble_sort_complication.jpg][./bubble_sort_complication.jpg]]
+
+也就是说其 *最坏、最好、平均时间复杂度都是O(n^2)*
+*** 在空间复杂度上分析
+无论数据序列如何，都消耗恒定的多余内存。
+
+其 *空间复杂度为 O(1),也叫做原地排序算法*
+*** 在稳定性上分析
+当大数被交换时，就会导致相同数据顺序被交换，比如 "6,6,5,5,4,3,2"
+
+所以 *选择排序不是稳定性排序算法*
+
+* 总结
+无论是从时间复杂度还是从稳定性来说，排序算法当然选择冒泡排序和插入排序，那这二者又该如何选呢？
+
+根据代码实现数据交换来看，插入排序比冒泡排序更为简洁，所以从工程应用上来讲，插入排序比冒泡排序的效率更高。

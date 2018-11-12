@@ -71,9 +71,37 @@
 
   pop -> 0
 #+END_EXAMPLE
+链式栈的代码位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/stack/list][此处]]，其输出如下。
+#+BEGIN_EXAMPLE
+  push element:
+  stack:lilei,
+  stack:may,lilei,
+  stack:jack,may,lilei,
+  pop element:
+  get : jack
+  stack:may,lilei,
+  get : may
+  stack:lilei,
+  get : lilei
+  stack:
+#+END_EXAMPLE
 * 队列
 队列的实现方式同样也有数组(顺序队列)或双向链表(链式队列)来做。
 
 为了避免顺序队列在数组写满后的搬移操作，通常我们会使用循环队列(ring buffer)以达到O(1)的时间复杂度。
 - 代码位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/queue/ring_buffer][此处]]
 
+链式队列的代码在[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/queue/list][此处]],其输出为：
+#+BEGIN_EXAMPLE
+  write element:
+  queue:lilei,
+  queue:lilei,may,
+  queue:lilei,may,jack,
+  read element:
+  get : lilei
+  queue:may,jack,
+  get : may
+  queue:jack,
+  get : jack
+  queue:
+#+END_EXAMPLE
