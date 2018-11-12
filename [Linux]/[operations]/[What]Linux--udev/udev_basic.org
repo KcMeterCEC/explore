@@ -129,4 +129,326 @@ key的字符串，也可以使用shell中的一些通配符:
   + 比如 "[0-9]" 表示匹配0-9中一个数字
 - "|" : 匹配左值或右值
 *** key的赋值
+下面这些key可以被赋值
+- 所谓赋值的意义就是设置或执行对应的动作
+| key                      | 意义                                                                                 |
+|--------------------------+--------------------------------------------------------------------------------------|
+| NAME                     | 网络接口的名称                                                                       |
+| SYMLINK                  | 符号链接的名称                                                                       |
+| OWNER,GROUP,MODE         | 设备的拥有者、组、模式等                                                             |
+| SECLABEL{module}         | 为设置指定对应的安全模块                                                             |
+| ATTR{key}                | 向设备sysfs中的属性文件写值                                                          |
+| SYSCTL{kernel parameter} | 向内核参数写值                                                                       |
+| ENV{key}                 | 设置设备的属性值                                                                     |
+| TAG                      | 设备的标记，用于过滤和分组                                                           |
+| RUN{type}                | 当规则执行完后，执行程序列表。type的值为 =program= 或 =builtin=,程序名需要加绝对路径 |
+| LABEL                    | 和C中label意义一样，用于GOTO跳转                                                     |
+| GOTO                     | 跳转到对应的LABEL处                                                                  |
+| IMPORT{type}             | 为设备属性导入一个值                                                                 |
+| OPTIONS                  | 规则和设备的选项                                                                     |
 
+其中 =NAME=, =SYMLINK= , =PROGRAM= , =OWNER= , =GROUP= , =MODE= , =SECLABEL= , =RUN= 的赋值字符串可以使用替换符，
+- =RUN= 的替换符要在规则执行完后才生效
+
+具有下面这些替换符:
+- $kernel, %k : 设备在内核中的名称
+- $number, %n : 设备在内核中的数值
+- $devpath, %p : 设备的路径
+- %id, %b : 设备的名称
+- $driver : 设备对应的驱动名称
+- $attr{file}, %s{file} : 设备在 =sysfs= 中的属性值
+- %env{key}, %E{key} : 设备属性值
+- $major, %M : 主设备号
+- $minor, %m : 次设备号
+- $result, %c : 运行外部程序的 =PROGRAM= 返回值
+- $parent, %p : 符设备节点名
+- $name : 设备名称
+- $links : 符号链接
+- $root, %r : =dev_root= 的值
+- $sys, %S : sysfs的挂载点
+- $devnode, %N : 设备节点名称
+- %% : 代表 “%”
+- $$ : 代表 “$”
+
+* 使用
+上面一大堆看得人头晕，具体实践一下就明白了，步骤如下:
+1. 找到设备路径
+2. 分析设备及父设备属性
+3. 编写规则文件
+4. 仿真测试
+5. 验证
+
+** 找到设备路径
+首先 *运行文章开头的代码* ，然后查看对应设备插入或拔下的输出信息。
+
+比如，我通过将SD卡插入到读卡器后，输出了下面这部分信息:
+#+BEGIN_EXAMPLE
+  ACTION=add
+  DEVPATH=/devices/pci0000:00/0000:00:0c.0/usb1/1-2/1-2:1.0/host3/target3:0:0/3:0:0:0/block/sdb/sdb1
+  SUBSYSTEM=block
+  DEVNAME=/dev/sdb1
+  DEVTYPE=partition
+  PARTN=1
+  SEQNUM=4933
+  USEC_INITIALIZED=6355493922
+  MAJOR=8
+  MINOR=17
+  ID_BUS=usb
+  ID_INSTANCE=0:0
+  ID_MODEL=STORAGE_DEVICE
+  ID_MODEL_ENC=STORAGE\x20DEVICE\x20\x20
+  ID_MODEL_ID=0749
+  ID_PART_TABLE_TYPE=dos
+  ID_PART_TABLE_UUID=61a220e7
+  ID_PATH=pci-0000:00:0c.0-usb-0:2:1.0-scsi-0:0:0:0
+  ID_PATH_TAG=pci-0000_00_0c_0-usb-0_2_
+#+END_EXAMPLE
+由此便可得知设备路径 =DEVPATH= 为 =/sys/= 下的:
+#+BEGIN_EXAMPLE
+  /devices/pci0000:00/0000:00:0c.0/usb1/1-2/1-2:1.0/host3/target3:0:0/3:0:0:0/block/sdb/sdb1
+#+END_EXAMPLE
+** 分析设备及父设备属性
+=udevadm= 命令可以以层次的方式展示当前设备属性及父设备的属性，一般使用方式为:
+#+BEGIN_EXAMPLE
+  udevadm info -ap <devpath>
+#+END_EXAMPLE
+
+所以接下来查看其属性:
+#+BEGIN_EXAMPLE
+  cec@virtual:~$ udevadm info -ap /devices/pci0000:00/0000:00:0c.0/usb1/1-2/1-2:1.0/host3/target3:0:0/3:0:0:0/block/sdb/sdb1
+
+  Udevadm info starts with the device specified by the devpath and then
+  walks up the chain of parent devices. It prints for every device
+  found, all possible attributes in the udev rules key format.
+  A rule to match, can be composed by the attributes of the device
+  and the attributes from one single parent device.
+
+    looking at device '/devices/pci0000:00/0000:00:0c.0/usb1/1-2/1-2:1.0/host3/target3:0:0/3:0:0:0/block/sdb/sdb1':
+      KERNEL=="sdb1"
+      SUBSYSTEM=="block"
+      DRIVER==""
+      ATTR{alignment_offset}=="0"
+      ATTR{discard_alignment}=="0"
+      ATTR{inflight}=="       0        0"
+      ATTR{partition}=="1"
+      ATTR{ro}=="0"
+      ATTR{size}=="15515648"
+      ATTR{start}=="8192"
+      ATTR{stat}=="     396    14920    20016     1332        1        0        1        0        0      728     1332"
+
+    looking at parent device '/devices/pci0000:00/0000:00:0c.0/usb1/1-2/1-2:1.0/host3/target3:0:0/3:0:0:0/block/sdb':
+      KERNELS=="sdb"
+      SUBSYSTEMS=="block"
+      DRIVERS==""
+      ATTRS{alignment_offset}=="0"
+      ATTRS{capability}=="51"
+      ATTRS{discard_alignment}=="0"
+      ATTRS{events}=="media_change"
+      ATTRS{events_async}==""
+      ATTRS{events_poll_msecs}=="-1"
+      ATTRS{ext_range}=="256"
+      ATTRS{hidden}=="0"
+      ATTRS{inflight}=="       0        0"
+      ATTRS{range}=="16"
+      ATTRS{removable}=="1"
+      ATTRS{ro}=="0"
+      ATTRS{size}=="15523840"
+      ATTRS{stat}=="    1250    44760    64984     4636        3        0        3        0        0     2424     4636"
+
+  ........
+
+#+END_EXAMPLE
+以上只打印了其上一级的父设备，一般来讲这就可以匹配了。
+** 编写规则文件
+#+BEGIN_EXAMPLE
+  #以add作为捕捉点
+  # ATTRS 都是使用父节点的属性
+  ACTION=="add" \
+  , ATTRS{capability}=="51" \
+  , ATTRS{events}=="media_change" \
+  , RUN+="/bin/bash /home/cec/learn/linux/udev/out.sh"
+#+END_EXAMPLE
+上面的匹配规则比较简单，需要注意的是 =RUN= key,因为RUN运行的外部命令都需要绝对路径，
+如果我们直接在此处写命令实在麻烦，所以使用 =/bin/bash= 来运行绝对路径脚本，在脚本中再运行命令就方便多了。
+
+脚本"out.sh" 如下:
+#+BEGIN_SRC bash
+  #/bin/bash
+
+  echo "sdcard inserted!" > /home/cec/learn/linux/udev/test.out
+#+END_SRC
+最后，将这个规则文件需要拷贝到规则目录:
+#+BEGIN_EXAMPLE
+  sudo cp 99-sdcardcheck.rules /etc/udev/rules.d/
+#+END_EXAMPLE
+** 仿真测试
+=udevadm test= 可以模拟规则文件是否被调用， *需要保证设备没有被拔下！*
+- 并不会运行 =RUN= key
+#+BEGIN_EXAMPLE
+  ....
+  Reading rules file: /etc/udev/rules.d/99-sdcardcheck.rules
+  ....
+  run: '/bin/bash /home/cec/learn/linux/udev/out.sh'
+  ....
+#+END_EXAMPLE
+由上可以看出规则文件已经被正确调用了。
+** 验证
+现在重载一下规则文件:
+#+BEGIN_EXAMPLE
+  sudo udevadm control --reload
+#+END_EXAMPLE
+然后重新插入sd卡，可以看到对应路径新建了文件 =test.out=
+* mdev
+对于嵌入式linux来说，udev相对太重量级了，busybox为此提供了几乎同样功能的mdev。
+
+** 准备
+为了使用mdev，需要以下几个前提:
+- 内核使能hotplug
+- busybox使能mdev
+- 文件系统需要挂载 =sysfs= 和 =proc=  文件系统
+** 配置
+mdev的配置文件位于 =/etc/mdev.conf= ，其匹配关系格式为:
+#+BEGIN_EXAMPLE
+  <device regex> <uid>:<gid> <octal permissions> [=path] [@|$|*<command>]
+#+END_EXAMPLE
+- <device regex> : 以正则表达式的方式匹配 =/dev= 设备名
+- <uid>:<gid> : 设定user id 和 group id
+  + 默认的uid和gid都为root
+- <octal permissions> : 设定操作权限
+  + 默认的权限为660
+- <=|>path> : 移动或重命名设备节点
+  + 当为 "=" 时，代表单纯的移动或重命名
+  + 当为 ">" 时，代表移动或重命名后，还会在 =/dev= 下创建设备的符号链接
+- [@|$|*<command>] : 匹配成功后，调用对应的命令动作
+  + @ : 在创建设备节点后调用此命令
+  + $ : 在移除设备节点前调用此命令
+  + * : 在创建设备节点后以及移除设备节点前都调用此命令
+    
+比如:
+#+BEGIN_EXAMPLE
+  mmcblk1p[0-9]  0:0 660 */etc/hotplug/sd/sd_det
+#+END_EXAMPLE
+
+=sd_det= 就是一个脚本，用于当设备匹配后的执行脚本。
+- 当设备匹配后，变量 =${MDEV}= 便是设备的名称
+** 使用
+- 使能mdev为hotplug管理者:
+#+BEGIN_EXAMPLE
+  echo /sbin/mdev > /proc/sys/kernel/hotplug
+#+END_EXAMPLE
+- 启动
+#+BEGIN_EXAMPLE
+  mdev -s
+#+END_EXAMPLE
+** 实例
+mdev.conf:
+#+BEGIN_EXAMPLE
+  $MODALIAS=.* 0:0 660 @modprobe "$MODALIAS"
+
+  console 0:0 0600 
+  cpu_dma_latency 0:0 0660 
+  fb0:0 44 0660 
+  full 0:0 0666 
+  initctl 0:0 0600 
+  ircomm[0-9].* 0:20 0660 
+  kmem 0:15 0640 
+  kmsg 0:0 0660 
+  log 0:0 0666 
+  loop[0-9].* 0:6 0640 
+  mem 0:15 0640 
+  network_latency 0:0 0660 
+  network_throughput 0:0 0660 
+  null 0:0 0666 
+  port 0:15 0640 
+  ptmx 0:5 0666 
+  ram[0-9].* 0:6 0640 
+  random 0:0 0666 
+  sda 0:6 0640 
+  tty 0:5 0666 
+  tty.* 0:0 0620 
+  urandom 0:0 0666 
+  usbdev.* 0:0 0660 */etc/mdev/usb.sh
+  vcs.* 0:5 0660 
+  zero 0:0 0666 
+ 
+  snd/pcm.* 0:0 0660
+  snd/control.* 0:0 0660
+  snd/timer 0:0 0660
+  snd/seq 0:0 0660
+  snd/mini.* 0:00 0660
+
+  input/event.* 0:0 0660 @/etc/mdev/find-touchscreen.sh
+  input/mice 0:0 0660
+  input/mouse.* 0:0 0660
+
+  tun[0-9]* 0:0 0660 =net/
+
+  [hs]d[a-z][0-9]? 0:0 660 */etc/mdev/mdev-mount.sh
+  mmcblk[0-9].* 0:0 660 */etc/mdev/mdev-mount.sh
+#+END_EXAMPLE
+mdev-mount.sh
+#+BEGIN_SRC bash
+  #!/bin/sh
+  MDEV_AUTOMOUNT=y
+  MDEV_AUTOMOUNT_ROOT=/run/media
+  [ -f /etc/default/mdev ] && . /etc/default/mdev
+  if [ "${MDEV_AUTOMOUNT}" = "n" ] ; then
+    exit 0
+  fi
+
+  case "$ACTION" in
+    add|"")
+      ACTION="add"
+      # check if already mounted
+      if grep -q "^/dev/${MDEV} " /proc/mounts ; then
+        # Already mounted
+        exit 0
+      fi
+      DEVBASE=`expr substr $MDEV 1 3`
+      if [ "${DEVBASE}" == "mmc" ] ; then
+        DEVBASE=`expr substr $MDEV 1 7`
+      fi
+      # check for "please don't mount it" file
+      if [ -f "/dev/nomount.${DEVBASE}" ] ; then
+        # blocked
+        exit 0
+      fi
+      # check for full-disk partition
+      if [ "${DEVBASE}" == "${MDEV}" ] ; then
+        if [ -d /sys/block/${DEVBASE}/${DEVBASE}*1 ] ; then
+          # Partition detected, just quit
+          exit 0
+        fi
+        if [ ! -f /sys/block/${DEVBASE}/size ] ; then
+          # No size at all
+          exit 0
+        fi
+        if [ `cat /sys/block/${DEVBASE}/size` == 0 ] ; then
+          # empty device, bail out
+          exit 0
+        fi
+      fi
+      # first allow fstab to determine the mountpoint
+      if ! mount /dev/$MDEV > /dev/null 2>&1
+      then
+        MOUNTPOINT="${MDEV_AUTOMOUNT_ROOT}/$MDEV"
+        mkdir "$MOUNTPOINT"
+        mount -t auto /dev/$MDEV "$MOUNTPOINT"
+      fi
+      ;;
+    remove)
+      MOUNTPOINT=`grep "^/dev/$MDEV\s" /proc/mounts | cut -d' ' -f 2`
+      if [ ! -z "$MOUNTPOINT" ]
+      then
+        umount "$MOUNTPOINT"
+        rmdir "$MOUNTPOINT"
+      else
+        umount /dev/$MDEV
+      fi
+      ;;
+    ,*)
+      # Unexpected keyword
+      exit 1
+      ;;
+  esac
+#+END_SRC
