@@ -21,7 +21,7 @@
 
 [[./device_update_overview.jpg]]
 
-** 升级细节
+** 启动流程
 对于嵌入式Linux而言，其升级代码一般位于系统之上而不是在u-boot中，因为这在后期的升级更为简便。
 
 但需要注意的是：
@@ -43,4 +43,44 @@
 
 [[./linux_boot.jpg]]
 
+** 升级
+系统升级的思路如下图:
+[[./linux_sysupdate.jpg]]
 
+对应的emmc的分区方式如下图:
+[[./linux_emmc_format.jpg]]
+
+- 1分区是uboot默认引导的分区，当1分区系统被破坏时，uboot便会从2分区启动备份恢复系统
+- 2分区除了备份恢复系统还具有升级系统文件和应用文件等
+  + 启动后的系统initramfs来检测2分区的升级文件，而对应的更新系统
+- 3分区是initramfs在完成系统基本配置后，会跳转到的真实应用文件系统
+- 4分区主要用户存储用户数据和日志文件
+  
+*** initramfs到rootfs
+initramfs需要达到以下几点要求:
+1. 体积要足够的小，以达到快速启动
+  + 因为kernel会将整个ramfs拷贝到内存，如果ramfs体积太大这会消耗不少时间
+2. 具备更新系统文件和根文件系统的功能
+   
+主要难点在更新根文件系统，根文件系统格式为cpio格式，这需要ramfs中具有cpio命令，具体流程如下:
+1. 当根文件系统要更新时，则解压缩包并覆盖
+#+BEGIN_EXAMPLE
+  cpio -idmv < xxx.cpio
+#+END_EXAMPLE
+2. 跳转至根文件系统
+#+BEGIN_EXAMPLE
+  mount /dev/mmcblk1p3 /mnt/
+
+  #文件系统的绑定，需要根据 cat /proc/mounts 来实际调整
+  mount -o bind /proc /mnt/proc/
+  mount -o bind /sys /mnt/sys/
+  mount -o bind /sys/kernel/debug /mnt/sys/kernel/debug/
+  mount -o bind /dev /mnt/dev/
+  mount -o bind /run /mnt/run/
+  mount -o bind /var/volatile /mnt/var/volatile/
+  mount -o bind /dev/pts /mnt/dev/pts/
+  mount -o bind /sys/kernel/config/ /mnt/sys/kernel/config/
+
+  #进入根文件系统
+  chroot /mnt/
+#+END_EXAMPLE
