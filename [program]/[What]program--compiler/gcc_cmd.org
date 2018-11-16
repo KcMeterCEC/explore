@@ -1,0 +1,28 @@
+#+TITLE: [What]compiler -> gcc 常用命令
+#+DATE:  <2018-11-16 五> 
+#+TAGS: compiler
+#+LAYOUT: post 
+#+CATEGORIES: program,compiler
+#+NAME: <program_compiler_gcc_cmd.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理gcc下及其与编译链接相关的命令，避免遗忘。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 编译
+| 命令                      | 说明                                  |
+|---------------------------+---------------------------------------|
+| gcc -E hello.c -o hello.i | -E 表示只进行预编译                   |
+| gcc -S hello.i -o hello.s | -S 表示将预编译后的文件编译为汇编语言 |
+| gcc -S hello.c -o hello.s | -S 也表示将源文件直接编译为汇编语言   |
+| gcc -c hello.s -o hello.o | -c 表示将汇编语言文件转换为目标文件   |
+| gcc -c hello.c -o hello.o | -c 也表示将源文件直接转换为目标文件   |
+* 查看
+| 命令                   | 说明                                    |
+|------------------------+-----------------------------------------|
+| file <file_name>       | 查看文件是哪些类型                      |
+| size <file_name>       | 查看目标文件text段、数据段、bss段的大小 |
+| objdump -h <file_name> | 查看目标文件段表整体描述                |
+|                        |                                         |

@@ -1,0 +1,45 @@
+#+TITLE: [What]compiler -> gcc 常用属性
+#+DATE:  <2018-04-02 Mon> 
+#+TAGS: compiler
+#+LAYOUT: post 
+#+CATEGORIES: program,compiler
+#+NAME: <program_compiler_gcc_attribute.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+整理gcc下的attribute，避免遗忘。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+
+* 数据结构
+** 结构体非对齐
+在两个系统进行通信发送数据时，经常会要以结构体非对齐方式，以保证数据对应的情况下减小发送带宽。
+
+使用 =__packed= 来强制编译器不使用对齐。
+#+BEGIN_SRC c
+typedef struct __attribute__((__packed__))
+{
+        uint8_t cmd;
+        uint8_t data;
+}cmd_normal;
+#+END_SRC
+
+* 消除Warning
+** 指针到整数的转换
+c编程中经常会将指针强制转换为整数以传递地址，但这种情况下gcc会有对应警告，相应的应对解决方案:
+- cast from pointer to integer of different size : 将指针强制转换为整数
+#+BEGIN_SRC c
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wpointer-to-int-cast"
+  //强制转换代码放这里
+  #pragma GCC diagnostic pop
+#+END_SRC
+- cast to pointer from integer of different size : 将整数强制转换为指针
+#+BEGIN_SRC c
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
+  //强制转换代码放这里
+  #pragma GCC diagnostic pop
+#+END_SRC

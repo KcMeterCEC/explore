@@ -228,6 +228,11 @@ DTC是将 .dts 文件编译为 .dtb 的工具.其源代码位于 =scripts/dtc=,�
 *** DTB(Device Tree Blob)
 .dtb文件是由.dts文件通过DTC工具编译过来的,此文件可以被linux内核和u-boot识别.
 此文件可以与内核镜像单独存放,也可以与内核镜像打包.编译内核时,使能 =CONFIG_ARM_APPENDED_DTB= 便可以打包.
+
+可以使用内核自带的脚本将dtb转为dts以验证是否调用了正确的设备树:
+#+BEGIN_EXAMPLE
+  ./scripts/dtc/dtc -I dtb -O dts -o devicetree.dts devicetree.dtb
+#+END_EXAMPLE
 *** 绑定(Binding)
 设备树针对不同设置的绑定说明文档位于 =Documentation/devicetree/bindings=, 在使用内核提供的驱动时，需要查看此文件以知道哪些属性是必须的，哪些是可选的。
 
