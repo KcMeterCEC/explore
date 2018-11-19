@@ -12,7 +12,6 @@
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
-
 * 数据结构
 ** 结构体非对齐
 在两个系统进行通信发送数据时，经常会要以结构体非对齐方式，以保证数据对应的情况下减小发送带宽。
@@ -42,4 +41,18 @@ c编程中经常会将指针强制转换为整数以传递地址，但这种情�
   #pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
   //强制转换代码放这里
   #pragma GCC diagnostic pop
+#+END_SRC
+* 链接
+** 自定义段
+GCC 提供了一个扩展机制,可以指定变量或函数所处的段:
+#+BEGIN_SRC c
+/*
+  在全局变量或函数前加上 __attribute__((section("name")))
+  就可以把相应的变量或函数放到以 "name" 作为段名的段中
+ ,*/
+__attribute__((section("FOO")))  int global = 42;
+
+__attribute__((section("BAR"))) void foo()
+{
+}
 #+END_SRC
