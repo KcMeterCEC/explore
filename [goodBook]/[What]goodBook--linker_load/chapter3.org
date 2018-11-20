@@ -424,6 +424,27 @@ ELF 文件的段结构就是由段表决定的,编译器,链接器和装载器�
 链接过程中,最需要关心的就是全局符号的相互粘合, 局部符号,段名,行号等都是次要的,它们 *对于其他目标文件来说是不可见的*,在链接过程中也是无关紧要的.
 
 符号表的查看使用命令 =readelf -s hello.o=
+#+BEGIN_EXAMPLE
+  Symbol table '.symtab' contains 17 entries:
+     Num:    Value          Size Type    Bind   Vis      Ndx Name
+       0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+       1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS SimpleSection.c
+       2: 0000000000000000     0 SECTION LOCAL  DEFAULT    1 
+       3: 0000000000000000     0 SECTION LOCAL  DEFAULT    3 
+       4: 0000000000000000     0 SECTION LOCAL  DEFAULT    4 
+       5: 0000000000000000     0 SECTION LOCAL  DEFAULT    5 
+       6: 0000000000000004     4 OBJECT  LOCAL  DEFAULT    3 static_var.1802
+       7: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 static_var2.1803
+       8: 0000000000000000     0 SECTION LOCAL  DEFAULT    7 
+       9: 0000000000000000     0 SECTION LOCAL  DEFAULT    8 
+      10: 0000000000000000     0 SECTION LOCAL  DEFAULT    6 
+      11: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    3 global_init_var
+      12: 0000000000000004     4 OBJECT  GLOBAL DEFAULT  COM global_uninit_var
+      13: 0000000000000000    36 FUNC    GLOBAL DEFAULT    1 func1
+      14: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND _GLOBAL_OFFSET_TABLE_
+      15: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND printf
+      16: 0000000000000024    51 FUNC    GLOBAL DEFAULT    1 main
+#+END_EXAMPLE
 ** 符号表的结构
 符号表往往是文件中的一个段,段名一般叫".symtab",它是由  =Elf32/64_Sym= 结构组成的数组,每个结构对应一个符号.
 #+BEGIN_SRC c
@@ -477,20 +498,25 @@ ELF 文件的段结构就是由段表决定的,编译器,链接器和装载器�
 - _edata or edata 数据段最末尾的虚拟地址
 - _end or end 程序虚拟结束地址
 ** 符号修饰与函数签名
-为了避免用户写的代码中符号与库文件中符号名称有所冲突, UNIX下的 C 预言规定,C 语言源代码文件中的所有全局变量和函数经过编译后,相对应的符号名前加上下划线 "_".
+为了避免用户写的代码中符号与库文件中符号名称有所冲突, UNIX下的 C 语言规定,C 语言源代码文件中的所有全局变量和函数经过编译后,相对应的符号名前加上下划线 "_".
 而 fortan 语言的源代码经过编译后的符号名前后都要加上下划线 "_". *在现在* 的 Linux下的 GCC 编译器中,默认情况下已经去掉了C的下划线,但是 Windows 还保持这样的传统.
 GCC 编译器可以通过参数选项 =-fleading-underscore= 或 =-fno-leading-underscore= 来打开和关闭是否在 C 语言加下划线.
 *** C++ 符号修饰
 为了支持 C++ 的特性, 发明了 *符号修饰(Name Decoration)或符号改编(Name Mangling)* 的机制.
+
 函数签名包含了一个函数的信息,包括函数名,它的参数类型,它所在的类和名称空间及其他信息.函数签名用于识别不同的函数,就像签名用于识别不同的人一样,函数的名字只是函数签名的一部分.
+
 在编译器及连接器处理符号时,它们使用某种 *名称修饰* 的方法,使得函数签名对应一个 *修饰后名称(Decorated Name)*.编译器在将 C++ 源代码编译成目标文件时,会将函数和变量的名字
 进行修饰,形成符号名,所以不会有重复的名字.
+
 GCC的基本C++名称修饰方法如下:所有的符号都以 "_Z"开头,对于嵌套的名字,后面紧跟 "N",然后是各个名称空间和类的名字,每个名字前是名字字符串的长度,再以 "E" 结尾.
 比如 N::C::func 经过修饰后就是 =_ZN1N1C4funcE=. 对于一个函数来说,它的参数列表紧跟在 "E" 后面,对于 int 类型来说, 就是字母"i".所以以整个 N::C::func(int) 函数签名经过
 修饰为 =_ZN1N1C4funcEi=.binutils 里面提供了一个叫 "c++filt" 的工具可以用来解析被修饰过的名称,比如 =c++filt _ZN1N1C4funcEi=.
+
 签名和名称修饰机制不光被使用到函数上,C++中的全局变量和静态变量也有同样的机制.对于全局变量来说,它跟函数一样都是一个全局可见的名称,它也遵循上面的名称修饰机制. *值得注意的是*,
 变量的类型并没有被加入到修饰后的名称中,所以不论这个变量是整形还是浮点型甚至是一个全局对象,它的名称都是一样的.
 名称修饰机制也被用来防止静态变量的名字冲突.
+
 不同的编译器厂商的名称修饰方法可能不同,所以不同的编译器对于同一个函数签名可能对应不同的修饰后名称.
 *** extern "C"
 c++代码中有可能会引用到 c 语言所提供的库函数,如果以c++的规则来修饰函数,那么到最终的链接过程便无法成功链接到 C的库函数中,导致编译失败.
@@ -507,7 +533,7 @@ extern "C" {
 *** 弱符号与强符号
 当使用强符号时(Strong Symbol),如果多个目标文件含有相同名字的全局符号定义，那么这些目标文件在链接的时候就会出现符号重复定义的错误。
 
-对于c/c++来说，编译器默认函数和初始化了的全局变量为强符号，未初始化的全局变量未弱符号，也可以通过gcc =__attribute__((weak))= 来定义一个强符号为若符号。
+*对于c/c++来说，编译器默认函数和初始化了的全局变量为强符号，未初始化的全局变量未弱符号* ，也可以通过gcc =__attribute__((weak))= 来定义一个强符号为弱符号。
 #+BEGIN_SRC c
 //既不是强符号，也不是弱符号，因为它是外部变量引用
 extern int ext;
@@ -543,8 +569,6 @@ int main()
         if(foo) foo();
 }
 #+END_SRC
-
-
 ** 调试信息
 调试信息包含了源代码与目标代码之间的关系，比如行数，函数，变量的一一对应关系。
 
