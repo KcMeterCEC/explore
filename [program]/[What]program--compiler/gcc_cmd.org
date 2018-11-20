@@ -28,5 +28,7 @@
 | objdump -s -d <file_name>                                            | 将所有的段以16进制打印并反汇编代码段    |
 | objcopy -I binary -O elf32-i386 -B i386 <input_file> <output_name>.o | 将文件转换为i386格式的目标文件          |
 | readelf -h <file_name>                                               | 读取ELF文件头                           |
-| readelf -S <file_name>                                               | 显示elf文件的完整段表                          |
+| readelf -S <file_name>                                               | 显示elf文件的完整段表                   |
+| readelf -s <file_name>                                               | 查看elf文件的符号表                     |
+|                                                                      |                                         |
 
