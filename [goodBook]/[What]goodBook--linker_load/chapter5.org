@@ -1,0 +1,14 @@
+#+TITLE: [What]链接、装载与库 --> 可执行文件的装载与进程
+#+DATE: <2018-11-22 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,程序员的自我休养
+#+NAMA: <book_link_chapter_6.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+熟悉linux下可执行文件的装载过程。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+  
