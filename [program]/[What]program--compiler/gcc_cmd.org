@@ -25,18 +25,19 @@
 | gcc -c -fno-builtin hello.c                | 关闭内置函数优化选项                                                   |
 | ld -T <link_script>                        | 指定链接脚本                                                                 |
 * 查看
-| 命令                                                                 | 说明                                    |
-|----------------------------------------------------------------------+-----------------------------------------|
-| file <file_name>                                                     | 查看文件是哪些类型                      |
-| size <file_name>                                                     | 查看目标文件text段、数据段、bss段的大小 |
-| objdump -h <file_name>                                               | 查看目标文件关键段表整体描述            |
-| objdump -s -d <file_name>                                            | 将所有的段以16进制打印并反汇编代码段    |
-| objdump -r <file_name>                                               | 查看目标文件的重定位表                  |
-| objcopy -I binary -O elf32-i386 -B i386 <input_file> <output_name>.o | 将文件转换为i386格式的目标文件          |
-| readelf -h <file_name>                                               | 读取ELF文件头                           |
-| readelf -S <file_name>                                               | 显示elf文件的完整段表                   |
-| readelf -s <file_name>                                               | 查看elf文件的符号表                     |
-| ar -t <lib_name>.a                                                   | 查看静态库所包含哪些目标文件            |
-| ar -x <lib_name>.a                                                   | 解压静态库中的目标文件                  |
-| ld -verbose                                                          | 查看链接器的默认链接脚本                            |
+| 命令                                                                 | 说明                                               |
+|----------------------------------------------------------------------+----------------------------------------------------|
+| file <file_name>                                                     | 查看文件是哪些类型                                 |
+| size <file_name>                                                     | 查看目标文件text段、数据段、bss段的大小            |
+| objdump -h <file_name>                                               | 查看目标文件关键段表整体描述                       |
+| objdump -s -d <file_name>                                            | 将所有的段以16进制打印并反汇编代码段               |
+| objdump -r <file_name>                                               | 查看目标文件的重定位表                             |
+| objcopy -I binary -O elf32-i386 -B i386 <input_file> <output_name>.o | 将文件转换为i386格式的目标文件                     |
+| readelf -h <file_name>                                               | 读取ELF文件头                                      |
+| readelf -S <file_name>                                               | 显示elf文件的完整段表                              |
+| readelf -s <file_name>                                               | 查看elf文件的符号表                                |
+| readelf -l <file_name>                                               | 查看elf文件的segment，了解映射到虚拟地址空间的结构 |
+| ar -t <lib_name>.a                                                   | 查看静态库所包含哪些目标文件                       |
+| ar -x <lib_name>.a                                                   | 解压静态库中的目标文件                             |
+| ld -verbose                                                          | 查看链接器的默认链接脚本                           |
 

@@ -1,0 +1,72 @@
+#+TITLE: [What]链接、装载与库 --> 动态链接
+#+DATE: <2018-11-25 Sun> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,程序员的自我休养
+#+NAME: <book_link_chapter_7.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+静态链接使得内存浪费太大并且更新不方便，而动态链接则弥补了这个不足。
+
+动态链接的基本思想是把程序按照模块拆分成各个相对独立部分，在程序运行时才将它们链接在一起形成一个完整程序。
+而不像静态链接一样把所有程序模块都链接成一个单独的可执行文件。
+- linux下为 *动态共享对象(DSO, Dynamic Shared Objects)* , 以 =.so= 为扩展名
+- windows下为 *动态链接库(Dynamical Linking Library)*, 以 =.dll= 为扩展名
+
+动态链接的优点如下:
+1. 一个动态链接库被多个进程所使用，节省了内存空间
+2. 由于多个进程共享同一模块，使得cpu cache命中率很高
+3. 动态模块升级时不用更新程序其他部分，使得升级方便
+4. 程序在运行时可以动态加载各种程序模块，可以被用于制作插件
+5. 只要操作系统提供了相应的接口，模块就可以跨操作系统兼容
+  - 如何接口没有管理好，那么兼容性将会是个问题
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 实例感受
+测试代码如下:
+#+BEGIN_SRC c
+  //file program1.c
+  #include "lib.h"
+
+  int main()
+  {
+    foobar(1);
+
+    return 0;
+  }
+  //file program2.c
+  #include "lib.h"
+
+  int main()
+  {
+    foobar(2);
+
+    return 0;
+  }
+  //file lib.c
+  #include <stdio.h>
+
+  void foobar(int i)
+  {
+    printf("printing from lib.so %d\n", i);
+  }
+  //file lib.h
+  #ifndef __LIB_H__
+  #define __LIB_H__
+  extern void foobar(int i);
+  #endif
+#+END_SRC
+编译共享库及执行验证
+#+BEGIN_EXAMPLE
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ gcc -fPIC -shared -o lib.so lib.c
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ gcc -o program1 program1.c ./lib.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ gcc -o program2 program2.c ./lib.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ ls
+  lib.c  lib.h  lib.so  program1  program1.c  program2  program2.c
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ ./program1
+  printing from lib.so 1
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ ./program2
+  printing from lib.so 2
+#+END_EXAMPLE
