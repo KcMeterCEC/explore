@@ -23,7 +23,8 @@
 | gcc -c -fno-common hello.c                 | 把所有未初始化的全局变量不以COMMON块的形式处理                         |
 | gcc -c -ffunction-sections -fdata-sections | 将数据和代码都单独分段，以在链接时将未使用的代码移除目标文件，减小大小 |
 | gcc -c -fno-builtin hello.c                | 关闭内置函数优化选项                                                   |
-| ld -T <link_script>                        | 指定链接脚本                                                                 |
+| ld -T <link_script>                        | 指定链接脚本                                                           |
+| gcc -fPIC -shared -o hello.so hello.c      | 以位置无关码的形式生成动态链接库                                       |
 * 查看
 | 命令                                                                 | 说明                                               |
 |----------------------------------------------------------------------+----------------------------------------------------|
@@ -40,4 +41,6 @@
 | ar -t <lib_name>.a                                                   | 查看静态库所包含哪些目标文件                       |
 | ar -x <lib_name>.a                                                   | 解压静态库中的目标文件                             |
 | ld -verbose                                                          | 查看链接器的默认链接脚本                           |
+
+- =readelf -d <filename>.so | grep TEXTREL= : 若无任何输出，代表此动态链接库是位置无关码的形式
 

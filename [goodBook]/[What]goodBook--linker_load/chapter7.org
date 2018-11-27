@@ -70,3 +70,72 @@
   cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ ./program2
   printing from lib.so 2
 #+END_EXAMPLE
+为了能够观察代码在虚拟地址中的映射关系，修改 =lib.c= :
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <unistd.h>
+
+  void foobar(int i)
+  {
+    printf("printing from lib.so %d\n", i);
+    printf("sleep\n");
+    while(1)
+      {
+        sleep(1);  
+      }
+  }
+#+END_SRC
+可以看到它映射格局如下:
+#+BEGIN_EXAMPLE
+  cec@virtual:~/learn/c/dynamical$ ./program1&
+  [1] 16831
+  printing from lib.so 1
+  sleep
+  cec@virtual:~/learn/c/dynamical$ cat /proc/16831/maps 
+  00400000-00401000 r-xp 00000000 08:01 5778451                            /home/cec/learn/c/dynamical/program1
+  00600000-00601000 r--p 00000000 08:01 5778451                            /home/cec/learn/c/dynamical/program1
+  00601000-00602000 rw-p 00001000 08:01 5778451                            /home/cec/learn/c/dynamical/program1
+  0150c000-0152d000 rw-p 00000000 00:00 0                                  [heap]
+  7fd652d58000-7fd652f18000 r-xp 00000000 08:01 3409179                    /lib/x86_64-linux-gnu/libc-2.23.so
+  7fd652f18000-7fd653118000 ---p 001c0000 08:01 3409179                    /lib/x86_64-linux-gnu/libc-2.23.so
+  7fd653118000-7fd65311c000 r--p 001c0000 08:01 3409179                    /lib/x86_64-linux-gnu/libc-2.23.so
+  7fd65311c000-7fd65311e000 rw-p 001c4000 08:01 3409179                    /lib/x86_64-linux-gnu/libc-2.23.so
+  7fd65311e000-7fd653122000 rw-p 00000000 00:00 0 
+  7fd653122000-7fd653123000 r-xp 00000000 08:01 5769668                    /home/cec/learn/c/dynamical/lib.so
+  7fd653123000-7fd653322000 ---p 00001000 08:01 5769668                    /home/cec/learn/c/dynamical/lib.so
+  7fd653322000-7fd653323000 r--p 00000000 08:01 5769668                    /home/cec/learn/c/dynamical/lib.so
+  7fd653323000-7fd653324000 rw-p 00001000 08:01 5769668                    /home/cec/learn/c/dynamical/lib.so
+  7fd653324000-7fd65334a000 r-xp 00000000 08:01 3409177                    /lib/x86_64-linux-gnu/ld-2.23.so
+  7fd653521000-7fd653524000 rw-p 00000000 00:00 0 
+  7fd653548000-7fd653549000 rw-p 00000000 00:00 0 
+  7fd653549000-7fd65354a000 r--p 00025000 08:01 3409177                    /lib/x86_64-linux-gnu/ld-2.23.so
+  7fd65354a000-7fd65354b000 rw-p 00026000 08:01 3409177                    /lib/x86_64-linux-gnu/ld-2.23.so
+  7fd65354b000-7fd65354c000 rw-p 00000000 00:00 0 
+  7ffe3ede1000-7ffe3ee02000 rw-p 00000000 00:00 0                          [stack]
+  7ffe3ef2d000-7ffe3ef30000 r--p 00000000 00:00 0                          [vvar]
+  7ffe3ef30000-7ffe3ef32000 r-xp 00000000 00:00 0                          [vdso]
+  ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+#+END_EXAMPLE
+在堆与栈之间，映射了动态链接库 =libc,lib= 以及动态链接器 =ld= 。
+- 在运行program1之前，动态链接器先完成链接工作，然后再把控制权交给program1执行.
+* 地址无关代码
+动态链接库在被装载时其地址是未知的，这是为了避免:
+1. 多个动态库的干涉问题
+2. 自身以后升级，内部函数和变量地址改变的问题
+   
+所以使用了 *装载时重定位(Load Time Relocation)* 的方式: 在链接时，对所有绝对地址的引用不作重定位，而把这一步推迟到装载时再完成。
+一旦模块装载地址确定，即目标地址确定，那么系统对程序中所有的绝对地址引用进行重定位。
+
+但这种方式依然有问题: 因为需要重定位，就需要修改动态链接库的代码(也就是地址会改变)。但是动态链接库是需要多个进程共享的，
+多个进程拥有独立的数据部分，但代码部分是共享的。这就无法满足此需求。
+
+于是，最终的 *地址无关代码(PIC, Position-independent Code)* 方式就产生了: 把指令中那些需要被修改的部分分离出来，跟数据部分放在一起，这样指令部分就可以保存不变。
+而数据部分可以在每个进程拥有一个副本。
+- 在实现时，数据段中存放指向这些函数的指针数组(全局偏移表，Global Offset Table, GOT)，通过数组来间接找到动态链接库代码的位置。
+  
+地址无关引用方式如下表:
+|          | 指令跳转、调用      | 数据访问      |
+|----------+---------------------+---------------|
+| 模块内部 | 相对跳转和调用      | 相对地址访问  |
+| 模块外部 | 间接跳转和调用(GOT) | 间接访问(GOT) |
+
