@@ -91,8 +91,8 @@ PC 平台流行的 *可执行文件格式(Executable)* 主要是 Windows 下的 
                     CONTENTS, ALLOC, LOAD, RELOC, READONLY, DATA
 #+END_EXAMPLE
 上图中:
-- size : 段大小
-- File off : 段 *相对于文件起始的偏移*
+- size : 段内容大小
+- File off : 段内容 *相对于文件起始的偏移*
 - 第二行表示段的属性
   + CONTENTS : 该段在后面的文件内容中存在
     + BSS段没有此属性，表明它不占用后面的内容仅在段表处表明大小即可
