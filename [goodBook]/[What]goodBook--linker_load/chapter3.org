@@ -399,11 +399,12 @@ ELF 文件的段结构就是由段表决定的,编译器,链接器和装载器�
 对于每个需要重定位的代码段或数据段,都会有一个相应的重定位表.
 比如 ".rela.text" 就是针对 ".text" 段的重定位表.
 ** String Table(字符串表)
-代码中的字符串是被集中放到一个表,然后使用字符串在表中的偏移在引用字符串.
+代码中的符号(函数名、变量名等)是被集中放到一个表,然后使用字符串在表中的偏移再引用字符串.
 通过这种方法,在ELF 文件中引用字符串只需给出数字下标即可,不用考虑字符串长度的问题.
 一般字符串表在 ELF 文件中也以段的形式保存,常见的段名为 ".strtab" 或 ".shstrtab ".
 这两个字符串表分别为 *字符串表(String Table)* 和 *段表字符串表(Section Header String Table)*.
-字符串表用来保存普通的字符串,段表字符串用来保存段表中用到的字符串.
+字符串表用来保存符号表中的字符串,段表字符串用来保存段表中用到的字符串(比如段名).
+- 实际代码中用到的字符串是存放于只读数据段(.rodata)中的!
 * 链接的接口--符号
 在链接中,目标文件之间的相互拼合实际上是目标文件之间对地址的引用, 即对函数和变量的地址的引用. 
 在链接中, 我们将函数和变量统称为 *符号(Symbol)*,函数名和变量名就是 *符号名(Symbol Name)*.
@@ -497,6 +498,33 @@ ELF 文件的段结构就是由段表决定的,编译器,链接器和装载器�
 - __etext or _etext or etext  代码段最末尾的虚拟地址
 - _edata or edata 数据段最末尾的虚拟地址
 - _end or end 程序虚拟结束地址
+  
+使用如下代码测试:
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+  extern char __executable_start[];
+  extern char etext[], _etext[], __etext[];
+  extern char edata[], _edata[];
+  extern char end[], _end[];
+
+  int main()
+  {
+    printf("executable start %p\n", __executable_start);
+    printf("text end %p %p %p\n", etext, _etext, __etext);
+    printf("data end %p %p\n", edata, _edata);
+    printf("executable end %p %p\n", end, _end);
+
+    return 0;
+  }
+#+END_SRC
+#+BEGIN_EXAMPLE
+  cec@virtual:~/learn/c/hello$ ./special_symbol
+  executable start 0x400000
+  text end 0x40061d 0x40061d 0x40061d
+  data end 0x601038 0x601038
+  executable end 0x601040 0x601040
+#+END_EXAMPLE
 ** 符号修饰与函数签名
 为了避免用户写的代码中符号与库文件中符号名称有所冲突, UNIX下的 C 语言规定,C 语言源代码文件中的所有全局变量和函数经过编译后,相对应的符号名前加上下划线 "_".
 而 fortan 语言的源代码经过编译后的符号名前后都要加上下划线 "_". *在现在* 的 Linux下的 GCC 编译器中,默认情况下已经去掉了C的下划线,但是 Windows 还保持这样的传统.
@@ -569,6 +597,11 @@ int main()
         if(foo) foo();
 }
 #+END_SRC
+#+BEGIN_EXAMPLE
+  这种弱符号和弱引用对于库来说十分有用，比如库定义的弱符号可以被用户定义的强符号所覆盖，从而使得程序可以使用自定义版本的库函数。
+  或者程序可以对某些扩展功能模块的引用定义为弱引用，当我们将扩展模块与程序链接在一起时，功能模块就可以正常使用。
+  如果我们去掉了某些功能模块，那么程序也可以正常链接，只是缺少了相应的功能，这使得程序的功能更加容易裁剪和组合。
+#+END_EXAMPLE
 ** 调试信息
 调试信息包含了源代码与目标代码之间的关系，比如行数，函数，变量的一一对应关系。
 

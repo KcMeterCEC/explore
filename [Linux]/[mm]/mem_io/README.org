@@ -7,6 +7,8 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+学习笔记:宋宝华老师的内存课程
+
 理解内存与I/O交换详细过程。
 #+BEGIN_HTML
 <!--more-->
