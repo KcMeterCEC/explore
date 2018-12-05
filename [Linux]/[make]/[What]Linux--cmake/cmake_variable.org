@@ -31,9 +31,23 @@ cmake -D<val>=<value> ../
 
 在构建系统最顶层具有 =CMakeLists.txt= 文件，然后在此文件中可以通过 =add_subdirectory()= 来包含子文件夹，子文件夹中也需要有 =CMakeLists.txt= 文件来构建。
 
-在此层文件夹中给变量指定的值，会作用于此文件夹以及子文件夹(在函数中指定的值除外)。因为cmake在运行此层的 =CMakeLists.txt= 前，会将父文件中指定的变量以及拷贝到当前层。
+在此层文件夹中给变量指定的值，会作用于此文件夹以及子文件夹(在函数中指定的值除外)。因为cmake在运行此层的 =CMakeLists.txt= 前，会将父文件中指定的变量 *拷贝* 到当前层。
 *** 持续性缓存范围(Persistent Cache)
 持续性缓存中保存的变量的值会存在于工程构建的多次运行中，也类似于相对于本工程的环境变量。
+- 在实际应用中常常需要在父文件和多个子文件中设置全局变量(比如加入编译源码)，这个时候需要使用cache变量
+#+BEGIN_EXAMPLE
+  #定义处理宏
+  macro(append_sources)
+    set(SOURCES ${SOURCES} ${ARGV} CACHE INTERNAL "description" FORCE)
+  endmacro(append_sources)
+
+  #在根文件中
+  unset(SOURCES CACHE) #避免重复添加
+  append_sources(${PROJECT_SOURCE_DIR}/main.c)
+
+  #在其他子文件中
+  append_sources(${CMAKE_CURRENT_SOURCE_DIR}/test.c)
+#+END_EXAMPLE
 ** 变量引用规则
 cmake 中变量引用优先级依次是： 函数变量 -> 文件夹变量 -> 缓存变量 
 
@@ -62,9 +76,9 @@ set(<variable_name> <value1> [<value2>] ... CACHE <type> <docstring> [FORCE])
   + FILEPATH :用于选择文件路径
   + PATH :用于选择文件夹路径
   + STRING :设置字符串，可以用户主动输入，或者在 =STRINGS= 缓存变量被设置时，用于选择
-  + INTERNAL :使用此选项代表一个恒定值，与使用 =FORCE= 效果一致
+  + INTERNAL :内部缓存变量，不会显示在 =ccmake= , =cmake-gui= 中
 - <docstring> 选项用于描述这个变量
-- [FORCE] :选项用于设置一个恒定值
+- [FORCE] :选项用于强制设置一个值
 
 对于缓存变量还有一个命令可以将其设置为高级模式，高级模式的变量只有在 gui 设置显示高级模式时才显示：
 #+begin_example
