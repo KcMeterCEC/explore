@@ -139,3 +139,47 @@
 | 模块内部 | 相对跳转和调用      | 相对地址访问  |
 | 模块外部 | 间接跳转和调用(GOT) | 间接访问(GOT) |
 
+* 延迟绑定
+动态链接在程序启动时装载一起运行时的GOT定位都会减慢程序的运行速度，为了优化启动速度使用延迟绑定(Lazy Binding)的方式来优化。
+- 延迟绑定使用PLT(Procedure Linkage Table)的方式实现
+
+其核心思想就是：当函数被第一次调用到的时候才形式符号绑定、重定位等操作。
+- 因为很多函数并不会被使用
+
+PLT在函数第一次被调用后，首先进行符号查找、重定位，然后才会跳转到GOT表。
+
+ELF将GOT拆分成了两个表叫做".got"和".got.plt"，".got"用来保存全局变量引用的地址，".got.plt"用来保存函数引用的地址。
+
+* 动态链接相关结构
+动态链接方式的elf文件启动步骤为:
+1. 读取可执行文件头部，检查文件合法性，从头部中的"Program Header"中读取每个"Segment"的虚拟地址、文件地址和属性，并将它们映射到进程虚拟空间的相应位置
+2. 将动态链接器加载到进程地址空间并将控制权交给动态链接器的入口地址。
+3. 动态链接器执行一系列自身初始化操作，根据当前环境参数开始对可执行文件进行动态链接工作，当链接工作完成后将控制权转交到可执行文件的入口地址，程序开始运行
+** ".interp"段
+=.interp= 段保存一个字符串，指定该可执行文件所需要的动态连接器的路径。
+#+BEGIN_EXAMPLE
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical$ objdump -s program1
+
+  program1:     file format elf64-x86-64
+
+  Contents of section .interp:
+   0238 2f6c6962 36342f6c 642d6c69 6e75782d  /lib64/ld-linux-
+   0248 7838362d 36342e73 6f2e3200           x86-64.so.2. 
+#+END_EXAMPLE
+可以看到在x86-64系统上其为 =/lib64/ld-linux-x86-64.so.2= ,实际上它是一个符号链接，指向当前系统的动态连接器。
+
+这样的好处是：当动态连接器版本有所更新时，不需要重新编译可执行文件，因为符号链接的路径和名称都不会被改变。
+** ".dynamic"段
+=.dynamic= 段保存了动态连接器所需要的基本信息，比如依赖于哪些共享对象、动态链接符号表的位置、
+动态链接重定位表的位置、共享对象初始化代码的地址等。
+#+BEGIN_SRC c
+  typedef struct
+  {
+    Elf64_Sxword	d_tag;			/* Dynamic entry type */
+    union
+    {
+      Elf64_Xword d_val;		/* Integer value */
+      Elf64_Addr d_ptr;			/* Address value */
+    } d_un;
+  } Elf64_Dyn;
+#+END_SRC

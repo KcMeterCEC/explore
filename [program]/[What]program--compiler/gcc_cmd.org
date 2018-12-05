@@ -43,4 +43,5 @@
 | ld -verbose                                                          | 查看链接器的默认链接脚本                           |
 
 - =readelf -d <filename>.so | grep TEXTREL= : 若无任何输出，代表此动态链接库是位置无关码的形式
+- =readelf -l <filename> | grep interpreter= : 查看可执行文件动态连接器路径
 
