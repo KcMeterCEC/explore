@@ -38,9 +38,13 @@
 | readelf -S <file_name>                                               | 显示elf文件的完整段表                              |
 | readelf -s <file_name>                                               | 查看elf文件的符号表                                |
 | readelf -l <file_name>                                               | 查看elf文件的segment，了解映射到虚拟地址空间的结构 |
+| readelf -d <file_name>.so                                            | 查看动态链接文件头(.dynamic 段)                    |
+| readelf -sD <file_name>.so                                           | 查看动态链接文件符号哈希表                         |
+| readelf --dyn-syms <file_name>.so                                    | 查看动态链接文件的动态符号表                       |
 | ar -t <lib_name>.a                                                   | 查看静态库所包含哪些目标文件                       |
 | ar -x <lib_name>.a                                                   | 解压静态库中的目标文件                             |
 | ld -verbose                                                          | 查看链接器的默认链接脚本                           |
+| ldd <file_name>                                                      | 查看程序主模块或共享库依赖于哪些共享库             |
 
 - =readelf -d <filename>.so | grep TEXTREL= : 若无任何输出，代表此动态链接库是位置无关码的形式
 - =readelf -l <filename> | grep interpreter= : 查看可执行文件动态连接器路径
