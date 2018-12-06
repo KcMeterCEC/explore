@@ -169,9 +169,10 @@ ELF将GOT拆分成了两个表叫做".got"和".got.plt"，".got"用来保存全�
 可以看到在x86-64系统上其为 =/lib64/ld-linux-x86-64.so.2= ,实际上它是一个符号链接，指向当前系统的动态连接器。
 
 这样的好处是：当动态连接器版本有所更新时，不需要重新编译可执行文件，因为符号链接的路径和名称都不会被改变。
-** ".dynamic"段
+** ".dynamic"段(动态链接描述头)
 =.dynamic= 段保存了动态连接器所需要的基本信息，比如依赖于哪些共享对象、动态链接符号表的位置、
 动态链接重定位表的位置、共享对象初始化代码的地址等。
+- =.dynamic= 存在于动态链接文件中，类似于elf文件头，用于描述此文件的概览
 #+BEGIN_SRC c
   typedef struct
   {
@@ -183,3 +184,123 @@ ELF将GOT拆分成了两个表叫做".got"和".got.plt"，".got"用来保存全�
     } d_un;
   } Elf64_Dyn;
 #+END_SRC
+比较常用的d_tag有下面这些值:
+| d_tag类型            | d_un的含义                                         |
+|----------------------+----------------------------------------------------|
+| DT_SYMTAB            | 动态链接符号表的地址，d_ptr表示".dynsym"的地址     |
+| DT_STRTAB            | 动态链接字符串表地址，d_ptr表示".dynstr"的地址     |
+| DT_STRSZ             | 动态链接字符串表大小，d_val表示大小                |
+| DT_HASH              | 动态链接哈希表地址,d_ptr表示".hash"的地址          |
+| DT_SONAME            | 本共享对象的"SO-NAME"                              |
+| DT_RPATH             | 动态链接共享对象搜索路径                           |
+| DT_INIT              | 初始化代码地址                                     |
+| DT_FINIT             | 结束代码地址                                       |
+| DT_NEED              | 依赖的共享对象文件,d_ptr表示所依赖的共享对象文件名 |
+| DT_REL/DT_RELA       | 动态链接重定位表地址                               |
+| DT_RELENT/DT_RELAENT | 动态重读位表入口数量                               |
+#+BEGIN_EXAMPLE
+  cec@virtual:~/learn/c/dynamical$ readelf -d lib.so 
+
+  Dynamic section at offset 0xe18 contains 24 entries:
+    Tag        Type                         Name/Value
+   0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+   0x000000000000000c (INIT)               0x5b8
+   0x000000000000000d (FINI)               0x76c
+   0x0000000000000019 (INIT_ARRAY)         0x200e00
+   0x000000000000001b (INIT_ARRAYSZ)       8 (bytes)
+   0x000000000000001a (FINI_ARRAY)         0x200e08
+   0x000000000000001c (FINI_ARRAYSZ)       8 (bytes)
+   0x000000006ffffef5 (GNU_HASH)           0x1f0
+   0x0000000000000005 (STRTAB)             0x3b0
+   0x0000000000000006 (SYMTAB)             0x230
+   0x000000000000000a (STRSZ)              188 (bytes)
+   0x000000000000000b (SYMENT)             24 (bytes)
+   0x0000000000000003 (PLTGOT)             0x201000
+   0x0000000000000002 (PLTRELSZ)           72 (bytes)
+   0x0000000000000014 (PLTREL)             RELA
+   0x0000000000000017 (JMPREL)             0x570
+   0x0000000000000007 (RELA)               0x4b0
+   0x0000000000000008 (RELASZ)             192 (bytes)
+   0x0000000000000009 (RELAENT)            24 (bytes)
+   0x000000006ffffffe (VERNEED)            0x490
+   0x000000006fffffff (VERNEEDNUM)         1
+   0x000000006ffffff0 (VERSYM)             0x46c
+   0x000000006ffffff9 (RELACOUNT)          3
+   0x0000000000000000 (NULL)               0x0
+#+END_EXAMPLE
+** 动态符号表
+静态链接中，符号的建立和使用被分别称为定义和引用。
+而动态链接中，动态链接库符号被外部使用时称为导出(Export)，对应使用外部符号的部分称为导入(Import).
+
+和静态链接一样，为了表示符号的导入导出关系，elf使用 *动态符号表(Dynamic Symbol Table)* 来保存这些信息，段名 =.dynsym=
+- 与符号表(.symtab)不同的是，.dynsym只保存了与动态链接相关的符号。而所有的符号依然保存在 =.symtab= 中。
+  
+同样的，动态符号表中实际包含的是符号的下标，真正的字符串内存存在于 *动态符号字符串表(.dynstr ,Dynamic String Table)* 中
+- 由于动态链接下，需要在运行时查找符号，为了加快符号的查找过程，还需要有辅助的 *符号哈希表(.hash)*.
+  
+#+BEGIN_EXAMPLE
+  cec@virtual:~/learn/c/dynamical$ readelf --dyn-syms  lib.so 
+
+  Symbol table '.dynsym' contains 16 entries:
+     Num:    Value          Size Type    Bind   Vis      Ndx Name
+       0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+       1: 00000000000005b8     0 SECTION LOCAL  DEFAULT    9 
+       2: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_deregisterTMCloneTab
+       3: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND puts@GLIBC_2.2.5 (2)
+       4: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND printf@GLIBC_2.2.5 (2)
+       5: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND __gmon_start__
+       6: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND _Jv_RegisterClasses
+       7: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_registerTMCloneTable
+       8: 0000000000000000     0 FUNC    GLOBAL DEFAULT  UND sleep@GLIBC_2.2.5 (2)
+       9: 0000000000000000     0 FUNC    WEAK   DEFAULT  UND __cxa_finalize@GLIBC_2.2.5 (2)
+      10: 0000000000201038     0 NOTYPE  GLOBAL DEFAULT   23 _edata
+      11: 0000000000201040     0 NOTYPE  GLOBAL DEFAULT   24 _end
+      12: 0000000000201038     0 NOTYPE  GLOBAL DEFAULT   24 __bss_start
+      13: 00000000000005b8     0 FUNC    GLOBAL DEFAULT    9 _init
+      14: 000000000000076c     0 FUNC    GLOBAL DEFAULT   13 _fini
+      15: 0000000000000730    57 FUNC    GLOBAL DEFAULT   12 foobar
+
+  cec@virtual:~/learn/c/dynamical$ readelf -sD  lib.so 
+
+  Symbol table of `.gnu.hash' for image:
+    Num Buc:    Value          Size   Type   Bind Vis      Ndx Name
+     10   0: 0000000000201038     0 NOTYPE  GLOBAL DEFAULT  23 _edata
+     11   0: 0000000000201040     0 NOTYPE  GLOBAL DEFAULT  24 _end
+     12   1: 0000000000201038     0 NOTYPE  GLOBAL DEFAULT  24 __bss_start
+     13   1: 00000000000005b8     0 FUNC    GLOBAL DEFAULT   9 _init
+     14   2: 000000000000076c     0 FUNC    GLOBAL DEFAULT  13 _fini
+     15   2: 0000000000000730    57 FUNC    GLOBAL DEFAULT  12 foobar
+#+END_EXAMPLE
+** 动态链接重定位表
+在动态链接下，无论是可执行文件或共享对象，一旦它依赖于其他共享对象，那么它代码或数据中就会有对于导入符号的引用。
+在编译时这些导入符号的地址未知(在静态链接中，这些目标文件中的未知地址最终在链接阶段被修正)，所以就需要在运行时将这些
+导入符号的引用修正，也就是重定位。
+- 如果一个共享对象不是以PIC模式编译的，那么它的代码段和数据段是需要在装载时重定位的
+- 如果一个共享对象是PIC模式编译的，那么它的数据段是需要重定位的
+  + 代码段通过GOT变为了相对地址引用，但GOT存在于数据段中，而数据段可能包含绝对地址引用。
+    
+静态链接的重定位是在静态链接时完成的，目标文件中包含有重定位表(.rel.text, .rel.data)。
+
+动态链接的重定位是在装载时完成的，动态链接文件中的重定位表分别叫做 =.rel.dyn, .rel.plt= 分别对应 =.rel.data, .rel.text= 
+- =.rel.dyn= 是对数据引用的修正，修正的位置位于 =.got= 以及数据段
+- =.rel.plt= 是对函数引用的修改，修正的位置位于 =.got.plt= 
+#+BEGIN_EXAMPLE
+  cec@virtual:~/learn/c/dynamical$ readelf -r lib.so
+
+  Relocation section '.rela.dyn' at offset 0x4b0 contains 8 entries:
+    Offset          Info           Type           Sym. Value    Sym. Name + Addend
+  000000200e00  000000000008 R_X86_64_RELATIVE                    700
+  000000200e08  000000000008 R_X86_64_RELATIVE                    6c0
+  000000201030  000000000008 R_X86_64_RELATIVE                    201030
+  000000200fd8  000200000006 R_X86_64_GLOB_DAT 0000000000000000 _ITM_deregisterTMClone + 0
+  000000200fe0  000500000006 R_X86_64_GLOB_DAT 0000000000000000 __gmon_start__ + 0
+  000000200fe8  000600000006 R_X86_64_GLOB_DAT 0000000000000000 _Jv_RegisterClasses + 0
+  000000200ff0  000700000006 R_X86_64_GLOB_DAT 0000000000000000 _ITM_registerTMCloneTa + 0
+  000000200ff8  000900000006 R_X86_64_GLOB_DAT 0000000000000000 __cxa_finalize@GLIBC_2.2.5 + 0
+
+  Relocation section '.rela.plt' at offset 0x570 contains 3 entries:
+    Offset          Info           Type           Sym. Value    Sym. Name + Addend
+  000000201018  000300000007 R_X86_64_JUMP_SLO 0000000000000000 puts@GLIBC_2.2.5 + 0
+  000000201020  000400000007 R_X86_64_JUMP_SLO 0000000000000000 printf@GLIBC_2.2.5 + 0
+  000000201028  000800000007 R_X86_64_JUMP_SLO 0000000000000000 sleep@GLIBC_2.2.5 + 0
+#+END_EXAMPLE
