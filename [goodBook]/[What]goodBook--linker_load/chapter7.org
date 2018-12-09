@@ -304,3 +304,217 @@ ELF将GOT拆分成了两个表叫做".got"和".got.plt"，".got"用来保存全�
   000000201020  000400000007 R_X86_64_JUMP_SLO 0000000000000000 printf@GLIBC_2.2.5 + 0
   000000201028  000800000007 R_X86_64_JUMP_SLO 0000000000000000 sleep@GLIBC_2.2.5 + 0
 #+END_EXAMPLE
+** 动态链接时进程堆栈初始化信息
+进程初始化的时候，堆栈里面保存了关于进程执行环境和命令行参数等信息，还保存了动态链接器所需要的一些 *辅助信息数组(Auxiliary Vector)* 。
+#+BEGIN_SRC c
+  typedef struct
+  {
+    uint64_t a_type;		/* Entry type */
+    union
+    {
+      uint64_t a_val;		/* Integer value */
+      /* We use to have pointer elements added here.  We cannot do that,
+         though, since it does not work when using 32-bit definitions
+         on 64-bit platforms and vice versa.  */
+    } a_un;
+  } Elf64_auxv_t;
+#+END_SRC
+| a_type 定义 | a_type 值 | a_val含义                                            |
+|-------------+-----------+------------------------------------------------------|
+| AT_NULL     |         0 | 数组结束                                             |
+| AT_EXEFD    |         2 | 可执行文件的句柄，动态链接器通过此句柄访问可执行文件 |
+| AT_PHDR     |         3 | 可执行文件中程序头表(Program Header)在进程中的地址   |
+| AT_PHENT    |         4 | 可执行文件中程序头表每个入口的大小                   |
+| AT_PHNUM    |         5 | 可执行文件中程序头表中入口的数量                     |
+| AT_BASE     |         7 | 动态连接器本身的装载地址                             |
+| AT_ENTRY    |         9 | 可执行文件入口地址                                   |
+
+进程栈的视图如下:
+[[./process_stack.jpg]]
+
+使用下面的代码可以验证: (*此处有疑问，与书本上的结果不一致!*)
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdint.h>
+
+  int main(int argc, char*argv[])
+  {
+    intptr_t *str_addr = (intptr_t *)(argv[0]) - 1;
+
+    printf("\n-------------------------\n");
+    printf("stack str_addr = %p\n", str_addr);
+    printf("the number of argument is %ld\n", *str_addr);
+    printf("argv = %p, --> %s\n", argv[0], argv[0]);
+
+    return 0;
+  }
+#+END_SRC
+* 动态链接的步骤和实现
+动态链接的基本步骤分为3步:
+1. 启动动态链接器本身
+2. 装载所有需要的共享对象
+3. 重定位和初始化
+** 动态链接器启动
+动态链接器本身也是一个共享对象，所以动态链接器需要有些特殊性：
+1. 动态链接器不可以依赖于其他任何共享对象
+2. 动态链接器本身所需要的全局、静态变量以及函数的重定位工作由它本身完成。
+  - 这部分启动代码被称为 *自举(Bootstrap)*
+    
+#+BEGIN_EXAMPLE
+  动态链接器入口地址即使自举代码的入口，当操作系统将进程控制权交给动态链接器时，
+  动态链接器的自举代码即开始执行。自举代码首先会找到自己的GOT,而GOT的第一个入口保存
+  的是".dynamic"段的偏移地址，由此找到了动态链接器本身的".dynamic"段。
+
+  通过".dynamic"中的信息，自举代码便可以获得动态链接器本身的重定位表和符号表，从而得到动态链接器本身的
+  重定位入口，先将它们全部重定位。从这一步开始，动态链接器代码中才可以开始使用自己的全局变量和静态变量。
+#+END_EXAMPLE
+** 装载共享对象
+完成自举后，动态链接器将可执行文件的符号表和链接器本身的符号表合并到一个符号表中，称为 *全局符号表(Global Symbol Table)* ，
+链接器根据".dynamic"段中内容(DT_NEEDED)来得到此文件的依赖对象。
+
+链接器列出可执行文件中所需要的所有共享对象，将这些对象的名字放入到一个装载集合中。然后从集合里取一个名字并打开该文件并映射。
+
+如果共享对象也依赖于其他对象，那么将所依赖的共享对象的名字放入到装载集合中，如此循环直到所有的依赖共享对象都被装载进来。
+*** 符号的优先级
+当多个共享库中有同名的全局变量被引用，应该使用哪一个呢？
+
+示例代码如下:
+#+BEGIN_SRC c
+  //file a1.c
+  #include <stdio.h>
+
+  void a()
+  {
+    printf("a1.c\n");
+  }
+  //file a2.c
+  #include <stdio.h>
+
+  void a()
+  {
+    printf("a2.c\n");
+  }
+  //file b1.c
+  void a();
+
+  void b1()
+  {
+    a();
+  }
+  //file b2.c
+  void a();
+
+  void b2()
+  {
+    a();
+  }
+#+END_SRC
+假设b1.c使用a1.c的变量，b2.c使用a2.c的变量:
+#+BEGIN_EXAMPLE
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ gcc -fPIC -shared a1.c -o a1.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ gcc -fPIC -shared a2.c -o a2.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ gcc -fPIC -shared b1.c a1.so -o b1.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ gcc -fPIC -shared b2.c a2.so -o b2.so
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ ldd b1.so 
+    linux-vdso.so.1 (0x00007ffddabfe000)
+    a1.so => not found
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ ldd b2.so
+    linux-vdso.so.1 (0x00007ffcdd59a000)
+    a2.so => not found
+#+END_EXAMPLE
+接下来调用b1和b2:
+#+BEGIN_SRC c
+  //file main.c
+  void b1();
+  void b2();
+  int main()
+  {
+    b1();
+    b2();
+    while(1);
+
+    return 0;
+  }
+#+END_SRC
+将a1.so,b1.so,a2.so,b2.so拷贝进/usr/lib后:
+#+BEGIN_EXAMPLE
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ ./main
+  a1.c
+  a1.c
+  cec@ubuntu:~/exercise/linux/linker_loader/dynamical/symbol$ cat /proc/82889/maps
+  55a2d2ab6000-55a2d2ab7000 r-xp 00000000 08:01 5382434                    /home/cec/exercise/linux/linker_loader/dynamical/symbol/main
+  55a2d2cb6000-55a2d2cb7000 r--p 00000000 08:01 5382434                    /home/cec/exercise/linux/linker_loader/dynamical/symbol/main
+  55a2d2cb7000-55a2d2cb8000 rw-p 00001000 08:01 5382434                    /home/cec/exercise/linux/linker_loader/dynamical/symbol/main
+  55a2d365b000-55a2d367c000 rw-p 00000000 00:00 0                          [heap]
+  7f3d46a43000-7f3d46a44000 r-xp 00000000 08:01 4328772                    /usr/lib/a2.so
+  7f3d46a44000-7f3d46c43000 ---p 00001000 08:01 4328772                    /usr/lib/a2.so
+  7f3d46c43000-7f3d46c44000 r--p 00000000 08:01 4328772                    /usr/lib/a2.so
+  7f3d46c44000-7f3d46c45000 rw-p 00001000 08:01 4328772                    /usr/lib/a2.so
+  7f3d46c45000-7f3d46c46000 r-xp 00000000 08:01 4325633                    /usr/lib/a1.so
+  7f3d46c46000-7f3d46e45000 ---p 00001000 08:01 4325633                    /usr/lib/a1.so
+  7f3d46e45000-7f3d46e46000 r--p 00000000 08:01 4325633                    /usr/lib/a1.so
+  7f3d46e46000-7f3d46e47000 rw-p 00001000 08:01 4325633                    /usr/lib/a1.so
+  7f3d46e47000-7f3d4702e000 r-xp 00000000 08:01 4985510                    /lib/x86_64-linux-gnu/libc-2.27.so
+  7f3d4702e000-7f3d4722e000 ---p 001e7000 08:01 4985510                    /lib/x86_64-linux-gnu/libc-2.27.so
+  7f3d4722e000-7f3d47232000 r--p 001e7000 08:01 4985510                    /lib/x86_64-linux-gnu/libc-2.27.so
+  7f3d47232000-7f3d47234000 rw-p 001eb000 08:01 4985510                    /lib/x86_64-linux-gnu/libc-2.27.so
+  7f3d47234000-7f3d47238000 rw-p 00000000 00:00 0 
+  7f3d47238000-7f3d47239000 r-xp 00000000 08:01 4342578                    /usr/lib/b2.so
+  7f3d47239000-7f3d47438000 ---p 00001000 08:01 4342578                    /usr/lib/b2.so
+  7f3d47438000-7f3d47439000 r--p 00000000 08:01 4342578                    /usr/lib/b2.so
+  7f3d47439000-7f3d4743a000 rw-p 00001000 08:01 4342578                    /usr/lib/b2.so
+  7f3d4743a000-7f3d4743b000 r-xp 00000000 08:01 4342577                    /usr/lib/b1.so
+  7f3d4743b000-7f3d4763a000 ---p 00001000 08:01 4342577                    /usr/lib/b1.so
+  7f3d4763a000-7f3d4763b000 r--p 00000000 08:01 4342577                    /usr/lib/b1.so
+  7f3d4763b000-7f3d4763c000 rw-p 00001000 08:01 4342577                    /usr/lib/b1.so
+  7f3d4763c000-7f3d47663000 r-xp 00000000 08:01 4985482                    /lib/x86_64-linux-gnu/ld-2.27.so
+  7f3d47844000-7f3d47846000 rw-p 00000000 00:00 0 
+  7f3d47861000-7f3d47863000 rw-p 00000000 00:00 0 
+  7f3d47863000-7f3d47864000 r--p 00027000 08:01 4985482                    /lib/x86_64-linux-gnu/ld-2.27.so
+  7f3d47864000-7f3d47865000 rw-p 00028000 08:01 4985482                    /lib/x86_64-linux-gnu/ld-2.27.so
+  7f3d47865000-7f3d47866000 rw-p 00000000 00:00 0 
+  7ffcf4861000-7ffcf4882000 rw-p 00000000 00:00 0                          [stack]
+  7ffcf4888000-7ffcf488b000 r--p 00000000 00:00 0                          [vvar]
+  7ffcf488b000-7ffcf488d000 r-xp 00000000 00:00 0                          [vdso]
+  ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]
+#+END_EXAMPLE
+这种一个共享对象里面的全局符号被另一个共享对象的同名全局符号覆盖的现象被称为共享对象全局符号介入(Global Symbol Interpose).
+
+Linux下的规则为: 当一个符号需要被加入全局符号表时，如果相同的符号名已经存在，则 *后加入的符号被忽略。*
+- 在实际使用中就要避免这种符号重名的问题，否则就很可能出现莫名其妙的问题
+
+由于main先调用的b1，所以对应的a1先被加载，接下来要加载a2时，其符号便被忽略了。
+** 重定位和初始化
+此步开始重新遍历可执行文件和每个共享对象的重定位表，将需要重定位的位置进行修正。
+
+- 如果某个共享对象有 ".init" 段，那么动态链接器会执行".init"段中的代码，用以实现共享对象特有的初始化过程。
+  + 可执行文件中的 ".init" 段由程序初始化部分完成。
+- 如果某个共享对象有 ".finit" 段，那么动态链接器会在进程退出时执行".finit"段中的代码，用以实现共享对象特有的退出过程。
+* 显式运行时链接(Explicit Run time Linking)
+用户可以在运行时指定加载或卸载对应的模块，这就可以实现插件的功能，使得程序模块组织变得很灵活。
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 加载动态库
+   ,* @par: filename: 被加载动态库的路径
+   ,* @par : flag : 函数符号解析方式
+   ,* - RTLD_LAZY : 延迟绑定
+   ,* - RTLD_NOW : 立即加载
+   ,* @ret : 返回模块句柄，失败返回NULL
+   ,*/
+  void *dlopen(const char *filename, int flag);
+  /**
+   ,* @brief : 得到符号的地址
+   ,* @handle : dlopen句柄
+   ,* @symbol : 符号
+   ,*/
+  void *dlsym(void *handle, char *symbol);
+  /**
+   ,* @brief : 卸载动态库
+   ,*/
+  int dlclose(void *handle);
+  /**
+   ,* @brief 检查上次调用是否成功
+   ,* @ret :成功返回NULL,否则返回对应的错误消息
+   ,*/
+  char *dlerror(void);
+#+END_SRC
