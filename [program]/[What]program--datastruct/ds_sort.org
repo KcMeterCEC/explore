@@ -346,4 +346,185 @@
 4. 大值索引不变，小值往后移动一下，然后重复上一步
 5. 当其中一个数组遍历完毕，那么将另一个数组剩下的值依次写入临时数组即可
 6. 将临时空间的值写入合并后的数组
+   
+代码如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <assert.h>
+  #include <string.h>
+
+  static void merge(int *buf, int start, int end_first, int end)
+  {
+      int *buf1 = buf + start;
+      int buf1_size = end_first - start + 1;
+      int buf1_index = 0;
+      int *buf2 = buf + end_first + 1;
+      int buf2_size = end - end_first;
+      int buf2_index = 0;
+
+      //printf("merge start1 = %d, end1 = %d, start2 = %d, end2 = %d\n",
+              //start, end_first, end_first+1, end);
+
+      int *tmp_buf = (int *)malloc((buf1_size + buf2_size) * sizeof(int));
+      assert(tmp_buf);
+      int tmp_buf_index = 0;
+
+      int loop_size = buf1_size > buf2_size ? buf2_size : buf1_size;
+      //printf("loop size = %d\n", loop_size);
+      for(int i = 0; i < loop_size; i++)
+      {
+          printf("compare : %d <=> %d\n", buf1[buf1_index], buf2[buf2_index]);
+          if(buf1[buf1_index] > buf2[buf2_index])
+          {
+              tmp_buf[tmp_buf_index] = buf2[buf2_index];
+              buf2_index++;
+          }
+          else
+          {
+              tmp_buf[tmp_buf_index] = buf1[buf1_index];
+              buf1_index++;
+          }
+          printf("grep %d\n", tmp_buf[tmp_buf_index]);
+          tmp_buf_index++;
+      }
+      if(buf1_index < buf1_size)
+      {
+          memcpy(tmp_buf + tmp_buf_index, buf1 + buf1_index, (buf1_size - buf1_index) * sizeof(int));
+      }
+      else
+      {
+          memcpy(tmp_buf + tmp_buf_index, buf2 + buf2_index, (buf2_size - buf2_index) * sizeof(int));
+      }
+      printf("tmp buf:\n");
+      for(int i = 0; i< buf1_size + buf2_size; i++)
+      {
+          printf("%d,", tmp_buf[i]);
+      }
+      printf("\n\n");
+      memcpy(buf + start, tmp_buf, (buf1_size + buf2_size) * sizeof(int));
+
+      free(tmp_buf);
+  }
+
+  static void merge_sort(int *buf, int start, int end)
+  {
+      int end_first = (start + end) / 2;
+      int start_second = end_first + 1;
+
+      printf("merge sort start->%d, end = %d\n",
+              start, end);
+
+      if(end - start_second < 0)
+      {
+          return;
+      }
+
+      merge_sort(buf, start, end_first);
+      merge_sort(buf, start_second, end);
+
+      merge(buf, start, end_first, end);
+  }
+
+  #define BUF_SIZE    (7)
+  static int buffer[BUF_SIZE] = {7,6,5,4,3,2,1};
+
+  int main(int argc, char *argv[])
+  {
+      printf("buffer before merge sort: ");
+      for(int i = 0; i < BUF_SIZE; i++)
+      {
+          printf("%d,", buffer[i]);
+      }
+      printf("\n");
+      merge_sort(buffer, 0, BUF_SIZE - 1);
+      printf("buffer after merge sort: ");
+      for(int i = 0; i < BUF_SIZE; i++)
+      {
+          printf("%d,", buffer[i]);
+      }
+      printf("\n");
+      return 0;
+  }
+#+END_SRC
+
+执行结果如下:
+#+BEGIN_EXAMPLE
+  buffer before merge sort: 7,6,5,4,3,2,1,
+  merge sort start->0, end = 6
+  merge sort start->0, end = 3
+  merge sort start->0, end = 1
+  merge sort start->0, end = 0
+  merge sort start->1, end = 1
+  compare : 7 <=> 6
+  grep 6
+  tmp buf:
+  6,7,
+
+  merge sort start->2, end = 3
+  merge sort start->2, end = 2
+  merge sort start->3, end = 3
+  compare : 5 <=> 4
+  grep 4
+  tmp buf:
+  4,5,
+
+  compare : 6 <=> 4
+  grep 4
+  compare : 6 <=> 5
+  grep 5
+  tmp buf:
+  4,5,6,7,
+
+  merge sort start->4, end = 6
+  merge sort start->4, end = 5
+  merge sort start->4, end = 4
+  merge sort start->5, end = 5
+  compare : 3 <=> 2
+  grep 2
+  tmp buf:
+  2,3,
+
+  merge sort start->6, end = 6
+  compare : 2 <=> 1
+  grep 1
+  tmp buf:
+  1,2,3,
+
+  compare : 4 <=> 1
+  grep 1
+  compare : 4 <=> 2
+  grep 2
+  compare : 4 <=> 3
+  grep 3
+  tmp buf:
+  1,2,3,4,5,6,7,
+
+  buffer after merge sort: 1,2,3,4,5,6,7,
+#+END_EXAMPLE
+** 分析
+*** 在执行效率上分析
+合并部分的代码，无论原先数组是否有序，它都要遍历一次，所以其最小、最大、平均时间复杂度都是一样的。
+
+分析其时间复杂度，也可以通过递推公式的思维来分析:
+[[./merge_sort_complication.jpg]]
+
+到最后一级时： n/2^k=1 , 也就是 k=log_{2}n，那么最终的公式就是: T(n)=n + n*log_{2}n
+
+所以其时间复杂度就是 O(n*log(n))
+*** 在空间复杂度上分析
+在实现合并的过程中，每次都要申请临时内存，但在退出此函数后内存又被释放掉了，整个过程中申请的最大内存都不会超过n。
+
+所以 *其空间复杂度为O(n).*
+*** 在稳定性上分析
+当两个数据大小一致时，它们是被按顺序存放的，并不会改变先前的位置。
+
+所以归并排序 *是稳定性算法.*
+
+* 快速排序(Quick sort)
+快速排序也使用的是分治思想,但与归并排序不同的是：
+- 归并排序先将数组进行分组，待分组完成之后再进行排序，然后层层向上合并
+- 快速排序是先排序再分组，待最后分组完成后，排序也就完成了
+
+也就是说归并排序是自下而上的排序方式，快速排序是自上而下的排序方式。
 
