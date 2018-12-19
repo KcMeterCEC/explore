@@ -15,7 +15,7 @@
 此节只列出Linux和c库操作接口，具体的详细信息还是要找 =man= 。
 - 其实在实际应用中，还是尽量使用标准的 c/c++ 库便于以后移植。
 
-需要注意的是：标准的ISOC库的I/O操作默认是带有缓存的，也就是填充一定的缓存后才会区调用系统接口。
+需要注意的是：标准的ISOC库的I/O操作默认是带有缓存的，也就是填充一定的缓存后才会去调用系统接口。
 而如果直接使用POSIX标准的系统接口，相当于上层没有做缓存，但实际上 *内核为了尽量批量化的操作I/O，其内部也会做缓存。*
 ** 常用接口
 *** 文件的创建
@@ -83,8 +83,7 @@ FILE *fopen( const char *filename, const char *mode );
 
 *** 文件读写
 - linux
-    进行read和write大量数据读写时，需要考虑单次读写的字节数，取文件系统的block大小(比如4096字节)，
-能在尽量减小系统调用的同时保证较高的写入效率。
+    进行read和write大量数据读写时，需要考虑单次读写的字节数，取文件系统的block大小(比如4096字节)，能在尽量减小系统调用的同时保证较高的写入效率。
 #+BEGIN_SRC c
   ssize_t read(int fd, void *buf, size_t count);
   ssize_t write(int fd, const void *buf, size_t count);
@@ -541,46 +540,48 @@ int fclose( FILE *stream );
 在设备驱动中，会关心file和inode这两个结构体。
 - 每打开一个文件，在内核空间中就有与之关联的 file 结构体
   + 设备驱动通过此结构体判断用户操作模式(比如是阻塞还是非阻塞等)
+    - 判断阻塞还是非阻塞使用 =f_flags= 
+  + =private_data= 保存该设备驱动申请的数据地址
 - inode 则包含了一个文件的详细信息
 ** file
 #+BEGIN_SRC c
-struct file {
-        union {
-                struct llist_nodefu_llist;
-                struct rcu_head fu_rcuhead;
-        } f_u;
-        struct pathf_path;
-        struct inode*f_inode;/* cached value */
-        const struct file_operations*f_op;
+  struct file {
+          union {
+                  struct llist_nodefu_llist;
+                  struct rcu_head fu_rcuhead;
+          } f_u;
+          struct pathf_path;
+          struct inode*f_inode;/* cached value */
+          const struct file_operations*f_op;
 
-        /*
-         ,* Protects f_ep_links, f_flags.
-         ,* Must not be taken from IRQ context.
-         ,*/
-        spinlock_tf_lock;
-        atomic_long_tf_count;
-        unsigned int f_flags;
-        fmode_tf_mode;
-        struct mutexf_pos_lock;
-        loff_tf_pos;
-        struct fown_structf_owner;
-        const struct cred*f_cred;
-        struct file_ra_statef_ra;
+          /*
+           ,* Protects f_ep_links, f_flags.
+           ,* Must not be taken from IRQ context.
+           ,*/
+          spinlock_tf_lock;
+          atomic_long_tf_count;
+          unsigned int f_flags;
+          fmode_tf_mode;
+          struct mutexf_pos_lock;
+          loff_tf_pos;
+          struct fown_structf_owner;
+          const struct cred*f_cred;
+          struct file_ra_statef_ra;
 
-        u64f_version;
-        #ifdef CONFIG_SECURITY
-        void*f_security;
-        #endif
-        /* needed for tty driver, and maybe others */
-        void*private_data;
+          u64f_version;
+          #ifdef CONFIG_SECURITY
+          void*f_security;
+          #endif
+          /* needed for tty driver, and maybe others */
+          void*private_data;
 
-        #ifdef CONFIG_EPOLL
-        /* Used by fs/eventpoll.c to link all the hooks to this file */
-        struct list_headf_ep_links;
-        struct list_headf_tfile_llink;
-#endif /* #ifdef CONFIG_EPOLL */
-        struct address_space*f_mapping;
-} __attribute__((aligned(4)));/* lest something weird decides that 2 is OK */
+          #ifdef CONFIG_EPOLL
+          /* Used by fs/eventpoll.c to link all the hooks to this file */
+          struct list_headf_ep_links;
+          struct list_headf_tfile_llink;
+  #endif /* #ifdef CONFIG_EPOLL */
+          struct address_space*f_mapping;
+  } __attribute__((aligned(4)));/* lest something weird decides that 2 is OK */
 #+END_SRC
 ** inode 
 #+BEGIN_SRC c
