@@ -3,7 +3,7 @@
 #+TAGS: 数据结构与算法
 #+LAYOUT: post 
 #+CATEGORIES: program,数据结构与算法
-#+NAME: <program_DS_sort.org>
+#+NAME: <program_DS_linear_sort.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
