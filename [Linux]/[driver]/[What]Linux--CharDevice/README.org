@@ -38,62 +38,114 @@ void cdev_del(struct cdev *);
 设备号由12位主设备号和20位次设备号组成
 - 主设备代表某一类设备，次设备号代表某个具体设备
 #+BEGIN_SRC c
-/*从dev_t 中获取主设备号*/
-#define MAJOR(dev)      ((unsigned int) ((dev) >> MINORBITS))
-/*从dev_t 中获取次设备号*/
-#define MINOR(dev)      ((unsigned int) ((dev) & MINORMASK))
-//通过主次设备号生成 dev_t
-#define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))
+  /*从dev_t 中获取主设备号*/
+  #define MAJOR(dev)      ((unsigned int) ((dev) >> MINORBITS))
+  /*从dev_t 中获取次设备号*/
+  #define MINOR(dev)      ((unsigned int) ((dev) & MINORMASK))
+  //通过主次设备号生成 dev_t
+  #define MKDEV(ma,mi)    (((ma) << MINORBITS) | (mi))
 
 
-/**
- ,* @brief 将已知设备号向系统申请
- ,*/
-extern int register_chrdev_region(dev_t, unsigned, const char *);
-/**
- ,* @brief 由系统分配一个设备号
- ,*/
-extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, const char *);
-//释放设备号
-extern void unregister_chrdev_region(dev_t, unsigned);
+  /**
+   ,* @brief 将已知设备号向系统申请
+   ,* @note 在使用 cdev_add 之前需要申请设备号
+   ,*/
+  extern int register_chrdev_region(dev_t, unsigned, const char *);
+  /**
+   ,* @brief 由系统分配一个设备号
+   ,* @note 在使用 cdev_add 之前需要申请设备号, 推荐使用此函数
+   ,*/
+  extern int alloc_chrdev_region(dev_t *, unsigned, unsigned, const char *);
+  //释放设备号
+  //在使用cdev_del之后需要释放设备号
+  extern void unregister_chrdev_region(dev_t, unsigned);
 #+END_SRC
 ** 文件操作接口
 #+BEGIN_SRC c
-struct file_operations {
-        struct module *owner;
-        loff_t (*llseek) (struct file *, loff_t, int);
-        ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
-        ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
-        ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
-        ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
-        int (*iterate) (struct file *, struct dir_context *);
-        unsigned int (*poll) (struct file *, struct poll_table_struct *);
-        long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
-        long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
-        int (*mmap) (struct file *, struct vm_area_struct *);
-        int (*open) (struct inode *, struct file *);
-        int (*flush) (struct file *, fl_owner_t id);
-        int (*release) (struct inode *, struct file *);
-        int (*fsync) (struct file *, loff_t, loff_t, int datasync);
-        int (*aio_fsync) (struct kiocb *, int datasync);
-        int (*fasync) (int, struct file *, int);
-        int (*lock) (struct file *, int, struct file_lock *);
-        ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
-        unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
-        int (*check_flags)(int);
-        int (*flock) (struct file *, int, struct file_lock *);
-        ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
-        ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
-        int (*setlease)(struct file *, long, struct file_lock **, void **);
-        long (*fallocate)(struct file *file, int mode, loff_t offset,
-                          loff_t len);
-        void (*show_fdinfo)(struct seq_file *m, struct file *f);
-        #ifndef CONFIG_MMU
-        unsigned (*mmap_capabilities)(struct file *);
-        #endif
-};
+  struct file_operations {
+          struct module *owner;
+    //修改当前文件的读写位置
+          loff_t (*llseek) (struct file *, loff_t, int);
+    //读取数据
+          ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+    //写入数据
+          ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+          ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
+          ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
+          int (*iterate) (struct file *, struct dir_context *);
+    //询问设备是否可以被阻塞地立即读写
+          unsigned int (*poll) (struct file *, struct poll_table_struct *);
+    //控制命令
+          long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+          long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
+    //将设备内存映射到进程的虚拟地址空间中
+          int (*mmap) (struct file *, struct vm_area_struct *);
+          int (*open) (struct inode *, struct file *);
+          int (*flush) (struct file *, fl_owner_t id);
+          int (*release) (struct inode *, struct file *);
+          int (*fsync) (struct file *, loff_t, loff_t, int datasync);
+          int (*aio_fsync) (struct kiocb *, int datasync);
+          int (*fasync) (int, struct file *, int);
+          int (*lock) (struct file *, int, struct file_lock *);
+          ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+          unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
+          int (*check_flags)(int);
+          int (*flock) (struct file *, int, struct file_lock *);
+          ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsigned int);
+          ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsigned int);
+          int (*setlease)(struct file *, long, struct file_lock **, void **);
+          long (*fallocate)(struct file *file, int mode, loff_t offset,
+                            loff_t len);
+          void (*show_fdinfo)(struct seq_file *m, struct file *f);
+          #ifndef CONFIG_MMU
+          unsigned (*mmap_capabilities)(struct file *);
+          #endif
+  };
 #+END_SRC
 * 驱动组成框架
+** 基本组成部分
+由上面的介绍可以知道基本的字符设备驱动有以下几部分组成:
+- 实际情况下，并不会直接用下面这个模块的方式来编写，而是基于驱动框架来编写。
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 此结构体表示设备需要用到的私有数据，和面向对象中的对象概念一样
+   ,*/
+  typedef struct
+  {
+    struct cdev dev_obj;
+    dev_t       dev_no;
+    //...
+  }xxx_dev_t;
+  static int __init xxx_init(void)
+  {
+    int ret = 0;
+    //申请该设备的私有数据
+    xxx_dev_t *new_dev = kzalloc(sizeof(xxx_dev_t), GFP_KERNEL);
+    if(new_dev == NULL)
+      {
+        ret = -ENOMEM;
+        goto out;
+      }
+    //初始化cdev
+    cdev_init(&new_dev->dev_obj, &xxx_fops);
+    //申请设备号
+    alloc_chrdev_region(&new_dev->dev_no, 0, 1, DEV_NAME);
+    //...
+    //注册设备
+    ret = cdev_add(&new_dev->dev_obj, new_dev->dev_no, 1);
+    //...
+
+  out:
+    return ret;
+  }
+  static void __exit xxx_exit(void)
+  {
+    //注销设备
+    cdev_dev(&new_dev->dev_obj);
+    //释放占用的设备号
+    unregister_chrdev_region(new_dev->dev_no, 1);
+  }
+#+END_SRC
 ** ioctl() 命令
 Linux 建议ioctl() 命令的组成方式为:
 | 设备类型 | 序列号 | 方向 | 数据尺寸 |
@@ -122,7 +174,7 @@ typedef enum
 }cmdClassEnum;
 #+END_SRC
 * 数据交换
-由于用户空间不能直接访问内核空间的内存,因此需要使用函数 =copy_from_user(), copy_to_user()=来完成数据 *复制*.
+由于用户空间不能直接访问内核空间的内存,因此需要使用函数 =copy_from_user(), copy_to_user()= 来完成数据 *复制*.
 #+BEGIN_SRC C
 //返回不能被复制的字节数,如果完全复制成功则返回0
 unsigned long copy_from_user(void *to, const void __user *from, unsigned long count);
