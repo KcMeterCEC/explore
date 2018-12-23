@@ -81,3 +81,71 @@ FHS(File Hierarchy Standard)标准规定了共享库路径:
   + 比如动态链接器、c运行时库等
 - =/usr/lib= : 非系统运行时所需要的关键性共享库，主要是一些开发时用到的库，一般不会被用户的程序或shell脚本直接使用
 - =/usr/local/lib= : 跟系统本身并不十分相关的库，主要是一些第三方应用程序的库，主要被 =/usr/local/bin= 下的程序使用
+* 共享库查找过程
+模块中的 =.dynamic= 标明了依赖库的路径。
+- 如果此路径是绝对路径，那么就按照这个路径查找
+- 如果是相对路径，则会依次在 =/etc/ld.so.cache,/usr/lib/,/lib/= 中查找
+
+=ldconfig= 会刷新动态链接库的符号链接，并集中存放到 =/etc/ld.so.cache= 文件中，以便于快速查找。
+- 所以当安装、更新共享库后，都需要使用 =ldconfig= 命令
+* 环境变量
+** LD_LIBRARY_PATH
+用于临时改变应用程序的共享库查找路径，而不会影响系统中的其他程序。
+- 有利于共享库的调试和测试
+  
+默认 =LD_LIBRARY_PATH= 的值为空，若为某个进程设置了路径，动态链接器会优先寻找此路径。
+** LD_PRELOAD
+指定预先装载的一些共享库或是目标文件，无论程序是否依赖于它们，LD_PRELOAD里面指定的共享库或目标文件都会被装载。
+** LD_DEBUG
+可以打开动态链接器的调试功能，可以设置以下值:
+- files : 显示装载过程
+- bindings : 显示动态链接的符号绑定过程
+- libs : 显示共享库的查找过程
+- versions : 显示符号的版本依赖关系
+- reloc : 显示重定位过程
+- symbols : 显示符号表查找过程
+- statistics : 显示动态链接过程中的各种统计信息
+- all : 显示以上所有信息
+- help : 显示上面的各种可选值的帮助信息
+* 共享库的创建与安装
+** 创建
+#+BEGIN_EXAMPLE
+  gcc -shared -Wl,-soname,<soname> -o <library_name> <source_files> <library_files>
+#+END_EXAMPLE
+- =-WL,-soname=  用于指定SO-NAME,用于以后被 =ldconfig= 使用
+  
+比如有libfoo1.c,libfoo2.c,产生libfoo.so.1.0.0的共享库，且它们依赖于libbar1.so,libbar2.so这两个共享库，那么命令如下:
+#+BEGIN_EXAMPLE
+  gcc -shared -fPIC -Wl,-soname,libfoo.so.1 -o libfoo.so.1.0.0 libfoo1.c libfoo2.c -lbar1 -lbar2
+#+END_EXAMPLE
+** 安装
+1. 将生成的共享库复制到标准共享目录
+2. 运行ldconfig生成软链接
+
+如果不是存放在标准目录，使用 =ldconfig -n shared_library_directory= 建立SO-NAME,并且需要为gcc提供"-L"和"-l"参数
+- "-L" 指定共享库的搜索路径
+- "-l" 指定共享库名称
+** 共享库的构造和析构
+构造函数，可以在共享库加载后进行一些初始化工作，可以在main函数运行前或在 =dlopen()= 返回前运行:
+#+BEGIN_SRC c
+  void __attribute__((constructor)) init_function(void);
+#+END_SRC
+析构函数，可以在main函数执行完毕后，或在 =dlclose()= 返回前运行:
+#+BEGIN_SRC c
+  void __attribute__((destructor)) fini_function(void);
+#+END_SRC
+
+**注意:** 为了使用这种特性，gcc不可以使用 =-nostartfiles= =-nostdlib= 这两个参数!
+
+可以存在多个构造和析构函数，并为它们指定优先级：
+- 对于构造，数值越小优先级越高。而析构的优先级正好相反，这也符合资源的申请和释放原则
+#+BEGIN_SRC c
+  void __attribute__((constructor(5))) init_function1(void);
+  void __attribute__((constructor(10))) init_function2(void);
+
+  void __attribute__((destructor(10))) fini_function2(void);
+  void __attribute__((destructor(5))) fini_function1(void);
+#+END_SRC
+  
+
+
