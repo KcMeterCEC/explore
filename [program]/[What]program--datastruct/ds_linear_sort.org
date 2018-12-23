@@ -41,6 +41,179 @@
   3. 按照桶的顺序依次将一个桶的数据读入内存，进行快速排序，完成后将此桶内存写回硬盘
   4. 当步骤3执行完毕后，一个大文件也就排好序了
 #+END_EXAMPLE
+
+简易的示例代码如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <assert.h>
+  #include <string.h>
+
+  #define BUF_SIZE (10)
+  static int buf[BUF_SIZE];
+
+  #define BUCKET_SIZE_MAXIMUM (4)
+  typedef struct
+  {
+      int *buf;
+      int size;
+      int start;
+      int end;
+      int index;
+  }bucket_t;
+
+  static void swap(int *a, int *b)
+  {
+      int tmp = *a;
+      ,*a = *b;
+      ,*b = tmp;
+  }
+
+  static int partition(int *buf, int p, int r)
+  {
+      int i = p;
+
+      for(int j = p; j <= r - 1; j++)
+      {
+      if(buf[j] < buf[r])
+      {
+          if(i != j)
+          {
+        swap(&buf[j], &buf[i]);
+          }
+          i++;
+      }
+      }
+
+      swap(&buf[i], &buf[r]);
+
+      return i;
+  }
+
+  static void quick_sort_frame(int *buf, int p, int r)
+  {
+      if(p >= r)
+      {
+      return ;
+      }
+      int q = partition(buf, p, r);
+
+      printf("quick_sort p = %d, r = %d, q = %d\n", p, r, q);
+      for(int i = p; i <= r; i++)
+      {
+      printf("%d,", buf[i]);
+      }
+      printf("\n");
+      quick_sort_frame(buf, p, q - 1);
+      quick_sort_frame(buf, q + 1, r);
+  }
+  static void quick_sort(int *buf, int size)
+  {
+      quick_sort_frame(buf, 0, size - 1);
+    printf("quick sort:\n");
+    for(int i = 0; i < size; i++)
+    {
+      printf("%d,", buf[i]);
+    }
+    printf("\n");    
+  }
+  static void bucket_sort(int *buf, int size)
+  {
+      int minimum = buf[0];
+      int maximum = buf[0];
+
+      for(int i = 1; i < size; i++)
+      {
+          if(minimum > buf[i])
+          {
+              minimum = buf[i];
+          }
+          else if(maximum < buf[i])
+          {
+              maximum = buf[i];
+          }
+      }
+      printf("get buffer minimum = %d, maximum = %d\n", minimum, maximum);
+
+      int bucket_cnt = size / BUCKET_SIZE_MAXIMUM;
+      int remain = size % BUCKET_SIZE_MAXIMUM;
+
+      if(remain)
+      {
+        bucket_cnt += 1;
+      }
+      printf("we need %d buckets\n", bucket_cnt);
+
+      bucket_t buckets[bucket_cnt];
+      int start_index = minimum;
+      for(int i = 0; i < bucket_cnt; i++)
+      {
+        int malloc_cnt = BUCKET_SIZE_MAXIMUM;
+        if((i == bucket_cnt - 1) && (remain != 0))
+        {
+          malloc_cnt = remain;
+        }
+        buckets[i].buf = (int *)malloc(malloc_cnt * sizeof(int));
+        assert(buckets[i].buf);
+        buckets[i].size = malloc_cnt;
+        buckets[i].start = start_index;
+        buckets[i].end = start_index + buckets[i].size - 1;
+        buckets[i].index = 0;
+        start_index += buckets[i].size;
+        printf("bucket -> %d, start = %d,end = %d, size = %d\n", 
+          i, buckets[i].start, buckets[i].end,buckets[i].size);
+      }
+
+      int buf_index = 0;
+      for(int i = 0; i < size; i++)
+      {
+        for(int j = 0; j < bucket_cnt; j++)
+        {
+          if((buf[i] <= buckets[j].end) && (buf[i] >= buckets[j].start))
+          {
+            buf_index = j;
+            break;
+          }
+        }
+        buckets[buf_index].buf[buckets[buf_index].index++] = buf[i];
+
+        printf("bucket %d -> index %d = %d\n",
+          buf_index, buckets[buf_index].index - 1, buf[i]);
+      }
+
+      int *buf_addr = buf;
+      for(int i = 0; i < bucket_cnt; i++)
+      {
+        quick_sort(buckets[i].buf, buckets[i].size);
+        memcpy(buf_addr, buckets[i].buf, buckets[i].size * sizeof(int));
+        buf_addr += buckets[i].size;
+
+        free(buckets[i].buf);
+      }
+  }
+
+  int main(int argc, char *argv[])
+  {
+      printf("buffer contents:\n");
+      for(int i = BUF_SIZE; i > 0; i--)
+      {
+          buf[BUF_SIZE - i] = i;
+          printf("%d,", buf[BUF_SIZE - i]);
+      }
+      printf("\n");
+
+      bucket_sort(buf, BUF_SIZE);
+
+      printf("buffer contents:\n");
+      for(int i = 0; i < BUF_SIZE; i++)
+      {
+          printf("%d,", buf[i]);
+      }
+      printf("\n");
+      return 0;
+  }
+
+#+END_SRC
 ** 分析
 *** 时间复杂度
 理想情况下：
