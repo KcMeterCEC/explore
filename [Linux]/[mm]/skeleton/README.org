@@ -7,7 +7,13 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+课程: 宋宝华老师的内存管理
+
 整理Linux中的内存申请与释放的原理。
+
+| kernel version | arch  |
+|----------------+-------|
+| v4.4.0         | arm32 |
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
@@ -23,7 +29,7 @@ buddy算法虽然是动态的分离和合并，但合并的前置条件是这段
 为了保证DMA在任何时候都可以申请到连续的物理内存，所以在一开始就指定一片内存区域为保留区，仅仅用于DMA申请连续物理内存。
 
 但这会导致当平时DMA不使用时，这片内存也无法用作其他用途，造成空间浪费。
-*** CMA(连续内存分配器)
+*** CMA(Contiguous Memory Allocator, 连续内存分配器)
 为了弥补 reserved 方式的不足，三星提出了CMA方式，其基本思想为：
 1. 在物理内存分配了一片CMA区域(设备树中指定)，这片区域是物理内存连续的。
 2. 当DMA没有使用时，这片CMA区域交付给用户空间使用
@@ -32,6 +38,11 @@ buddy算法虽然是动态的分离和合并，但合并的前置条件是这段
   - 在移动应用程序对应的物理内存时，新申请的内存是否连续对应用程序并不影响
   - 由于在移动过程中需要重新修改页表，这段时间应用程序无法操作物理内存，会有短暂的卡顿。
 4. 将CMA区交付给DMA使用。
+- 有关reserved内存在设备树中的配置文档位于 =Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt= 
+   
+可以在menuconfig中配置cma：
+- =Kernel Features -> Contiguous Memory Allocator= : 使能cma
+- =Device Drivers -> Generic Driver Options -> DMA Contiguous Mmeory Allocator= : 使能dma_cma
 
 ** 算法粒度问题
 由于buddy算法的基本单位是页，而目前大部分页都是4K字节，这就导致当一个用户仅申请几个字节时，剩余的3K多字节就白白浪费了！
