@@ -43,7 +43,6 @@ buddy算法虽然是动态的分离和合并，但合并的前置条件是这段
 可以在menuconfig中配置cma：
 - =Kernel Features -> Contiguous Memory Allocator= : 使能cma
 - =Device Drivers -> Generic Driver Options -> DMA Contiguous Mmeory Allocator= : 使能dma_cma
-
 ** 算法粒度问题
 由于buddy算法的基本单位是页，而目前大部分页都是4K字节，这就导致当一个用户仅申请几个字节时，剩余的3K多字节就白白浪费了！
 
@@ -55,7 +54,7 @@ buddy算法与slab,malloc之间的关系可以简单的以下图表示:
 从上图可以看出：
 1. buddy算法是针对整个内存条的，它将内存条进行统一的管理。 *而内核态或是用户态对它来说都是客户而已！*
   - 也就是说：内核和用户对buddy来说都是平级的，无论是哪一方申请走了内存，另外一方都无法再申请同一处内存。
-2. 在 *内核空间* 中 slab策略 将buddy的内存进行了二次管理，将从slab申请的一大块内存分成很多小块给内核kmalloc,kfree使用
+2. 在 *内核空间* 中 slab策略 将buddy的内存进行了二次管理，将从buddy申请的一大块内存分成很多小块给内核kmalloc,kfree使用
   - slab并非是每次都要与buddy交互，这要根据内核中申请的内存大小而定。
   - 并且可以看出 kmalloc和kfree与buddy没有直接的关系，其申请与释放都是与slab交互的
   - buddy将内存条视为内存池，而slab将buddy视为内存池，所以它们在算法上是对等的
