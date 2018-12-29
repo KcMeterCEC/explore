@@ -200,7 +200,7 @@ malloc在用户使用时，其内部使用的是 lazy机制：
 
 此时Linux就会启动OOM(out of memory)机制， *将内存打分因子最高* 的应用给Kill掉以释放足够的内存。
 
-在内存为1G的虚拟机上，按照如下流程体验：
+在内存为1G的32位虚拟机上，按照如下流程体验：
 #+BEGIN_EXAMPLE
   #使用root身份，关闭交换空间
   swapoff -a
@@ -246,7 +246,7 @@ Linux会为每个进程进行打分，每个进程的 oom score 取决于:
 - oom_score_adj: oom_score会加上oom_score_adj这个值
 - oom_adj: -15 ~ 15 的系数范围调整
   
-这部分规则的代码位于函数 =oom_badness()= 中:
+这部分规则的代码位于函数 =/mm/oom_kill.c/oom_badness()= 中:
 #+BEGIN_SRC c
   /**
    ,* oom_badness - heuristic function to determine which candidate task to kill
