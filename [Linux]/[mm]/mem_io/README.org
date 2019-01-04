@@ -7,9 +7,13 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-学习笔记:宋宝华老师的内存课程
+课程: 宋宝华老师的内存管理
 
 理解内存与I/O交换详细过程。
+
+| kernel version | arch  |
+|----------------+-------|
+| v4.4.0         | arm32 |
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
@@ -35,7 +39,7 @@
   #第一次运行此命令，可以发现其产生了major page faults，代表有硬盘的文件交互
 
   \time -v python ./hello.py
-  #第二次运行此命令，可以发现其major page faults 计数为0，代表是直接从内存读，且运行时间远短语第一次
+  #第二次运行此命令，可以发现其major page faults 计数为0，代表是直接从内存读，且运行时间远短于第一次
 #+END_EXAMPLE
 ** page cache 的表现形式
 [[./pagecache_mode.jpg]]
@@ -87,5 +91,5 @@ linux内核使用LRU(Least Recently Used)算法来实现将 =file-backed 和 ann
 - 将物理内存中分一小块分区作为swap分区
 - CPU将要被置换的页面 *压缩* 以后放入这个swap分区
   + 这样也相当于增加了一部分内存
-- 当进程要切换回来时，CPU再加压缩swap分区
+- 当进程要切换回来时，CPU再解压缩swap分区
 [[./ZRAM.jpg]]

@@ -47,6 +47,37 @@ buddy算法虽然是动态的分离和合并，但合并的前置条件是这段
 由于buddy算法的基本单位是页，而目前大部分页都是4K字节，这就导致当一个用户仅申请几个字节时，剩余的3K多字节就白白浪费了！
 
 为了解决这个问题，Linux内核在buddy的基础之上进行了二次管理。
+** 内存碎片
+在内核空间申请的内存都是不可移动的，这也会导致最终的内存碎片。虽然内存中有足够多的空间，但这些空间由于其不连续而导致申请大内存失败。
+
+为此linux将内存空间又分为了可移动的、不可移动的、可回收类型，内核空间就在不可移动内存中申请空间，用户空间就在可移动内存中申请空间。这样内核就可以整理可移动的内存空间以腾出大片的连续内存。
+
+但这些类型的分配都是一个动态的过程，最开始都是可移动的页面，只有在内核申请时才会从可移动页面申请一部分为不可移动内存。
+
+#+BEGIN_SRC c
+  /*
+   ,* This array describes the order lists are fallen back to when
+   ,* the free lists for the desirable migrate type are depleted
+   ,*/
+  static int fallbacks[MIGRATE_TYPES][4] = {
+                                            [MIGRATE_UNMOVABLE]   = { MIGRATE_RECLAIMABLE, MIGRATE_MOVABLE,   MIGRATE_TYPES },
+                                            [MIGRATE_RECLAIMABLE] = { MIGRATE_UNMOVABLE,   MIGRATE_MOVABLE,   MIGRATE_TYPES },
+                                            [MIGRATE_MOVABLE]     = { MIGRATE_RECLAIMABLE, MIGRATE_UNMOVABLE, MIGRATE_TYPES },
+  #ifdef CONFIG_CMA
+                                            [MIGRATE_CMA]         = { MIGRATE_TYPES }, /* Never used */
+  #endif
+  #ifdef CONFIG_MEMORY_ISOLATION
+                                            [MIGRATE_ISOLATE]     = { MIGRATE_TYPES }, /* Never used */
+  #endif
+  };
+#+END_SRC
+上面的代码展示了不同类型的内存在其空间不够用时寻找内存的顺序。
+- 比如内核要申请UNMOVABLE(不可移动)内存时如果当前类型空间不够了，依次在RECLAIMABLE(可回收)、MOVABLE(可移动)类型中寻找。
+  
+主动触发可移动页面整理:
+#+BEGIN_EXAMPLE
+  echo 1 > /proc/sys/vm/compact_memory
+#+END_EXAMPLE
 * buddy 算法与slab,malloc之间的关系
 buddy算法与slab,malloc之间的关系可以简单的以下图表示:
 [[./buddy_struct.jpg]]
