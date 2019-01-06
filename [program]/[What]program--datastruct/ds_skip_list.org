@@ -1,0 +1,15 @@
+#+TITLE: [What]数据结构与算法 -> 跳表
+#+DATE:  <2019-01-07 Mon> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post 
+#+CATEGORIES: program,数据结构与算法
+#+NAMA: <program_DS_skip_list.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程：王争 --> <数据结构与算法之美>
+
+跳表(Skip list)时各方面性能都比较优秀的动态数据结构，可以支持快速的插入、删除、查找操作。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML

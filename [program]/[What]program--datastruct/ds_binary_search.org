@@ -15,6 +15,13 @@
 #+END_HTML
 * 概念
 二分查找时针对 *有序的数据集合* ， 每次通过跟区间的中间元素对比，将待查找区间缩小为之前的一半，直到找到要查找的元素或区间被缩小为0.
+** 应用场景
+二分查找对数据有以下要求：
+1. 数组是通过数组进行存储的，这样才能够进行随机访问
+2. 数组中的数据必须是有序存储的，否则需要先排序再进行查找
+3. 数据量不能太小或太大
+  - 太小其效率还不如遍历来得干脆
+  - 太大则会消耗大量的连续内存。
 * 分析
 ** 时间复杂度
 二分查找每次对数据集合进行折半后判断，那么假设数据集合长度为n，其判断位置依次为:
@@ -143,6 +150,234 @@
 
     int32_t index;
     if((index = find_value(buffer, 0, buffer_size - 1, request_value)) != -1)
+    {
+      printf("The index of value [%d] is <%d>\n", request_value, index);
+    }
+    else
+    {
+      printf("Sorry, the list doesn't include this value.\n");
+    }
+
+    return 0;
+  }
+#+END_SRC
+*** 二分查找求均方根值
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdbool.h>
+
+  double binary_search_sqrt(double val)
+  {
+    double min = 0;
+    double max = 0;
+    double middle = 0;
+
+    if(val <= 0)
+      {
+        return -1;
+      }
+    else if(val < 1)
+      {
+        min = val;
+        max = 1;
+      }
+    else if(val == 1)
+      {
+        return 1;
+      }
+    else if(val > 1)
+      {
+        min = 1;
+        max = val;
+      }
+
+
+    bool finished = false;
+    while(finished == false)
+      {
+        middle = (min + max) / 2;
+
+        double up = middle + 1e-6f;
+        double down = middle - 1e-6f;
+        if(((up * up) > val) && ((down * down) < val))
+          {
+            finished = true;
+          }
+        else if((middle * middle) > val)
+          {
+            max = middle;
+          }
+        else if((middle * middle) < val)
+          {
+            min = middle;
+          }
+      }
+
+    return middle;
+  }
+
+  int main(int argc, char *argv[])
+  {
+    double input;
+    printf("input a value:");
+    scanf("%lf", &input);
+    printf("input = %lf\n", input);
+    printf("sqrt(%lf) = %lf\n", input, binary_search_sqrt(input));
+
+    return 0;
+  }
+#+END_SRC
+** 变体
+*** 查找第一个或最后一个为给定值的索引
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdint.h>
+  #include <stdbool.h>
+
+  // #define FIRST_VALUE
+
+  static int32_t buffer[] =
+  //0  1  2  3  4  5   6   7   8   9   10  11  12  13  14  15
+  { 0, 1, 5, 7, 8, 15, 19, 19, 19, 19, 35, 58, 69, 70, 88, 91,
+    //16  17   18   19   20   21   22   23   24   25   26   27
+    100, 123, 133, 145, 156, 178, 189, 200, 201, 258, 289, 291};
+  int32_t find_value(int32_t *buf, int32_t size, int32_t request_value)
+  {
+    int32_t low = 0;
+    int32_t high = size - 1;
+    while(low <= high)
+    {
+      int32_t mid = low + ((high - low)  >> 1);
+
+      if(buf[mid] == request_value)
+      {
+  #ifdef FIRST_VALUE			
+        if((mid == 0) || (buf[mid - 1] != request_value))
+        {
+          return mid;
+        }
+        high = mid - 1;
+  #else
+        if((mid == (size - 1)) || (buf[mid + 1] != request_value))
+        {
+          return mid;
+        }
+        low = mid + 1;		
+  #endif			
+      }
+      else if(buf[mid] < request_value)
+      {
+        low = mid + 1;
+      }
+      else 
+      {
+        high = mid - 1;
+      }
+    }
+
+    return -1;
+  }
+  int main(int argc, char * argv[])
+  {
+    int32_t buffer_size = sizeof(buffer) / sizeof(int32_t);
+
+    printf("\nBuffer list:\n");
+    printf("index : value\n");
+    for(int i = 0; i < buffer_size; i++)
+    {
+      printf("%3d : %3d\n", i, buffer[i]);
+    }
+
+    int32_t request_value;
+    printf("Please input a number value which you want to find it's index:");
+    scanf("%d", &request_value);
+    printf("\nStarting find the index of value [%d]\n", request_value);
+
+
+    int32_t index;
+    if((index = find_value(buffer, buffer_size, request_value)) != -1)
+    {
+      printf("The index of value [%d] is <%d>\n", request_value, index);
+    }
+    else
+    {
+      printf("Sorry, the list doesn't include this value.\n");
+    }
+
+    return 0;
+  }
+#+END_SRC
+*** 查找第一个大于或小于给定值的索引
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdint.h>
+  #include <stdbool.h>
+
+  // #define GTEAT_THAN_VALUE
+
+  static int32_t buffer[] =
+  //0  1  2  3  4  5   6   7   8   9   10  11  12  13  14  15
+  { 0, 1, 5, 7, 8, 15, 19, 19, 19, 19, 35, 58, 69, 70, 88, 91,
+    //16  17   18   19   20   21   22   23   24   25   26   27
+    100, 123, 133, 145, 156, 178, 189, 200, 201, 258, 289, 291};
+  int32_t find_value(int32_t *buf, int32_t size, int32_t request_value)
+  {
+    int32_t low = 0;
+    int32_t high = size - 1;
+    while(low <= high)
+    {
+      int32_t mid = low + ((high - low)  >> 1);
+
+  #ifdef GTEAT_THAN_VALUE
+      if(buf[mid] <= request_value)
+      {
+        low = mid + 1;
+      }			
+  #else
+      if(buf[mid] >= request_value)
+      {
+        high = mid - 1;
+      }			
+  #endif			
+      else
+      {
+  #ifdef GTEAT_THAN_VALUE			
+        if((mid == 0) || (buf[mid - 1] <= request_value))
+        {
+          return mid;
+        }
+        high = mid - 1;
+  #else
+        if((mid == size - 1) || (buf[mid + 1] >= request_value))
+        {
+          return mid;
+        }
+        low = mid + 1;
+  #endif			
+      }
+    }
+
+    return -1;
+  }
+  int main(int argc, char * argv[])
+  {
+    int32_t buffer_size = sizeof(buffer) / sizeof(int32_t);
+
+    printf("\nBuffer list:\n");
+    printf("index : value\n");
+    for(int i = 0; i < buffer_size; i++)
+    {
+      printf("%3d : %3d\n", i, buffer[i]);
+    }
+
+    int32_t request_value;
+    printf("Please input a number value which you want to find it's index:");
+    scanf("%d", &request_value);
+    printf("\nStarting find the index of value [%d]\n", request_value);
+
+
+    int32_t index;
+    if((index = find_value(buffer, buffer_size, request_value)) != -1)
     {
       printf("The index of value [%d] is <%d>\n", request_value, index);
     }
