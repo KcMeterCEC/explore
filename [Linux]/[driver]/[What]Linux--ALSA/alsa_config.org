@@ -12,18 +12,33 @@
 <!--more-->
 #+END_HTML
 * 概览
-ALSA库具有配置文件位于 =/usr/share/alsa/alsa.conf= , 此文件用于载入其他网卡的配置。
+ALSA库具有配置文件位于 =/usr/share/alsa/alsa.conf= , 此文件用于载入其他声卡的配置。
 - 首先读取文件 =/usr/share/alsa/cards/aliases.conf= , 以得出声卡名称与其对应的配置文件的关系
   + 其格式为 =<card name> cards.<config name>= 
-- 根据当前装载的网卡名去调用对应的配置文件
+- 根据当前装载的声卡名去调用对应的配置文件
   + 比如有格式 =au8810 cards.AU8810= 通过 =cat /proc/asound/cards= 得出声卡名为 "au8810"，则对应调用文件 =AU8810.conf=
 - 除此之外还会调用文件 =${HOME}/.asoundrc= （每个用户的单独配置）以及 =/etc/asound.conf= （全局配置）
 * 配置
+** 关于声卡和设备的名称
+要输出声音，得需要两个要素：
+1. IIS声音流
+2. 将IIS转换为模拟波形的音频芯片
+
+其中的IIS流也就是PCM流，这在ALSA中也是这么称呼的，所以看到pcm就应该立即想到这就是音频数据流。
+
+而音频芯片在ALSA中就称为device，它与pcm共同组成card。
+
+[[./alsa_name.jpg]]
+
+如上图所示，整个总体被称为一个card,而设备1、设备2、设备3被分别称作device1,device2,device3.
+
+ALSA中的card和device是以0开始计数的，所以当要驱动第一个card中的第一个device时，对应其名称为 =hw:0,0=
 ** 设置默认声卡
 编辑文件 =~/.asoundrc= 内容如下:
 #+BEGIN_EXAMPLE
   # 在使用ALSA库编程时，默认的 default 对应的就是 hw:0,0
   # hw:<soundcard number>,<device number>
+  # default前的感叹号用于替代alsa api 中默认的default配置
   pcm.!default {
     type hw
     card 0
@@ -37,7 +52,28 @@ ALSA库具有配置文件位于 =/usr/share/alsa/alsa.conf= , 此文件用于载
 - 在路径 =/proc/asound/cardx= 下具有类似文件:
   + pcm0c : 0设备输入端(capture)
   + pcm0p : 0设备发送端(playback)
+** PCM设置的规则
+*** 重命名
+PCM重命名设置规则如下:
+#+BEGIN_EXAMPLE
+  pcm.NAME {
+    type hw               # Kernel PCM
+    card INT/STR          # Card name or number
+    [device] INT          # Device number (default 0)     
+    [subdevice] INT       # Subdevice number, -1 first available (default -1)
+    mmap_emulation BOOL   # enable mmap emulation for ro/wo devices
+  }
+#+END_EXAMPLE
+基于以上规则，我们可以为对应的pcm设置其他名称，而不是 =default, hw:x,x= 这种不清晰的名称，比如将hw:0,0映射为speaker
+#+BEGIN_EXAMPLE
+  pcm.speaker {
+    type hw
+    card 0
+    device 0
+  }
+#+END_EXAMPLE
+这样就可以在编程中使用 =speaker= 这个字符串了
 
 
-** 待续...
-此部分配置内容与我所想的不一致，待忙完这段时间再来补充.
+
+
