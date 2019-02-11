@@ -21,7 +21,8 @@ Advanced Linux Sound Architecture(ALSA) 的应用层操作。
 
 Pluse code modulation(PCM)：简单点理解就是使用AD将模拟转数字而得到的信号。
 - 与信号有关的参数有采样的位数和采样的速率。
-  + 采样位数越高可以反应的幅度越精细，动态范围越大
+  + 采样位数越高可以反应的幅度越精细，动态范围越大.其公式为 =20log(10,最大数值)= 
+    - 比如12位ADC的动态范围约72dB，每增加一位其动态范围增加6dB
   + 人耳的频率范围是20Hz～20kHz，根据奈奎斯特定理，采样频率要高于输入信号的2倍才能还原波形。常用的有8k,11.025k,22.05k,16k,37.8k,44.1k,48k等
 * 准备工作
 ** 发现声卡
@@ -122,6 +123,7 @@ card 1: PCH [HDA Intel PCH], device 2: VT1802 Alt Analog [VT1802 Alt Analog]
 - hw:1,0
 - hw:1,2
 * 典型的应用处理流程
+大体上的处理流程如下代码:
 #+BEGIN_SRC c
 open_the_device();
 set_the_parameters_of_the_device();
@@ -132,11 +134,21 @@ while (!done) {
 }
 close_the_device();
 #+END_SRC
+在具体编码时，首先会打开pcm设备，然后设置其方向、周期、采样率等参数，最后才是启动传输。
+
+在设置具体参数时，可以先检查期望设定的参数是否被支持，以及当前的设定和设备的能力，使用函数:
+#+BEGIN_SRC c
+  snd_pcm_hw_params_can_<capability>
+  snd_pcm_hw_params_is_<property>
+  snd_pcm_hw_params_get_<parameter>
+  snd_pcm_hw_params_test_<parameter>
+#+END_SRC
 * 发送音频示例
 使用此代码运行后将会听到一段音输出
 ** 编码
 *注意：*
 1. 发送的数据都是以frame 为单位
+  - 一个frame大小就是多个通道单点采用数据的大小，比如双通道16位的一个frame就是4字节。
 2. 发送缓存大小(buffer size)和段的大小(period size)必须设置
 #+BEGIN_SRC c
   // file:send.c
@@ -153,115 +165,120 @@ close_the_device();
 
   #define PI  (3.141592653) 
 
-  main (int argc, char *argv[])
+  int main (int argc, char *argv[])
   {
-          int i;
-          int err;
-          snd_pcm_t *playback_handle; //PCM流 句柄
-          snd_pcm_hw_params_t *hw_params;//PCM流设置参数
+    int i;
+    int err;
+    snd_pcm_t *playback_handle; //PCM流 句柄
+    snd_pcm_hw_params_t *hw_params;//PCM流设置参数
 
-          int16_t *short_buf = (int16_t *)malloc(PLAY_BUF_SIZE * sizeof(int16_t) * 2);
-          float f = 600.0f; 
-          unsigned int rate = 44100;
-          double temp = 2 * PI * f / (double)rate;
-          for(uint32_t i = 0; i < PLAT_BUF_SIZE; i++)
-          {
-            int16_t temp1 = cos(i * temp) * 10000;
-            int16_t temp2 = sin(i * temp) * 10000;
-            short_buf[2 * i] = temp1;
-            short_buf[2 * i + 1] = temp2;
-          }
+    int16_t *short_buf = (int16_t *)malloc(PLAY_BUF_SIZE * sizeof(int16_t) * 2);
+    float f = 600.0f; 
+    unsigned int rate = 44100;
+    double temp = 2 * PI * f / (double)rate;
+    for(uint32_t i = 0; i < PLAY_BUF_SIZE; i++)
+    {
+      int16_t temp1 = cos(i * temp) * 10000;
+      int16_t temp2 = sin(i * temp) * 10000;
+      short_buf[2 * i] = temp1;
+      short_buf[2 * i + 1] = temp2;
+    }
 
 
-          //以输出流的方式打开
-          if ((err = snd_pcm_open (&playback_handle, argv[1], SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
-                  fprintf (stderr, "cannot open audio device %s (%s)\n",
-                           argv[1],
-                           snd_strerror (err));
-                  exit (1);
-          }
+    //以输出流的方式打开
+    if ((err = snd_pcm_open (&playback_handle, argv[1], SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+      fprintf (stderr, "cannot open audio device %s (%s)\n",
+         argv[1],
+         snd_strerror (err));
+      exit (1);
+    }
 
-          //申请参数结构内存
-          if ((err = snd_pcm_hw_params_malloc (&hw_params)) < 0) {
-                  fprintf (stderr, "cannot allocate hardware parameter structure (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
+    //申请参数结构内存
+    if ((err = snd_pcm_hw_params_malloc (&hw_params)) < 0) {
+      fprintf (stderr, "cannot allocate hardware parameter structure (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
 
-          //获取目前的参数
-          if ((err = snd_pcm_hw_params_any (playback_handle, hw_params)) < 0) {
-                  fprintf (stderr, "cannot initialize hardware parameter structure (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
+    //获取目前的参数
+    if ((err = snd_pcm_hw_params_any (playback_handle, hw_params)) < 0) {
+      fprintf (stderr, "cannot initialize hardware parameter structure (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
 
-          //左右声道交替采样
-          if ((err = snd_pcm_hw_params_set_access (playback_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
-                  fprintf (stderr, "cannot set access type (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
-          //16位pcm,小端模式
-          if ((err = snd_pcm_hw_params_set_format (playback_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
-                  fprintf (stderr, "cannot set sample format (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
-          //采样数据 44.1k
-          if ((err = snd_pcm_hw_params_set_rate_near (playback_handle, hw_params, &rate, 0)) < 0) {
-                  fprintf (stderr, "cannot set sample rate (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
-          int frames = 128; //一个段包含多少个frame
-          int dir = 0;
-          if((err = snd_pcm_hw_params_set_period_size_near(playback_handle, hw_params, &frames, &dir)) < 0)
-          {
-              fprintf(stderr, "Cannot set period size (%s)\n", snd_strerr(err));
-               exit (1);
-          }
-          int buffer_size = 1024; //一个缓存包含多个frame
+    //左右声道交替采样
+    if ((err = snd_pcm_hw_params_set_access (playback_handle, hw_params, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
+      fprintf (stderr, "cannot set access type (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
+    //16位pcm,小端模式
+    if ((err = snd_pcm_hw_params_set_format (playback_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
+      fprintf (stderr, "cannot set sample format (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
+    //采样数据 44.1k
+    if ((err = snd_pcm_hw_params_set_rate_near (playback_handle, hw_params, &rate, 0)) < 0) {
+      fprintf (stderr, "cannot set sample rate (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
+    snd_pcm_uframes_t frames = 128; //一个段包含多少个frame
+    int dir = 0;
+    if((err = snd_pcm_hw_params_set_period_size_near(playback_handle, hw_params, &frames, &dir)) < 0)
+    {
+        fprintf(stderr, "Cannot set period size (%s)\n", snd_strerror(err));
+         exit (1);
+    }
+    snd_pcm_uframes_t buffer_size = 1024; //一个缓存包含多个frame
 
-          if((err = snd_pcm_hw_params_set_buffer_size_near(playback_handle, hw_params, &buffer_size, &dir)) < 0)
-          {
-              fprintf(stderr, "Cannot set buffer size (%s)\n", snd_strerr(err));
-               exit (1);
-          }
-          //双通道输出
-          if ((err = snd_pcm_hw_params_set_channels (playback_handle, hw_params, 2)) < 0) {
-                  fprintf (stderr, "cannot set channel count (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
-          //将参数应用于硬件
-          if ((err = snd_pcm_hw_params (playback_handle, hw_params)) < 0) {
-                  fprintf (stderr, "cannot set parameters (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
-          //释放参数缓存
-          snd_pcm_hw_params_free (hw_params);
+    if((err = snd_pcm_hw_params_set_buffer_size_near(playback_handle, hw_params, &buffer_size)) < 0)
+    {
+        fprintf(stderr, "Cannot set buffer size (%s)\n", snd_strerror(err));
+         exit (1);
+    }
+    //双通道输出
+    if ((err = snd_pcm_hw_params_set_channels (playback_handle, hw_params, 2)) < 0) {
+      fprintf (stderr, "cannot set channel count (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
+    //将参数应用于硬件
+    if ((err = snd_pcm_hw_params (playback_handle, hw_params)) < 0) {
+      fprintf (stderr, "cannot set parameters (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
+    //释放参数缓存
+    snd_pcm_hw_params_free (hw_params);
 
-          //获取设备权限
-          if ((err = snd_pcm_prepare (playback_handle)) < 0) {
-                  fprintf (stderr, "cannot prepare audio interface for use (%s)\n",
-                           snd_strerror (err));
-                  exit (1);
-          }
+    //获取设备权限
+    if ((err = snd_pcm_prepare (playback_handle)) < 0) {
+      fprintf (stderr, "cannot prepare audio interface for use (%s)\n",
+         snd_strerror (err));
+      exit (1);
+    }
 
-          //发送数据流
-          if ((err = snd_pcm_writei (playback_handle, short_buf, PLAY_BUF_SIZE)) != PLAY_BUF_SIZE) {
-                  fprintf (stderr, "write to audio interface failed (%s)\n",
-                              snd_strerror (err));
-                  exit (1);
-          }
-          //等待数据发送完成
-          snd_pcm_drain(playback_handle);
+    //发送数据流
+    for(uint8_t i = 0; i < 10; i++)
+    {
+      if ((err = snd_pcm_writei (playback_handle, short_buf, PLAY_BUF_SIZE)) != PLAY_BUF_SIZE) {
+        snd_pcm_prepare(playback_handle); //写入错误时，需要重新prepare一次
+        fprintf (stderr, "write to audio interface failed (%s)\n",
+              snd_strerror (err));
+        exit (1);
+      }
+    }
 
-          //关闭设备
-          snd_pcm_close (playback_handle);
-          free(short_buf);
-          exit (0);
+    //等待数据发送完成
+    snd_pcm_drain(playback_handle);
+
+    //关闭设备
+    snd_pcm_close (playback_handle);
+    free(short_buf);
+    exit (0);
   }
 #+END_SRC
 ** 编译
@@ -270,8 +287,9 @@ gcc send.c -lasound -lm
 #+end_example
 ** 运行
 #+begin_example
-./a.bout hw:1,0
+  ./a.bout default
 #+end_example
+- 对于播放的更为详细的代码可以参考 =alsa-utils= 源码中的 =aplay= 代码
 * 录音示例
 使用此代码运行后，将会录取一段音频到缓存中。
 ** 编码
@@ -280,7 +298,7 @@ gcc send.c -lasound -lm
 #include <stdlib.h>
 #include <alsa/asoundlib.h>
 
-main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
         int i;
         int err;
@@ -365,4 +383,5 @@ gcc receiver.c -o receive -lasound
 #+begin_example
 ./receive hw:1,0
 #+end_example
+- 对于录音的更为详细的代码可以参考 =alsa-utils= 源码中的 =aplay= 代码
 

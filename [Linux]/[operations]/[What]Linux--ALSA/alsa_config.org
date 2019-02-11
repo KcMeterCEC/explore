@@ -2,7 +2,7 @@
 #+DATE:  <2018-08-10 五> 
 #+TAGS: driver
 #+LAYOUT: post 
-#+CATEGORIES: linux, driver, ALSA
+#+CATEGORIES: linux, operations, ALSA
 #+NAME: <linux_driver_ALSA_config.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
