@@ -3,7 +3,7 @@
 #+TAGS: 数据结构与算法
 #+LAYOUT: post 
 #+CATEGORIES: program,数据结构与算法
-#+NAMA: <program_DS_hash_table.org>
+#+NAME: <program_DS_hash_table.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
