@@ -50,6 +50,266 @@
 - 删除: 删除操作是将数组对应位置标记为 =deleted= 而不是直接置空，否则在查找数据的时候会由于此次的空白而无法遍历后面的数据导致查找失败
 
 当数组中存储的数据越来越多时，出现冲突的可能性也会越来越大，在以上的增删改查操作时，最坏的时间复杂度为O(n)。
+
+示例如下:
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdint.h>
+  #include <stdbool.h>
+
+  typedef struct 
+  {
+      uint32_t number;
+      char     *name;
+      uint8_t  age;
+  }student_t;
+
+  #define HASH_TABLE_SIZE     (4)
+
+  typedef struct 
+  {
+      student_t student;
+      bool     empty;
+      bool     deleted;
+  }hash_element_t;
+
+  struct 
+  {
+      hash_element_t  buf[HASH_TABLE_SIZE];
+      uint32_t        empty_size;
+  }hash_table;
+
+  static student_t bruce =
+  {
+      .number = 10102,
+      .name = "Bruce",
+      .age = 16,
+  };
+  static student_t tom =
+  {
+      .number = 10103,
+      .name = "Tom",
+      .age = 18,
+  };
+  static student_t may =
+  {
+      .number = 10205,
+      .name = "May",
+      .age = 20,
+  };
+  static student_t jim =
+  {
+      .number = 10303,
+      .name = "Jim",
+      .age = 27,
+  };
+  static student_t tony =
+  {
+      .number = 10503,
+      .name = "tony",
+      .age = 25,
+  };
+
+
+  static void hash_init(void)
+  {
+      hash_table.empty_size = HASH_TABLE_SIZE;
+      for(uint32_t i = 0; i < HASH_TABLE_SIZE; ++i)
+      {
+          hash_table.buf[i].empty = true;
+      }
+  }
+
+  static uint32_t hash_val_get(uint32_t key)
+  {
+      return (key % HASH_TABLE_SIZE);
+  }
+  static bool hash_save(student_t *student, uint32_t index, bool is_modify)
+  {
+      bool ret = false;
+
+      if((hash_table.buf[index].empty == true) ||
+      (is_modify == true))
+      {
+          printf("I edit index : %d -> [%s]\n", index, student->name);
+
+          hash_table.buf[index].student = *student;
+          hash_table.buf[index].empty = false;
+          hash_table.buf[index].deleted = false;
+
+          if(is_modify == false)
+          {
+              --hash_table.empty_size;
+          }
+
+          ret = true;
+      }
+
+      return ret;
+  }
+  static bool hash_insert(student_t *student)
+  {
+      bool ret = true;
+
+      if(hash_table.empty_size == 0)
+      {
+          ret = false;
+          printf("hash table is full!I can't insert [%s] into.\n", student->name);
+          goto out;
+      }
+      uint32_t index = hash_val_get(student->number);
+      if(hash_save(student, index, false) == false)
+      {
+          while(hash_table.empty_size)
+          {
+              index += 1;
+              if(index >= HASH_TABLE_SIZE)
+              {
+                  index = 0;
+              }
+              if(hash_save(student, index, false) == true)
+              {
+                  break;
+              }
+          }   
+      }
+
+  out:
+      return ret;
+  }
+  static int32_t hash_find_index(uint32_t key)
+  {
+      int32_t ret = -1;
+      uint32_t index = hash_val_get(key);
+
+      for(uint32_t i = 0; i < HASH_TABLE_SIZE; i++)
+      {
+          if(hash_table.buf[index].empty == true)
+          {
+              break;
+          }
+          if(hash_table.buf[index].deleted == true)
+          {
+              if((++index) >= HASH_TABLE_SIZE)
+              {
+                  index = 0;
+              }            
+              continue;
+          }
+          if(hash_table.buf[index].student.number == key)
+          {
+              ret = index;
+              break;
+          }
+          if((++index) >= HASH_TABLE_SIZE)
+          {
+              index = 0;
+          }
+      }
+
+      if(ret == -1)
+      {
+          printf("error: I can't find index!\n");
+      }
+
+      return ret;
+  }
+  static bool hash_rm(uint32_t key)
+  {
+      bool ret = false;
+      int32_t index = hash_find_index(key);
+      if(index != -1)
+      {
+          ret = true;
+          printf("rm [%s]\n", hash_table.buf[index].student.name);
+          hash_table.buf[index].deleted = true;
+          hash_table.buf[index].empty = true;
+          ++hash_table.empty_size;
+      }
+
+      return ret;
+  }
+  static bool hash_modify(student_t *student)
+  {
+      bool ret = false;
+      int32_t index = hash_find_index(student->number);
+      if(index != -1)
+      {
+          ret = true;
+          hash_save(student, index, true);
+      }
+
+      return ret;
+  }
+  static bool hash_find(student_t *student, uint32_t key)
+  {
+      bool ret = false;
+      int32_t index = hash_find_index(key);
+      if(index != -1)
+      {
+          ret = true;
+
+          ,*student = hash_table.buf[index].student;
+      }
+
+      return ret;
+  }
+
+  static void print_student(const student_t *student)
+  {
+      printf("Hi, my name is [%s], and my number is [%d], and I'm [%d]\n", 
+      student->name,
+      student->number,
+      student->age);
+  }
+
+  int main(int argc, char *argv[])
+  {
+      hash_init();
+
+      hash_insert(&bruce);
+      hash_insert(&tom);
+      hash_insert(&may);
+      hash_insert(&jim);
+      hash_insert(&tony);
+
+      hash_rm(may.number);
+
+      bruce.age = 50;
+      hash_modify(&bruce);
+
+      hash_insert(&tony);
+
+      jim.age = 50;
+      hash_modify(&jim);
+
+      printf("Hash table list:\n");
+      for(uint8_t i = 0; i < HASH_TABLE_SIZE; i++)
+      {
+          printf("[%s] is located in index [%d]\n", 
+          hash_table.buf[i].student.name, i);
+      }
+
+      student_t student;
+
+      if(hash_find(&student, bruce.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, tom.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, may.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, jim.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, tony.number) == true) 
+      print_student(&student);            
+
+      return 0;
+  }
+#+END_SRC
 **** 2. 二次探测(Quadratic probing)
 线性探测如果遇到冲突后进行探测的步长为1，而二次探测的步长为原来的二次方:
 - 线程探测: hash(key) + 0, hash(key) + 1, hash(key) + 2 .....
