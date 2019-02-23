@@ -329,6 +329,230 @@
 - 缺点：数据分布不连续，无法很好利用cpu cache。且对于小的对象存储比较消耗内存(节点指针也会占用内存)
   + 可以将链表由跳表、红黑树等代替，以提高查询效率
 - 应用场景：存储大对象、大数据量
+  
+示例如下:
+#+BEGIN_SRC c
+  #include "unidir_list.h"
+  #include <stdint.h>
+  #include <stdlib.h>
+  #include <assert.h>
+
+  typedef struct 
+  {
+      uint32_t number;
+      char     *name;
+      uint8_t  age;
+  }student_t;
+
+  #define HASH_TABLE_SIZE     (4)
+
+  typedef struct 
+  {
+      student_t student;
+      struct list_node   node;
+  }hash_element_t;
+
+  struct 
+  {
+      hash_element_t  buf[HASH_TABLE_SIZE];
+  }hash_table;
+
+  static student_t bruce =
+  {
+      .number = 10102,
+      .name = "Bruce",
+      .age = 16,
+  };
+  static student_t tom =
+  {
+      .number = 10103,
+      .name = "Tom",
+      .age = 18,
+  };
+  static student_t may =
+  {
+      .number = 10205,
+      .name = "May",
+      .age = 20,
+  };
+  static student_t jim =
+  {
+      .number = 10303,
+      .name = "Jim",
+      .age = 27,
+  };
+  static student_t tony =
+  {
+      .number = 10503,
+      .name = "tony",
+      .age = 25,
+  };
+
+
+  static void hash_init(void)
+  {
+      for(uint32_t i = 0; i < HASH_TABLE_SIZE; ++i)
+      {
+          undir_list.init_obj(&hash_table.buf[i].node);
+      }
+  }
+
+  static uint32_t hash_val_get(uint32_t key)
+  {
+      return (key % HASH_TABLE_SIZE);
+  }
+  static void hash_save(student_t *student, uint32_t index)
+  {
+      hash_element_t   *obj;
+      bool             have_obj = false;
+
+      unidir_list_for_each_entry(obj, &hash_table.buf[index].node, hash_element_t, node)
+      {
+          if(obj->student.number == student->number)
+          {
+              obj->student = *student;
+              printf("modify student [%s]\n", student->name);
+              have_obj = true;
+              break;
+          }
+      }
+      if(have_obj == false)
+      {
+          printf("insert student [%s]\n", student->name);
+
+          obj = (hash_element_t *)malloc(sizeof(hash_element_t));
+          assert(obj != NULL);
+          obj->student = *student;
+          undir_list.insert(&hash_table.buf[index].node, &obj->node);  
+      }
+  }
+  static void hash_insert(student_t *student)
+  {
+      uint32_t index = hash_val_get(student->number);
+      printf("insert index = %d\n", index);
+
+      hash_save(student, index);
+  }
+  static bool hash_rm(uint32_t key)
+  {
+      bool ret = false;
+      int32_t index = hash_val_get(key);
+      printf("rm index = %d\n", index);
+      if(index != -1)
+      {
+          struct list_node  *current_node = &hash_table.buf[index].node;
+          hash_element_t   *obj;
+          do
+          {
+              obj = unidir_list_first_entry(current_node, hash_element_t, node);
+              if(obj->student.number == key)
+              {
+                  printf("rm student [%s]\n", obj->student.name);
+                  undir_list.remove_next(current_node);
+                  ret = true;
+                  break;
+              }
+              current_node = current_node->next;
+          }while(current_node != &hash_table.buf[index].node);
+      }
+      if(ret == false)
+      {
+          printf("can not find !\n");
+      }
+
+      return ret;
+  }
+  static void  hash_modify(student_t *student)
+  {
+      hash_insert(student);
+  }
+  static bool hash_find(student_t *student, uint32_t key)
+  {
+      bool ret = false;
+      int32_t index = hash_val_get(key);
+      printf("find index = %d\n", index);
+      if(index != -1)
+      {
+          hash_element_t   *obj;
+          unidir_list_for_each_entry(obj, &hash_table.buf[index].node, hash_element_t, node)
+          {
+              if(obj->student.number == key)
+              {
+                  ,*student = obj->student;
+                  ret = true;
+                  break;
+              }
+          }
+      }
+      if(ret == false)
+      {
+          printf("can not find !\n");
+      }
+
+      return ret;
+  }
+
+  static void print_student(const student_t *student)
+  {
+      printf("Hi, my name is [%s], and my number is [%d], and I'm [%d]\n", 
+      student->name,
+      student->number,
+      student->age);
+  }
+
+  int main(int argc, char *argv[])
+  {
+      unidir_list_str_init();
+    
+      hash_init();
+
+      hash_insert(&bruce);
+      hash_insert(&tom);
+      hash_insert(&may);
+      hash_insert(&jim);
+      hash_insert(&tony);
+
+      hash_rm(may.number);
+
+      bruce.age = 50;
+      hash_modify(&bruce);
+
+      hash_insert(&tony);
+
+      jim.age = 50;
+      hash_modify(&jim);
+
+      printf("Hash table list:\n");
+      for(uint8_t i = 0; i < HASH_TABLE_SIZE; i++)
+      {
+          hash_element_t   *obj;
+          unidir_list_for_each_entry(obj, &hash_table.buf[i].node, hash_element_t, node)
+          {
+              printf("[%s] is located in index [%d]\n", 
+              obj->student.name, i);
+          }
+      }
+
+      student_t student;
+
+      if(hash_find(&student, bruce.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, tom.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, may.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, jim.number) == true) 
+      print_student(&student);
+
+      if(hash_find(&student, tony.number) == true) 
+      print_student(&student);            
+
+      return 0;
+  }
+#+END_SRC
 * 散列函数的设计
 ** 一般设计方法
 好的散列函数需要:

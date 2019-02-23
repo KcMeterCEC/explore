@@ -27,13 +27,26 @@ grabserial -v -d /dev/ttyUSB0 -e 60 -t -m "Booting Linux on physical CPU*"
 #+end_example
 * 提高开机速度
 在了解到各个部分的开机时间后，有下面这些通用的方法可以提高Linux的开机速度。
+** 关闭不用的模块
+- 准备工作做好后，确认以下配置已经打开:
+  - =CONFIG_PRINTK_TIME=
+  - =CONFIG_KALLSYMS=
+- 重启系统后，将输出保存到文件并上传至PC
+  - =dmesg > boot.log=
+- 使用 bootgraph 查看初始化组件的占用时间
+  - =linux/scripts/bootgraph.pl boot.log > boot.svg= 
+- 最后主要优化：
+  - 查看哪些模块是自己不需要的，然后关闭它们。
+  - 查看启动文件系统的时间，关掉文件系统中无用的配置
+  - 将相对耗时的模块初始化尽量放在开机以后再加载。
+  
+*注意:* 倘若dmesg显示信息不完整，那是打印缓存设置得太小的缘故，需要[[http://kcmetercec.top/2018/03/08/linux_debug_kernel_printk/#orgf9fc695][增大缓存]]。
 ** bootargs 设置
 *** 取消不必要的串口输出
 printk的发送会比较占用时间，所以可以取消一些不重要的输出：
 - 在menuconfig中取消 earlyprintk 宏，并且在 bootargs 中也取消此字符串
 - 在 bootargs 中取消 loglevel=8 字符串，用 quiet 代替。
   + quiet 会让 kernel 设置为只有警告以上的信息才会打印(loglevel=4)
-
 *** 指定延迟校准值
 内核在每次启动的时候会校准延迟，比如 :
 #+begin_example
