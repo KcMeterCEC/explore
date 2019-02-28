@@ -7,6 +7,10 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+参考链接:
+1. [[https://elinux.org/Boot-up_Time_Reduction_Howto]]
+2. [[https://elinux.org/images/6/64/Chris-simmonds-boot-time-elce-2017_0.pdf]]
+
 通过串口打印以及进行终端捕捉能够比较深入的了解Linux在启动过程中各个步骤所花费的时间。
 #+BEGIN_HTML
 <!--more-->
