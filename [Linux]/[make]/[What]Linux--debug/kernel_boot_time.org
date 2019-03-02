@@ -45,6 +45,8 @@ grabserial -v -d /dev/ttyUSB0 -e 60 -t -m "Booting Linux on physical CPU*"
   - 将相对耗时的模块初始化尽量放在开机以后再加载。
   
 *注意:* 倘若dmesg显示信息不完整，那是打印缓存设置得太小的缘故，需要[[http://kcmetercec.top/2018/03/08/linux_debug_kernel_printk/#orgf9fc695][增大缓存]]。
+*** 获取编译的详细文件大小
+yocto提供了 =scripts/tiny/ksize.py= ，在编译根目录下运行即可列出编译后的文件大小。
 ** bootargs 设置
 *** 取消不必要的串口输出
 printk的发送会比较占用时间，所以可以取消一些不重要的输出：
