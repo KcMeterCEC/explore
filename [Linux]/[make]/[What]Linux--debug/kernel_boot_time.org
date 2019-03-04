@@ -10,6 +10,7 @@
 参考链接:
 1. [[https://elinux.org/Boot-up_Time_Reduction_Howto]]
 2. [[https://elinux.org/images/6/64/Chris-simmonds-boot-time-elce-2017_0.pdf]]
+3. [[https://elinux.org/images/7/70/Opdenacker-boot-time-ELC-2014.pdf]]
 
 通过串口打印以及进行终端捕捉能够比较深入的了解Linux在启动过程中各个步骤所花费的时间。
 #+BEGIN_HTML
@@ -62,3 +63,6 @@ Calibrating delay loop... 1332.01 BogoMIPS(lpj=6660096)
 #+begin_example
 lpj=6660096
 #+end_example
+** 简化文件系统的初始化脚本
+对于busybox而言，其使用的是sysvinit方式，其初始化方式在其文件 =/etc/inittab= 中有所描述，
+可以根据此文件的描述先找出其所有的初始化脚本，然后看看哪些是可以取消的，哪些是可以延后的。
