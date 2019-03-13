@@ -110,3 +110,5 @@
   - 插入节点时，如果碰到key值相同的节点，将此数据插入在该节点的右树中
   - 查找节点时，如果碰到key值相同的节点，继续在右子树中查找，直到遇到叶子节点
   - 删除节点时，查到所有节点后依次删除
+** 简易示例
+位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/binary_tree][此处]]
