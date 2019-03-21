@@ -9,7 +9,7 @@
 
 课程：王争 --> <数据结构与算法之美>
 
-前导知识: [[http://www.cnblogs.com/tiancai/p/9072813.html][红黑树的演变]]
+前导知识: [[https://www.jianshu.com/p/bbd5d5b4d1a3][红黑树的演变]]
 
 认识传说中的红黑树。
 #+BEGIN_HTML
