@@ -1,0 +1,14 @@
+#+TITLE: [What]arm 架构概览
+#+DATE:  <2019-04-08 一> 
+#+TAGS: arm
+#+LAYOUT: post 
+#+CATEGORIES: processor, arm, architecture
+#+NAMA: <processor_arm_arch_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程: 张健 --> [8小时学透ARM体系架构]
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
