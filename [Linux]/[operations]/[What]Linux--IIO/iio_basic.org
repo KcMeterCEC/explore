@@ -268,7 +268,7 @@ iio 设备在sysfs中可以读写的文件名为: <in/out>_<channel>_<attr> .
     {
       printf("can not find ms5611!\n");
     }
-  printf("ms5611 have %d channels\n", iio_device_get_channels_count(baro));
+  printf("ms5611 has %d channels\n", iio_device_get_channels_count(baro));
   mb_temp = iio_device_find_channel(baro,
                                            "temp", false);
 
