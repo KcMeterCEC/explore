@@ -10,6 +10,8 @@
 课程：王争 --> <数据结构与算法之美>
 
 认识堆这种树。
+
+实践代码位于[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/heap][github]]
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
