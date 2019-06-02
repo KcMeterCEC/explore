@@ -66,3 +66,5 @@
 [[./bfs.jpg]]
 
 如上图，想从 =you= 开始搜寻谁有 =key= ，其最短路径便是绿色路径。
+
+这是我的一个[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/graph][糟糕的示例]]，对应修改方案是是将图进行一个映射，以数值的方式来执行图的算法。
