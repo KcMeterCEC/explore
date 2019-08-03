@@ -1,0 +1,17 @@
+#+TITLE: [What]数据结构与算法 -> 字符串匹配
+#+DATE:  <2019-05-31 五> 
+#+TAGS: 数据结构与算法
+#+LAYOUT: post 
+#+CATEGORIES: program,数据结构与算法
+#+NAMA: <program_DS_string.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+课程：王争 --> <数据结构与算法之美>
+
+一个字符串匹配都有这么多学问，真是太妙了。
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+

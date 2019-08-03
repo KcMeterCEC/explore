@@ -1,0 +1,126 @@
+#+TITLE: [What]Limited Direct Execution
+#+DATE: <2019-07-29 一> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_cpu-mechanisms.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+理解操作系统虚拟化CPU的实现机制。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+操作系统要实现虚拟化机制，有两个挑战：
+1. 尽量少的占用计算机资源完成虚拟化机制
+2. 尽量高效率的运行进程同时也能很好的掌控它们
+   
+* 无限制的运行
+无限制的运行是指：系统从硬盘拷贝代码到内存，将其加入进程列表并为其分配必要的内存后跳入入口地址开始执行。
+
+这种情况下进程的运行效率是最高的，但由于进程具有绝对的访问权限，导致系统的资源可以不被保护的访问。
+
+一不小心就会搞死整个系统，此时的操作系统和代码库差别不大了，很明显是不行的。
+* 有限制的运行
+由此才发明了用户态和内核态，用户态进程不能直接发起IO请求、访问其他进程内存等，内核态则对资源有绝对的控制权。
+- 要实现用户态和内核态是需要CPU硬件支持的
+
+内核为用户态进程提供了系统调用于完成文件系统访问、申请内存、与其他进程通信等特权功能。
+
+调用系统API后，内部会调用陷入内核的汇编指令，跳转至内核代码的同时也进入到了特权等级。
+当内核处理完此调用后又通过汇编执行回到用户态，跳转至用户代码的同时也进入到了用户等级。
+- 内核会先将用户态的PC指针、寄存器值保存到对应的进程栈中，在完成处理后又弹出该栈
+- 同时内核也会对函数调用（是否在函数表中欧冠）及用户输入的参数进行检查，避免参数指向了非法地址而出现安全问题。
+* 进程间的切换
+** 合作式调度
+合作式调度是由进程通过系统调用或非法访问来实现进程切换。
+- 系统调用相当于进程主动让出CPU，内核无法干预
+- 非法访问是由于触发了异常而由内核主动切换到其他进程
+
+但如果一个进程既不进行系统调用也没有触发任何异常，那就无法完成进程切换，这肯定是不行的。
+- 之前在单片机上写的合作式调度器也经常遇到这个问题，虽然一个任务的理论时间片耗尽了，但由于其执行时间的不可控导致整个系统实时性极差。
+
+** 由系统任务完成调度
+通过定时器中断来完成内核的主动调度，并且在调用系统接口时也可能会触发调度。
+- 在进入中断时，硬件会自动保存部分当前的运行进程寄存器到内核栈
+
+调度器在进行进程切换时，会完整的保存当前进程上下文到进程的PCB中，并恢复应该切换到的进程的上下文。
+- 上下文包含当前的寄存器值、PC指针、栈指针。
+  
+在进入上下文切换时，内核会关闭中断以避免CPU被占用。
+* 作业
+** 测试系统调用所消耗的时间
+通过执行多次系统调用算平均值求得调用时间。
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <sys/time.h>
+  #include <stdint.h>
+  #include <fcntl.h>
+  #include <sys/types.h>
+  #include <sys/stat.h>
+
+  int main(int argc, char*argv[])
+  {
+      if(argc != 2)
+      {
+          printf("usage : %s <run times>\n", argv[0]);
+
+          exit(1);
+      }
+      int times = atoi(argv[1]);
+
+      if(times <= 0)
+      {
+          times = 1;
+      }
+      printf("run system call %d times\n", times);
+
+      struct timeval start;
+      struct timeval end;
+
+      int f_index = open("./call_time.c", O_RDONLY);
+      if(f_index == -1)
+      {
+          perror("open file failed:");
+          exit(1);
+      }
+      int buf;
+
+      if(gettimeofday(&start, NULL) == -1)
+      {
+          perror("gettimeofday() failed:");
+          exit(1);
+      }
+
+      for(int i = 0; i < times; i++)
+      {
+          if(read(f_index, &buf, 0) == -1)
+          {
+              perror("read failed:");
+          }
+      }
+
+      if(gettimeofday(&end, NULL) == -1)
+      {
+          perror("gettimeofday() failed:");
+          exit(1);
+      }
+
+      uint64_t t = end.tv_sec * 1000000 + end.tv_usec -
+          (start.tv_sec * 1000000 + start.tv_usec);
+
+      printf("system call took %f us\n", (double)t / (double)times);
+
+      close(f_index);
+
+
+      return 0;
+  }
+
+#+END_SRC
+执行10万次测得的平均调用时间为1微秒。
+
+** 系统整体性能测试
+使用[[http://lmbench.sourceforge.net/][lmbench]]可以很好的测试。

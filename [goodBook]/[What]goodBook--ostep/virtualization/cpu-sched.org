@@ -1,0 +1,17 @@
+#+TITLE: [What]Scheduling:Introduction
+#+DATE: <2019-08-02 五> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAMA: <book_ostep_cpu-sched.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+理解操作系统调度策略。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 模拟调度策略
+通过 *轮转时间* 来测试调度策略的优劣.
+
+
