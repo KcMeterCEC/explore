@@ -3,7 +3,7 @@
 #+TAGS: CS
 #+LAYOUT: post
 #+CATEGORIES: book,ostep
-#+NAMA: <book_ostep_cpu-sched.org>
+#+NAME: <book_ostep_cpu-sched.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -11,7 +11,45 @@
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
-* 模拟调度策略
-通过 *轮转时间* 来测试调度策略的优劣.
+* 轮转时间(Turnaround Time)
+通过 *轮转时间* 来测试调度策略的优劣， *轮转时间* 是指从启动进程到完成该进程所花的时间。
+** FIFO 策略
+假设只有一个核的情况下，以 FIFO 策略调度进程。
+
+当进程 A、B、C 同时启动（FIFO 调度器依次运行），且其完成所需时间分别为 100、10、10 秒，那么它们的平均轮转时间为：
+#+BEGIN_EXAMPLE
+  (100 + 110 + 120) / 3 = 110
+#+END_EXAMPLE
+- 从 A 启动到 A 完成花费 100 秒
+- 从 B 启动到 B 完成花费 110 秒
+- 从 C 启动到 C 完成花费 120 秒
+** SJF(Shortest Job First) 策略
+当调度器先运行花费时间短的进程，此处是 B、C、A 顺序调度（假设可以提前预知各个进程运行时间），那么平均轮转时间为：
+#+BEGIN_EXAMPLE
+  (10 + 20 + 120 ) / 3 = 50
+#+END_EXAMPLE
+
+下面假设当 A 先启动，10 秒以后才是 B、C 同时启动，那么即使是 SJF 策略也只能先调度 A ， 那么平均轮转时间为：
+#+BEGIN_EXAMPLE
+  （100 + 100 + 110) / 3 = 103.333
+#+END_EXAMPLE
+** STCF(Shortest Time-to-Completion First) 策略
+要实现运行时间短的进程优先运行，就需要调度器能根据进程优先级进行上下文切换。
+
+基于 SJF 的第二种运行方法，当 B、C 启动时， A 就会被抢占，其平均轮转时间为：
+#+BEGIN_EXAMPLE
+  ( 10 + 20 + 120 ) / 3 = 50
+#+END_EXAMPLE
+* 响应时间(Response Time)
+轮转时间测测试方式是以进程启动到进程完成所花的时间，应用场景比较单一。
+
+在时分复用机制的调度策略中，响应时间是比较重要的测量指标。
+
+*响应时间* 是指从进程已进入准备状态到其真正被调度所花的时间。
+
+虽然上面的 STCF 调度策略具有很短的轮转时间，但其响应时间极长，这导致用户体验很差。
+- 比如 C 进程需要等到 B 进程运行完了才能被调度。
+** RR(Round Robin) 策略
+RR 策略便是以时间片的方式循环调度各个进程的调度策略， 时间片的长度是定时器粒度的整数倍。
 
 
