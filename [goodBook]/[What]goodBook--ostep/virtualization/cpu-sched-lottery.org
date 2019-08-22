@@ -108,3 +108,8 @@ Linux 下的 CFS（Completely Fair Scheduler，完全公平调度器）在[[http
 Linux 使用虚拟时间（virtual runtime，vruntime）来表示一个任务所占有的 CPU 资源：
 - 当任务在运行时，它的 vruntime 就会累加
 - 调度器调度 vruntime 最小的那一个任务
+  
+CFS 不能调度得太频繁，不然上下文的切换时间将会占用太多资源。但也不能太长，这样就无法达到所谓的公平调度。
+
+为此 CFS 调整了以下参数：
+
