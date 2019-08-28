@@ -1,0 +1,175 @@
+#+TITLE: [What]Scheduling: Proportional Share
+#+DATE: <2019-08-20 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_cpu-sched-lottery.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习比例分配调度器，其核心思想是：保证每一个任务获得 *确定比例* 的 CPU 使用时间。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* tickets 表示一个任务所占用的 CPU 百分比
+比例分配调度器随机的切换多个任务，在全局上来看让其符合其所要求的百分比。
+- 这种方式使得调度器的实现相对轻量级
+
+比例分配调度器具有如下特点：
+- 比例分配调度器可以站在更为宏观的角度来分配各个任务占用 CPU 的百分比，看到这里感觉和 Linux 下的 cgroup 很像。
+#+BEGIN_EXAMPLE
+  比如有用户 A 和 B，比例分配调度器为他们各分配了 100 个 ticket。
+
+  在用户 A 内部使用了 1000 个 ticket，它为其任务 A1 和 A2 各分配 500 个 ticket。
+  在用户 B 内部使用了 10 个 ticket，且只有一个任务。
+
+  最终，比例分配调度器会给任务 A1 和 A2 各 50 个 ticket，给任务 B 100 个 ticket，
+  所以 B 任务占用的 CPU 资源更多。
+#+END_EXAMPLE
+- 比例分配调度器可以将一个任务的 tickets 传送给另一个任务，这在 C/S 架构下很有作用。
+#+BEGIN_EXAMPLE
+  比如客户端向服务端发送了一个请求，客户端希望服务端可以尽快的处理完此请求。
+
+  那么客户端可以将它所拥有的 tickets 发送给服务端，服务端便可以获得更多的 CPU 资源而完成得更快。
+
+  当服务端完成此请求以后，再将客户端的 tickets 归还。
+#+END_EXAMPLE
+- 每个任务都可以动态的调整其 tickets
+#+BEGIN_EXAMPLE
+  当一个 group 的多个任务协调工作时，其中一个任务需要短暂的占用更多的 CPU 资源，
+  那么它可以主动提升其 tickets。
+#+END_EXAMPLE
+* 执行过程
+比例分配调度器的调度算法极为简单：
+1. 将任务都挂在一个链表中，每个任务都有其对应的 ticket，这些任务的 ticket 求和得 A
+2. 使用随机数发生器使得其产生一个在 A 内的值
+3. 使用计数器从 0 开始依次与每个任务的 ticket 相加，当计数器的值大于随机数时，便调用当前任务
+#+BEGIN_SRC c
+  // counter: used to track if we’ve found the winner yet
+  int counter = 0;
+
+  // winner: use some call to a random number generator to
+  // get a value, between 0 and the total # of tickets
+  int winner = getrandom(0, totaltickets);
+
+  // current: use this to walk through the list of jobs
+  node_t *current = head;
+  while (current) {
+    counter = counter + current->tickets;
+    if (counter > winner)
+      break; // found the winner
+    current = current->next;
+   }
+  // ’current’ is the winner: schedule it...
+#+END_SRC
+
+为了提高调度器的效率，可以根据任务的 ticket 进行排序，ticket 值大的在前面，这是为了使计数器循环尽量少的次数。
+
+* 另一种思路
+按照前面的调度策略，在短时间内实际上是无法达到每个任务所要求的比例的，
+为此先驱们使用 stride 和 pass 来共同决定一个任务什么时候该被运行，以求达到公平。
+- stride : 每个任务执行的计数步进
+- pass : 每个任务独有的总的运行计数
+
+其调度原则是：调度 pass 值最小的那个任务
+- 因为这意味着那个任务被分配的时间太少了
+#+BEGIN_SRC c
+  curr = remove_min(queue); // pick client with min pass
+  schedule(curr); // run for quantum
+  curr->pass += curr->stride; // update pass using stride
+  insert(queue, curr); // return curr to queue
+#+END_SRC
+
+假设任务 A、B、C 的 ticket 依次为 100,50,250，以 10000 除以这些值得出它们的 stride 依次为：
+100、200、40。
+
+这样可以画出一个调度表：
+| Pass(A) (stride = 100) | Pass(B)(stride = 200) | Pass(C)(stide = 40) | 当前运行 |
+|------------------------+-----------------------+---------------------+----------|
+|                      0 |                     0 |                   0 | A        |
+|                    100 |                     0 |                   0 | B        |
+|                    100 |                   200 |                   0 | C        |
+|                    100 |                   200 |                  40 | C        |
+|                    100 |                   200 |                  80 | C        |
+|                    100 |                   200 |                 120 | A        |
+|                    200 |                   200 |                 120 | C        |
+|                    200 |                   200 |                 160 | C        |
+|                    200 |                   200 |                 200 | ...      |
+
+可以看到 A、B、C 的运行次数依次为 2、1、5,这已经很接近之前分配的 ticket 值了。
+
+*需要注意的是：* 虽然这种调度策略看上去很公平，但如果中途插进来一个新任务，那么它的 pass 值为 0,
+它会占用 CPU 很长时间。
+
+所以综合来看，还是随机数的调度策略更为合理，因为它比较的是增量而不是绝对量。
+* Linux 中的 CFS 调度器
+Linux 下的 CFS（Completely Fair Scheduler，完全公平调度器）在[[http://kcmetercec.top/2018/05/26/linux_ps_schedule/#org384066f][进程课程]]中有所了解，具有极高的切换效率且满足 IO 密集和 CPU 密集型的协调。
+
+Linux 使用虚拟时间（virtual runtime，vruntime）来表示一个任务所占有的 CPU 资源：
+- 当任务在运行时，它的 vruntime 就会累加
+- 调度器调度 vruntime 最小的那一个任务
+  
+CFS 不能调度得太频繁，不然上下文的切换时间将会占用太多资源。但也不能太长，这样就无法达到所谓的公平调度。
+
+为此 CFS 调整了以下参数：
+- sched_latency : 动态的调整时间片（每隔多久调度器判断是否该切换）
+  + 一般此值取 48ms，然后用此值除以运行的任务数量，便可以得出每个任务调度的时间片
+#+BEGIN_EXAMPLE
+  当有 4 个任务时，那么每个任务的时间片就是 12ms。
+  并且在运行过程中，每个任务运行时的 vruntime 都会增加。
+  那么当一个任务的时间片到了后，必然会调度另外一个 vruntime 更小的任务。
+
+  最终看到的效果就是 RR 策略的轮询调度方式。
+#+END_EXAMPLE
+- min_granularity : 最小的调度时间片，这是为了避免任务过多而通过 =sched_latency= 计算的时间片过小
+  + 一般此值取 6ms，也就是调度器最短也是每隔 6ms 判断一次任务是否需要被切换。
+    
+** 优先级
+Linux 通过 nice 值（-20 ～ +19）来确认一个任务的优先级，nice 值越大优先级越低（默认为 0）。
+
+nice 值对应内核中的 =weight= :
+#+BEGIN_SRC c
+  static const int prio_to_weight[40] = {
+
+    /* -20 */ 88761, 71755, 56483, 46273, 36291,
+
+    /* -15 */ 29154, 23254, 18705, 14949, 11916,
+
+    /* -10 */ 9548, 7620, 6100, 4904, 3906,
+
+    /* -5  */ 3121, 2501, 1991, 1586, 1277,
+
+    /*  0  */ 1024, 820, 655, 526, 423,
+
+    /*  5  */ 335, 272, 215, 172, 137,
+
+    /* 10  */ 110, 87, 70, 56, 45,
+
+    /* 15  */ 36, 29, 23, 18, 15,
+  };
+#+END_SRC
+
+加上优先级机制后，每个任务的时间片由下面公式决定:
+[[./cfs_time_slice.jpg]]
+- 当前任务的 =weight= 除以总运行任务的 =weight= 的和，再乘以 =sched_latency= 
+#+BEGIN_EXAMPLE
+  比如当前系统有任务 A 和 B：
+  任务 A 高优先级，其 nice 值为 -5，对应的 weight 为 3121
+  任务 B 普通优先级，其 nice 值为 0，对应的 weight 为 1024
+
+  那么：
+  任务 A 的时间片为 : 3121 / (3121 + 1024) * sched_latency
+  任务 B 的时间片为 : 1024 / (3121 + 1024) * sched_latency
+#+END_EXAMPLE
+
+每个任务的 =vruntime= 由下面公式决定：
+[[./cfs_vruntime.jpg]]
+- 可以看到：当 nice 值越高， weight 越大，其 =vruntime= 增加得就越慢，那么它占用 CPU 的资源就越多。
+
+** 使用红黑树完成调度策略
+红黑树的排序算法使得小 vruntime 的任务始终都在左子树，便可以直接得出下一次该调度的任务。
+- 红黑树上挂的都是当前正在运行的任务
+- 当任务从睡眠转变到就绪态时，内核会将其 vruntime 设置为树中的最小值
+  + 避免一个任务睡眠过久而 vruntime 太小，导致其他任务长时间没有机会运行
+  + 但当一个任务睡眠时间太短且频繁睡眠时，它总是会占用更多的 CPU 资源。
+
