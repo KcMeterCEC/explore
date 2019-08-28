@@ -1,0 +1,60 @@
+#+TITLE: [What]Scheduling: Multiprocessor
+#+DATE: <2019-08-27 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_cpu-sched-multi.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习多核心下的调度。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 多核相比单核多出的问题
+** cache coherence（cache 一致性）
+当 CPU1 在访问主存地址 A 处的值时，会将 A 处的值先读入 CPU1 的 cache，修改的值也会写入 cache，并会延迟写入主存。
+
+接下来 CPU2 也要访问地址 A 处的值，此时它读入 cache 的值为旧值，而不是 CPU1 修改后的新值。
+#+BEGIN_EXAMPLE
+  其中一个解决方案是使用 bus snooping（总线探测）技术：
+  简单说就是保持各个 CPU 对同一主存处的 cache 一致性。
+#+END_EXAMPLE
+** cache affinity（cache 亲和性）
+当一个进程在 CPU1 运行时，那么它的当前状态会被保存到 CPU1 的 cache 中，内存页表也会被保存在快表中。
+
+如果这个进程下次运行又跑到了 CPU2 去，那么又得需要做一次 cache 和快表，这显然是效率低下的。
+
+所以，为了更高的运行效率，调度器就需要保证一个进程要在其固定的 CPU 上运行，而能总是把进程调度到其他 CPU 上去。
+* 单队列多核调度器
+SQMS（single queue multiprocessor scheduling，单队列多核调度器），将需要被调度的任务放在一个队列之中。
+
+在从队列取出被调度的任务时，每个核按顺序取出任务分配给自己，因此 SQMS 需要加锁以保证调度的正确性。
+- 但是随着 CPU 数量的增加，加锁的方式会导致调度器性能越来越低（需要等待其他核先取出任务）。
+
+*SQMS 具有 cache affinity 问题* ：
+假设队列中有任务 A、B、C、D、E，并且当前有 4 个 CPU，那么随着时间推移其调度顺序为：
+
+|   | CPU0 | CPU1 | CPU2 | CPU3 |
+|---+------+------+------+------|
+| 1 | A    | B    | C    | D    |
+| 2 | E    | A    | B    | C    |
+| 3 | D    | E    | A    | B    |
+| 4 | C    | D    | E    | A    |
+| 5 | B    | C    | D    | E    |
+| 6 | A    | B    | C    | D    |
+
+可以看到这种调度方式将导致 cache miss 和 TLB miss。
+
+为此 SQMS 的改进方案是：固定几个任务在对应的 CPU 运行，多余的任务轮转到各个 CPU 依次运行：
+|   | CPU0 | CPU1 | CPU2 | CPU3 |
+|---+------+------+------+------|
+| 1 | A    | B    | C    | D    |
+| 2 | E    | B    | C    | D    |
+| 3 | A    | E    | C    | D    |
+| 4 | A    | B    | E    | D    |
+| 5 | A    | B    | C    | E    |
+| 6 | A    | B    | C    | D    |
+
+这种方式相比上面的调度方式确实很好的利用的 cache。
+* 多队列多核调度器
