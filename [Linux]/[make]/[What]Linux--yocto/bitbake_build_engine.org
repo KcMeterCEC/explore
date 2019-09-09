@@ -374,7 +374,7 @@ python本地函数的定义有些许不同，需要使用 =python= 关键字来�
 
 
 *** 任务(tasks)
-上面所讲述的几种函数，将他们名称前加上 =do_= 就被称为任务(tasks)，BitBake使用 =addtask= 命令来讲此任务加入任务列表。
+上面所讲述的几种函数，将他们名称前加上 =do_= 就被称为任务(tasks)，BitBake使用 =addtask= 命令来将此任务加入任务列表。
 #+BEGIN_EXAMPLE
   python do_clean () {
   # task to clean remove build output...

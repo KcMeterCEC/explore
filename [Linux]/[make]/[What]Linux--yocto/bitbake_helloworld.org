@@ -27,7 +27,7 @@
 3. 在构建目录(build)的 =bblayers.conf= 中包含该层
 4. 启动bitbake构建并测试
 
-* 新建和配置软件包层
+* 软件包层
 通过前面的基础理论知识可以知道：要增加一个软件包，正规的做法是为其增加一个layer并配置构建规则。
 ** 新建层
 #+BEGIN_EXAMPLE
@@ -45,20 +45,80 @@
       └── example
           └── example_0.1.bb
 #+END_EXAMPLE
-** 配置层
-* 新建构建环境
-为构建[[https://nano-editor.org/][nano]]新建一个构建环境:
+** 配置层   
+新增加的 =layer.conf= 已经填充好了对于该层的基础配置:
 #+BEGIN_EXAMPLE
-  source oe-init-build-env build-nano
-#+END_EXAMPLE
-新建的目录结构如下:
-#+BEGIN_EXAMPLE
-  .
-  └── conf
-      ├── bblayers.conf
-      ├── local.conf
-      └── templateconf.cfg
+  # We have a conf and classes directory, add to BBPATH
+  BBPATH .= ":${LAYERDIR}"
 
-  1 directory, 3 files
+  # We have recipes-* directories, add to BBFILES
+  BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
+              ${LAYERDIR}/recipes-*/*/*.bbappend"
+
+  BBFILE_COLLECTIONS += "meta-nano"
+  BBFILE_PATTERN_meta-nano = "^${LAYERDIR}/"
+  BBFILE_PRIORITY_meta-nano = "6"
+#+END_EXAMPLE
+
+在此基础之上，需要增加其兼容性声明:
+#+BEGIN_EXAMPLE
+  LAYERSERIES_COMPAT_meta-nano = "sumo"
+#+END_EXAMPLE
+
+可以看到： =recipes-example= 中的 =example_0.1.bb= 会被 bitbake 解析，所以接下来需要配置该 recipe 文件。
+
+根据前面的理解，可以想象出编写 recipe 文件的流程：
+1. 根据要下载软件包的链接，填充其路径到 =SRC_URL= 变量中
+2. 依次编写 =do_download()、do_unpack()、do_compile()、do_build()、do_install()= 函数
+3. 使用 =addtask= 将函数先后顺序串联起来 
+
+其实步骤 2 和 3 在 =base.bbclass= 中都已经包含了，也就是说只需要配置 =SRC_URL= 即可。
+
+*校验值的获取*
+
+bb 文件需要被下载文件的 md5 以及 LICENSE 的 md5：
+- 文件的 md5 获取，需要手动下载文件后，对 *最初压缩包* 使用 =md5sum= 生成值
+- LICENSE 的 md5 获取，需要解压缩文件后，对文件 *COPYING* 使用 =md5sum= 生成值
+  + LICENSE 变量的值需要与 COPYING 中的一致
+  
+最终，bb 文件的内容如下:
+#+BEGIN_EXAMPLE
+  SUMMARY = "bitbake-layers recipe"
+  DESCRIPTION = "Recipe created by bitbake-layers"
+  LICENSE = "GPLv3"
+  LIC_FILES_CHKSUM = "file://COPYING;md5=f27defe1e96c2e1ecd4e0c9be8967949"
+
+  # 对所下载文件的版本标识，此变量必须有
+  PV = "4.4"
+
+  SRC_URI = "https://nano-editor.org/dist/v4/nano-${PV}.tar.xz"
+  SRC_URI[md5sum] = "9650dd3eb0adbab6aaa748a6f1398ccb"
+#+END_EXAMPLE
+* 构建
+** 配置构建环境
+仅需要在 =bblayers.conf= 中加入刚刚新建的层即可
+#+BEGIN_EXAMPLE
+  # POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+  # changes incompatibly
+  POKY_BBLAYERS_CONF_VERSION = "2"
+
+  BBPATH = "${TOPDIR}"
+  BBFILES ?= ""
+
+  BBLAYERS ?= " \
+    /home/cec/github/poky/meta \
+    /home/cec/github/poky/meta-poky \
+    /home/cec/github/poky/meta-yocto-bsp \
+    /home/cec/github/poky/meta-nano \
+    "
+#+END_EXAMPLE
+** 构建
+#+BEGIN_EXAMPLE
+  bitbake nano
+#+END_EXAMPLE
+即可在 =downloads= （用于保存下载包的文件夹）文件夹中看到：
+#+BEGIN_EXAMPLE
+  nano-4.4.tar.xz
+  nano-4.4.tar.xz.done
 #+END_EXAMPLE
 
