@@ -1,0 +1,22 @@
+#+TITLE: [What]Yocto Project --> 问题排查
+#+DATE: <2019-09-10 二> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAMA: <yocto_troubleshooting.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+整理在遇到问题时该如何排查。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 日志
+
