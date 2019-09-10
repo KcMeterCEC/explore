@@ -122,3 +122,146 @@ bb 文件需要被下载文件的 md5 以及 LICENSE 的 md5：
   nano-4.4.tar.xz.done
 #+END_EXAMPLE
 
+* 依赖的处理
+yocto 可以处理两种依赖关系：
+- 构建依赖：在构建过程中对于头文件、静态链接库、其他组件的依赖
+- 运行时依赖：在运行过程中对动态链接库、配置文件、其他组建的依赖
+
+当然在对包的描述中就需要声明依赖关系。
+** 声明
+bitbake recipe 使用 =PROVIDES= 变量来声明当前包的名称和功能，以便于其它 recipe 可以依赖。
+
+一共有 3 种声明方式：
+- 隐式声明： 通过 recipe 文件名来自动解析
+#+BEGIN_EXAMPLE
+  <package_name>_<package version>_<package revision>.bb
+  - 比如： nano_2.2.6_r0.bb
+  - 分别是：名称、版本、修订版
+
+  bitbake 会自动将其赋值：
+  PN = "nano"
+  PV = "2.2.6" （默认为 1.0）
+  PR = "r0" （默认为 r0）
+#+END_EXAMPLE
+- 显示声明：显示的设置 PN、PV、PR 变量的值
+  + 显示声明优先级大于隐式声明
+- 符号声明：符号声明想对于给当前 recipe 取一个别名，这样其他包就可以引用此别名（而不是具体的版本号）
+#+BEGIN_EXAMPLE
+  PROVIDES =+ "virtual/editor"
+
+  比如上面是对 nano 名称的别名，其实引号内可以是任意字符串。
+  但是为了避免与其他名称冲突，一般使用 "virtual/" 作为前缀。
+  - 由于符号 "/" 在 UNIX 系统中代表路径，所以其他包是不会具有此名称的，也就避免了冲突
+#+END_EXAMPLE
+** 依赖
+recipe 分别使用变量 =DEPENDS= 和 =RDEPENDS= 表示构建时和运行时的依赖：
+#+BEGIN_EXAMPLE
+  DEPENDS = "libxml2-native gettext-native virtual/libiconv ncurses"
+  RDEPENDS = "base-files run-postinsts"
+  - 各个名称之间使用空格做分隔
+#+END_EXAMPLE
+仅用以上这种方式有个缺点，就是只有等待它所依赖的包完全构建完了之后，它才开始下载、解压缩、打补丁、编译……
+
+很明显下载、解压缩、打补丁这些步骤与依赖毫无关系，如果按照上面方式则延长了构建时间。
+
+所以需要在 task 中使用 =deptask= 和 =rdeptask= 来表明依赖：
+#+BEGIN_EXAMPLE
+  do_configure[deptask] = "do_populate_staging"
+  - 在 DEPENDS 中的 recipe 在完成 do_populate_staging 之后，才执行当前的 do_configure
+
+  do_package_write[rdeptask] = "do_package"
+  - 在 RDEPENDS 中的 do_package 完成后，才执行当前的 do_package_write
+#+END_EXAMPLE
+** 多重声明
+如果有多个包具有相同的符号声明，可以在 layer 的配置文件中使用 =PREFERRED_PROVIDER= 进行选取。
+#+BEGIN_EXAMPLE
+  声明：
+  editor1.bb : PROVIDES = "virtual/editor"
+  editor2.bb : PROVIDES = "virtual/editor"
+
+  依赖：
+  mailer.bb : RDEPENDS = "virtual/editor"
+
+  在依赖的配置文件中配置：
+  PREFERRED_PROVIDER_virtual/editor = "editor2"
+
+  以确认使用 editor2
+#+END_EXAMPLE
+* 版本选择
+通常一个软件包有多个版本，默认情况下 bitbake 使用 =PV= 指定的版本号来获取。
+
+也可以使用变量 =PREFERRED_VERSION= 来指定使用哪个版本:
+#+BEGIN_EXAMPLE
+  PREFERRED_VERSION_<package name> = "<version>"
+
+  PREFERRED_VERSION_editor = "1.1"
+  PREFERRED_VERSION_linux-yocto = "3.1%"
+  - “%” 表示后面的版本信息被忽略
+#+END_EXAMPLE
+* 变体构建
+默认情况下，bitbake 构建软件包是以目标板交叉编译的方式构建。
+
+实际上，在某些情况下需要将软件包以多种方式构建（比如也需要构建主机版本）。
+
+可以使用变量 =BBCLASSEXTEND= 来指定以哪种方式构建:
+#+BEGIN_EXAMPLE
+  BBCLASSEXTEND += "native"
+#+END_EXAMPLE
+对于以上赋值，bitbake 会在 *第二次* 运行该 recipe 时继承类 =native.bbclass= 。
+- 用户需要实现 =native.bbclass= 以指明如何构建
+* 元数据的默认值
+** 默认变量
+*** 内部自动获取的变量
+bitbake 会很据当前环境来自动的设置以下变量：
+- FILE：当前 bitbake 所处理文件的绝对路径。比如配置文件、recipe、class 等等。
+- LAYERDIR：当前 bitbake 所在的文件夹的绝对路径
+- TOPDIR：启动 bitbake 的绝对路径，一般是在 build 目录下启动
+*** 工程所指定的变量
+在构建目录、层中需要设置的变量：
+- BBFILES：以空格分隔增加当前构建的特定 recipe、class、append 文件
+- BBLAYERS：需要包含的层的绝对路径，以空格分隔
+- BBPATH：bitbake 根据此变量层层搜寻 =classes= 、 =conf= 文件夹以分别获得 =.bbclass= 、 =.conf= 文件
+*** 运行时变量
+运行时变量默认在 =conf/bitbake.conf= 中配置：
+- B ：bitbake 构建源码包的绝对路径
+- BUILD_ARCH：主机的构架
+- CACHE：bitbake 构建过程中的 cache 文件所存放的路径，这些文件提高构建速度
+- CVSDIR：cvs 的路径
+- D：安装镜像文件的路径
+- DEPENDS：包的依赖列表
+- DEPLOY_DIR：部署文件夹
+- DEPLOY_DIR_IMAGE：二进制镜像文件的存放路径
+- DL_DIR：下载安装包的存放路径
+- FILE_DIRNAME：当前 bitbake 正在处理的文件夹路径
+- FILESDIR：当 =FILESPATH= 中搜寻不到文件时会在此路径中搜寻
+- FILESPATH：bitbake 的搜寻路径集合
+- GITDIR：git 的路径
+- MKTEMPCMD：用于创建临时文件的指令
+- MKTEMPDIRCMD：用于创建临时文件夹的指令
+- OVERRIDES：优先级列表，bitbake 从右向左处理，所以在最后的优先级最高
+- P：使用横线将包名称和版本连接起来（ P = "${PN}-${PV}" ）
+- PERSISTENT_DIR：和 =CACHE= 一样，二者其一必须设置
+- PF：使用横线连接包名称、版本号、次版本号（PF = "${PN}-${PV}-${PR}"）
+- PN：包名称
+- PV：包版本
+- PR：包修订版
+- PROVIDES：包声明列表
+- S：未解压源码的存放路径
+- SRC_URI：包的下载路径
+- SRCREV：从 SCM 下载源码的修订版
+- SVNDIR：svn 路径
+- T：构建过程中临时文件存放路径，一般是在构建目录的 =tmp= 文件夹中
+- TARGET_ARCH：目标板的构架
+- TMPBASE：对应 =MKTMPCMD= 、 =MKTEMPDIRCMD= 的文件存放路径
+- TMPDIR：构建中输出所存放的目录
+- WORKDIR：构建包的存放路径
+** 默认任务
+在 =base.bbclass= 中提供了默认的构建任务：
+- do_fetch
+- do_unpack
+- do_configure
+- do_compile
+- do_install
+- do_package
+  
+以上任务在很多时候都可以被继承后使用，也就是说用户的 bb 文件不用实现，但还是要分情况重写该方法。
