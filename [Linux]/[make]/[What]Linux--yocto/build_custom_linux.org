@@ -1,0 +1,283 @@
+#+TITLE: [What]Yocto Project --> 构建定制化的 linux
+#+DATE: <2019-09-12 四> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAME: <yocto_build_linux.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+应用前面所学，构建定制化 linux，最为重要的一章。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* linux 发行版全局概览
+OpenEmbedded Core 和其他 yocto 项目都带有一些示例镜像文件 recipe，以 =core-image= 开头。
+
+这些镜像包括仅仅带命令行的镜像，也有带 X11 的窗口服务，还有带 UI 接口的。
+#+BEGIN_EXAMPLE
+  cec@box:~/github/poky$ find ./meta*/recipes*/images -name "*.bb" -print
+
+  # 相比 core-image-minimal ，包含了 initramfs
+  ./meta/recipes-core/images/core-image-minimal-initramfs.bb
+
+  # 基于 core-image-minimal，增加了 mtd 子系统工具
+  ./meta/recipes-core/images/core-image-minimal-mtdutils.bb
+
+  # 这也是和 core-image-minimal 一样的基础包，但是可以支持更多硬件
+  ./meta/recipes-core/images/core-image-base.bb
+
+  # 基于 core-image-minimal，增加了开发所使用到的工具链，可以在目标机上开发
+  ./meta/recipes-core/images/core-image-minimal-dev.bb
+
+  ./meta/recipes-core/images/core-image-tiny-initramfs.bb
+
+  # 用于产生整个 yocto 项目的虚拟镜像文件，用于 VMware 打开
+  ./meta/recipes-core/images/build-appliance-image_15.0.0.bb
+
+  # 最基础的，用于设备启动到命令行登录
+  ./meta/recipes-core/images/core-image-minimal.bb
+
+  # 增加了 linux 标准库
+  ./meta/recipes-extended/images/core-image-lsb.bb
+
+  ./meta/recipes-extended/images/core-image-kernel-dev.bb
+
+  # 用于在主机环境（QEMU）测试
+  ./meta/recipes-extended/images/core-image-testmaster.bb
+  ./meta/recipes-extended/images/core-image-testmaster-initramfs.bb
+
+  # 增加了 linux 标准库和对应的开发包
+  ./meta/recipes-extended/images/core-image-lsb-dev.bb
+
+  # 相比 core-image-lsb-dev 增加了开发工具
+  ./meta/recipes-extended/images/core-image-lsb-sdk.bb
+
+  # 在基础 image 中增加了命令行工具（bash,acl,grep,tar 等）
+  ./meta/recipes-extended/images/core-image-full-cmdline.bb
+
+
+  # 基于 x11 提供了 clutter 工具
+  ./meta/recipes-graphics/images/core-image-clutter.bb
+
+  # 使用 weston 代替 x11
+  ./meta/recipes-graphics/images/core-image-weston.bb
+
+  # 包含 X11 窗口服务
+  ./meta/recipes-graphics/images/core-image-x11.bb
+
+  # 相比 core-image-rt 还多了 sdk
+  ./meta/recipes-rt/images/core-image-rt-sdk.bb
+
+  # 基于 core-image-minimal，构建实时内核，并且提供相应工具给用户空间
+  ./meta/recipes-rt/images/core-image-rt.bb
+
+  # 基于 core-image-sato-dev，包含了开发工具链
+  ./meta/recipes-sato/images/core-image-sato-sdk.bb
+  ./meta/recipes-sato/images/core-image-sato-sdk-ptest.bb
+
+  # 基于 core-image-sato ，包含了开发包
+  ./meta/recipes-sato/images/core-image-sato-dev.bb
+
+  # 基于 sato 主题的发行版，基于 X11 提供了很多应用程序
+  ./meta/recipes-sato/images/core-image-sato.bb
+
+  ./meta-selftest/recipes-test/images/error-image.bb
+  ./meta-selftest/recipes-test/images/wic-image-minimal.bb
+  ./meta-selftest/recipes-test/images/oe-selftest-image.bb
+  ./meta-selftest/recipes-test/images/test-empty-image.bb
+
+  # 支持多种库（比如 32,64 位库）
+  ./meta-skeleton/recipes-multilib/images/core-image-multilib-example.bb
+#+END_EXAMPLE
+- 上面的这些 recipe 都继承于 =core-image= 类，而 =core-image= 类又继承于 =image= 类。
+- 这些 recipe 会设置 =IMAGE_INSTALL= 变量，此变量表示这些包会被安装在目标机根文件系统什么位置
+  + =core-image= 类中设置了 =packagegroup-core-boot= 和 =packagegroup-base-extended= 以创建最基本的启动文件系统
+    
+用户可以往变量 =IMAGE_INSTALL= 中插入值以扩展这些基础镜像。
+- 只能扩展不能删除原镜像固有的
+** 使用 package 扩展基础发行版
+最简单的扩展方式便是在构建目录的 =conf/local.conf= 中将需要添加的包写入 =IMAGE_INSTALL= 变量：
+#+BEGIN_EXAMPLE
+  # 为所有 image 增加以下 package
+  IMAGE_INSTALL_append = " <package> <package group>"
+  - 需要注意引号后及 package 之间的空格， append 是不会主动添加空格的
+  - 使用 append 的原因是它可以使得修改立即生效
+
+  # 为特定 Image 增加
+  IMAGE_INSTALL_append_pn-<image name> = " <package> <package group>"
+  # 比如 IMAGE_INSTALL_append_pn-core-image-minimal = " strace"
+
+  # IMAGE_INSTLL 继承自 core-image 类，更为合适的是使用变量 CORE_IMAGE_EXTRA_INSTALL
+
+  # 为所有 image 添加以下包，但不影响 core-image
+  CORE_IMAGE_EXTRA_INSTALL = "strace sudo sqlite3"
+#+END_EXAMPLE
+** 使用 QEMU 测试发行版
+在构建目录的 =conf/local.conf= 中的 =MACHINE= 可以设置 QEMU 的模拟目标板：
+#+BEGIN_EXAMPLE
+  # 启动最后一次构建测试
+  runqemu qemux86
+
+  # 启动指定的 image
+  runqemu qemux86 core-image-minimal
+
+  # 启动指定的内核和根文件系统
+  runqemu <path>/bzImage-qemux86.bin <path>/core-image-minimal-qemux86.ext3
+#+END_EXAMPLE
+** 检验和比较 image
+在 =conf/local.conf= 中加入：
+#+BEGIN_EXAMPLE
+  INHERIT += "buildhistory"
+  BUILDHISTORY_COMMIT = "1"
+#+END_EXAMPLE
+以后每次构建，bitbake 都会将历史存入 git 库中，存放路径为 =${TOPDIR}/buildhistory=
+
+此路径中会存放 =images= 和 =package= 文件夹，image 文件夹是关注的重点：
+#+BEGIN_EXAMPLE
+  ${TOPDIR}/buildhistory/images/<machine>/<c library>/<image>
+#+END_EXAMPLE
+- image-info.txt：对 image 的全局说明
+- installed-packages.txt：已安装的 package 列表
+- installed-package-names.txt：已安装的 package 列表，仅包含名称
+- file-in-image.txt：根文件系统所有文件夹、文件列表
+** 使用 recipe 扩展 image
+在测试阶段，制作 package 是麻烦的事，直接用 recipe 扩展 image 是最简单粗暴的做法。   
+- 首先需要建立一个 recipe，并填写下面类似的内容
+  + 建议将此 recipe 放在一个单独的 layer 里面
+#+BEGIN_EXAMPLE
+  # 这里可以使用 include 也可以使用 require
+  # 使用 require 在对应的 image 找不到时会报错
+  # 这里的意思是当前 bb 文件用于扩展 core-image-base
+  require recipe-core/images/core-image-base.bb
+
+  IMAGE_INSTALL += "sqlite3 mtd-utils coreutils"
+  IMAGE_FEATURES = "dev-pkgs"
+#+END_EXAMPLE
+- 然后在 =conf/bblayers.conf= 中添加此 layer
+** image 的特征
+image 的特征功能，允许用户可以加入 package、修改配置文件等。
+- 这种方式相当于将一些配置和安装都取了一个别名，用户只需要选择是否开启即可
+
+使用方式为：
+#+BEGIN_EXAMPLE
+  IMAGE_FEATURES = "<feature>"
+
+  # EXTRA_IMAGE_FEATURES 中的内容会被附加到 IMAGE_FEATURES 中
+  EXTRA_IMAGE_FEATURES = "<feature>"
+#+END_EXAMPLE
+
+image.bbclass 中定义了以下 feature：
+- debug-tweaks：用于开发目的，比如取消 root 密码
+- package-management：安装包管理系统
+- read-only-rootfs：设置根文件系统为只读
+- splash：显示 Logo 开机而不是命令行字符串
+
+populate_sdk_base.bbclass 中定义了以下特征：
+- dbg-pkgs：设置安装包包含符号表，这是为了便于调试
+- dev-pkgs：设置安装包包含开发所需要的文件
+- doc-pkgs：设置安装包包含文档
+- staticdev-pkgs：以静态库的方式安装包
+- ptest-pkgs：安装包测试工具
+
+core-image.bbclass 中定义了以下特征：
+- eclipse-debug：为 eclipse 安装其调试工具（GDB server、TCF 等）
+- hwcodecs：如果硬件平台支持，为其安装硬件编解码器
+- nfs-server：安装网络文件系统工具
+- qt4-pkgs：安装 Qt 框架
+- ssh-server-dropbear：安装 ssh 服务
+- ssh-server-openssh：按装 ssh 服务，与上面两个只能选择其一
+- tools-debug：安装调试工具（GDB,strace 等）
+- tools-profile：安装性能监控工具
+- tools-sdk：安装 sdk 工具
+- tools-testapps：安装测试工具
+- x11：安装 x11 服务
+- x11-base ： 不带窗口的 x11
+- x11-sato ： 安装 sato 
+
+** 包组(package groups)
+包组将一些包捆绑在一起，用于 =IMAGE_INSTALL= ，一个名字便可以安装多个包。
+
+包组使用recipe 文件定义，recipe 文件以 =packagegroup-= 开头，并且放在 =meta-xxx/recipes-xxx/packagegroup= 文件夹中
+*** 默认包组
+yocto 提供了一下默认包组（与前面的 image 特征遥相互应）：
+- packagegroup-core-ssh-dropbear：dropbear ssh
+- packagegroup-core-ssh-openssh：openssh
+- packagegroup-core-buildessential：基础开发工具（Autotools,binutils,compiler...）
+- packagegroup-core-tools-debug：基础调试工具（gdb,strace...）
+- packagegroup-core-sdk：基于 buildessential，增加了开发工具链
+- packagegroup-core-standalone-sdk-target：提供 gcc 和 c++ 库
+- packagegroup-core-eclipse-debug：用于 eclipse 的调试工具
+- packagegroup-core-tools-testapps：提供测试工具
+- packagegroup-self-hosted：用于 =build-appliance=
+- packagegroup-core-boot：用于基本启动的最小镜像文件
+- packagegroup-core-nfs：网络文件系统
+- packagegroup-base：支持更多硬件的包
+- packagegroup-cross-canadian：多个平台交叉编译
+- packagegroup-core-tools-profile：性能测试
+- packagegroup-core-device-devel：distcc 支持
+- packagegroup-qt-toolchain-target：基于 x11 的 Qt 开发工具
+- packagegroup-qte-toolchain-target：嵌入式平台的 Qt 开发工具
+- packagegroup-core-qt ： 基于 x11 的 qt 包
+- packagegroup-core-qt4e：嵌入式 qt 工具
+- packagegroup-core-x11-xserver：仅提供 x11 服务
+- packagegroup-core-x11：x11 全套
+- packagegroup-core-x11-base：x11 基础服务
+- packagegroup-core-x11-sato：sato 主题
+- packagegroup-core-clutter-core ： clutter
+- packagegroup-core-directfb：提供基于 frame buffer 的触摸支持
+- packagegroup-core-lsb：提供 lsb
+- packagegroup-core-full-cmdline：命令行工具
+*** 定义包组
+定义包组的 recipe 文件名称为 =packagegroup-<name>.bb==
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Custom	package	group	for	our	IoT	devices”
+
+  DESCRIPTION	=	“This	package	group	adds	standard	functionality	required	by our	IoT	devices.”
+
+  LICENSE	=	“MIT”
+
+  # 需要继承 packagegroup 类
+  inherit	packagegroup
+
+  # 此 recipe 需要定义的包组名称，以空格分隔
+  PACKAGES	=	“\
+        packagegroup-databases	\
+        packagegroup-python	\
+        packagegroup-servers”
+
+  # 需要依赖的 package
+  RDEPENDS_packagegroup-databases	=	“\
+        db	\
+        sqlite3”
+
+  RDEPENDS_packagegroup-python	=	“\
+        python	\
+        python-sqlite3”
+
+  RDEPENDS_packagegroup-servers	=	“\
+        openssh	\
+        openssh-sftp-server”
+
+  # 如果有就包含，但不是必须的
+  RRECOMMENDS_packagegroup-python	=	“\
+        ncurses	\
+        readline	\
+        zip”
+#+END_EXAMPLE
+
+当然，这些 recipe 一样可以被 bitbake 直接执行：
+- 便于最开始的调试
+#+BEGIN_EXAMPLE
+  bitbake packagegroup-<name>
+#+END_EXAMPLE
+* 构建 image
+
+
