@@ -278,6 +278,320 @@ yocto 提供了一下默认包组（与前面的 image 特征遥相互应）：
 #+BEGIN_EXAMPLE
   bitbake packagegroup-<name>
 #+END_EXAMPLE
-* 构建 image
+* 构建独立 image
+如果想要构建不一来默认 image 的 image，那么需要至少继承 =image= 或 =core-image= 类，然后在此基础上再添加一些 feature,package,recipe。
 
+比如下面这样的 recipe，创建的 image 启动包含基本的控制台：
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Custom	image	recipe	that	does	not	get	any	simpler”
+  DESCRIPTION	=	“Well	yes,	you	could	remove	SUMMARY,	DESCRIPTION,	LICENSE.”
+  LICENSE	=	“MIT”
+
+  #	We	are	using	the	append	operator	(+=)	below	to	preserve	the	default
+  #	values	set	by	the	core-image	class	we	are	inheriting.
+  IMAGE_INSTALL	+=	“mtd-utils”
+  IMAGE_FEATURES	+=	“splash”
+
+  #如果不想依赖默认的 IMAGE_INSTALL 和 IMAGE_FEATURES ，那么可以使用直接赋值
+  IMAGE_INSTALL	=	“packagegroup-core-boot	packagegroup-base-extended	\
+                                    ${CORE_IMAGE_EXTRA_INSTALL}	mtd-utils”
+  IMAGE_FEATURES	=	“${EXTRA_IMAGE_FEATURES}	splash”
+
+  inherit	core-image
+#+END_EXAMPLE
+- core-image 包含了 =packagegroup-core-boot= 和 =packagegroup-base-ectended= 两个包组
+- 上面直接附加至变量 =IMAGE_INSTALL= 和 =IMAGE_FEATURES=
+  + =EXTRA_IMAGE_FEATURES= 和 =CORE_IMAGE_EXTERA_INSTALL= 是专门用于 =conf/local.conf= 的变量
+* 根文件系统 image 的选项
+下面的这些选项用于配置根文件系统：
+** 语言及位置的设置
+变量 =IMAGE_LINGUAS= 用于配置文件系统需要增加支持的语言：
+- 默认就是 =en-us=
+#+BEGIN_EXAMPLE
+  IMAGE_LINGUAS	=	“en-gb	pt-br”
+#+END_EXAMPLE
+** 包管理机制
+构建系统可以以 4 种方式打包软件包：
+- opkg(Open Package Management)
+  + 使用的元数据少于 dpkg 和 RPM，创建的包体积更小
+- dpkg(Debia Package Management)
+  + 使用更多的元数据处理依赖和版本控制
+- RPM(Red Hat Package Manager)
+  + 使用更多的元数据处理依赖和版本控制，由于它使用 python 编写，所以需要目标机也要安装 python
+- tar
+  
+只有前 3 种可以被用于创建根文件系统。
+
+在 =conf/local.conf= 中设置 =PACKAGE_CLASSES= 变量来配置使用哪种打包机制：
+- 可以定义多个，但至少定义 1 个
+  + 有多个时，第一个用作跟文件系统的创建，同时构建系统会为普通安装对象创建所有指定的包
+#+BEGIN_EXAMPLE
+  PACKAGE_CLASSES	=	“package_rpm	package_ipk	package_tar”
+#+END_EXAMPLE
+
+包的存放路径在构建目录中的 =tmp/deploy/<pms>= ，比如 =tmp/deploy/rpm= 包含了所有以 rpm 结构打包的软件。
+** image 的大小
+以下这些变量可以设置 image 大小：
+- IMAGE_ROOTFS_SIZE：设置跟文件系统 image 的 *最小大小* ，单位为 kB，默认值为 65536
+- IMAGE_ROOTFS_ALIGNMENT：根文件系统大小的对齐值，单位为 kB，默认值为 1。
+- IMAGE_ROOTFS_EXTRA_SPACE：分配额外的空空间给根文件系统，单位为 kB，默认值为 0。
+- IMAGE_OVERHEAD_FACTOR：指定文件大小的倍数，默认为 1.3。
+
+** 根文件系统类型
+使用变量 =IMAGE_FATYPES= 设置根文件系统类型：
+#+BEGIN_EXAMPLE
+  IMAGE_FSTYPES	=	“ext3	tar.bz2”
+#+END_EXAMPLE
+- tar,tar.gz,tar.bz2,tar.xz,tar.lz3：创建非压缩和压缩的根文件系统 image
+- ext2,ext2.gz,ext2.bz,ext2.lzma：使用 ext2 文件系统的压缩或非压缩
+- ext3,ext3.gz：使用 ext3 文件系统的压缩或非压缩
+- btrfs：使用 btrfs 格式化
+- jffs2,jffs2.sum：
+- cramfs：rom fs
+- iso：使用 ISO 9660 标准的文件系统，支持 CD-ROM
+- hddimg：支持硬盘启动
+- squashfs,squashfs-xz：SquashFS 格式
+- ubi,ubifs：
+- cpio,cpio.gz,cpio.xz,cpio.lzma
+- vmdk：用于 VMware 的文件系统格式
+- elf：使用 mkelfImage 工具制作
+** 用户，组，密码
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Custom	image	recipe	from	scratch”
+  DESCRIPTION	=	“Directly	assign	IMAGE_INSTALL	and	IMAGE_FEATURES	for	\
+                                for	direct	control	over	image	contents.”
+  LICENSE	=	“MIT”
+  #	We	are	using	the	assignment	operator	(=)	below	to	purposely	overwrite
+  #	the	default	from	the	core-image	class.
+  IMAGE_INSTALL	=	“packagegroup-core-boot	packagegroup-base-extended	\
+                                    ${CORE_IMAGE_EXTRA_INSTALL}”
+  inherit	core-image
+  inherit	extrausers
+  #	set	image	root	password
+  ROOT_PASSWORD	=	“secret”
+  DEV_PASSWORD	=	“hackme”
+
+  # useradd : 增加用户
+  # usermode: 修改用户
+  # userdel : 删除用户
+  # groupadd : 增加组
+  # groupmode: 修改组
+  # groupdel : 删除组
+  EXTRA_USERS_PARAMS	=	“\
+        groupadd	developers;	\
+        useradd	-p	`openssl	passwd	${DEV_PASSWORD}`	developer;	\
+        useradd	-g	developers	developer;	\
+        usermod	-p	`openssl	passwd	${ROOT_PASSWORD}`	root;	\
+        ”
+#+END_EXAMPLE
+** 其他
+对于根文件系统其他杂项的调整，可以用 =ROOTFS_POSTPROCESS_COMMAND= 来完成：
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Custom	image	recipe	from	scratch”
+  DESCRIPTION	=	“Directly	assign	IMAGE_INSTALL	and	IMAGE_FEATURES	for	\
+                                for	direct	control	over	image	contents.”
+  LICENSE	=	“MIT”
+  #	We	are	using	the	assignment	operator	(=)	below	to	purposely	overwrite
+  #	the	default	from	the	core-image	class.
+  IMAGE_INSTALL	=	“packagegroup-core-boot	packagegroup-base-extended	\
+                                    ${CORE_IMAGE_EXTRA_INSTALL}”
+  inherit	core-image
+  #	Additional	root	filesystem	processing
+  modify_shells()	{
+        printf	“#	/etc/shells:	valid	login	shells\n/bin/sh\n/bin/bash\n”	\
+                        >	${IMAGE_ROOTFS}/etc/shells
+  }
+  ROOTFS_POSTPROCESS_COMMAND	+=	“modify_shells;”
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+  modify_sudoers()	{
+        sed	‘s/#	%sudo/%sudo/’	<	${IMAGE_ROOTFS}/etc/sudoers	>	\
+                  ${IMAGE_ROOTFS}/etc/sudoers.tmp
+        mv	${IMAGE_ROOTFS}/etc/sudoers.tmp	${IMAGE_ROOTFS}/etc/sudoers
+  }
+  ROOTFS_POSTPROCESS_COMMAND	+=	“modify_sudoers;”
+#+END_EXAMPLE
+
+#+BEGIN_EXAMPLE
+  configure_sshd()	{
+        #	disallow	password	authentication
+        echo	“PasswordAuthentication	no”	>>	${IMAGE_ROOTFS}/etc/ssh/sshd_config
+        #	create	keys	in	tmp/deploy/keys
+        mkdir	-p	${DEPLOY_DIR}/keys
+        if	[	!	-f	${DEPLOY_DIR}/keys/${IMAGE_BASENAME}-sshroot	];	then
+              ssh-keygen	-t	rsa	-N	”	\
+                    -f	${DEPLOY_DIR}/keys/${IMAGE_BASENAME}-sshroot
+        fi
+        #	add	public	key	to	authorized_keys	for	root
+        mkdir	-p	${IMAGE_ROOTFS}/home/root/.ssh
+        cat	${DEPLOY_DIR}/keys/${IMAGE_BASENAME}-sshroot.pub	\
+                >>	${IMAGE_ROOTFS}/home/root/.ssh/authorized_keys
+  }
+  ROOTFS_POSTPROCESS_COMMAND	+=	“configure_sshd;”
+#+END_EXAMPLE
+* 发行版配置
+发行版的配置是全局配置，会影响所有 image 的构建。
+
+在构建目录的 =conf/local.conf= 中，使用 =DISTRO= 指定构建系统的配置：
+#+BEGIN_EXAMPLE
+  # 构建系统会在其包含的元数据层中的 conf/distro 文件搜寻文件 poky.conf
+  DISTRO	=	“poky”
+#+END_EXAMPLE
+yocto 默认提供了以下几种发行版的配置文件：
+- poky：yocto 默认就是使用的这种配置，也是推荐在其基础上来做修改
+- poky-bleeding：这个是基于 yocto 的版本，所有的 package 都是使用最新版本，不建议使用
+- poky-lsb：包含 LSB，与 =core-image-lsb= 联合使用
+- poky-tiny：与 =core-image-minimal= 联合使用，精简了 poky 的配置
+** poky 的具体配置
+=poky= 的配置文件 =poky.conf= 位于 =meta-poky/conf/distro/= 中：
+#+BEGIN_EXAMPLE
+  DISTRO = "poky"
+  DISTRO_NAME = "Poky (Yocto Project Reference Distro)"
+  DISTRO_VERSION = "2.5.3"
+  DISTRO_CODENAME = "sumo"
+  SDK_VENDOR = "-pokysdk"
+  SDK_VERSION := "${@'${DISTRO_VERSION}'.replace('snapshot-${DATE}','snapshot')}"
+
+  MAINTAINER = "Poky <poky@yoctoproject.org>"
+
+  TARGET_VENDOR = "-poky"
+
+  LOCALCONF_VERSION = "1"
+
+  DISTRO_VERSION[vardepsexclude] = "DATE"
+  SDK_VERSION[vardepsexclude] = "DATE"
+
+  # Override these in poky based distros
+  POKY_DEFAULT_DISTRO_FEATURES = "largefile opengl ptest multiarch wayland vulkan"
+  POKY_DEFAULT_EXTRA_RDEPENDS = "packagegroup-core-boot"
+  POKY_DEFAULT_EXTRA_RRECOMMENDS = "kernel-module-af-packet"
+
+  DISTRO_FEATURES ?= "${DISTRO_FEATURES_DEFAULT} ${DISTRO_FEATURES_LIBC} ${POKY_DEFAULT_DISTRO_FEATURES}"
+
+  PREFERRED_VERSION_linux-yocto ?= "4.14%"
+
+  SDK_NAME = "${DISTRO}-${TCLIBC}-${SDK_ARCH}-${IMAGE_BASENAME}-${TUNE_PKGARCH}"
+  SDKPATH = "/opt/${DISTRO}/${SDK_VERSION}"
+
+  DISTRO_EXTRA_RDEPENDS += " ${POKY_DEFAULT_EXTRA_RDEPENDS}"
+  DISTRO_EXTRA_RRECOMMENDS += " ${POKY_DEFAULT_EXTRA_RRECOMMENDS}"
+
+  POKYQEMUDEPS = "${@bb.utils.contains("INCOMPATIBLE_LICENSE", "GPL-3.0", "", "packagegroup-core-device-devel",d)}"
+  DISTRO_EXTRA_RDEPENDS_append_qemuarm = " ${POKYQEMUDEPS}"
+  DISTRO_EXTRA_RDEPENDS_append_qemuarm64 = " ${POKYQEMUDEPS}"
+  DISTRO_EXTRA_RDEPENDS_append_qemumips = " ${POKYQEMUDEPS}"
+  DISTRO_EXTRA_RDEPENDS_append_qemuppc = " ${POKYQEMUDEPS}"
+  DISTRO_EXTRA_RDEPENDS_append_qemux86 = " ${POKYQEMUDEPS}"
+  DISTRO_EXTRA_RDEPENDS_append_qemux86-64 = " ${POKYQEMUDEPS}"
+
+  TCLIBCAPPEND = ""
+
+  QEMU_TARGETS ?= "arm aarch64 i386 mips mipsel mips64 mips64el nios2 ppc x86_64"
+  # Other QEMU_TARGETS "sh4"
+
+  PREMIRRORS ??= "\
+  bzr://.*/.*   http://downloads.yoctoproject.org/mirror/sources/ \n \
+  cvs://.*/.*   http://downloads.yoctoproject.org/mirror/sources/ \n \
+  git://.*/.*   http://downloads.yoctoproject.org/mirror/sources/ \n \
+  gitsm://.*/.* http://downloads.yoctoproject.org/mirror/sources/ \n \
+  hg://.*/.*    http://downloads.yoctoproject.org/mirror/sources/ \n \
+  osc://.*/.*   http://downloads.yoctoproject.org/mirror/sources/ \n \
+  p4://.*/.*    http://downloads.yoctoproject.org/mirror/sources/ \n \
+  svn://.*/.*   http://downloads.yoctoproject.org/mirror/sources/ \n"
+
+  MIRRORS =+ "\
+  ftp://.*/.*      http://downloads.yoctoproject.org/mirror/sources/ \n \
+  http://.*/.*     http://downloads.yoctoproject.org/mirror/sources/ \n \
+  https://.*/.*    http://downloads.yoctoproject.org/mirror/sources/ \n"
+
+  # The CONNECTIVITY_CHECK_URI's are used to test whether we can succesfully
+  # fetch from the network (and warn you if not). To disable the test set
+  # the variable to be empty.
+  # Git example url: git://git.yoctoproject.org/yocto-firewall-test;protocol=git;rev=master
+  CONNECTIVITY_CHECK_URIS ?= "https://www.example.com/"
+
+  SANITY_TESTED_DISTROS ?= " \
+              poky-2.4 \n \
+              poky-2.5 \n \
+              ubuntu-15.04 \n \
+              ubuntu-16.04 \n \
+              ubuntu-18.04 \n \
+              fedora-28 \n \
+              centos-7 \n \
+              debian-8 \n \
+              debian-9 \n \
+              opensuse-42.3 \n \
+              "
+  #
+  # OELAYOUT_ABI allows us to notify users when the format of TMPDIR changes in
+  # an incompatible way. Such changes should usually be detailed in the commit
+  # that breaks the format and have been previously discussed on the mailing list
+  # with general agreement from the core team.
+  #
+  OELAYOUT_ABI = "12"
+
+  # add poky sanity bbclass
+  INHERIT += "poky-sanity"
+
+  # QA check settings - a little stricter than the OE-Core defaults
+  WARN_TO_ERROR_QA = "already-stripped compile-host-path install-host-path \
+                      installed-vs-shipped ldflags pn-overrides rpaths staticdev \
+                      useless-rpaths"
+  WARN_QA_remove = "${WARN_TO_ERROR_QA}"
+  ERROR_QA_append = " ${WARN_TO_ERROR_QA}"
+
+  require conf/distro/include/poky-world-exclude.inc
+  require conf/distro/include/no-static-libs.inc
+  require conf/distro/include/yocto-uninative.inc
+  INHERIT += "uninative"
+#+END_EXAMPLE
+
+*** 发行版的信息
+以下这些变量用于表示发行版的一些信息：
+- DISTRO：发行版的简称，其值 *必须与配置文件名称一致* ，比如 =poky.conf= 文件中此值必须是 =poky=
+- DISTRO_NAME：发行版的全称，很多 recipe 文件都会引用这个变量。
+  + 其值会在控制台的启动输出中显示
+- DISTRO_VERSION：发行版的版本号，很多 recipe 文件都会引用这个变量。
+  + 其值会在控制台的启动输出中显示
+- DISTRO_CODENAME：发行版的代号
+- MAINTAINER：发行版的维护者联系方式，一般是 名称和 email 的方式
+- TARGET_VENDOR：发行版厂商名称， *需要以连词号开头* ， 比如 "-poky"。
+  + 与 =TARGET_ARCH= , =TARGET_OS= 连接在一起，比如 "i586-poky-linux"
+*** SDK 信息
+- SDK_NAME：SDK 名称， SDK_NAME = "${DISTRO}-${TCLIBC}-${SDK_ARCH}-${IMAGE_BASENAME}-${TUNE_PKGARCH}"
+- SDK_VERSION：SDK 版本号
+- SDK_VENDOR：SDK 发行商，和 =TARGET-VENDOR= 一样，也是需要连词号开头
+- SDK_PATH：SDK 的安装路径
+*** 发行版的特征
+用于设置发行版所具备的功能：
+- DISTRO_FEATURES：DISTRO_FEATURES ?= "${DISTRO_FEATURES_DEFAULT} ${DISTRO_FEATURES_LIBC} ${POKY_DEFAULT_DISTRO_FEATURES}"
+*** 指定特定版本
+- PREFERRED_VERSION : 用于指定某部分的特定版本号，而不是最新版本，这通常用于指定 linux 内核的版本。
+*** 依赖
+指定运行时的依赖：
+- DISTRO_EXTRA_RDEPENDS：运行时的必须依赖，如果不存在这些依赖则会构建失败
+- DISTRO_EXTRA_RRECOMMENDS：建议运行时依赖，如果有则会被加入，没有也不会构建失败
+*** 工具链配置
+用于构建过程中的工具链配置：
+- TCMODE：构建时的工具链，默认值是 =default= ，对应于 =conf/distro/include= 中的 =tcmode-${TCMODE}.inc= 文件
+- TCLIBC：构建时的 C 库，对应于 =conf/distro/include= 中的 =tclibc-${TCLIBC}.inc= 文件
+- TCLIBCAPPEND：c 库的附加
+*** 镜像配置
+- PREMIRRORS 和 MIRRORS：镜像文件的地址
+*** 构建系统的配置
+- LOCALCONF_VERSION：构建系统所需求的 =local.conf= 的版本。
+  + 它与 =local.conf= 中的 =CONF_VERSION= 比较，如果它比较大则会自动升级 =local.conf= 到新版本，否则报错
+- LAYER_CONF_VERSION：与 =bblayers.conf= 中的 =LAYER_CONF_VERSION= 比较，小于则报错
+- OELAYOUT_ABI：对 =TMPDIR= 布局版本的要求，不匹配则报错
+- BB_SIGNATURE_HANDLER：签名机制，用于判断缓存文件是否已经被改变
+*** 构建系统的检验
+- INHERIT += "poky-sanity: 继承 =poky-sanity.bbclass= 以完成系统基础检查
+- CONNECTIVITY_CHECK_URIS：用于检查网络是否连接的 URL
+- SANITY_TESTED_DISTROS：表示这个发行版在哪些主机系统上已经经过了验证
+*** QA 检查
+- WARN_QA：哪些 QA 检查会触发警告，但不会停止构建过程
+- ERROR_QA：哪些 QA 检查会触发错误并停止构建过程
+
+** 发行版的特征
 
