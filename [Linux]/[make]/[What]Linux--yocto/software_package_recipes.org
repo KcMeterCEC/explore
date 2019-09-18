@@ -1,0 +1,24 @@
+#+TITLE: [What]Yocto Project --> 编写 recipe
+#+DATE: <2019-09-18 三> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAMA: <yocto_write_recipe.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+前面几章都是走马观花式的了解了一下 yocto 系统，可以看到其整个构建核心就是配置文件和 recipe。
+
+其中配置文件仅仅是变量的赋值及修改，难点还是在于 recipe 的编写。
+
+有了 recipe 的基础，接下来就会进入内核、BSP、APP 3大主题，这学习曲线还是有点绕……
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML

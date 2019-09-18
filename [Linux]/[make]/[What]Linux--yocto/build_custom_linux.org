@@ -594,4 +594,102 @@ yocto 默认提供了以下几种发行版的配置文件：
 - ERROR_QA：哪些 QA 检查会触发错误并停止构建过程
 
 ** 发行版的特征
+通过设置变量 =DISTRO_FEATURES= ，来配置对应软件包使用哪部份配置。
 
+比如一个软件包既可以配置为控制台模式，也可以配置为带 UI 模式，当 =DISTRO_FEATURES= 中包含
+x11 这个特征时，这个软件包在构建时就会加入其 UI 特性。
+
+发行版特征和 image 特征不一样， image 特征是指定了某部分软件会被安装进根文件系统，而发行版特性
+是配置整个发行版可以支持软件包的哪些特性。
+- 也就是说一些 recipe 会根据 =DISTRO_FEATURES= 的值来决定自己的构建方式
+
+一般在 recipe 中使用 =DISTRO_FEATURES= 的方式为:
+#+BEGIN_EXAMPLE
+  # 如果 DISTRO_FEATURES 包含 feature 则返回 true_val，否则返回 falase_val
+  if bb.utils.contains('DISTRO_FEATURES', <feature>, <true_val>, <false_val>, d)
+      ...
+#+END_EXAMPLE
+
+下面这些特征可以被加入 =DISTRO_FEATURES= ：
+- alsa：ALSA 音频处理构架
+- bluetooth：蓝牙
+- cramfs：CramFS
+- directfb：直接帧缓存
+- ext2：ext2 文件系统
+- ipsec：IPSec 机制
+- ipv6：IPv6 支持
+- irda：IrDA 标准
+- keyborad：键盘支持
+- nfs：网络文件系统支持
+- opengl：OpenGL 库包含
+- pci：pci 支持
+- pcmcia：使能 PCMCIA
+- ppp:PPP 协议
+- smbfs：网络共享文件系统
+- systemd：使用 systemd 代替 SysVinit
+- sysvinit：使用 SysVinit
+- usbgadget：使能 usb gadget 框架，让 linux 设备作为从设备
+- usbhost：使能 usb host 框架
+- wayland：
+- wifi：使能 wifi
+- x11：使能 x11 框架
+  
+还有一个变量叫做 =MACHINE_FEATURES= ，这个变量主要是在 bsp 层中配置。
+- 比如 =DISTRO_FEATURES= 和 =MACHINE_FEATURES= 都使能了 =bluetooth= ， =DISTRO_FEATURES= 会使能底层驱动
+和上层应用，而 =MACHINE_FEATURES= 只会使能底层驱动。
+** 系统管理器
+构建系统支持 SysVinit 和 systemd 两种系统管理器，默认情况下就是使用的 SysVinit。
+
+如果想要使用 systemd，那么需要在发行版的配置文件中增加：
+#+BEGIN_EXAMPLE
+  # 安装 systemd 到根文件系统（注意空格）
+  DISTRO_FEATURES_append = " systemd"
+
+  # 配置 systemd 为系统管理器
+  VIRTUAL-RUNTIME_init_manager = "systemd"
+
+  # 取消 sysvinit 的安装
+  DISTRO_FEATURES_BACKFULL_CONSIDERED = "sysvinit"
+#+END_EXAMPLE
+** 发行版的默认设置
+OE Core 元数据层文件 =meta/conf/distro/defaultsetup.conf= 提供了发行版的默认配置：
+- 这个文件会被 =bitbake.conf= 所包含。
+#+BEGIN_EXAMPLE
+  include conf/distro/include/default-providers.inc
+  include conf/distro/include/default-versions.inc
+  
+# default-distrovars 设置了以下变量：
+# DISTRO_FEATURES,DISTRO_FEATURES_DEFAULT,DISTRO_FEATURES_LIBC,DISTRO_FEATURES_LIBC_DEFAULT
+  include conf/distro/include/default-distrovars.inc
+  include conf/distro/include/world-broken.inc
+
+  TCMODE ?= "default"
+  require conf/distro/include/tcmode-${TCMODE}.inc
+
+  TCLIBC ?= "glibc"
+  require conf/distro/include/tclibc-${TCLIBC}.inc
+
+  require conf/distro/include/uninative-flags.inc
+
+  # Allow single libc distros to disable this code
+  TCLIBCAPPEND ?= "-${TCLIBC}"
+  TMPDIR .= "${TCLIBCAPPEND}"
+
+  CACHE = "${TMPDIR}/cache/${TCMODE}-${TCLIBC}${@['', '/' + str(d.getVar('MACHINE'))][bool(d.getVar('MACHINE'))]}${@['', '/' + str(d.getVar('SDKMACHINE'))][bool(d.getVar('SDKMACHINE'))]}"
+
+  USER_CLASSES ?= ""
+  PACKAGE_CLASSES ?= "package_ipk"
+  INHERIT_BLACKLIST = "blacklist"
+  INHERIT_DISTRO ?= "debian devshell sstate license remove-libtool"
+  INHERIT += "${PACKAGE_CLASSES} ${USER_CLASSES} ${INHERIT_DISTRO} ${INHERIT_BLACKLIST}"
+#+END_EXAMPLE
+
+** 第三方的层
+在[[http://layers.openembedded.org][官方层共享网站]]中提供了很多经过测试的 recipe、layer，所以当我们需要将某个软件包安装进
+根文件系统时，可以提前现在这个网站搜索一下，就不用自己造轮子了。
+
+一旦下载了 layer，就只需要：
+1. 在构建环境的 =conf/bblayers.conf= 中加入此层的路径
+2. 在 image 中加入该 package
+** Toaster
+Toaster 是图形化的与 bitbake 网络接口的工具，但不如编辑文本和命令行的方式可以修改任何位置。

@@ -1,0 +1,125 @@
+#+TITLE: [What]Yocto Project --> 构建树莓派 3B 发行版
+#+DATE: <2019-09-17 二> 
+#+TAGS: yocto
+#+LAYOUT: post 
+#+CATEGORIES: linux, make, yocto
+#+NAME: <yocto_build_raspberry_linux.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+参考书籍:Embedded Linux System with the Yocto Project
+- 书籍比实际的yocto版本要低，所以yocto的详细命令需要参考其[[https://www.yoctoproject.org/docs/][对应版本手册]]
+  
+参考链接：[[https://jumpnowtek.com/rpi/Raspberry-Pi-Systems-with-Yocto.html][Building Respberry Pi Systems with Yocto]]
+
+运行环境:
+- ubuntu18.04 amd64
+- yocto 2.5.1
+
+学了这么多，不实践一下是不行的。
+
+现在尝试在对树莓派 3B 的底层硬件不熟悉的情况下，通过前面 yocto 的基础知识构建一个发行版。
+
+根据前面的学习，可以先猜测一下要在基于 poky 的基础上构建树莓派的发行版需要至少这些步骤：
+1. 获取树莓派的 layer
+2. 基于当前 layer 说明配置 layer 中的变量
+3. 在 =bblayers.conf= 中加入此 layer
+4. 根据发行版的需求，修改 image 和 distro 的配置
+5. 构建并测试
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* layer 的获取
+[[https://github.com/jumpnow/meta-rpi][meta-rpi]]便提供了树莓派的 layer，这个是基于官方 meta-raspberrypi 做的修改。
+
+** 切换到合适分支
+通过查看其 README 可以发现，目前其最新维护的版本支持的 yocto 分支是 =warrior= ，
+所以我也需要将当前分支 =sumo= 切换到 =warrior= 。
+** 依赖 layer 的获取
+README 中也说明了其依赖了其他在 =warrior= 下的 layer：
+#+BEGIN_EXAMPLE
+  git clone -b warrior git://git.openembedded.org/meta-openembedded
+  git clone -b warrior https://github.com/meta-qt5/meta-qt5
+  git clone -b warrior git://git.yoctoproject.org/meta-raspberrypi
+#+END_EXAMPLE
+
+好了，现在获取 =meta-rpi= :
+#+BEGIN_EXAMPLE
+   mkdir ./rpi
+   cd ./rpi
+   git clone -b warrior git://github.com/jumpnow/meta-rpi
+#+END_EXAMPLE
+* 创建构建目录
+对应新的 target，需要为其创建新的 build dir：
+#+BEGIN_EXAMPLE
+  source ./oe-init-build-env ./rpi/build
+#+END_EXAMPLE
+
+
+* 配置
+在 =meta-rpi/conf= 中就具有示例配置，可以直接替换构建目录中的 =conf= ，然后在此基础上修改：
+#+BEGIN_EXAMPLE
+  cp ../meta-rpi/conf/local.conf.sample conf/local.conf
+  cp ../meta-rpi/conf/bblayers.conf.sample conf/bblayers.conf
+#+END_EXAMPLE
+** 修改 bblayers.conf
+根据当前目录架构，修改 layer 的路径：
+#+BEGIN_EXAMPLE
+  # POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+  # changes incompatibly
+  POKY_BBLAYERS_CONF_VERSION = "2"
+
+  BBPATH = "${TOPDIR}"
+  BBFILES ?= ""
+
+  BBLAYERS ?= " \
+      /home/cec/github/poky/meta \
+      /home/cec/github/poky/meta-poky \
+      /home/cec/github/poky/meta-openembedded/meta-oe \
+      /home/cec/github/poky/meta-openembedded/meta-multimedia \
+      /home/cec/github/poky/meta-openembedded/meta-networking \
+      /home/cec/github/poky/meta-openembedded/meta-perl \
+      /home/cec/github/poky/meta-openembedded/meta-python \
+      /home/cec/github/poky/meta-qt5 \
+      /home/cec/github/poky/meta-raspberrypi \
+      /home/cec/github/poky/rpi/meta-rpi \
+  "
+#+END_EXAMPLE
+** 修改 local.conf
+*** 检查 MACHINE
+变量 =MACHINE= 代表目标板，此值必须得设定对，不然编译结果将无法运行。
+
+目前我用的是树莓派 3B，在 =meta-raspberrypi/conf/machine= 可以看到这些名称：
+#+BEGIN_EXAMPLE
+  include                 raspberrypi2.conf     raspberrypi4-64.conf  raspberrypi-cm.conf
+  raspberrypi0.conf       raspberrypi3-64.conf  raspberrypi4.conf     raspberrypi.conf
+  raspberrypi0-wifi.conf  raspberrypi3.conf     raspberrypi-cm3.conf
+#+END_EXAMPLE
+通过查看 raspberrypi 官网可以知道 3B 的 SOC 型号是 BCM2837 64bit CPU，那么当前 =MACHINE= 就应该赋值 =raspberrypi3-64= 。
+*** 修改 DL_DIR 和 SSTATE_DIR
+同样，在前期学习中我已经将这两个文件夹定向到了构建目录之外，所以这里也需要指向之前的文件夹，以减少构建时间。
+#+BEGIN_EXAMPLE
+  DL_DIR ?= "/home/cec/github/poky/downloads"
+  SSTATE_DIR ?= "/home/cec/github/poky/sstate-cache"
+#+END_EXAMPLE
+*** 设置密码
+默认用户 =root= 的密码通过变量 =EXTRA_USERS_PARAMS= 指定，这里默认为 =jumpnowtek= 。
+#+BEGIN_EXAMPLE
+  INHERIT += "chageusers"
+  CHAGE_USERS_PARAMS = "chage -d0 root; "
+#+END_EXAMPLE
+上面这两行用于第一次启动时，强制让用户修改密码。
+
+如果想要无密码登录，那么可以在 image feature 中加入 =debug-tweaks= ，这样的话原来设置密码的那几行都要屏蔽掉。
+* 构建
+现在配置已经完成，接下来便可以开始构建。
+
+而且在 =local.conf= 中可以看到默认的串口 1 波特率是 115200。
+
+由于目前我这个板不带液晶，那么实际运行就要通过串口来观察了。
+** 编译
+在前面的学习中可以知道：yocto 默认带了很多 image 供基础编译，但根据其说明我们需要：
+#+BEGIN_EXAMPLE
+  bitbake concole-image
+#+END_EXAMPLE
+之前缓存那么多的下载文件都用不上，又是一个漫长的等待……
