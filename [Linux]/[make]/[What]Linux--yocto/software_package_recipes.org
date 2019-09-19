@@ -1,9 +1,9 @@
 #+TITLE: [What]Yocto Project --> 编写 recipe
-#+DATE: <2019-09-18 三> 
+#+DATE: <2019-09-19 四> 
 #+TAGS: yocto
 #+LAYOUT: post 
 #+CATEGORIES: linux, make, yocto
-#+NAMA: <yocto_write_recipe.org>
+#+NAME: <yocto_write_recipe.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -22,3 +22,59 @@
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* recipe 的布局和惯例
+recipe 的主要作用就是构建一个软件包，OpenEmbedded 的 wiki 提供了[[http://openembedded.org/wiki/Styleguide][recipe 编写风格说明]]。
+** 文件名称
+recipe 文件名称其实可以很灵活，但按照正规的命名规则分为两种方式：
+*** 不通过版本控制的方式抓取的包
+#+BEGIN_EXAMPLE
+  <packagename>_<version>-<revision>.bb
+  <packagename>_<version>-<revision>.bbappend
+#+END_EXAMPLE
+- packagename：recipe 要构建的软件包名，bitbake 会将其赋值给变量 =PN=
+- version：软件包版本号，bitbake 会将其赋值给变量 =PV=
+- revision：修订版本号，bitbake 会将其赋值给变量 =PR=
+  
+*注意：*
+- 不要再在 packagename 中使用下划线了，而应该使用短横线
+- version 和 revision 中不能再含有短横线了，而应该用英文句点分割
+#+BEGIN_EXAMPLE
+  avahi_0.6.31.bb
+  linux-yocto_3.14.bb
+  wps-supplicant_2.2.bb
+#+END_EXAMPLE
+*** 通过版本控制方式抓取的包
+版本控制这里指的是像 git、svn、cvs 等这种工具，它们的命名规则为：
+#+BEGIN_EXAMPLE
+  <packagename>_<scm>.bb
+#+END_EXAMPLE
+packagename 的规则如前所述，scm 就是用 git、svn、cvs 替代。
+
+在此基础之上，recipe 还需要将变量 =PV= 设置为如下格式：
+#+BEGIN_EXAMPLE
+  PV = "<version>+git${SRCREV}"
+#+END_EXAMPLE
+version 指的是 tag，而 SRCREV 值的是其修订版。
+
+比如有文件 =meta-openembedded/meta-python/recipes-devtools/gyp/gyp_git.bb= ，这表明：
+- 软件包名是 =gyp= ，并且是通过 git 进行版本控制
+
+对应其内容为：
+#+BEGIN_EXAMPLE
+  DESCRIPTION = "GYP is a Meta-Build system: a build system that generates other build systems."
+  HOMEPAGE = "https://gyp.gsrc.io/"
+  LICENSE = "BSD-3-Clause"
+  LIC_FILES_CHKSUM = "file://LICENSE;md5=ab828cb8ce4c62ee82945a11247b6bbd"
+  SECTION = "devel"
+
+  SRC_URI = "git://chromium.googlesource.com/external/gyp;protocol=https"
+  SRCREV = "8bee09f4a57807136593ddc906b0b213c21f9014"
+
+  S = "${WORKDIR}/git"
+  PV = "0.1+git${SRCPV}"
+
+  inherit setuptools3
+
+  BBCLASSEXTEND = "native nativesdk"
+#+END_EXAMPLE
+** recipe 的内容结构

@@ -54,8 +54,6 @@ README 中也说明了其依赖了其他在 =warrior= 下的 layer：
 #+BEGIN_EXAMPLE
   source ./oe-init-build-env ./rpi/build
 #+END_EXAMPLE
-
-
 * 配置
 在 =meta-rpi/conf= 中就具有示例配置，可以直接替换构建目录中的 =conf= ，然后在此基础上修改：
 #+BEGIN_EXAMPLE
@@ -95,7 +93,8 @@ README 中也说明了其依赖了其他在 =warrior= 下的 layer：
   raspberrypi0.conf       raspberrypi3-64.conf  raspberrypi4.conf     raspberrypi.conf
   raspberrypi0-wifi.conf  raspberrypi3.conf     raspberrypi-cm3.conf
 #+END_EXAMPLE
-通过查看 raspberrypi 官网可以知道 3B 的 SOC 型号是 BCM2837 64bit CPU，那么当前 =MACHINE= 就应该赋值 =raspberrypi3-64= 。
+通过查看 raspberrypi 官网可以知道 3B 的 SOC 型号是 BCM2837 64bit CPU，那么当前 =MACHINE= 就应该赋值 =raspberrypi3= 。
+- 之前尝试过 =raspberrypi3-64.conf= 但在编译时生成 zimage 报错
 *** 修改 DL_DIR 和 SSTATE_DIR
 同样，在前期学习中我已经将这两个文件夹定向到了构建目录之外，所以这里也需要指向之前的文件夹，以减少构建时间。
 #+BEGIN_EXAMPLE
@@ -123,3 +122,70 @@ README 中也说明了其依赖了其他在 =warrior= 下的 layer：
   bitbake concole-image
 #+END_EXAMPLE
 之前缓存那么多的下载文件都用不上，又是一个漫长的等待……
+
+其中，文件 =bcm2837-bootfiles= 试了很多次都失败，最后还是使用 =axel= 来下载，然后修改其 =bbappend= ：
+#+BEGIN_EXAMPLE
+  RPIFW_DATE = "20190823"
+  SRCREV = "7163480fff007dc98978899b556dcf06f8a462c8"
+
+  SRC_URI[md5sum] = "e2bf5bd0d7e584239eb94e3c139e6a61"
+  SRC_URI[sha256sum] = "6aa835679207557234ded04cad6f9d0b4405943e8c98c01eed47234fb006f87d"
+
+  RPIFW_SRC_URI = "file://${DL_DIR}/firmware-${SRCREV}.tar.gz"
+  RPIFW_S = "${WORKDIR}/firmware-${SRCREV}"
+
+  do_unpack() {
+      tar -C ${WORKDIR} -xzf ${DL_DIR}/firmware-${SRCREV}.tar.gz
+  }
+#+END_EXAMPLE
+
+最终的编译输出位于： =/home/cec/github/poky/rpi/build/tmp/deploy/images/raspberrypi3=
+** 制作 SD 卡
+*** 分区
+当前使用的 layer 提供了 =meta-rpi/scripts/mk2parts.sh= 脚本来完成 SD 卡的分区。
+- 将 SD 卡分为 boot 分区和 rootfs 分区
+  + boot 分区存放 bootloader,kernel,devicetree,config file   
+  + rootfs 分区存放根文件系统
+    
+使用 =lsblk= 查看当前 SD 卡的名称后使用 =mk2parts.sh= ：
+#+BEGIN_EXAMPLE
+  cd ./rpi/meta-rpi/scripts
+  sudo ./mk2parts.sh sdb
+#+END_EXAMPLE
+然后创建挂载点，便于后期脚本挂载：
+#+BEGIN_EXAMPLE
+  sudo mkdir /media/card
+#+END_EXAMPLE
+*** 配置环境变量
+当前使用的 layer 提供了 =copy_boot.sh= 脚本和 =copy_rootfs.sh= 脚本来完成 SD 卡的制作。
+
+在使用这两个脚本前，需要设置变量 =OETMP= 和 =MACHINE= ，
+对应 yocto 的 =TMPDIR= 和 =MACHINE= 。
+
+根据上面的配置，可以知道我们的 =TMPDIR= 的路径是： =/home/cec/github/poky/rpi/build/tmp= ，=MACHINE= 就是 =raspberrypi3= 。
+#+BEGIN_EXAMPLE
+  export OETMP=/home/cec/github/poky/rpi/build/tmp
+  export MACHINE=raspberrypi3
+#+END_EXAMPLE
+*** 写入分区
+先写入 boot 分区：
+#+BEGIN_EXAMPLE
+  ./copy_boot.sh sdb
+#+END_EXAMPLE
+可以看到 boot 分区有这些内容：
+#+BEGIN_EXAMPLE
+  bcm2709-rpi-2-b.dtb               bootcode.bin  fixup4db.dat  fixup_x.dat   start4x.elf   zImage
+  bcm2710-rpi-3-b.dtb               cmdline.txt   fixup4x.dat   overlays      start_cd.elf
+  bcm2710-rpi-3-b-plus.dtb          config.txt    fixup_cd.dat  start4cd.elf  start_db.elf
+  bcm2710-rpi-cm3.dtb               fixup4cd.dat  fixup.dat     start4db.elf  start.elf
+  bcm2835-bootfiles-20190823.stamp  fixup4.dat    fixup_db.dat  start4.elf    start_x.elf
+#+END_EXAMPLE
+
+再写入 rootfs 分区：
+#+BEGIN_EXAMPLE
+  ./copy_rootfs.sh sdc console
+#+END_EXAMPLE
+可以看到 rootfs 分区就已经是一个完整的根文件系统了。
+
+* 启动
+插入 SD 卡，接上串口即可启动，输入用户名 =root= 即可登录系统。
