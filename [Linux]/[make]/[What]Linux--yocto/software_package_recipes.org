@@ -78,3 +78,162 @@ version 指的是 tag，而 SRCREV 值的是其修订版。
   BBCLASSEXTEND = "native nativesdk"
 #+END_EXAMPLE
 ** recipe 的内容结构
+recipe 的内容可以分为多个小节来看，以 =meta/recipes-core/gettext/gettext_0.19.8.1.bb= 为例：
+#+BEGIN_EXAMPLE
+  # 对此 recipe（元数据）的说明
+  SUMMARY = "Utilities and libraries for producing multi-lingual messages"
+  DESCRIPTION = "GNU gettext is a set of tools that provides a framework to help other programs produce multi-lingual messages. \
+  These tools include a set of conventions about how programs should be written to support message catalogs, a directory and file \
+  naming organization for the message catalogs themselves, a runtime library supporting the retrieval of translated messages, and \
+  a few stand-alone programs to massage in various ways the sets of translatable and already translated strings."
+  HOMEPAGE = "http://www.gnu.org/software/gettext/gettext.html"
+
+  # 包管理方式
+  SECTION = "libs"
+
+  # 授权
+  LICENSE = "GPLv3+ & LGPL-2.1+"
+  LIC_FILES_CHKSUM = "file://COPYING;md5=d32239bcb673463ab874e80d47fae504"
+
+  # 继承说明
+  inherit autotools texinfo pkgconfig
+
+  # 构建说明
+  DEPENDS = "gettext-native virtual/libiconv"
+  DEPENDS_class-native = "gettext-minimal-native"
+  PROVIDES = "virtual/libintl virtual/gettext"
+  PROVIDES_class-native = "virtual/gettext-native"
+  RCONFLICTS_${PN} = "proxy-libintl"
+  SRC_URI = "${GNU_MIRROR}/gettext/gettext-${PV}.tar.gz \
+       file://parallel.patch \
+       file://add-with-bisonlocaledir.patch \
+       file://cr-statement.c-timsort.h-fix-formatting-issues.patch \
+       file://use-pkgconfig.patch \
+  "
+
+  SRC_URI[md5sum] = "97e034cf8ce5ba73a28ff6c3c0638092"
+  SRC_URI[sha256sum] = "ff942af0e438ced4a8b0ea4b0b6e0d6d657157c5e2364de57baa279c1c125c43"
+
+
+  EXTRA_OECONF += "--without-lispdir \
+                   --disable-csharp \
+                   --disable-libasprintf \
+                   --disable-java \
+                   --disable-native-java \
+                   --disable-openmp \
+                   --disable-acl \
+                   --without-emacs \
+                   --without-cvs \
+                   --without-git \
+                  "
+  EXTRA_OECONF_append_class-target = " \
+                   --with-bisonlocaledir=${datadir}/locale \
+  "
+
+  PACKAGECONFIG ??= "croco glib libxml"
+  PACKAGECONFIG_class-native = ""
+  PACKAGECONFIG_class-nativesdk = ""
+
+  PACKAGECONFIG[croco] = "--without-included-libcroco,--with-included-libcroco,libcroco"
+  PACKAGECONFIG[glib] = "--without-included-glib,--with-included-glib,glib-2.0"
+  PACKAGECONFIG[libxml] = "--without-included-libxml,--with-included-libxml,libxml2"
+  # Need paths here to avoid host contamination but this can cause RPATH warnings
+  # or problems if $libdir isn't $prefix/lib.
+  PACKAGECONFIG[libunistring] = "--with-libunistring-prefix=${STAGING_LIBDIR}/..,--with-included-libunistring,libunistring"
+  PACKAGECONFIG[msgcat-curses] = "--with-libncurses-prefix=${STAGING_LIBDIR}/..,--disable-curses,ncurses,"
+
+  acpaths = '-I ${S}/gettext-runtime/m4 \
+             -I ${S}/gettext-tools/m4'
+
+  do_install_append_libc-musl () {
+    rm -f ${D}${libdir}/charset.alias
+    rm -f ${D}${includedir}/libintl.h
+    rm -f ${D}${libdir}/libintl.la
+  }
+
+  # 打包说明
+  # these lack the .x behind the .so, but shouldn't be in the -dev package
+  # Otherwise you get the following results:
+  # 7.4M    glibc/images/ep93xx/Angstrom-console-image-glibc-ipk-2008.1-test-20080104-ep93xx.rootfs.tar.gz
+  # 25M     uclibc/images/ep93xx/Angstrom-console-image-uclibc-ipk-2008.1-test-20080104-ep93xx.rootfs.tar.gz
+  # because gettext depends on gettext-dev, which pulls in more -dev packages:
+  # 15228   KiB /ep93xx/libstdc++-dev_4.2.2-r2_ep93xx.ipk
+  # 1300    KiB /ep93xx/uclibc-dev_0.9.29-r8_ep93xx.ipk
+  # 140     KiB /armv4t/gettext-dev_0.14.1-r6_armv4t.ipk
+  # 4       KiB /ep93xx/libgcc-s-dev_4.2.2-r2_ep93xx.ipk
+
+  PACKAGES =+ "libgettextlib libgettextsrc"
+  FILES_libgettextlib = "${libdir}/libgettextlib-*.so*"
+  FILES_libgettextsrc = "${libdir}/libgettextsrc-*.so*"
+
+  PACKAGES =+ "gettext-runtime gettext-runtime-dev gettext-runtime-doc"
+
+  FILES_${PN} += "${libdir}/${BPN}/*"
+
+  # The its/Makefile.am has defined:
+  # itsdir = $(pkgdatadir)$(PACKAGE_SUFFIX)/its
+  # not itsdir = $(pkgdatadir), so use wildcard to match the version.
+  FILES_${PN} += "${datadir}/${BPN}-*/*"
+
+  FILES_gettext-runtime = "${bindir}/gettext \
+                           ${bindir}/ngettext \
+                           ${bindir}/envsubst \
+                           ${bindir}/gettext.sh \
+                           ${libdir}/libasprintf.so* \
+                           ${libdir}/GNU.Gettext.dll \
+                          "
+  FILES_gettext-runtime-dev += "${libdir}/libasprintf.a \
+                        ${includedir}/autosprintf.h \
+                       "
+  FILES_gettext-runtime-doc = "${mandir}/man1/gettext.* \
+                               ${mandir}/man1/ngettext.* \
+                               ${mandir}/man1/envsubst.* \
+                               ${mandir}/man1/.* \
+                               ${mandir}/man3/* \
+                               ${docdir}/gettext/gettext.* \
+                               ${docdir}/gettext/ngettext.* \
+                               ${docdir}/gettext/envsubst.* \
+                               ${docdir}/gettext/*.3.html \
+                               ${datadir}/gettext/ABOUT-NLS \
+                               ${docdir}/gettext/csharpdoc/* \
+                               ${docdir}/libasprintf/autosprintf.html \
+                               ${infodir}/autosprintf.info \
+                              "
+
+  # 重写任务
+  do_install_append() {
+      rm -f ${D}${libdir}/preloadable_libintl.so
+  }
+
+  do_install_append_class-native () {
+    rm ${D}${datadir}/aclocal/*
+    rm ${D}${datadir}/gettext/config.rpath
+    rm ${D}${datadir}/gettext/po/Makefile.in.in
+    rm ${D}${datadir}/gettext/po/remove-potcdate.sin
+
+          create_wrapper ${D}${bindir}/msgfmt \
+                  GETTEXTDATADIR="${STAGING_DATADIR_NATIVE}/gettext-0.19.8/"
+
+  }
+
+  # 扩展
+  BBCLASSEXTEND = "native nativesdk"
+#+END_EXAMPLE
+*** 描述 recipe 的元数据
+- SUMMARY：对软件包的简要描述，以一行描述且最多 80 个字符
+- DESCRIPTION：对软件包的详细描述
+- AUTHOR：描述作者的名字和 email 方式，可以列出多个作者。
+#+BEGIN_EXAMPLE
+  AUTHOR = "Santa Claus <santa@northpole.com>"
+#+END_EXAMPLE
+- HOMEPAGE：软件包的主站
+- BUGTRACKER：追踪软件包 BUG 的站点
+*** 软件包管理的元数据
+这部分用于提供给包管理系统。
+- SECTION：说明包的类型，包管理系统根据此变量来组织该包，可用的值有：
+  + app,audio,base,devel,libs
+- PRIORITY：描述此包可以作用于哪种系统，仅仅在 dpkg 和 opkg 包管理器下使用
+  + standard：任何 linux 系统都适用的标准包
+  + required：系统所必需的
+  + optional：可选的
+  + extra：可能会与系统的其他包相冲突
