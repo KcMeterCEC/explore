@@ -237,3 +237,150 @@ recipe 的内容可以分为多个小节来看，以 =meta/recipes-core/gettext/
   + required：系统所必需的
   + optional：可选的
   + extra：可能会与系统的其他包相冲突
+*** 许可说明
+许可说明是 yocto 强制要求的：
+- LICENSE：许可名称
+- LIC_FILES_CHECKSUM：许可文件的校验
+*** 继承与包含
+- =inherit <class name>= ：继承自 class，这个语句在文件中的位置并不会影响 bitbake 的解析
+- =include <file name>= , =requirde <file name>= ：包含文件， *这句话在文件中的位置就很重要了，bitbake 会在语句处展开文件*
+*** 构建说明
+- PROVIDES：给 recipe 取别名，详细参考[[http://kcmetercec.top/2018/09/16/linux_make_yocto_bitbake_hello/#org9b9b4dc][此处]]。
+- DEPENDS：在构建此包前，必须构建指定的依赖包，详细参考[[http://kcmetercec.top/2018/09/16/linux_make_yocto_bitbake_hello/#org662313f][此处]]。
+- PN：包的名字，可以由 bitbake 从文件中获取，也可以用户显示指定，[[http://kcmetercec.top/2018/09/16/linux_make_yocto_bitbake_hello/#org9b9b4dc][此处有详细说明]]。
+- PV：包版本
+- PR：包修订版，默认值为 r0。
+- SRC_URI：源码、补丁及其他文件的下载路径，详细参考[[http://kcmetercec.top/2018/09/16/linux_bitbake_build_engine/#org441957f][此处]]。
+- SRCDATA：源码的日期，这个只有在使用 SCM 为源时才有用。
+- S：指定存放源码的路径，默认为 =${WORKDIR}/${PN}-${PV}= ，如果使用 SCM 方式获取，需要修改为 =${WORKDIR}/git=
+- B：构建过程中，中间对象的存放路径，默认和 =S= 的值一致
+- FILESEXTRAPATHS：扩展构建系统的搜寻路径
+- PACKAGECONFIG：对包的特征进行配置，比如有如下 3 个 feature：
+#+BEGIN_EXAMPLE
+  PACKAGECONFIG[f1]	=	“—with-f1,—wo-f1,build-deps-f1,rt-deps-f1”
+  PACKAGECONFIG[f2]	=	“—with-f2,—wo-f2,build-deps-f2,rt-deps-f2”
+  PACKAGECONFIG[f3]	=	“—with-f3,—wo-f3,build-deps-f3,rt-deps-f3”
+#+END_EXAMPLE
+每个 feature 通过逗号分割了 4 个配置，当对应的 feature 被使能时：
+1. 第一个配置被应用于配置脚本的参数列表
+2. 第二个配置被附加于 =EXTRA_OECONF= 
+3. 第三个参数被附加于 =DEPENDS= 构建依赖
+4. 第四个参数被附加于 =RDEPENDS= 运行时依赖
+   
+为了能使能这些特征，可以使用以下两种方式：
+1. 使用附加文件 =append file= ，创建附加文件 =<recipe file name>.bbappend= ，然后可以使能特征。
+#+BEGIN_EXAMPLE
+  PACKAGECONFIG = "f2 f3"
+  # 或者
+  PACKAGECONFIG_append = " f2 f3"
+#+END_EXAMPLE
+2. 使用配置文件 =local.conf= ：
+#+BEGIN_EXAMPLE
+  PACKAGECONFIG_pn-<packagename> = "f2 f3"
+  # 或者
+  PACKAGECONFIG_append_pn-<packagename> = " f2 f3"
+#+END_EXAMPLE
+- EXTRA_OECONF：配置脚本（指的是 autotools 中的 =configure= 配置脚本 ）的附加参数
+- EXTRA_OEMAKE：GUN Make 的附加配置
+- EXTRA_OECMAKE：CMake 的附加配置
+- LDFLAGS：链接脚本配置
+- PACKAGE_ARCH：软件包应用的硬件构建。
+  + 默认情况下，对于目标板这个值设置为 =TUNE_PAGARCH= ， 对于主机这个值设置为 =BUILD_ARCH= ，对于 SDK 这个值设置为 =${SDK_ARCH}-{SDKPKGSUFFIX}=
+  + 如果这个软件包是完全独立于任何构架的，那么可以主动将其设置为 =${MACHINE_ARCH}=
+*** 打包
+这部分设置使用打包器如何打包此编译好的软件，打包在软件被构建并被安装到根文件系统目录后执行。
+- PACKAGES：指定该包被打包的几种形式的列表，默认值为 =${PN}-dbg ${PN}-staticdev ${PN}-dev ${PN}-doc ${PN}-locale ${PACKAGE_BEFORE_PN} ${PN}=
+- FILES：指定哪些文件会被包含进包，默认情况下不需要修改此值。
+  + 但如果需要包含额外的文件，或者是在 =PACKAGES= 中新增了包类型时，就需要修改此值了
+- PACKAGE_BEFORE_PN：在包名字被创建之前，新增一个包
+- PACKAGE_DEBUG_SPLIT_STYLE：当 =${PN}-dbg= 包被创建时，指定其文件组织方式
+  + ".debug"：将带有调试信息的文件存放在 =.debug= 文件夹中，这个文件夹和编译产生的二进制文件放在一起
+  + "debug-file-directory"：将带有调试信息的文件存放在 =/usr/lib/debug=
+  + "debug-without_src"：与 =.debug= 的放置位置一样，只是不包含源码了
+- PACKAGESPLITFUNCS：制定包存放方式的任务，默认由 =package.bbclass= 的 =package_do_split_locales_populate_packages= 任务来做。
+*** 任务
+用户可以重写，附加默认的任务。
+*** 变量和类的扩展
+=BBCLASSEXTEND= 变量可以扩展包。
+*** 运行时配置
+- RDEPENDS：指定包在运行时的依赖，一般都要指定哪个包的依赖，比如：
+#+BEGIN_EXAMPLE
+  # 此软件的 dev 包依赖于 perl 包
+  RDEPENDS_${PN}-dev += "perl"
+  # 包依赖还支持版本选择
+  # RDEPENDS_${PN}	=	“<package>	(<operator>	<version>)” , <operator> 可以是 =,<,>,<=,>=
+  RDEPENDS_${PN}	=	“gettext	(>	0.16)”
+#+END_EXAMPLE
+- RRECOMMENDS：与 =RDEPENDS= 一样，只是并不强制要求被依赖的包必须存在
+- RSUGGESTS：与 =RRECOMMENDS= 一样，只是当包存在时构建系统也不会构建此包，而是提醒用户有这个包存在
+- RPROVIDES：此包的别名，用于其他包可以通过此名字来依赖它
+- RCONFLICTS：指定此包与哪些包冲突，如果已经构建了那些包，那么此包不会被构建。实际使用时应该加上包名称：
+#+BEGIN_EXAMPLE
+  RCONFILCTS_${PN} = "conflicting-package-name"
+#+END_EXAMPLE
+- RREPLACES：这个软件包可以替代哪些软件包，如果与那些包还有冲突，那么应该设置 =RCONFLICTS= 变量，实际使用事应该加上包名称：
+#+BEGIN_EXAMPLE
+RREPLACES_${PN} = "other_package_being_replaced"
+#+END_EXAMPLE
+** recipe 格式
+- 变量的赋值：等号两端由空格分割，等号右边由双引号包含值
+#+BEGIN_EXAMPLE
+  VARIABLE = "VALUE"
+#+END_EXAMPLE
+- 续行：使用右斜杠（\）来续行，斜杠后不能有空格，引号使用单独一行
+#+BEGIN_EXAMPLE
+  VARIABLE	=	“\
+               value1	\
+               value2	\
+              ”
+#+END_EXAMPLE
+- python 和 shell 函数：统一使用 4 个空格来代替 Tab
+- 注释：注释要单独占用一个行或多行，不能在语句同一行后加入注释
+- task 的顺序：按照以下顺序来放置 task
+#+BEGIN_EXAMPLE
+  # 这个就是构建软件包的标准流程
+  do_fetch
+  do_unpack
+  do_patch
+  do_configure
+  do_compile
+  do_install
+  do_populate_sysroot
+  do_package
+#+END_EXAMPLE
+- 组织顺序：recipe 组织的先后顺序如下：
+#+BEGIN_EXAMPLE
+  SUMMARY：简要说明，最多 80 字符
+  DESCRIPTION：详细说明，可选
+  AUTHOR
+  HOMEPAGE
+  BUGTRACKER
+  SECTION
+  LICENSE
+  LIC_FILES_CHKSUM
+  DEPENDS
+  PROVIDES
+  PV
+  SRC_URI
+  SRCREV
+  S
+  inherit ...
+  PACKAGECONFIG
+  build class specific variables, i.e. EXTRA_QMAKEVARS_POST, EXTRA_OECONF
+  task overrides, i.e. do_configure
+  PACKAGE_ARCH
+  PACKAGES
+  FILES
+  RDEPENDS
+  RRECOMMENDS
+  RSUGGESTS
+  RPROVIDES
+  RCONFLICTS
+  BBCLASSEXTEND
+#+END_EXAMPLE
+* 从头开始写一个新的 recipe
+** 编写 recipe 的思路
+编写 recipe 时，按照下图思路然后再按照前面说的 recipe 组织格式排列即可。
+- 可以先从[[http://layers.openembedded.org/layerindex/branch/master/layers/][官方 layer]] 或 github 中寻找一个相似的 recipe，然后在此基础上做修改
+[[./create_new_recipe.jpg]]
+** 新建 recipe
