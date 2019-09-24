@@ -383,4 +383,49 @@ RREPLACES_${PN} = "other_package_being_replaced"
 编写 recipe 时，按照下图思路然后再按照前面说的 recipe 组织格式排列即可。
 - 可以先从[[http://layers.openembedded.org/layerindex/branch/master/layers/][官方 layer]] 或 github 中寻找一个相似的 recipe，然后在此基础上做修改
 [[./create_new_recipe.jpg]]
-** 新建 recipe
+** 新建层后创建 recipe
+在对默认的工程增加 recipe 时，首先要做的就是新建一个层。
+
+这样即有便于今后维护，也不会破坏原有的工程。
+
+新建层使用命令：
+#+BEGIN_EXAMPLE
+  bitbake-layers create-layer meta-<layername>
+#+END_EXAMPLE
+
+然后新建的层便会提供一个示例的 recipe 以及 =conf/layer.conf= ：
+- 一般使用此默认设置即可
+#+BEGIN_EXAMPLE
+  # We have a conf and classes directory, add to BBPATH
+  BBPATH .= ":${LAYERDIR}"
+
+  # We have recipes-* directories, add to BBFILES
+  # 由 BBFILES 可以看出，当前层中的 recipes-* 文件夹下的所有子文件夹中的 *.bb 和 *.bbappend 文件都会被包含。
+  BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
+              ${LAYERDIR}/recipes-*/*/*.bbappend"
+
+  BBFILE_COLLECTIONS += "meta-nano"
+  BBFILE_PATTERN_meta-nano = "^${LAYERDIR}/"
+  BBFILE_PRIORITY_meta-nano = "6"
+  LAYERSERIES_COMPAT_meta-nano = "sumo"
+#+END_EXAMPLE
+
+比如对于当前系统，我想要写 app，那么就可以在层中新建 =recipes-apps/apps= 文件夹，然后新建 recipe 来包含 app 代码。
+- 关于 recipe 的文件的命名，前面已经详细说过了，一般使用 =<package_name>_<version>.bb= 即可。
+
+** 获取源码
+可以在 bitbake 提供的示例 recipe 的基础之上开始调整。
+
+获取源码最关键的就是设置 =SRC_URI= ,在[[http://kcmetercec.top/2018/09/16/linux_bitbake_build_engine/][源码的下载]]一节中已经详细说明了此变量该如何设置。
+- 一般来讲默认使用 =base.bbclass= 中的 =do_fetch= 方法即可，也就是不用单独实现一次了
+  
+在填写源码地址时，一般会含有包的版本，这种情况下使用 =PV= 来替代比较好以后移植。
+#+BEGIN_EXAMPLE
+  SRC_URI = "https://nano-editor.org/dist/v4/nano-${PV}.tar.xz"
+#+END_EXAMPLE
+
+在填写压缩包的 MD5 或 SHA256 校验时，一般为包单独取名并为其指定校验和。
+
+而对于 git 方式获取的源码不需要提供校验和，但一般需要指定 =branch= 。
+** 解压缩
+对于通过压缩包的方式获取的源码，需要解压缩。
