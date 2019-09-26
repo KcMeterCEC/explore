@@ -614,4 +614,86 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 - SYSTEMD_PACKAGES：包含配置脚本包名称，默认不用设置。
 - SYSTEMD_SERVICE：配置文件名称
 ** 输出结果打包
+目前构建已经完成，接下来就是 =do_package= 任务了，通过包管理系统将构建输出进行打包。
+*** 包的分离
+包分离（package splitting）就是将构建输出文件放置到不同的包中，可以配置输出文件是否包含相应的库、调试信息等等。
 
+主要由以下两个变量完成：
+- PACKAGES：用空格分离，代表输出文件可以输出哪些包。
+  + 在 =meta/conf/bitbake.conf= 中定义了其默认值 =PACKAGES = "${PN}-dbg ${PN}-staticdev ${PN}-dev ${PN}-doc ${PN}-locale ${PACKAGE_BEFORE_PN} ${PN}"=
+- FILES：用于规定哪些文件夹和文件会被包含进包，这个值通常含有条件：
+#+BEGIN_EXAMPLE
+  # 文件或文件夹名以空格分割
+  FILES_${PN}-dbg = "<files>"
+  # bitbake.conf 中的默认值
+  FILES_${PN} = "${bindir}/* ${sbindir}/* ${libexecdir}/* ${libdir}/lib*${SOLIBS} \
+              ${sysconfdir} ${sharedstatedir} ${localstatedir} \
+              ${base_bindir}/* ${base_sbindir}/* \
+              ${base_libdir}/*${SOLIBS} \
+              ${base_prefix}/lib/udev ${prefix}/lib/udev \
+              ${base_libdir}/udev ${libdir}/udev \
+              ${datadir}/${BPN} ${libdir}/${BPN}/* \
+              ${datadir}/pixmaps ${datadir}/applications \
+              ${datadir}/idl ${datadir}/omf ${datadir}/sounds \
+              ${libdir}/bonobo/servers"
+
+  FILES_${PN}-bin = "${bindir}/* ${sbindir}/*"
+
+  FILES_${PN}-doc = "${docdir} ${mandir} ${infodir} ${datadir}/gtk-doc \
+              ${datadir}/gnome/help"
+  SECTION_${PN}-doc = "doc"
+
+  FILES_SOLIBSDEV ?= "${base_libdir}/lib*${SOLIBSDEV} ${libdir}/lib*${SOLIBSDEV}"
+  FILES_${PN}-dev = "${includedir} ${FILES_SOLIBSDEV} ${libdir}/*.la \
+                  ${libdir}/*.o ${libdir}/pkgconfig ${datadir}/pkgconfig \
+                  ${datadir}/aclocal ${base_libdir}/*.o \
+                  ${libdir}/${BPN}/*.la ${base_libdir}/*.la"
+  SECTION_${PN}-dev = "devel"
+  ALLOW_EMPTY_${PN}-dev = "1"
+  RDEPENDS_${PN}-dev = "${PN} (= ${EXTENDPKGV})"
+
+  FILES_${PN}-staticdev = "${libdir}/*.a ${base_libdir}/*.a ${libdir}/${BPN}/*.a"
+  SECTION_${PN}-staticdev = "devel"
+  RDEPENDS_${PN}-staticdev = "${PN}-dev (= ${EXTENDPKGV})"
+
+  FILES_${PN}-dbg = "/usr/lib/debug /usr/src/debug"
+
+  SECTION_${PN}-dbg = "devel"
+  ALLOW_EMPTY_${PN}-dbg = "1"
+
+  FILES_${PN}-locale = "${datadir}/locale"
+#+END_EXAMPLE
+*** 新建包
+用户也可以新建包类型：
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Hello	Universe	Application”
+  DESCRPTION	=	“The	ultimate	hello	extending	beyond	‘world’.”
+  AUTHOR	=	“spacey@universetrotter.com”
+  HOMEPAGE	=	“http://universetrotter.com”
+  BUGTRACKER	=	“https://bugs.universetrotter.com”
+  PN	=	“hellouniverse”
+  #	Other	recipe	stuff
+  #	…
+  # 新增加一个 graphics 包
+  PACKAGES	=+	“graphics”
+  FILES_${PN}-graphics	=	“${datadir}/pixmaps/*”
+  # 向 doc 包中增加文件
+  FILES_${PN}-doc	=+	“${datadir}/blurbs/*”
+  PACKAGE_BEFORE_PN	=	“examples”
+  FILES_${PN}-examples	=	“${datadir}/examples”
+#+END_EXAMPLE
+
+*** 打包过程检查
+=insane= 类可以检查打包过程是否正常：
+- 文件或文件夹的权限
+- 目录结构
+  
+用户也可以增加 =WARN_QA= , =ERROR_QA= 这种输出中间过程。
+
+包存放于 =${WORKDIR}/packages-split= ，用户可以在此处检查。
+*** 包的架构
+一般来讲默认的包架构就可以了，但用户也可以做调整：
+- PACKAGE_ARCH = "${MACHINE_ARCH}" ：此包只在对应的 =MACHINE_ARCH= 时才构建
+- inherit allarch ：此包应用于所有架构
+
+** 定制安装脚本
