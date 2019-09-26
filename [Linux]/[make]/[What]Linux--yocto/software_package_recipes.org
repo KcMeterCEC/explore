@@ -383,6 +383,12 @@ RREPLACES_${PN} = "other_package_being_replaced"
 编写 recipe 时，按照下图思路然后再按照前面说的 recipe 组织格式排列即可。
 - 可以先从[[http://layers.openembedded.org/layerindex/branch/master/layers/][官方 layer]] 或 github 中寻找一个相似的 recipe，然后在此基础上做修改
 [[./create_new_recipe.jpg]]
+
+如果想对包的某个步骤做单独检查，可以只运行对应的任务：
+#+BEGIN_EXAMPLE
+  bitbake -c fetch <recipe name>
+  bitbake -c unpack <recipe name>
+#+END_EXAMPLE
 ** 新建层后创建 recipe
 在对默认的工程增加 recipe 时，首先要做的就是新建一个层。
 
@@ -429,3 +435,183 @@ RREPLACES_${PN} = "other_package_being_replaced"
 而对于 git 方式获取的源码不需要提供校验和，但一般需要指定 =branch= 。
 ** 解压缩
 对于通过压缩包的方式获取的源码，需要解压缩。
+- 一般来讲默认使用 =base.bbclass= 中的 =do_unpack= 方法即可，也就是不用单独实现一次了
+  
+下载的文件会被存放于 =DL_DIR= 中。
+  
+被解压缩的文件存放于变量 =S= 所指定的路径中。
+#+BEGIN_EXAMPLE
+  BPN = "${@oe.utils.prune_suffix(d.getVar('PN'), d.getVar('SPECIAL_PKGSUFFIX').split(), d)}"
+  BP = "${BPN}-${PV}"
+  S = "${WORKDIR}/${BP}"
+#+END_EXAMPLE
+从上面设置可以看出默认解压缩包文件名为： <package_name>-<packager_version>
+- 比如一个名为 =hello_2.9.bb= 的 recipe 下载 =hello-2.9.tar.gz= 文件包，最后被解压缩到 =hello-2.9= 文件夹中
+  
+对于使用 SCM 获取的代码会被存放于 =${WORKDIR}/<scm>=
+- scm 就是对应工具的名称，比如 =${WORKDIR}/git= 
+** 打补丁
+=base.bbclass= 继承了 =patch.bbclass= ，所以一般情况下用户也不用编写 =do_patch= 任务。
+
+当一个软件包需要打补丁时，需要做如下工作：
+- 在对应的 recipe 文件旁新建与 recipe name 一样的文件夹，用于存放补丁文件。
+  + 比如在 =meta-openembedded/meta-perl/recipes-perl/libnet= 下有 recipe 文件： =libnet-ssleay-perl_1.85.bb= 。那么对应的补丁文件夹名称就是 =libnet-ssleay-perl= 。
+- 在补丁文件夹中方式补丁，确保补丁使用 =-p1= 选项（忽略顶层文件夹）
+- 只需要在 =SRC_URI= 中加入补丁文件（.patch / .diff）在补丁文件夹中的路径。
+  + 当需要忽略多级路径时，需要增加 =striplevel= 选项
+  + 当路径在其他文件夹时，需要增加 =patchdir= 选项
+#+BEGIN_EXAMPLE
+  SRC_URI = "http://search.cpan.org/CPAN/authors/id/M/MI/MIKEM/Net-SSLeay-${PV}.tar.gz \
+             file://no-exec-on-configure.patch "
+#+END_EXAMPLE
+** 增加许可
+构建系统在下载和解压缩源码后，便会检查它的许可。   
+
+所有的 recipe 必须增加许可说明，不然构建系统会报错：
+- LICENSE：许可名称
+  + 在 =meta/files/common-licenses/= 中列出了业内的可用许可
+- LIC_FILES_CHKSUM：许可文件的校验和
+#+BEGIN_EXAMPLE
+  LICENSE = "Artistic-1.0 | GPL-1.0+"
+  LIC_FILES_CHKSUM = "file://README;beginline=274;endline=294;md5=67d67095d83e339da538a082fad5f38e"
+#+END_EXAMPLE
+
+有些开源软件包只是在说明中提出了该软件的许可，但并没有给出许可文件，这个时候使用 =COMMON_LICENSE_DIR= ：
+#+BEGIN_EXAMPLE
+  LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+#+END_EXAMPLE
+这种情况下，如果不知道该文件的 md5，那可以先不填，然后等构建系统报错以后从提示中拷贝过来即可。
+** 源码的配置
+源码的构建一般有 =makefile= , =autotools= , =cmake= 等，但 =makefile= 基本上属于上世纪的产物了。
+- 最推荐的当然是优秀的 =cmake= 。
+
+在配置当前源码前，需要先确认当前源码是否还依赖其他的源码，如果有需要将其加入 =DEPENDS= 变量中。
+
+*** GNU Autotools
+当源码包中包含 =configure.ac= 文件时，代表它使用的构建系统是 =GNU Autotools= 。
+
+对于这种构建系统，用户只需要继承 =autotools= 类即可，这个类已经提供了 =do_configure= 任务。
+
+当需要修改配置时，需要配置变量 =EXTRA_OECONF= ：
+#+BEGIN_EXAMPLE
+  # set default mailgroup to mail
+  # --with-libnfslock specify where to install nfslock.so.NVER
+  EXTRA_OECONF = "--enable-shared \
+                  --with-mailgroup=mail \
+                  --with-libnfslock=${libdir} \
+                 "
+#+END_EXAMPLE
+*** cmake
+当源码包中包含 =CMakeLists.txt= 时，代表它使用的构建系统是 =CMake= 。
+
+对于这种构建系统，用户只需要继承 =cmake= 类即可，这个类已经提供了 =do_configure= 任务。
+
+当需要修改配置时，需要配置变量 =EXTRA_OECMAKE= ：
+#+BEGIN_EXAMPLE
+  EXTRA_OECMAKE = "-DBUILD_WSI_MIR_SUPPORT=OFF \
+                   -DBUILD_LAYERS=OFF \
+                   -DBUILD_TESTS=OFF"
+#+END_EXAMPLE
+*** 其他
+如果既不是 =autotools= 也不是 =cmake= 构建，用户就需要自己来完成 =do_configure= 任务。
+
+修改配置时，需要配置变量 =EXTRA_OEMAKE= :
+#+BEGIN_EXAMPLE
+  EXTRA_OEMAKE = "'CC=${CC}' 'BIND=${CC}' 'AS=${CC} -c' 'CPP=${CPP}' \
+      'CFLAGS=-I. -DUNIX ${CFLAGS}' \
+      'CFLAGS_NOOPT=-I. -DUNIX ${CFLAGS}' \
+      'INSTALL=install' 'INSTALL_D=install -d' \
+      'BINFLAGS=0755'"
+#+END_EXAMPLE
+** 源码的编译
+前面经过源码的配置以后，最终就都是由 =Makefile= 来编译了。
+- =base.bbclass= 中已经提供了 =do_compile= 任务，所以一般来讲用户不需要任何多余工作。
+
+当编译失败时，一般会有以下 3 种可能：
+*** 并行构建错误
+构建系统默认情况下使能了并行构建，也就是多线程使用 Make 来同时编译。
+
+但在有些情况下由于编译的先后顺序问题，导致 Make 报错。
+
+简单粗暴的办法就是将变量 =PRALLEL_MAKE= 设置为空字符串。
+*** 主机泄漏
+就是指本来应该使用交叉编译工具链的头文件和库，却使用了主机自己的头文件和库。
+
+这类错误会由构建系统报错，根据提示更改即可。
+*** 缺乏头文件和库
+一般来讲，缺乏头文件和库是由于其依赖的软件包没有被构建导致的。
+
+需要设置 =DEPENDS= 变量以解决此问题。
+
+也有可能是头文件和库的访问路径设置错误，那么需要配置：
+- STAGING_BINDIR
+- STAGING_INCDIR
+- STAGING_DATADIR
+- STAGING_BASELIBDIR
+** 编译结果的安装
+当编译完成后， =base.bbclass= 提供的 =do_install= 任务将可执行文件、头文件、库、配置文件等，
+从 =S= , =B= , =WORKDIR= 从拷贝到 =D= 所指定的目录中。
+- 源码也会存在这个目录中
+#+BEGIN_EXAMPLE
+  TARGET_VENDOR = "-oe"
+  MULTIMACH_TARGET_SYS = "${PACKAGE_ARCH}${TARGET_VENDOR}-${TARGET_OS}"
+  TMPDIR ?= "${TOPDIR}/tmp"
+  BASE_WORKDIR ?= "${TMPDIR}/work"
+
+  # build/tmp/work/xxx-linux/<package_name>/
+  WORKDIR = "${BASE_WORKDIR}/${MULTIMACH_TARGET_SYS}/${PN}/${EXTENDPE}${PV}-${PR}"
+  T = "${WORKDIR}/temp"
+  D = "${WORKDIR}/image"
+  S = "${WORKDIR}/${BP}"
+  B = "${S}"
+#+END_EXAMPLE
+
+对于安装位置的配置：
+- autotools 和 cmake：这两个的类文件中已经提供了 =do_install= 任务。
+  + 如果要增加配置，用户需要新建 =do_install_append= 任务，然后使用 =install -d <source> <dest>= 语句
+- make：使用 make 方式，需要用户新建 =do_install= 任务，然后根据 Makefile 而设定对应变量（DESTDIR/PREFIX/INSTALLROOT）
+  + yocto 提供了 =oe_runmake= 函数可以直接调用 make
+#+BEGIN_EXAMPLE
+  do_install(){
+    oe_runmake install PREFIX=${D}
+  }
+#+END_EXAMPLE
+- 手动安装：如果连 Makefile 都没有提供 install 方法，那么就需要在 =do_install= 中使用 =install -d <src> <dest= 语句安装
+#+BEGIN_EXAMPLE
+  do_install(){
+    install -d ${B}/bin/hello ${D}${bindir}
+    install -d ${B}/lib/hello.lib ${D}${libdir}
+  }
+#+END_EXAMPLE
+yocto 默认定义了以下变量以指定安装位置：
+- bindir = "/usr/bin"
+- sbindir = "/usr/sbin"
+- libdir = "/usr/lib"
+- libexecdir = "/usr/lib"
+- sysconfdir = "/etc"
+- datadir = "/usr/share"
+- mandir = "/usr/share/man"
+- includedir = "/usr/include"
+** 系统服务设置
+当需要系统在启动时默认运行某些服务，在关机时停止某些服务，那么就需要设置系统服务。
+
+这种情况下，用户需要编写启动脚本。
+
+yocto 支持 sysvinit 和 systemd 两种服务管理器。
+
+*** SysVinit
+对于 sysvinit 需要将启动脚本放置于 =/etc/init.d= 以及在对应的 =/etc/rcx.d= 为该脚本创建符号链接。
+
+yocto 提供了 =update-rc.d= 类来完成这些工作，通过设置以下变量即可：
+- INITSCRIPT_PACKAGES：包含 =init= 脚本的软件包名称，一般这个值不用设置，因为默认为: =${PN}=
+- INITSCRIPT_NAME：启动脚本的名称
+- INITSCRIPT_PARAMS：传递给 =update-rc.d= 的参数
+  + 具体参数设置参看[[./www.tin.org/bin/man.cgi?section=8&topic=update-rc.d][此网页说明]]
+*** systemd
+systemd 可以并行启动任务，以提高开机速度。对应的配置脚本放置在 =/lib/systemd/system= 。
+
+yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
+- SYSTEMD_PACKAGES：包含配置脚本包名称，默认不用设置。
+- SYSTEMD_SERVICE：配置文件名称
+** 输出结果打包
+
