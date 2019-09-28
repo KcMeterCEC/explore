@@ -697,3 +697,213 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 - inherit allarch ：此包应用于所有架构
 
 ** 定制安装脚本
+用户可以在包安装、升级、卸载前后插入定制化脚本，RPM、dpkg、ipkg 都支持这种方式。
+
+可以定义以下 4 种脚本任务：
+- pkg_preinst_<package_name>：在包被安装前运行该脚本
+- pkg_postinst_<package_name>：在包被安装后运行该脚本
+- pkg_prerm_<package_name>：在包被卸载前运行该脚本
+- pkg_postrm_<package_name>：在包被卸载后运行该脚本
+  
+脚本内容是 shell 脚本：
+#+BEGIN_EXAMPLE
+  # 在包被安装后执行，会执行两次
+  # 一次是构建系统在创建根文件系统时，属于构建时
+  # 一次是在目标板上被包管理器调用时，属于运行时
+  pkg_postinst_${PN}()
+  {
+    #!/bin/sh
+    # shell commands go here
+  }
+
+  # 下面这种方式便可以区分构建时和运行时
+  pkg_postinst_${PN}()
+  {
+    #!/bin/sh
+    if [ x"$D" = "x" ];then
+       # shell commands for target execution
+    else
+       # shell commands for build system execution
+    fi
+  }
+#+END_EXAMPLE
+** 变体
+可以指定此包是对应于哪个对象的，默认都会为目标板编译一份。
+
+#+BEGIN_EXAMPLE
+  # 为主机构建
+  BBCLASSEXTEND = "native"
+  # 为 SDK 构建
+  BBCLASSEXTEND = "native-sdk"
+#+END_EXAMPLE
+* recipe 范例
+前面说了一大堆，现在要实践一下。
+** 新建并包含 layer
+在编写 recipe 之前，需要新建一个 layer：
+#+BEGIN_EXAMPLE
+  bitbake-layers create-layer meta-mylayer
+#+END_EXAMPLE
+然后在 =bblayers.conf= 中加入新建的层：
+#+BEGIN_EXAMPLE
+  # POKY_BBLAYERS_CONF_VERSION is increased each time build/conf/bblayers.conf
+  # changes incompatibly
+  POKY_BBLAYERS_CONF_VERSION = "2"
+
+  BBPATH = "${TOPDIR}"
+  BBFILES ?= ""
+
+  BBLAYERS ?= " \
+    /home/cec/github/poky/meta \
+    /home/cec/github/poky/meta-poky \
+    /home/cec/github/poky/meta-yocto-bsp \
+    /home/cec/github/poky/meta-nano \
+    /home/cec/github/poky/meta-mylayer \
+    "
+#+END_EXAMPLE
+
+在 mylayer 中增加一个 app 对应 1.0 版本的 recipe ： hello_1.0.bb
+#+BEGIN_EXAMPLE
+  .
+  ├── conf
+  │   └── layer.conf
+  ├── COPYING.MIT
+  ├── README
+  └── recipes-apps
+      └── hello
+          └── hello_1.0.bb
+
+  3 directories, 4 files
+#+END_EXAMPLE
+** 编写软件包
+新建源码文件如下：
+#+BEGIN_SRC c
+  //hello.c
+  #include "helloprint.h"
+
+  int main(void)
+  {
+      print_hello();
+
+      return 0;
+  }
+  //helloprint.c
+  #include <stdio.h>
+  #include "helloprint.h"
+
+  void print_hello(void)
+  {
+      printf("Hello world!My first Yocto project recipe.\n");
+  }
+  //helloprint.h
+  #ifndef __HELLOPRINT_H__
+  #define __HELLOPRINT_H__
+  extern print_hello(void);
+  #endif
+#+END_SRC
+
+然后将这三个文件打包：
+#+BEGIN_EXAMPLE
+  tar cvfz hello-1.0.tgz .
+#+END_EXAMPLE
+
+然后将此文件拷贝至 recipe 同一目录中的 *files* 文件夹中。
+- bitbake 会来搜寻这个文件夹的
+** 编写 recipe
+下面就按照前面讲的编写 recipe 的范例来编写 recipe 。
+*** 文件名称
+前面讲过文件名称的格式，并且我们这个没有通过 scm 来获取而 =<revision>= 一般不用设置，那么名称就是：
+#+BEGIN_EXAMPLE
+  #<package name>_<version>.bb
+  hello_1.0.bb
+#+END_EXAMPLE
+*** 文件的基本描述
+先添加基本的对此 reciep 的描述：
+#+BEGIN_EXAMPLE
+  SUMMARY = "exercise for yocto"
+  DESCRIPTION = "Recipe created by bitbake-layers"
+  AUTHOR = "kcmetercec <kcmeter.cec@gmail.com>"
+#+END_EXAMPLE
+*** 源码的获取
+由于当前我们将源码包放在和 recipe 同一个目录那，那么就是相对路径下的当前目录。
+
+#+BEGIN_EXAMPLE
+  SRC_URI = "file://hello-1.0.tgz"
+#+END_EXAMPLE
+*** 解压缩
+在 =base.bbclass= 中已经具有了解压缩的方法，所以不需要再实现一次。
+*** 打补丁
+目前不需要打补丁
+
+*** 添加许可
+由于 LICENSE 是必须的，但由于我们并没有包含 LICENSE 文件，所以就使用 yocto 所默认提供的 LICENSE。
+#+BEGIN_EXAMPLE
+  LICENSE = "MIT"
+  LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+#+END_EXAMPLE
+这个 md5 是我用 =md5sum= 在 =meta/files/common-licenses/MIT= 获取的。
+*** 源码配置
+由于我们当前并没有使用构建系统，所以这一步可以不做。
+*** 源码的编译
+源码的编译需要重写 =do_compile()= 任务：
+#+BEGIN_EXAMPLE
+  do_compile() {
+      ${CC} -c ${WORKDIR}/helloprint.c
+      ${CC} -c ${WORKDIR}/hello.c
+      ${CC} -o hello hello.o helloprint.o
+  }
+#+END_EXAMPLE
+*** 源码的安装
+由于没有使用构建系统，我们也需要重写 =do_install()= 任务：
+#+BEGIN_EXAMPLE
+  do_install() {
+      install -d ${D}${bindir}
+      install -m 0755 hello ${D}${bindir}
+  }
+#+END_EXAMPLE
+*** 其他配置
+    
+除此之外，还需要添加：
+#+BEGIN_EXAMPLE
+  TARGET_CC_ARCH += "${LDFLAGS}"
+#+END_EXAMPLE
+这个是 yocto 最新文档所标注的需要添加此变量。
+
+关于系统服务及打包对于我们现在练习并不相关，所以可以先不用管。
+*** 最终文件
+按照前面讲的文件格式进行整理，整个 reciep 如下：
+#+BEGIN_EXAMPLE
+  SUMMARY = "exercise for yocto"
+  DESCRIPTION = "Recipe created by bitbake-layers"
+  AUTHOR = "kcmetercec <kcmeter.cec@gmail.com>"
+
+  LICENSE = "MIT"
+  LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+
+  SRC_URI = "file://hello-1.0.tgz"
+
+  TARGET_CC_ARCH += "${LDFLAGS}"
+
+  do_compile() {
+      ${CC} -c ${WORKDIR}/helloprint.c
+      ${CC} -c ${WORKDIR}/hello.c
+      ${CC} -o hello hello.o helloprint.o
+  }
+
+  do_install() {
+      install -d ${D}${bindir}
+      install -m 0755 hello ${D}${bindir}
+  }
+#+END_EXAMPLE
+*** 构建并验证
+#+BEGIN_EXAMPLE
+  #构建 apps/hello 文件夹下的 recipe
+  bitbake hello
+#+END_EXAMPLE
+
+可以看到：
+- =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/= 有被解压缩的源码
+- =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/hello-1.0/= 有被编译后的输出
+- =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/packages-split/= 有被打包的目录结构
+- =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/deploy-rpms/= 有最终的打包输出
+- =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/image/= 有在文件系统的目录结构
+
