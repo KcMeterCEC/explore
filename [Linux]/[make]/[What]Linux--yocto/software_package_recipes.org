@@ -774,6 +774,10 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 
   3 directories, 4 files
 #+END_EXAMPLE
+并且需要在 =layer.conf= 中增加兼容性声明：
+#+BEGIN_EXAMPLE
+  LAYERSERIES_COMPAT_meta-mylayer = "sumo"
+#+END_EXAMPLE
 ** 编写软件包
 新建源码文件如下：
 #+BEGIN_SRC c
@@ -797,7 +801,7 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
   //helloprint.h
   #ifndef __HELLOPRINT_H__
   #define __HELLOPRINT_H__
-  extern print_hello(void);
+  extern void print_hello(void);
   #endif
 #+END_SRC
 
@@ -896,7 +900,7 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 #+END_EXAMPLE
 *** 构建并验证
 #+BEGIN_EXAMPLE
-  #构建 apps/hello 文件夹下的 recipe
+  #构建 apps/hello 文件夹下的 recipe，看是否有报错
   bitbake hello
 #+END_EXAMPLE
 
@@ -906,4 +910,38 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 - =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/packages-split/= 有被打包的目录结构
 - =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/deploy-rpms/= 有最终的打包输出
 - =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/image/= 有在文件系统的目录结构
+
+** 基于 Makefile 的构建
+基于上面的源码编写 Makefile，来完成自动化构建：
+#+BEGIN_EXAMPLE
+  CC=gcc
+  RM=rm
+
+  CFLAGS=-c -Wall
+  LDFLAGS=
+
+  DESTDIR=
+  BINDIR=/usr/bin
+
+  SOURCES=hello.c helloprint.c
+  OBJECTS=$(SOURCES:.c=.o)
+
+  EXECUTABLE=hellomake
+
+  .cpp.o:
+    ${CC} ${CFLAGS} $< -o $@
+  all: ${SOURCES} ${EXECUTABLE}
+
+  ${EXECUTABLE}: ${OBJECTS}
+    ${CC} ${LDFLAGS} $^ -o $@
+  clean:
+    ${RM} ${EXECUTABLE} *.o
+  install:${EXECUTABLE}
+    mkdir -p ${DESTDIR}/${BINDIR}
+    install -m 0755 $< ${DESTDIR}/${BINDIR}
+#+END_EXAMPLE
+然后重新压缩：
+#+BEGIN_EXAMPLE
+  tar --transform "s/^./hellomake-1.0/" -cvzf hellomake-1.0.tgz .
+#+END_EXAMPLE
 
