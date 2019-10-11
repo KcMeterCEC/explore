@@ -94,6 +94,10 @@ bitbake 提供了一些日志输出方法，便于 recipe 的调试：
   + shell : bbfatal <message>
     
 错误提示使用 =warn= 或 =error= 就可以了，这可以保证在显示错误的同时其他 task 依然可以运行。
+** 查看日志过程
+在每个 recipe 的构建输出目录中，都有一个 =temp= 文件夹。
+
+里面包含 =log.do_xxx= 和 =run.do_xxx= 文件，分别表示日志输出和实际的运行脚本，从这里可以看到详细的构建过程。
 * 任务执行
 ** 查看
 当不确定一个 recipe 将要被执行哪些任务时，可以使用命令 =listtasks= 来查看:
@@ -205,3 +209,10 @@ bitbake 可以生成 DOT 文件让 =graphviz= 图形化解析：
 - bitbake-layers show-appends：显示哪些 recipe 具有附加文件
 - bitbake-layers show-cross-depends：recipe 的依赖关系
 - bitbaky-layers flatten <dir>：将层扁平化输出到文件夹
+* 清除构建输出
+在修改了 recipe 后，务必运行清除命令后再构建：
+#+BEGIN_EXAMPLE
+  # 清除构建输出和缓存文件
+  bitbake -c cleansstate <recipe_name>
+  bitbake <recipe_name>
+#+END_EXAMPLE

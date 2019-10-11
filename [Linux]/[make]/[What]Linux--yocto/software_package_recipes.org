@@ -912,6 +912,7 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 - =/home/cec/github/poky/build/tmp/work/i586-poky-linux/hello/1.0-r0/image/= 有在文件系统的目录结构
 
 ** 基于 Makefile 的构建
+*** 编写 Makefile 并压缩
 基于上面的源码编写 Makefile，来完成自动化构建：
 #+BEGIN_EXAMPLE
   CC=gcc
@@ -944,4 +945,59 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 #+BEGIN_EXAMPLE
   tar --transform "s/^./hellomake-1.0/" -cvzf hellomake-1.0.tgz .
 #+END_EXAMPLE
+之所以要像上面这样压缩，是因为 =oe_runmake= 构建工具默认构建目录是在 =${WORKDIR}/${PN}-${PV}/${RECIPE_NAME}= 文件夹下,
+而以上的打包命令会创建文件夹 =hellomake-1.0= ，也就是说会解压时会自动创建该文件。
 
+不然实际编译时 =oe_runmake= 就找不到被构建的文件。
+*** 新建 recipe
+新建 hellomake-1.0.bb 并将 =hellomake-1.0.tgz= 拷贝至 =files= 文件夹中，如下目录结构：
+#+BEGIN_EXAMPLE
+  cec@box:~/github/poky/meta-mylayer/recipes-apps$ tree
+  .
+  ├── hello
+  │   ├── files
+  │   │   └── hello-1.0.tgz
+  │   └── hello_1.0.bb
+  └── hello-make
+      ├── files
+      │   └── hellomake-1.0.tgz
+      └── hellomake_1.0.bb
+
+  4 directories, 4 files
+#+END_EXAMPLE
+新写的 recipe 如下：
+#+BEGIN_EXAMPLE
+  SUMMARY = "exercise for yocto"
+  DESCRIPTION = "Recipe created by bitbake-layers"
+  AUTHOR = "kcmetercec <kcmeter.cec@gmail.com>"
+
+  LICENSE = "MIT"
+  LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+
+  SRC_URI = "file://hellomake-1.0.tgz"
+
+  TARGET_CC_ARCH += "${LDFLAGS}"
+
+  EXTRA_OEMAKE = "'CC=${CC}'"
+
+  do_install() {
+      oe_runmake install DESTDIR=${D} BINDIR=${bindir}
+  }
+#+END_EXAMPLE
+- 由于默认的 =Makefile= 中 =CC= 值为 =gcc= ，所以需要在 =EXTRA_OEMAKE= 中修改其值。
+- =base.bbclass= 中并没有 =do_install= 的实际执行代码，所以还需要调用 =oe_runmake= 来主动执行
+  + 同样的需要修改 =DESTDIR= 和 =BINDIR= 
+*** 验证
+当使用 =bitbake hellmake= 之后，可以看到：
+- /home/cec/github/poky/build/tmp/work/i586-poky-linux/hellomake/1.0-r0/hellomake-1.0 中包含源码及编译后的输出
+- /home/cec/github/poky/build/tmp/work/i586-poky-linux/hellomake/1.0-r0/deploy-rpms 中有 rpm 包
+  
+为了能够在目标 image 中运行该编译输出，需要在 =build/conf/local.conf= 中将此 package 加入：
+#+BEGIN_EXAMPLE
+CORE_IMAGE_EXTRA_INSTALL = "hellomake"
+#+END_EXAMPLE
+然后运行 =bitbake core-image-sato= ，启动 qemu 便可以运行了。
+
+
+
+** 基于 Cmake 的构建
