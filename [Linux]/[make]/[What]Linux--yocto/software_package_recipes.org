@@ -997,7 +997,68 @@ yocto 提供了 =systemd= 类来完成脚本方式，通过设置以下变量：
 CORE_IMAGE_EXTRA_INSTALL = "hellomake"
 #+END_EXAMPLE
 然后运行 =bitbake core-image-sato= ，启动 qemu 便可以运行了。
-
-
-
 ** 基于 Cmake 的构建
+依然是基于上面的源码编写 CMakeLists.txt：
+#+BEGIN_EXAMPLE
+  #Specify the minimum version for CMake
+  #使用 cmake -version 查看版本
+  cmake_minimum_required(VERSION 2.8)
+
+  #Project's names
+  set(EXEC_NAME "hellocmake")
+  project(${EXEC_NAME})
+
+  #Set the output folder where you program will be created
+  # CMAKE_SOURCE_DIR : CMakeLists.txt 文件所在位置
+  # CMAKE_BINARY_DIR: 二进制文件的输出路径（此处理解可能有误）
+  set(CMAKE_BINARY_DIR ${CMAKE_SOURCE_DIR}/bin)
+
+  # EXECUTABLE_OUTPUT_PATH: 最终可执行文件的输出路径
+  set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+  # LIBRARY_OUTPUT_PATH: 库输出路径
+  set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+  set(CMAKE_BUILD_TYPE Debug)
+  # PROJECT_SOURCE_DIR: 工程的根目录路径
+  #The following folder will be included
+  include_directories("${PROJECT_SOURCE_DIR}")
+
+  file(GLOB SOURCES ${PROJECT_SOURCE_DIR}/*.c)
+
+  #add source file
+  add_executable(${EXEC_NAME} ${SOURCES})
+#+END_EXAMPLE
+同样的打包方式：
+#+BEGIN_EXAMPLE
+  tar --transform "s/^./hellocmake-1.0/" -cvzf hellocmake-1.0.tgz .
+#+END_EXAMPLE
+同样的目录结构：
+#+BEGIN_EXAMPLE
+  cec@box:~/github/poky/meta-mylayer/recipes-apps$ tree hello-cmake/
+  hello-cmake/
+  ├── files
+  │   └── hellocmake-1.0.tgz
+  └── hellocmake_1.0.bb
+
+  1 directory, 2 files
+#+END_EXAMPLE
+recipe 内容如下：
+#+BEGIN_EXAMPLE
+  SUMMARY = "exercise for yocto"
+  DESCRIPTION = "Recipe created by bitbake-layers"
+  AUTHOR = "kcmetercec <kcmeter.cec@gmail.com>"
+
+  LICENSE = "MIT"
+  LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
+
+  SRC_URI = "file://hellocmake-1.0.tgz"
+
+  inherit cmake
+
+  do_install() {
+      install -d ${D}${bindir}
+      install -m 0755 ${S}/bin/hellocmake ${D}${bindir}
+  }
+#+END_EXAMPLE
+最后就是验证结果了。
