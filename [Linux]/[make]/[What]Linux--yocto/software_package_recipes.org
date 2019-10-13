@@ -1062,3 +1062,130 @@ recipe 内容如下：
   }
 #+END_EXAMPLE
 最后就是验证结果了。
+** 基于 autotools 的构建
+之前我们编写的[[http://kcmetercec.top/2018/09/16/linux_make_yocto_bitbake_hello/][nano recipe]]并不完成，现在将其完整化：
+#+BEGIN_EXAMPLE
+  SUMMARY = "bitbake-layers recipe"
+  DESCRIPTION = "nano editor"
+  LICENSE = "GPLv3"
+  LIC_FILES_CHKSUM = "file://COPYING;md5=f27defe1e96c2e1ecd4e0c9be8967949"
+
+  SRC_URI = "https://nano-editor.org/dist/v4/nano-${PV}.tar.xz"
+  SRC_URI[md5sum] = "9650dd3eb0adbab6aaa748a6f1398ccb"
+
+  # nano依赖于 ncurses
+  DEPENDS = "ncurses"
+  RDEPENDS_${PN} = "ncurses"
+
+  inherit autotools gettext
+#+END_EXAMPLE
+文件目录结构如下：
+#+BEGIN_EXAMPLE
+  cec@box:~/github/poky/meta-mylayer/recipes-apps$ tree nano/
+  nano/
+  └── nano_4.4.bb
+#+END_EXAMPLE
+接下来按照前面的步骤构建安装即可。
+
+** 基于二进制文件的安装
+如果有些可执行文件是已经提前预编译好的，也可以通过继承 =bin_package= 类来将其转进系统。
+
+这个类将会跳过 =do_configure= 和 =do_compile= 任务，直接将可执行代码打包。
+#+BEGIN_EXAMPLE
+  SUMMARY	=	“Package	the	Proprietary	Software”
+  DESCRIPTION	=	“A	sample	recipe	utilizing	the	bin_package	class	\
+                                to	package	the	externally	build	Proprietary	software	\
+                                package.”
+  LICENSE	=	“CLOSED”
+  SRC_URI	=	“file://proprietary-${PV}.rpm”
+  inherit	bin_package
+#+END_EXAMPLE
+
+* devtool
+devtool 还可以将上述构建 layer，加入构建环境，部署等工作简化。
+
+devtool 创建和维护一个工作区层，在这个层中修改和编辑 recipe，config 并可以部署到当前的构建环境中。
+** 新建 workspace 层
+#+BEGIN_EXAMPLE
+  # 如果不填 [layerpath] 那么就会在当前路径下新建 workspace 层
+  devtool create-workspace [layerpath]
+#+END_EXAMPLE
+使用以上命令，devtool 会将新建的层加入 =build/conf/bblayers.conf= 中。
+- 如果不想层被加入，可以在命令后加入 =--create-only=
+** 新建 recipe
+#+BEGIN_EXAMPLE
+  # <source-path> 代表被构建软件的本地路径
+  devtool add <recipe-name> <source-path>
+
+  #如果从非本地抓取软件，可以使用
+  devtool add <recipe-name> <source-path> -f <source-uri>
+
+#+END_EXAMPLE
+此命令会在之前的新建层中新建 =recipes/<recipe-name>/<recipe-name>.bb= 和 =appends/<recipe-name>.bbappend= 
+- 对应软件的路径被写入 =<recipe-name>.bbappend= 中
+  
+比如要增加 nano4.5 的 recipe，则这么用：
+#+BEGIN_EXAMPLE
+  #从远程抓取代码并解压后存放在当前目录的 files/nano 中
+  devtool add nano files/nano -f https://www.nano-editor.org/dist/v4/nano-4.5.tar.gz
+#+END_EXAMPLE
+然后目录结构如下：
+#+BEGIN_EXAMPLE
+  ├── appends
+  │   ├── lrzsz_0.12.20.bbappend
+  │   └── nano_4.5.bbappend
+  ├── conf
+  │   └── layer.conf
+  ├── README
+  └── recipes
+      ├── lrzsz
+      │   ├── lrzsz
+      │   │   └── lrzsz.patch
+      │   └── lrzsz_0.12.20.bb
+      └── nano
+          └── nano_4.5.bb
+
+  6 directories, 7 files
+#+END_EXAMPLE
+可以查看其 recipe ，发现连 LICENSE 和构建规则都填好了，而 bbappend 中则是本地的路径。
+** 构建 recipe
+#+BEGIN_EXAMPLE
+  devtool build nano
+#+END_EXAMPLE
+** 部署到目标系统
+目标系统需要运行了 ssh 服务：
+#+BEGIN_EXAMPLE
+  devtool	deploy-target	<recipe-name>	[user@]target-host[:destdir]
+  #如果要卸载，则使用
+  devtool	undploy-target	<recipe-name>	[user@]target-host
+#+END_EXAMPLE
+** 添加进 image
+#+BEGIN_EXAMPLE
+  devtool	build-image	<image-name>
+#+END_EXAMPLE
+** 使用 devtool 为原 recipe 中的软件打补丁
+*** 建立源码副本
+#+BEGIN_EXAMPLE
+  #1. 将 <recipe-name> 中的源码解压至 <source-path>，并为其新建 git 仓库
+  #2. 为 <recipe-name> 建立 bbappend 文件，覆盖原 recipe 中的 SRC_URI
+  devtool	modify	-x	<recipe-name>	<source-path>
+#+END_EXAMPLE
+*** 更新 recipe
+当修改源码并用 git 提交后：
+#+BEGIN_EXAMPLE
+  # 根据当前的修改为原 recipe 打补丁
+  # 此命令会为初始源码增加补丁文件，并修改原始 recipe 文件
+  devtool	update-recipe	<recipe-name>
+
+  # 如果不希望修改原始的 recipe 文件，而是使用 append 文件，使用下面这个命令
+  # 在 <layer-dir> 中为 <recipe-name> 增加附加文件
+  devtool	update-recipe	<recipe-name>	-a	<layer-dir>
+#+END_EXAMPLE
+
+
+
+
+
+
+
+
