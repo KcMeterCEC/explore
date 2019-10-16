@@ -1,0 +1,18 @@
+#+TITLE: [What]tcp/ip 协议族 --> arp 与 dns
+#+DATE: <2019-10-15 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+在阅读 [[http://kcmetercec.top/categories/book/%25E5%259B%25BE%25E8%25A7%25A3TCPIP-%25E5%2585%25A5%25E9%2597%25A8/][<<图解TCPIP>>]] 时，只简单提了一下 arp 与 dns，现在将它们加深一下理解。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* ARP
+ARP 实现网络地址到物理地址的转换，其原理是：主机向目标机器发送 ARP 请求，目标机收到请求后回应包含自己物理地址的 ARP 应答包。
+- 实际上整个局域网络都会接收到 ARP 请求包，只是其他机器由于目标地址不匹配而不响应罢了。
+** 报文格式
+
