@@ -117,3 +117,18 @@ linux 使用 =/etc/resolv.conf= 文件存放 DNS 服务器 IP 地址，可以使
   host -t A <url>
 #+END_EXAMPLE
 
+** 查看 DNS 报文
+依然使用 =tcpdump= 来抓取域名包：
+#+BEGIN_EXAMPLE
+  sudo tcpdump -i enp0s3 -nt -s 500 port domain
+
+  cec@virtual:~$ host -t A www.baidu.com
+  www.baidu.com is an alias for www.a.shifen.com.
+  www.a.shifen.com has address 14.215.177.38
+  www.a.shifen.com has address 14.215.177.39
+#+END_EXAMPLE
+可以看出内容：
+#+BEGIN_EXAMPLE
+  IP 192.168.11.9.44818 > 192.168.11.1.53: 29153+ A? www.baidu.com. (31)
+  IP 192.168.11.1.53 > 192.168.11.9.44818: 29153 3/0/0 CNAME www.a.shifen.com., A 14.215.177.38, A 14.215.177.39 (90)
+#+END_EXAMPLE
