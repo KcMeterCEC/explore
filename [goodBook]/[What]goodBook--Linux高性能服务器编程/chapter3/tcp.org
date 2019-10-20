@@ -1,0 +1,14 @@
+#+TITLE: [What]TCP 协议
+#+DATE: <2019-10-20 日> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAMA: <book_linux_server_chapter_3.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+在阅读 [[http://kcmetercec.top/categories/book/%25E5%259B%25BE%25E8%25A7%25A3TCPIP-%25E5%2585%25A5%25E9%2597%25A8/][<<图解TCPIP>>]] 时，只简单提了一下 tcp，现在将它们加深一下理解。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+
