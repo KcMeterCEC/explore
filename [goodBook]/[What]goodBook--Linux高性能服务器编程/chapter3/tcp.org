@@ -71,3 +71,31 @@ kind = 5：是 SACK 实际工作选项。用于告诉发送方本端已经收到
 kind = 8：是时间戳选项。提供较为准确的计算通信双方之间的回路时间（Round Trip Time,RTT）的方法，用于流量控制。
 - =/proc/sys/net/ipv4/tcp_timestamps= 来启动和关闭时间戳选项
 
+* TCP 连接的建立和关闭
+** 使用 tcpdump 观察                                                                                                                                                                                        
+本机通过 =telnet= 访问局域网一台主机的 =telnet server= ，使用 =tcpdump= 进行抓取:                                                                                                                           
+#+BEGIN_EXAMPLE                                                                                                                                                                                             
+  sudo tcpdump -i enp0s3 -nt '(src 192.168.0.253 and dst 192.168.0.103)or (src 192.168.0.103 and dst 192.168.0.253)'                                                                                        
+                                                                                                                                                                                                            
+  telent 192.168.0.103 80                                                                                                                                                                                   
+#+END_EXAMPLE                                                                                                                                                                                               
+连接后立即退出，可以抓取到如下输出：                                                                                                                                                                        
+#+BEGIN_EXAMPLE                                                                                                                                                                                             
+# 连接                                                                                                                                                                                                      
+  IP 192.168.0.253.38336 > 192.168.0.103.80: Flags [S], seq 899063137, win 64240, options [mss 1460,sackOK,TS val 600659478 ecr 0,nop,wscale 7], length 0                                                   
+  IP 192.168.0.103.80 > 192.168.0.253.38336: Flags [S.], seq 3217896549, ack 899063138, win 28960, options [mss 1460,sackOK,TS val 1442999620 ecr 600659478,nop,wscale 7], length 0                         
+  IP 192.168.0.253.38336 > 192.168.0.103.80: Flags [.], ack 1, win 502, options [nop,nop,TS val 600659484 ecr 1442999620], length 0                                                                         
+# 断开                                                                                                                                                                                                      
+  IP 192.168.0.253.38336 > 192.168.0.103.80: Flags [F.], seq 1, ack 1, win 502, options [nop,nop,TS val 600679745 ecr 1442999620], length 0                                                                 
+  IP 192.168.0.103.80 > 192.168.0.253.38336: Flags [F.], seq 1, ack 2, win 227, options [nop,nop,TS val 1443019885 ecr 600679745], length 0                                                                 
+  IP 192.168.0.253.38336 > 192.168.0.103.80: Flags [.], ack 2, win 502, options [nop,nop,TS val 600679754 ecr 1443019885], length 0                                                                         
+#+END_EXAMPLE                                                                                                                                                                                               
+连接和断开并没有发生数据的交换，所以整个过程 TCP 报文的数据长度为 0。                                                                                                                                       
+                                                                                                                                                                                                            
+第一个 TCP 报文段包含 SYN 标志，表示建立连接的同步报文段，该报文段的 ISN 值为 899063137。                                                                                                                   
+                                                                                                                                                                                                            
+第二个 TCP 报文段是对第一个报文段的响应，表示同意连接。该报文段的 ISN 值为 3217896549，并对第一个报文段的确认值为 899063138。                                                                               
+                                                                                                                                                                                                            
+第三个 TCP 报文段是对第二个报文段的确认，这样 TCP 连接就建立了。称为 TCP 三次握手。
+
+第四个 TCP 报文段包含 FIN 标志，表示结束报文段，其后的两个报文段和握手的逻辑是一样的。
