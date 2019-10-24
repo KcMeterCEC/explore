@@ -1,0 +1,83 @@
+#+TITLE: zynq vivado -> 自动化烧写 PL EFUSE
+#+DATE:  <2019-10-23 三> 
+#+TAGS: zynq
+#+LAYOUT: post 
+#+CATEGORIES: processor, zynq, vivado
+#+NAME: <processor_zynq_vivado_efuse.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+目前我装有 2016.2 和 2019.1 两个版本的 vivado，在烧写 AES key 到 PL 端，坑爹的是：
+- 2016.2 版本无法将烧写配置导出为 nkz 配置文件，所以这在出厂时需要出厂人员去点那么多次鼠标，一不小心就要出错。关键是出错后无法回退。
+  + 只能烧写一次
+- 2019.1 版本可以保存为 nkz 文件，这可以保证不会出现烧写配置错误的情况。 *然而此版本软件却限制了烧写时必须将 boot 模式切换为 JTAG 模式！*
+  + 这会增加出厂步骤
+
+所以，目前最好的办法是使用 2016.2 启动 TCL 脚本实现自动化下载。出厂人员只需要连接 JTAG 后运行脚本即可。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 编写脚本
+获取脚本最简单的方式，就是先在 vivado 下操作一次烧写，然后 tcl 命令列表便会出现在 vivado 的 =Tcl console= 中。
+- 在 =vivado.jou= 中也是刚刚所执行的 tcl 脚本
+
+在此基础之上可以加上一些状态判断以断定烧写成功。
+
+最终的脚本如下：
+#+BEGIN_EXAMPLE
+  proc error_puts {error_message} {
+	
+    puts $error_message
+    puts "***************"
+    puts "   烧写失败！  "
+    puts "***************"
+  }
+
+  if {[catch open_hw]} {
+    error_puts "打开硬件工具失败！"
+  } else {
+    connect_hw_server -url localhost:3121
+    current_hw_target [get_hw_targets */xilinx_tcf/Xilinx/*****]
+    set_property PARAM.FREQUENCY 6000000 [get_hw_targets */xilinx_tcf/Xilinx/*****]
+	
+    if {[catch open_hw_target]} {
+      error_puts "连接目标硬件失败！"
+    } else {
+      current_hw_device [lindex [get_hw_devices] 1]
+		
+      if {[catch [refresh_hw_device -update_hw_probes false [lindex [get_hw_devices] 1]]]} {
+        error_puts "获取目标信息失败！"
+      } elseif {[catch [create_hw_bitstream -hw_device [lindex [get_hw_devices] 1] -nky {./securekey.nky}]]} {
+        error_puts "创建加密流失败！"
+      } elseif {[catch [program_hw_devices -key {efuse} -control_efuse {418} [lindex [get_hw_devices] 1]]]} {
+        error_puts "烧写密钥失败！"
+      } elseif {[catch [refresh_hw_device [lindex [get_hw_devices] 1]]]} {
+        error_puts "再次获取目标信息失败！"
+      } else {
+        puts "***************"
+        puts "   烧写成功！  "
+        puts "***************"
+      }
+    }
+
+  }
+
+  close_hw
+#+END_EXAMPLE
+* 运行脚本
+** 启动 tcl shell
+vivado IDE 实在是太重量级了，启动 tcl shell 要轻便得多。
+
+在 windows 的启动路径为： =Start > Xilinx Design Tools > Vivado 2016.2 > Vivado 2016.2 Tcl Shell=
+** 运行脚本
+#+BEGIN_EXAMPLE
+  source <file_name>
+#+END_EXAMPLE
+** 结果验证
+可以在 vivado 中查看 EFUSE 的 KEY 值为全 F。
+
+这样生产人员就可以在 shell 中启动脚本即可。
+
+
+
+
