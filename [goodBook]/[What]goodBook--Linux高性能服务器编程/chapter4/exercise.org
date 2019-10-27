@@ -1,0 +1,13 @@
+#+TITLE: [What]TCP/IP 练习：访问 Internet 上的 Web 服务器
+#+DATE: <2019-10-14 一> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_4.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+前面算是理解了一下 TCP/IP 的工作原理，现在要来实践消化一下了。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
