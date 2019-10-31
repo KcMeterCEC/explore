@@ -11,3 +11,7 @@
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
+* 总体思路
+[[./http_exercise.jpg]]
+
+如上图所示，访问端运行 =wget= 程序，通过代理上的 =squid= 程序中转，访问 =www.baidu.com= 的首页 =index.html= 文档。
