@@ -15,3 +15,47 @@
 [[./http_exercise.jpg]]
 
 如上图所示，访问端运行 =wget= 程序，通过代理上的 =squid= 程序中转，访问 =www.baidu.com= 的首页 =index.html= 文档。
+* 部署
+** 客户端到代理
+客户端需要先设置代理服务器：
+#+BEGIN_EXAMPLE
+  # wq 为代理服务器
+  # 3128 为 squid 服务器的默认端口号
+  export http_proxy="wq:3128"
+#+END_EXAMPLE
+** squid 代理服务器
+在使用 apt 安装好 squid 后，在 =/etc/squid/squid.conf= 中加入以下两行：
+#+BEGIN_EXAMPLE
+  acl localnet src 192.168.0.0/24
+  http_access allow localnet
+#+END_EXAMPLE
+然后再启动服务：
+#+BEGIN_EXAMPLE
+  sudo service squid restart
+#+END_EXAMPLE
+* 抓取
+首先删除 arp 缓存，然后使用 tcpdump 抓取整个通信过程：
+#+BEGIN_EXAMPLE
+  sudo arp -d 192.168.0.1
+  sudo tcpdump -s 2000 -i enp0s3 -ntX '(src 192.168.0.105) or (dst 192.168.0.105) or (arp)'
+  wget --header="Connection: close" http://www.sogou.com
+#+END_EXAMPLE
+
+可以看到简略输出如下：
+#+BEGIN_EXAMPLE  
+  # 本机向代理的 3 次握手
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [S], seq 2021097523, win 64240, options [mss 1460,sackOK,TS val 1282507579 ecr 0,nop,wscale 7], length 0
+  IP 192.168.0.105.3128 > 192.168.0.253.44358: Flags [S.], seq 3602710900, ack 2021097524, win 28960, options [mss 1460,sackOK,TS val 3543938861 ecr 1282507579,nop,wscale 7], length 0
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [.], ack 1, win 502, options [nop,nop,TS val 1282507599 ecr 3543938861], length 0
+
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [P.], seq 1:186, ack 1, win 502, options [nop,nop,TS val 1282507600 ecr 3543938861], length 185
+  IP 192.168.0.105.3128 > 192.168.0.253.44358: Flags [.], ack 186, win 235, options [nop,nop,TS val 3543938871 ecr 1282507600], length 0
+  IP 192.168.0.105.3128 > 192.168.0.253.44358: Flags [P.], seq 1:469, ack 186, win 235, options [nop,nop,TS val 3543938981 ecr 1282507600], length 468
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [.], ack 469, win 501, options [nop,nop,TS val 1282507719 ecr 3543938981], length 0
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [F.], seq 186, ack 469, win 501, options [nop,nop,TS val 1282507720 ecr 3543938981], length 0
+  IP 192.168.0.105.3128 > 192.168.0.253.44358: Flags [FP.], seq 469:623, ack 186, win 235, options [nop,nop,TS val 3543938981 ecr 1282507600], length 154
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [R], seq 2021097709, win 0, length 0
+  IP 192.168.0.105.3128 > 192.168.0.253.44358: Flags [.], ack 187, win 235, options [nop,nop,TS val 3543938989 ecr 1282507720], length 0
+  IP 192.168.0.253.44358 > 192.168.0.105.3128: Flags [R], seq 2021097710, win 0, length 0
+#+END_EXAMPLE
+
