@@ -1,0 +1,13 @@
+#+TITLE: [What]Linux 网络编程基础 API
+#+DATE: <2019-11-05 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_5.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+APUE 对网络编程 API 都有详细的解释，现在再来回顾一下。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
