@@ -1,5 +1,5 @@
 #+TITLE: [What]Linux 网络编程基础 API
-#+DATE: <2019-11-05 二> 
+#+DATE: <2019-11-06 三> 
 #+TAGS: CS
 #+LAYOUT: post
 #+CATEGORIES: book,Linux高性能服务器编程
@@ -11,3 +11,201 @@ APUE 对网络编程 API 都有详细的解释，现在再来回顾一下。
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
+* socket 地址
+** 主机字节序和网络字节序
+根据数据存储顺序分为大端字节序（ big endian）和小端字节序（little endian），下面代码可以判断字节序。
+#+BEGIN_SRC c
+  #include <stdio.h>
+
+  int main(int argc, char *argv[])
+  {
+    int num = 0x12345678;
+    char *byte = (char *)&num;
+
+    if(*byte == 0x78)
+      {
+        printf("It's little endian\n");
+      }
+    else
+      {
+        printf("It's big endian\n");
+      }
+
+    return 0;
+  }
+#+END_SRC
+
+为了计算机通信数据正确，那必然要约定一致的字节序：
+- 主机字节序：目前大多 CPU 使用小端字节序，所以又被称为主机字节序
+- 网络字节序：网络通信规定为大端字节序，也就是说发送和接收方都需要以大端字节序发送和接收
+  
+*注意：* 即使同一台机器上运行的由不同语言编写的进程，也有可能是不同字节序，所以需要有良好的编程习惯。
+- JAVA 虚拟机统一采用大端字节序
+  
+Linux 提供了如下函数完成主机字节序和网络字节序的转换：
+#+BEGIN_SRC c
+  #include <arpa/inet.h>
+
+  //host to network long
+  uint32_t htonl(uint32_t hostlong);
+
+  uint16_t htons(uint16_t hostshort);
+
+  uint32_t ntohl(uint32_t netlong);
+
+  uint16_t ntohs(uint16_t netshort);
+#+END_SRC
+使用以上函数的场景有：
+1. 设置 IP 地址时，使用 32 位转换
+2. 设置端口号时，使用 16 位转换
+3. 发送格式化数据时，使用对应转换
+** 通用 socket 地址
+=sockaddr= 表示 socket 地址：
+#+BEGIN_SRC c
+  #include <sys/socket.h>
+
+  typedef unsigned short int sa_family_t;
+
+  struct sockaddr {
+    sa_family_t sa_family;
+    char        sa_data[14];
+  }
+#+END_SRC   
+=sa_family= 表示地址族，这个与协议族有对应关系：
+| 协议族   | 地址族   | 描述              | sa_data 含义                                       |
+|----------+----------+-------------------+----------------------------------------------------|
+| PF_UNIX  | AF_UNIX  | UNIX 本地域协议族 | 文件路径名，最长 108 字节                          |
+| PF_INET  | AF_INET  | TCP/IPv4 协议族   | 16 位端口号和 32 位地址                            |
+| PF_INET6 | AF_INET6 | TCP/IPV6 协议族   | 16 位端口号，32 位流标识，128 位地址，32 位范围 ID |
+
+#+BEGIN_SRC c
+  /* Protocol families.  */
+  #define PF_LOCAL	1	/* Local to host (pipes and file-domain).  */
+  #define PF_UNIX		PF_LOCAL /* POSIX name for PF_LOCAL.  */
+  #define PF_INET		2	/* IP protocol family.  */
+  #define PF_INET6	10	/* IP version 6.  */
+
+  /* Address families.  */
+  #define AF_UNIX		PF_UNIX
+  #define AF_INET		PF_INET
+  #define AF_INET6	PF_INET6
+#+END_SRC
+
+从上面定义可以看出它们的值是一样的，只是为了更好编码规范，需要根据当前对象使用对应的宏。
+
+仅仅用 =sockaddr= 中的 =sa_data= 并不能完全容量多种协议族的地址值，Linux 为此定义了 =sockaddr_storage= ：
+#+BEGIN_SRC c
+  /* Structure large enough to hold any socket address (with the historical
+     exception of AF_UNIX).  */
+  #define __ss_aligntype	unsigned long int
+  #define _SS_PADSIZE                                             \
+    (_SS_SIZE - __SOCKADDR_COMMON_SIZE - sizeof (__ss_aligntype))
+
+  struct sockaddr_storage
+  {
+    __SOCKADDR_COMMON (ss_);	/* Address family, etc.  */
+    char __ss_padding[_SS_PADSIZE];
+    __ss_aligntype __ss_align;	/* Force desired alignment.  */
+  };
+#+END_SRC
+** 专用 socket 地址
+上面的通用地址结构体是以字节的方式格式化存储地址，这并不编译代码操作。
+
+所以 Linux 为各个协议族提供了专门的 socket 地址结构体：
+#+BEGIN_SRC c
+  #define	__SOCKADDR_COMMON(sa_prefix)            \
+    sa_family_t sa_prefix##family
+
+  /* Structure describing the address of an AF_LOCAL (aka AF_UNIX) socket.  */
+  struct sockaddr_un
+  {
+    __SOCKADDR_COMMON (sun_);
+    char sun_path[108];		/* Path name.  */
+  };
+
+  /* Internet address.  */
+  typedef uint32_t in_addr_t;
+  struct in_addr
+  {
+    in_addr_t s_addr;
+  };
+
+  /* IPv6 address */
+  struct in6_addr
+  {
+    union
+    {
+      uint8_t	__u6_addr8[16];
+    } __in6_u;
+  #define s6_addr			__in6_u.__u6_addr8
+  };
+
+  /* Structure describing an Internet socket address.  */
+  struct sockaddr_in
+  {
+    __SOCKADDR_COMMON (sin_);
+    in_port_t sin_port;			/* Port number.  */
+    struct in_addr sin_addr;		/* Internet address.  */
+
+    /* Pad to size of `struct sockaddr'.  */
+    unsigned char sin_zero[sizeof (struct sockaddr) -
+                           __SOCKADDR_COMMON_SIZE -
+                           sizeof (in_port_t) -
+                           sizeof (struct in_addr)];
+  };
+
+  /* Ditto, for IPv6.  */
+  struct sockaddr_in6
+  {
+    __SOCKADDR_COMMON (sin6_);
+    in_port_t sin6_port;	/* Transport layer port # */
+    uint32_t sin6_flowinfo;	/* IPv6 flow information */
+    struct in6_addr sin6_addr;	/* IPv6 address */
+    uint32_t sin6_scope_id;	/* IPv6 scope-id */
+  };
+#+END_SRC
+
+这样在编程设置地址参数时就可以使用这些结构体，最后在调用对应函数时强制转换为 =sockaddr= 即可。
+** IP 地址转换函数
+为了提高编程的可读性，Linux 提供了字符串方式地址到二进制地址的相互转换函数：
+#+BEGIN_SRC c
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+
+  //将以字符串表示的 IPv4 地址转换为网络字节序的整数并存储于 inp 中
+  int inet_aton(const char *cp, struct in_addr *inp);
+  //将以字符串表示的 IPv4 地址转换为网络字节序的整数
+  in_addr_t inet_addr(const char *cp);
+
+  //将网络字节序的整数地址转换为字符串表示的 IPv4 地址
+  //此函数返回指向静态内存，所以其不可重入
+  char *inet_ntoa(struct in_addr in);
+
+  //将以字符串表示的 IPv4 或 IPv6 地址转换为网络字节序，并存储于对应的地址结构体中
+  int inet_pton(int af, const char *src, void *dst);
+  //将网络字节序的整数地址转换为字符串表示的 IPv4 或 IPv6 地址，size 指定转换的大小
+  //IPv4 大小至少为 INET_ADDRSTRLEN
+  //IPv6 大小至少为 INET6_ADDRSTRLEN
+  const char *inet_ntop(int af, const void *src,
+                        char *dst, socklen_t size);
+
+#+END_SRC
+* 创建 socket
+Linux 提供了 =socket= 函数来创建一个 socket 对象：
+#+BEGIN_SRC c
+  #include <sys/types.h>          /* See NOTES */
+  #include <sys/socket.h>
+
+  int socket(int domain, int type, int protocol);
+#+END_SRC
+* 命名 socket
+* 监听 socket
+* 接受连接
+* 发起连接
+* 关闭连接
+* 数据读写
+* 带外标记
+* 地址信息
+* socket 选项
+* 网络信息
