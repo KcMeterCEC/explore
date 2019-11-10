@@ -199,12 +199,144 @@ Linux 提供了 =socket= 函数来创建一个 socket 对象：
 
   int socket(int domain, int type, int protocol);
 #+END_SRC
+- =domain= 指定底层协议族
+  + =AF_INET= 表示 IPv4， =AF_INET6= 表示 IPv6， =AF_UNIX,AF_LOCAL= 表示 UNIX 本地协议族
+- =type= 指定服务类型，对于 =TCP= 协议则设置为 =SOCK_STREAM= (流服务)，对于 =UDP= 协议则设置为 =SOCK_DGRAM= （数据报服务）
+  + 以上参数可以与 =SOCK_NONBLOCK= （非阻塞）和 =SOCK_CLOEXEC= （用 fork 调用创建子进程时，子进程关闭该 socket）相与
+- =protocol= 表示具体的协议，一般前两个值都已经决定了协议的唯一性，一般设 0 表示使用默认协议。
 * 命名 socket
+将一个 socket 与 socket 地址绑定称为给 socket 命名。
+
+在服务器程序中，通常要命名 socket，只有命名后客户端才能知道如何连接它。
+而在客户端中，通常不需要命名，采用系统自动分配的地址即可。
+
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+
+  //将 addr 所指的地址分配给未命名的 sockfd 文件描述符
+  int bind(int sockfd, const struct sockaddr *addr,
+           socklen_t addrlen);
+#+END_SRC
 * 监听 socket
+将 socket 命名之后，需要创建一个监听队列存放待处理的客户端连接：
+#+BEGIN_SRC C
+  #include <sys/types.h> 
+  #include <sys/socket.h>
+  //创建一个以 sockfd 对应的最大长度为 backlog 的监听队列
+  int listen(int sockfd, int backlog);
+#+END_SRC
+=backlog= 表示处于完全连接状态的 socket 的上限，半连接的上限由 =/proc/sys/net/ipv4/tcp_max_syn_backlog= 指定。
+
+*需要注意的是：backlog 代表可连接最大长度减一* ，比如 backlog 设置为 5，代表最多可以连接 6 个客户端
+
+使用 =telnet= 连接下面代码的服务端，并用 =netstat -nt | grep <port>= 的方式查看状态便可验证：
+#+BEGIN_SRC C
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <arpa/inet.h>
+  #include <netdb.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <string.h>
+  #include <stdlib.h>
+  int main(int argc, char *argv[])
+  {
+      if(argc != 3)
+      {
+          printf("usage: %s : <port> <backlog>\n", argv[0]);
+
+          return -1;
+      }
+      int port = atoi(argv[1]);
+      int backlog = atoi(argv[2]);
+      //设置地址
+      struct sockaddr_in sockaddr;
+
+      sockaddr.sin_family = AF_INET;
+      sockaddr.sin_port = htons(port);
+      sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+      //新建 socket
+      int socket_fd = socket(sockaddr.sin_family, SOCK_STREAM, 0);
+      if(socket_fd <= 0)
+      {
+          perror("create socket failed!\n");
+          return -1;
+      }
+      //socket 命名
+      if(bind(socket_fd, (const struct sockaddr *)&sockaddr,sizeof(sockaddr)) < 0)
+      {
+          perror("can't bind socket and addr.\n");
+          return -1;
+      }
+      //开始监听
+      if(listen(socket_fd, backlog) < 0)
+      {
+          perror("listen failed!\n");
+          return -1;
+      }
+
+      while(1)
+      {
+          sleep(1);
+      }
+
+      return 0;
+  }
+#+END_SRC
 * 接受连接
+所谓的接受连接，是指从监听队列中取出一个 client 连接的节点，然后处理。
+- accept 不会判断当前连接处于何种状态（比如客户端异常断开）
+
+#+BEGIN_SRC C
+  #include <sys/types.h>          /* See NOTES */
+  #include <sys/socket.h>
+
+  //从 sockfd 对应的监听队列中取出一个监听 socket 赋值给 addr
+  //返回一个新连接 socket 的标识
+  int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+#+END_SRC
 * 发起连接
+客户端通过 =connect= 来主动发起连接：
+#+BEGIN_SRC C
+  #include <sys/types.h>          
+  #include <sys/socket.h>
+
+  //将 sockfd 与 addr 指向的地址进行连接
+  int connect(int sockfd, const struct sockaddr *addr,
+              socklen_t addrlen);
+#+END_SRC
 * 关闭连接
+关闭连接可以使用 =close= 和 =shutdown= :
+#+BEGIN_SRC C
+  #include <unistd.h>
+
+  //将 fd 引用计数减一，只有当计数为 0 时才真正关闭连接，在父子进程中需要注意
+  int close(int fd);
+
+  #include <sys/socket.h>
+
+  //立即以 how 的方式关闭 sockfd
+  //how : SHUT_RD -> 关闭读 SHUT_WR -> 关闭写 SHUT_RDWR -> 全关闭
+  int shutdown(int sockfd, int how);
+#+END_SRC
 * 数据读写
+** TCP 数据读写
+#+BEGIN_SRC C
+  #include <sys/types.h>
+  #include <sys/socket.h>
+
+  ssize_t send(int sockfd, const void *buf, size_t len, int flags);
+  ssize_t recv(int sockfd, void *buf, size_t len, int flags);
+#+END_SRC 
+
+需要明白的是：由于 TCP 是流数据通信，很可能 =recv= 所返回的实际读取长度小于需求的长度，所以需要多次调用 =recv= 才能得到完整的数据。
+
+flags 常用的取值如下：
+| 选项名      | 含义                                                                            | send | recv |
+|-------------+---------------------------------------------------------------------------------+------+------|
+| MSG_CONFIRM | 仅用 SOCK_DGRAM,SOCK_RAW 类型，指示数据链路层协议持续监听对方回应，直到得到答复 | Y    | N    |
+|             |                                                                                 |      |      |
 * 带外标记
 * 地址信息
 * socket 选项
