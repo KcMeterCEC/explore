@@ -333,11 +333,195 @@ Linux 提供了 =socket= 函数来创建一个 socket 对象：
 需要明白的是：由于 TCP 是流数据通信，很可能 =recv= 所返回的实际读取长度小于需求的长度，所以需要多次调用 =recv= 才能得到完整的数据。
 
 flags 常用的取值如下：
-| 选项名      | 含义                                                                            | send | recv |
-|-------------+---------------------------------------------------------------------------------+------+------|
-| MSG_CONFIRM | 仅用 SOCK_DGRAM,SOCK_RAW 类型，指示数据链路层协议持续监听对方回应，直到得到答复 | Y    | N    |
-|             |                                                                                 |      |      |
+| 选项名        | 含义                                                                            | send | recv |
+|---------------+---------------------------------------------------------------------------------+------+------|
+| MSG_CONFIRM   | 仅用 SOCK_DGRAM,SOCK_RAW 类型，指示数据链路层协议持续监听对方回应，直到得到答复 | Y    | N    |
+| MSG_DONTROUTE | 不查看路由表，直接将数据发送给本地局域网内的主机                                | Y    | N    |
+| MSG_DONTWAIT  | 非阻塞操作                                                                      | Y    | Y    |
+| MSG_MORE      | 内核超时等待更多数据写入发送缓存后一次性发送，提高传输效率                      | Y    | N    |
+| MSG_WAITALL   | 读操作仅在读取到指定数量的字节后才返回                                          | N    | Y    |
+| MSG_PEEK      | 读取数据，但不清除读缓存                                                        | N    | Y    |
+| MSG_OOB       | 紧急数据的读写                                                                  | Y    | Y    |
+| MSG_NOSIGNAL  | 往读端关闭的管道或 socket 连接中写入数据时，不会引发 SIGPIPE                    | Y    | N    |
+** UDP 数据读写
+#+BEGIN_SRC c
+  ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+                   struct sockaddr *src_addr, socklen_t *addrlen);
+  ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+                 const struct sockaddr *dest_addr, socklen_t addrlen);
+#+END_SRC
+由于 UDP 没有连接的概念，所以在其发送和接收函数中需要包含与其通信的地址信息。
+** 通用数据读写
+#+BEGIN_SRC c
+  struct iovec {                    /* Scatter/gather array items */
+    void  *iov_base;              /* Starting address */
+    size_t iov_len;               /* Number of bytes to transfer */
+  };
+
+  struct msghdr {
+    void         *msg_name;       /* optional address */
+    socklen_t     msg_namelen;    /* size of address */
+    struct iovec *msg_iov;        /* scatter/gather array */
+    size_t        msg_iovlen;     /* # elements in msg_iov */
+    void         *msg_control;    /* ancillary data, see below */
+    size_t        msg_controllen; /* ancillary data buffer len */
+    int           msg_flags;      /* flags on received message */
+  };
+  ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags);
+  ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags);
+#+END_SRC
+通用数据读写函数既可以用于 TCP 也可以用于 UDP，这两个函数使用分散聚合模式来实现多段内存的读写：
+- =struct iovec= 代表一块内存
+- =msg_iov= 指向多段内存数组地址， =msg_iovlen= 指定数组长度
+- =msg_name,msg_namelen= 分别表示对端的 socket 地址和长度，对于 TCP 而言设置为 NULL 
+- =flags= 设定与前面的数据读写标记一致
 * 带外标记
+当有带外标记（紧急）数据到达时，内核会产生异常事件或 =SIGURG= 信号，
+然后用户程序通过 =sockatmark= 判断下一个数据是否是带外数据，然后通过 =MSG_OOB= 标记接收数据。
+#+BEGIN_SRC c
+  #include <sys/socket.h>
+
+  int sockatmark(int sockfd);
+#+END_SRC
 * 地址信息
+#+BEGIN_SRC c
+  #include <sys/socket.h>
+
+  //获取本端 socket 地址
+  int getsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+  //获取对端 socket 地址
+  int getpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+#+END_SRC
 * socket 选项
+以下函数用于获取和设置 =socket= 文件描述符属性的函数：
+#+BEGIN_SRC c
+  #include <sys/types.h>          
+  #include <sys/socket.h>
+
+  //level 设定协议栈哪一层选项，optname 设置具体选项
+  int getsockopt(int sockfd, int level, int optname,
+                 void *optval, socklen_t *optlen);
+  int setsockopt(int sockfd, int level, int optname,
+                 const void *optval, socklen_t optlen);
+#+END_SRC
+
+需要注意的是： *对服务端而言，需要在 =listen= 之前设置 socket。对于客户端而言，需要在 =connect= 之前设置 socket。*
+
+下面根据协议栈的 Level 来说明常用的设置。
+** SOL_SOCKET(通用 socket 选项，与协议无关)
+- SO_DEBUG: 打开调试信息
+- SO_REUSEADDR: 重用本地地址(而不是让 TCP 连接处于 =TIME_WAIT= 状态，等待很久后才能重用此地址)
+  + 也可以通过置位 =/proc/sys/net/ipv4/tcp_tw_reuse= 达到同样的需求
+#+BEGIN_SRC c
+  int reuse = 1;
+  if(setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0)
+  {
+    perror("Can't set socket:");
+  }
+#+END_SRC
+- SO_TYPE: 获取 socket 类型
+- SO_ERROR: 获取并清除 socket 错误状态
+- SO_DONTROUTE: 不查看路由表，直接将数据发送给本地局域网内的主机，与 send 函数的 =MSG_DONTROUTE= 效果一样
+- SO_RCVBUF: TCP 接收缓冲区大小
+  + 也可以设置 =/proc/sys/net/ipv4/tcp_rmem= 
+- SO_SNDBUF: TCP 发送缓冲区大小
+  + 也可以设置 =/proc/sys/net/ipv4/tcp_wmem= 
+- SO_KEEPALIVE: 发送周期性保活报文以维持连接
+- SO_OOBINLINE: 将带外数据存放于普通数据缓存中，用户使用普通读取方式获取
+- SO_LINGER: 若有数据待发送，则延迟关闭，通过 =linger= 结构体配置是立即关闭，还是发送残留数据后关闭
+- SO_RCVLOWAT: TCP 接收缓存区低水位标记，当缓存数据大于低水位时，应用程序便可以读取
+- SO_SNDLOWAT: TCP 发送缓存区低水位标记，当空闲数据大于低水位时，应用程序便可以发送
+- SO_RCVTIMEO: 接收数据超时
+- SO_SNDTIMEO: 发送数据超时
+** IPPROTO_IP(IPv4 选项）
+- IP_TOS: 服务类型，用于设置最大延迟、最大吞吐等
+- IP_TTL: 存活时间，最多可以中转多少个路由器
+** IPPROTO_IPV6(IPv6 选项)
+- IPV6_NEXTHOP: 下一跳 IP 地址
+- IPV6_RECVPKTINFO: 接收分组信息
+- IPV6_DONTFRAG: 禁止分片
+- IPV6_RECVTCLASS: 接收通信类型
+** IPPROTO_TCP(TCP 选项)
+- TCP_MAXSEG: TCP 最大报文段大小
+- TCP_NODELAY: 禁止 Nagle 算法
 * 网络信息
+socket 地址指的是 IP 地址和端口号的集合，但这两个信息都是数值。
+
+如果能够通过字符串的形式转换一次，客户端的访问将比较方便。
+- 其中 IP 地址对应 *主机名* ，端口号对应 *服务名*
+- 服务端修改 IP 地址后并不会影响客户端。
+** gethostbyname, gethostbyaddr
+#+BEGIN_SRC c
+  #include <netdb.h>
+
+  struct hostent {
+    char  *h_name;            /* official name of host */
+    char **h_aliases;         /* alias list */
+    int    h_addrtype;        /* host address type */
+    int    h_length;          /* length of address */
+    char **h_addr_list;       /* list of addresses */
+  }
+
+
+  //根据主机名称获取主机的完整信息
+  struct hostent *gethostbyname(const char *name);
+
+  #include <sys/socket.h>       /* for AF_INET */
+  //根据 IP 地址获取主机的完整信息
+  struct hostent *gethostbyaddr(const void *addr,
+                                socklen_t len, int type);
+#+END_SRC
+=gethostbyname= 函数首先在本地的 =/etc/hosts= 文件中查找主机，如果没有找到再去访问 DNS 服务器。
+** getservbyname, getservbyport
+#+BEGIN_SRC c
+  #include <netdb.h>
+
+  struct servent {
+    char  *s_name;       /* official service name */
+    char **s_aliases;    /* alias list */
+    int    s_port;       /* port number */
+    char  *s_proto;      /* protocol to use */
+  }
+
+  //根据名称获取某个服务的完整信息
+  struct servent *getservbyname(const char *name, const char *proto);
+  //根据端口号获取某个服务的完整信息
+  struct servent *getservbyport(int port, const char *proto);
+#+END_SRC
+以上的转换关系都是通过读取 =/etc/services= 文件来获取服务信息的。
+** getaddrinfo
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  struct addrinfo {
+    int              ai_flags;
+    int              ai_family;
+    int              ai_socktype;
+    int              ai_protocol;
+    socklen_t        ai_addrlen;
+    struct sockaddr *ai_addr;
+    char            *ai_canonname;
+    struct addrinfo *ai_next;
+  };
+  //通过主机名和服务名获得 IP 地址和端口号
+  int getaddrinfo(const char *node, const char *service,
+                  const struct addrinfo *hints,
+                  struct addrinfo **res);
+  //res 资源是在函数内被申请，所以需要主动释放
+  void freeaddrinfo(struct addrinfo *res);
+#+END_SRC
+** getnameinfo
+#+BEGIN_SRC c
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  //通过 socket 地址同时获得以字符串表示的主机名和服务名
+  int getnameinfo(const struct sockaddr *sa, socklen_t salen,
+                  char *host, socklen_t hostlen,
+                  char *serv, socklen_t servlen, int flags);
+#+END_SRC
+
+
+
