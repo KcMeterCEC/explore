@@ -1,0 +1,20 @@
+#+TITLE: [What]Linux 服务器程序规范
+#+DATE: <2019-11-14 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_7.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+之前一直是云里雾里的，这次正好来整理一下。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 日志
+** Linux 系统日志
+Linux 提供了 =rsyslogd= 守护进程来处理系统日志，它既能够接收用户进程输出日志，又可以接收内核日志。
+- 用户进程调用 =syslog= 函数生成日志，该函数将日志输出到 =AF_UNIX= 类型的文件 =/dev/log= 中, =rsyslogd= 监听 =/dev/log= 将内存输出至 =/var/log/=
+- 内核日志由 =printk= 等函数打印到内核环形缓存，其内容被映射到 =/proc/kmsg= , =rsyslogd= 读取该文件后存储日志
+
+

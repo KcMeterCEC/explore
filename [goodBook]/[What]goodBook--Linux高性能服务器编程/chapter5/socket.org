@@ -383,6 +383,220 @@ flags 常用的取值如下：
 
   int sockatmark(int sockfd);
 #+END_SRC
+
+为了理解带外标记，现在树莓派上运行服务端，然后 PC 发送普通数据和带外数据来观察服务端的输出。
+
+服务端代码：
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <sys/socket.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <unistd.h>
+
+  int main(int argc, char *argv[])
+  {
+      if(argc != 2)
+      {
+          printf("usage: %s <port>\n", argv[0]);
+
+          return -1;
+      }
+      int port = atoi(argv[1]);
+
+      //addr
+      struct sockaddr_in socket_addr; 
+
+      memset(&socket_addr, 0, sizeof(socket_addr));
+      socket_addr.sin_family = AF_INET;
+      socket_addr.sin_port = htons(port);
+      socket_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+      //socket
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+      if(socket_fd < 0)
+      {
+          perror("can't create socket!\n");
+
+          return -1;
+      }
+
+      //bind
+      if(bind(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0)
+      {
+          perror("bind socket and address failed!\n");
+
+          return -1;
+      }
+      //listen
+      if(listen(socket_fd, 5) < 0)
+      {
+          perror("listen failed!\n");
+
+          return -1;
+      }
+      printf("I'm waiting for client...\n");
+      //accept
+      int client_fd = 0;
+
+      struct sockaddr_in client_addr;
+      socklen_t     addr_len = sizeof(client_addr);
+      if((client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len)) < 0)
+      {
+          perror("accept failed!\n");
+
+          return -1;
+      }
+
+      printf("connected to client ip: %s, port: %d\n",
+      inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+      ssize_t recv_len;
+
+      #define RECV_BUF_SIZE   (30)
+      char recv_buf[RECV_BUF_SIZE];
+
+      memset(recv_buf, 0, RECV_BUF_SIZE);
+      recv_len = recv(client_fd, recv_buf, RECV_BUF_SIZE - 1, 0);
+      printf("1.received %ld bytes : %s\n", recv_len, recv_buf);
+
+      memset(recv_buf, 0, RECV_BUF_SIZE);
+      recv_len = recv(client_fd, recv_buf, RECV_BUF_SIZE - 1, MSG_OOB);
+      if(recv_len < 0)
+      {
+          perror("recv failed:");
+      }
+      printf("2.received %ld bytes : %s\n", recv_len, recv_buf);
+
+      memset(recv_buf, 0, RECV_BUF_SIZE);
+      recv_len = recv(client_fd, recv_buf, RECV_BUF_SIZE - 1, 0);
+      printf("3.received %ld bytes : %s\n", recv_len, recv_buf);
+
+
+      close(client_fd);
+      close(socket_fd);
+
+      return 0;
+  }
+#+END_SRC
+
+客户端代码：
+#+BEGIN_SRC c
+    #include <sys/types.h>                                                                         
+    #include <netinet/in.h>                                                                        
+    #include <arpa/inet.h>                                                                         
+    #include <sys/socket.h>                                                                        
+    #include <stdio.h>                                                                             
+    #include <stdlib.h>                                                                            
+    #include <string.h>                                                                            
+    #include <unistd.h>  
+    #include <netdb.h>     
+    #include <assert.h>    
+    #include <stdint.h>                                                                 
+                                                                                                 
+  int main(int argc, char *argv[])                                                               
+  {                                                                                              
+      if(argc != 3)                                                                              
+      {                                                                                          
+          printf("usage: %s <hostname> <port>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[2]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port); 
+
+      struct hostent *host_info = gethostbyname(argv[1]);
+      assert(host_info);
+    
+      printf("I have found the ip address of host %s is:\n", host_info->h_name);
+
+      int i = 0;
+      do
+      {
+          printf("%s: %s\n", host_info->h_addrtype == AF_INET ? "ipv4" : "ipv6",
+          inet_ntoa(*(struct in_addr *)host_info->h_addr_list[i]));
+
+          i++;
+      }while(host_info->h_addr_list[i]);
+
+      // inet_aton(host_info->h_addr_list[0], &socket_addr.sin_addr);
+      socket_addr.sin_addr.s_addr = *(uint32_t *)host_info->h_addr_list[0];
+                                                                                                
+      //socket                                                                                   
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);                                           
+      if(socket_fd < 0)                                                                          
+      {                                                                                          
+          perror("can't create socket!\n");                                                      
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+                                                                                                
+      //connect                                                                                     
+      if(connect(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0)        
+      {                                                                                          
+          perror("connect to server failed!\n");                                           
+                                                                                                
+          return -1;                                                                             
+      }                                                                                                                                                                                 
+
+      const char *oob_data = "abc";
+      const char *normal_data = "123";
+
+      send(socket_fd, normal_data, strlen(normal_data), 0);
+      send(socket_fd, oob_data, strlen(oob_data), MSG_OOB);
+      send(socket_fd, normal_data, strlen(normal_data), 0);
+
+                                                                        
+      close(socket_fd);                                                                          
+                                                                                                
+      return 0;                                                                                  
+  }                                                                                                  
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+  # 服务端启动
+  $ ./oob_server 54321
+  I'm waiting for client...
+
+  # 客户端连接
+  ./oob_client raspberrypi.local 54321
+
+  # 服务端接收
+  1.received 5 bytes : 123ab
+  2.received 1 bytes : c
+  3.received 3 bytes : 123
+#+END_EXAMPLE
+可以看到：虽然客户端发送的带外数据是 "abc" ，但是只有最后一个字符 "c" 被当做带外数据。
+且服务器对正常数据的接收将被带外数据截断，也就是无法通过一个 =recv= 全部读出。
+
+同时 tcpdump 抓取的信息如下：
+#+BEGIN_EXAMPLE
+  //3 次握手
+  IP 192.168.11.32.43554 > 192.168.11.188.54321: Flags [S], seq 1128894586, win 29200, options [mss 1460,sackOK,TS val 2875722569 ecr 0,nop,wscale 10], length 0
+
+  IP 192.168.11.188.54321 > 192.168.11.32.43554: Flags [S.], seq 1082582215, ack 1128894587, win 28960, options [mss 1460,sackOK,TS val 4017151919 ecr 2875722569,nop,wscale 7], length 0
+
+  IP 192.168.11.32.43554 > 192.168.11.188.54321: Flags [.], ack 1, win 29, options [nop,nop,TS val 2875722570 ecr 4017151919], length 0
+
+  //发送 3 字节数据
+  IP 192.168.11.32.43554 > 192.168.11.188.54321: Flags [P.], seq 1:4, ack 1, win 29, options [nop,nop,TS val 2875722570 ecr 4017151919], length 3
+  //发送剩下的 6 字节，此包还包含结束、紧急指针
+  //urg 相对起始 4 偏移 3 也就是 7，那么最后一个就是 6，也就是 c，
+  IP 192.168.11.32.43554 > 192.168.11.188.54321: Flags [FP.U], seq 4:10, ack 1, win 29, urg 3, options [nop,nop,TS val 2875722570 ecr 4017151919], length 6
+  //断开应答
+  IP 192.168.11.188.54321 > 192.168.11.32.43554: Flags [.], ack 4, win 227, options [nop,nop,TS val 4017151920 ecr 2875722570], length 0
+
+  IP 192.168.11.188.54321 > 192.168.11.32.43554: Flags [F.], seq 1, ack 11, win 227, options [nop,nop,TS val 4017151920 ecr 2875722570], length 0
+#+END_EXAMPLE
 * 地址信息
 #+BEGIN_SRC c
   #include <sys/socket.h>
@@ -427,12 +641,227 @@ flags 常用的取值如下：
 - SO_SNDBUF: TCP 发送缓冲区大小
   + 也可以设置 =/proc/sys/net/ipv4/tcp_wmem= 
 - SO_KEEPALIVE: 发送周期性保活报文以维持连接
+  + 关于 keepalive 的理解参考[[https://holmeshe.me/network-essentials-setsockopt-SO_KEEPALIVE/][此链接]]
 - SO_OOBINLINE: 将带外数据存放于普通数据缓存中，用户使用普通读取方式获取
 - SO_LINGER: 若有数据待发送，则延迟关闭，通过 =linger= 结构体配置是立即关闭，还是发送残留数据后关闭
 - SO_RCVLOWAT: TCP 接收缓存区低水位标记，当缓存数据大于低水位时，应用程序便可以读取
 - SO_SNDLOWAT: TCP 发送缓存区低水位标记，当空闲数据大于低水位时，应用程序便可以发送
 - SO_RCVTIMEO: 接收数据超时
 - SO_SNDTIMEO: 发送数据超时
+  
+下面通过实例理解 TCP 接收和发送缓冲区大小设置。
+
+服务端代码：
+#+BEGIN_SRC c
+  #include <sys/types.h>                                                                         
+  #include <netinet/in.h>                                                                        
+  #include <arpa/inet.h>                                                                         
+  #include <sys/socket.h>                                                                        
+  #include <stdio.h>                                                                             
+  #include <stdlib.h>                                                                            
+  #include <string.h>                                                                            
+  #include <unistd.h>                                                                            
+
+  #define BUFFER_SIZE (1024)                                                                                                 
+  int main(int argc, char *argv[])                                                               
+  {                                                                                              
+      if(argc != 3)                                                                              
+      {                                                                                          
+          printf("usage: %s <port> <recv buffer size>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[1]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port);                                                        
+      socket_addr.sin_addr.s_addr = htonl(INADDR_ANY);                                           
+                                                                                                
+      //socket                                                                                   
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);                                           
+      if(socket_fd < 0)                                                                          
+      {                                                                                          
+          perror("can't create socket!\n");                                                      
+                                                                                                
+          return -1;                                                                             
+      } 
+
+      int recvbuf = atoi(argv[2]);
+      int len = sizeof(recvbuf);
+
+      setsockopt(socket_fd, SOL_SOCKET, SO_RCVBUF, &recvbuf, sizeof(recvbuf));
+      getsockopt(socket_fd, SOL_SOCKET, SO_RCVBUF, &recvbuf, (socklen_t *)&len);                                                                                        
+
+      printf("I want to set recv buf is %d, and actually recv buf is %d\n",
+      atoi(argv[2]), recvbuf);
+                                                                                                
+      //bind                                                                                     
+      if(bind(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0)        
+      {                                                                                          
+          perror("bind socket and address failed!\n");                                           
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      //listen                                                                                   
+      if(listen(socket_fd, 5) < 0)                                                               
+      {                                                                                          
+          perror("listen failed!\n");                                                            
+                                                                                                
+          return -1;                                                                             
+      }   
+          printf("I'm waiting for client...\n");                                                     
+      //accept                                                                                   
+      int client_fd = 0;                                                                         
+                                                                                                
+      struct sockaddr_in client_addr;                                                            
+      socklen_t     addr_len = sizeof(client_addr);                                              
+      if((client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len)) < 0)        
+      {                                                                                          
+          perror("accept failed!\n");                                                            
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+                                                                                                
+      printf("connected to client ip: %s, port: %d\n",                                           
+      inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));                             
+                                                                                                
+      char buffer[BUFFER_SIZE];
+      memset(buffer, 0, BUFFER_SIZE);
+      while(recv(client_fd, buffer, BUFFER_SIZE - 1, 0) > 0)
+      {
+        
+      }                                                                                                                         
+                                                                                                
+      close(client_fd);                                                                          
+      close(socket_fd);                                                                          
+                                                                                                
+      return 0;                                                                                  
+  }                                                                                                  
+#+END_SRC
+客户端代码：
+#+BEGIN_SRC c
+    #include <sys/types.h>                                                                         
+    #include <netinet/in.h>                                                                        
+    #include <arpa/inet.h>                                                                         
+    #include <sys/socket.h>                                                                        
+    #include <stdio.h>                                                                             
+    #include <stdlib.h>                                                                            
+    #include <string.h>                                                                            
+    #include <unistd.h>  
+    #include <netdb.h>     
+    #include <assert.h>    
+    #include <stdint.h>                                                                 
+
+  #define BUFFER_SIZE (512)                                                                                                 
+  int main(int argc, char *argv[])                                                               
+  {                                                                                              
+      if(argc != 4)                                                                              
+      {                                                                                          
+          printf("usage: %s <hostname> <port> <send buffer size>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[2]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port); 
+
+      struct hostent *host_info = gethostbyname(argv[1]);
+      assert(host_info);
+    
+      printf("I have found the ip address of host %s is:\n", host_info->h_name);
+
+      int i = 0;
+      do
+      {
+          printf("%s: %s\n", host_info->h_addrtype == AF_INET ? "ipv4" : "ipv6",
+          inet_ntoa(*(struct in_addr *)host_info->h_addr_list[i]));
+
+          i++;
+      }while(host_info->h_addr_list[i]);
+
+      // inet_aton(host_info->h_addr_list[0], &socket_addr.sin_addr);
+      socket_addr.sin_addr.s_addr = *(uint32_t *)host_info->h_addr_list[0];
+                                                                                                
+      //socket                                                                                   
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);                                           
+      if(socket_fd < 0)                                                                          
+      {                                                                                          
+          perror("can't create socket!\n");                                                      
+                                                                                                
+          return -1;                                                                             
+      }             
+
+      int sendbuf = atoi(argv[3]);   
+      int len = sizeof(sendbuf);
+
+      setsockopt(socket_fd, SOL_SOCKET, SO_SNDBUF, &sendbuf, sizeof(sendbuf));
+      getsockopt(socket_fd, SOL_SOCKET, SO_SNDBUF, &sendbuf, &len);  
+      printf("I want to set send buf is %d, and actually it is %d\n",
+      atoi(argv[3]), sendbuf);                                                                        
+                                                                                                
+      //connect                                                                                     
+      if(connect(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0)        
+      {                                                                                          
+          perror("connect to server failed!\n");                                           
+                                                                                                
+          return -1;                                                                             
+      }                                                                                                                                                                                 
+
+      char buffer[BUFFER_SIZE];
+      memset(buffer, 'a', BUFFER_SIZE);
+      send(socket_fd, buffer, BUFFER_SIZE, 0);
+
+                                                                        
+      close(socket_fd);                                                                          
+                                                                                                
+      return 0;                                                                                  
+  }                                                                                                  
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+  #服务端启动
+  pi@raspberrypi:~/learn/net/oob $ ./size_server 54321 50
+  I want to set recv buf is 50, and actually recv buf is 2240
+  I'm waiting for client...
+
+  #客户端启动
+  cec@virtual:~/learn/c/net/oob$ ./size_client raspberrypi.local 54321 2000
+  I have found the ip address of host raspberrypi.local is:
+  ipv4: 192.168.11.188
+  I want to set send buf is 2000, and actually it is 4608
+#+END_EXAMPLE
+可以看到接收缓冲区大小会被限制，系统会主动增加这些值。
+
+通过 tcpdump 抓取：
+#+BEGIN_EXAMPLE
+  # 3 次握手
+  IP 192.168.11.32.43716 > 192.168.11.188.54321: Flags [S], seq 3350415036, win 29200, options [mss 1460,sackOK,TS val 2877437849 ecr 0,nop,wscale 10], length 0
+  
+  IP 192.168.11.188.54321 > 192.168.11.32.43716: Flags [S.], seq 3487870517, ack 3350415037, win 1120, options [mss 1460,sackOK,TS val 4018867214 ecr 2877437849,nop,wscale 0], length 0
+  
+  IP 192.168.11.32.43716 > 192.168.11.188.54321: Flags [.], ack 1, win 29, options [nop,nop,TS val 2877437850 ecr 4018867214], length 0
+
+  # 客户端发送 512 字节数据
+  IP 192.168.11.32.43716 > 192.168.11.188.54321: Flags [P.], seq 1:513, ack 1, win 29, options [nop,nop,TS val 2877437850 ecr 4018867214], length 512
+
+  # 断开连接
+  IP 192.168.11.32.43716 > 192.168.11.188.54321: Flags [F.], seq 513, ack 1, win 29, options [nop,nop,TS val 2877437850 ecr 4018867214], length 0
+
+  IP 192.168.11.188.54321 > 192.168.11.32.43716: Flags [.], ack 513, win 608, options [nop,nop,TS val 4018867214 ecr 2877437850], length 0
+
+  IP 192.168.11.188.54321 > 192.168.11.32.43716: Flags [F.], seq 1, ack 514, win 608, options [nop,nop,TS val 4018867215 ecr 2877437850], length 0
+
+  IP 192.168.11.32.43716 > 192.168.11.188.54321: Flags [.], ack 2, win 29, options [nop,nop,TS val 2877437857 ecr 4018867215], length 0
+#+END_EXAMPLE
 ** IPPROTO_IP(IPv4 选项）
 - IP_TOS: 服务类型，用于设置最大延迟、最大吞吐等
 - IP_TTL: 存活时间，最多可以中转多少个路由器
@@ -450,6 +879,8 @@ socket 地址指的是 IP 地址和端口号的集合，但这两个信息都是
 如果能够通过字符串的形式转换一次，客户端的访问将比较方便。
 - 其中 IP 地址对应 *主机名* ，端口号对应 *服务名*
 - 服务端修改 IP 地址后并不会影响客户端。
+  
+在局域网中，如果没有架设 DNS，则可以通过在服务端和客户端安装 =avahi-daemon= 通过 =hostname.local= 的方式访问。
 ** gethostbyname, gethostbyaddr
 #+BEGIN_SRC c
   #include <netdb.h>
@@ -472,6 +903,8 @@ socket 地址指的是 IP 地址和端口号的集合，但这两个信息都是
                                 socklen_t len, int type);
 #+END_SRC
 =gethostbyname= 函数首先在本地的 =/etc/hosts= 文件中查找主机，如果没有找到再去访问 DNS 服务器。
+
+*需要注意的是* : =h_addr_list= 是以网络字节序存放的字节数组，而不是字符串！要以字符串显示需要使用 =inet_ntoa= 函数。
 ** getservbyname, getservbyport
 #+BEGIN_SRC c
   #include <netdb.h>
