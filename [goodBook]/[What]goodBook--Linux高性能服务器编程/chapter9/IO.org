@@ -1,0 +1,69 @@
+#+TITLE: [What]linux IO 复用
+#+DATE: <2019-11-27 三> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_9.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+之前[[http://kcmetercec.top/categories/linux/IO/overview/][粗略的学习了 IO 复用]]，现在再来加深理解。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+
+I/O 复用虽然能同时监听多个文件描述符， *但它本身是阻塞的* 。
+并且当多个文件描述符同时就绪时，如果不采取额外的措施，程序就只能按顺序依次处理其中的每个文件描述符，
+这使得服务器程序看起来像是串行工作的。要实现并发，只能使用多进程或多线程等编程手段。
+* select
+监听文件描述符上的可读、可写和异常事件。
+** API
+#+BEGIN_SRC c
+  /* According to POSIX.1-2001, POSIX.1-2008 */
+  #include <sys/select.h>
+
+  /* According to earlier standards */
+  #include <sys/time.h>
+  #include <sys/types.h>
+  #include <unistd.h>
+
+  struct timeval {
+    long    tv_sec;         /* seconds */
+    long    tv_usec;        /* microseconds */
+  };
+
+  /**
+   ,* @par nfds : 被监听文件描述符数值最大值加 1（因为文件描述符从 0 开始），这个参数用于向内核传递范围，提高 select 性能
+   ,* @par readfds,writefds,exceptfds : 指向可读、可写、异常事件对应的文件描述符集合
+   ,* @par timeout : 超时时间，当设置为 NULL 时，表示一直阻塞
+   ,* @ret 成功时返回就绪文件描述符总数，失败返回 -1 并设置 errno
+   ,*/
+  int select(int nfds, fd_set *readfds, fd_set *writefds,
+             fd_set *exceptfds, struct timeval *timeout);
+#+END_SRC
+=fd_set= 是一个整型数组，每一位代表文件描述符，linux 提供了对应的宏来操作这些位：
+#+BEGIN_SRC c
+  //清除 set 上的某一位
+  void FD_CLR(int fd, fd_set *set);
+  //检查 set 上某一位是否被设置
+  int  FD_ISSET(int fd, fd_set *set);
+  //设置 set 上的某一位
+  void FD_SET(int fd, fd_set *set);
+  //清除 set 上的所有位
+  void FD_ZERO(fd_set *set);
+#+END_SRC
+** 就绪条件
+在网络编程中，下列情况下 socket 可读：
+- socket 对应的内核接收缓存区中的字节数大于或等于低水位标记 =SO_RCVLOWAT= 
+- socket 通信的对方关闭连接，此时读操作返回 0
+- 监听 socket 上有新的连接请求
+- socket 上有未处理的错误，此时通过 =getsockopt()= 来读取和清除该错误
+
+在网络编程中，下列情况下 socket 可写：
+- socket 对应的内核发送缓冲区中可用字节数大于或等于低水位标记 =SO_SNDLOWAT= 
+- socket 的写操作被关闭。对写操作被关闭的 socket 执行写操作将触发一个 =SIGPIPE= 信号
+- socket 使用非阻塞 connect 连接成功或者失败后
+- socket 上有未处理的错误，此时通过 =getsockopt()= 来读取和清除该错误
+  
+在网络编程中，select能处理的异常情况只有一种：socket 上接收到带外数据
+** 处理带外数据
