@@ -67,3 +67,442 @@ I/O 复用虽然能同时监听多个文件描述符， *但它本身是阻塞�
   
 在网络编程中，select能处理的异常情况只有一种：socket 上接收到带外数据
 ** 处理带外数据
+socket 上接收到普通数据和带外数据都将使 select 返回，但 socket 处于不同的就绪状态：前者处于可读状态，后者处于异常状态。
+
+下面的代码是客户端发送普通和异常数据：
+#+BEGIN_SRC c
+    #include <sys/types.h>                                                                         
+    #include <netinet/in.h>                                                                        
+    #include <arpa/inet.h>                                                                         
+    #include <sys/socket.h>                                                                        
+    #include <stdio.h>                                                                             
+    #include <stdlib.h>                                                                            
+    #include <string.h>                                                                            
+    #include <unistd.h>  
+    #include <netdb.h>     
+    #include <assert.h>    
+    #include <stdint.h>                                                                 
+                                                                                                 
+  int main(int argc, char *argv[])                                                               
+  {                                                                                              
+      if(argc != 3)                                                                              
+      {                                                                                          
+          printf("usage: %s <hostname> <port>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[2]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port); 
+
+      struct hostent *host_info = gethostbyname(argv[1]);
+      assert(host_info);
+    
+      printf("I have found the ip address of host %s is:\n", host_info->h_name);
+
+      int i = 0;
+      do
+      {
+          printf("%s: %s\n", host_info->h_addrtype == AF_INET ? "ipv4" : "ipv6",
+          inet_ntoa(*(struct in_addr *)host_info->h_addr_list[i]));
+
+          i++;
+      }while(host_info->h_addr_list[i]);
+
+      // inet_aton(host_info->h_addr_list[0], &socket_addr.sin_addr);
+      socket_addr.sin_addr.s_addr = *(uint32_t *)host_info->h_addr_list[0];
+                                                                                                
+      //socket                                                                                   
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);                                           
+      if(socket_fd < 0)                                                                          
+      {                                                                                          
+          perror("can't create socket!\n");                                                      
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+                                                                                                
+      //connect                                                                                     
+      if(connect(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)) < 0)        
+      {                                                                                          
+          perror("connect to server failed!\n");                                           
+                                                                                                
+          return -1;                                                                             
+      }                                                                                                                                                                                 
+
+      const char *oob_data = "abc";
+      const char *normal_data = "123";
+
+      send(socket_fd, normal_data, strlen(normal_data), 0);
+      send(socket_fd, oob_data, strlen(oob_data), MSG_OOB);
+      send(socket_fd, normal_data, strlen(normal_data), 0);
+
+                                                                        
+      close(socket_fd);                                                                          
+                                                                                                
+      return 0;                                                                                  
+  }                                                                                                  
+#+END_SRC
+下面代码是服务端通过 select 来接收普通和异常数据：
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <assert.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <stdlib.h>
+  #include <fcntl.h>
+  #include <netdb.h>
+
+  int main(int argc, char *argv[])
+  {
+      int ret = 0;
+      if(argc != 2)
+      {
+          printf("usage: %s <port>\n", argv[0]);
+
+          ret = -1;
+          goto error1;
+      }
+
+      int port = atoi(argv[1]);
+
+      struct sockaddr_in addr;
+
+      addr.sin_family = AF_INET;
+      addr.sin_addr.s_addr = htonl(INADDR_ANY);
+      addr.sin_port = htons(port);
+
+      int socket_fd = socket(addr.sin_family, SOCK_STREAM, 0);
+      if(socket_fd <= 0)
+      {
+          perror("can't create socket!");
+          ret = -1;
+          goto error1;
+      }
+      if(bind(socket_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+      {
+          perror("bind socket failed!");
+          ret = -1;
+          goto error1;
+      }
+
+      if(listen(socket_fd, 5) < 0)
+      {
+          perror("listen socket failed!");
+          ret = -1;
+          goto error1;
+      }
+
+      struct sockaddr_in client_addr;
+      socklen_t addr_len = sizeof(client_addr);
+
+      int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
+      if(client_fd < 0)
+      {
+          perror("accept failed!");
+
+          ret = -1;
+          goto error2;
+      }
+      printf("client: ip -> %s, port -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+      char buf[1024];
+
+      fd_set read_fds;
+      fd_set exception_fds;
+      FD_ZERO(&read_fds);
+      FD_ZERO(&exception_fds);
+
+      while(1)
+      {
+          memset(buf, 0, sizeof(buf));
+
+          FD_SET(client_fd, &read_fds);
+          FD_SET(client_fd, &exception_fds);
+
+          if(select(client_fd + 1, &read_fds, NULL, &exception_fds, NULL) < 0)
+          {
+              perror("select failed:");
+              ret = -1;
+              goto error3;
+          }
+
+          int ret = 0;
+    
+        
+          if(FD_ISSET(client_fd, &read_fds))
+          {
+              if(( ret = recv(client_fd, buf, sizeof(buf) - 1, 0)) < 0)
+              {
+                  perror("recv failed:");
+
+                  ret = -1;
+                  goto error3;
+              }
+              else if(ret == 0)
+              {
+                  printf("socket has been closed.\n");
+                  goto error2;
+              }
+              else
+              {
+                  printf("I have got normal data: %s\n", buf);
+              }
+          }
+
+          memset(buf, 0, sizeof(buf));
+          if(FD_ISSET(client_fd, &exception_fds))
+          {
+              if((ret = recv(client_fd, buf, sizeof(buf) - 1, MSG_OOB)) < 0)
+              {
+                  perror("read oob data failed:");
+
+                  ret = -1;
+                  goto error3;
+              }
+              else if(ret == 0)
+              {
+                  printf("socket has been closed.\n");
+                  goto error2;
+              }
+              else
+              {
+                  printf("I have got oob data: %s\n", buf);
+              }
+          }
+      }
+  error3:
+      close(client_fd);    
+  error2:
+      close(socket_fd);
+  error1:
+      return ret;
+  }
+#+END_SRC
+接下来运行：
+#+BEGIN_EXAMPLE
+  #在树莓派上运行服务端
+  ./oob_server_select 54321
+  #在 PC 上运行客户端
+  cec@virtual:~/learn/c/net/oob$ ./oob_client raspberrypi.local 54321
+  I have found the ip address of host raspberrypi.local is:
+  ipv4: 192.168.11.188
+
+  #最终树莓派接收
+  client: ip -> 192.168.11.32, port -> 33204
+  I have got normal data: 123ab
+  I have got oob data: c
+  I have got normal data: 123
+  socket has been closed.
+#+END_EXAMPLE
+* poll
+poll 与 select 在使用上类似。
+#+BEGIN_SRC c
+  #include <poll.h>
+
+  struct pollfd {
+    int   fd;         /* file descriptor */
+    short events;     /* requested events */
+    short revents;    /* returned events */
+  };
+  int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+#+END_SRC
+event 类型有：
+| 事件       | 描述                                 |
+|------------+--------------------------------------|
+| POLLIN     | 数据（包括普通数据和优先数据）可读   |
+| POLLRDNORM | 普通数据可读                         |
+| POLLRDBAND | 优先级带数据可读                     |
+| POLLPRI    | 高优先级数据可读，比如 TCP 带外数据  |
+| POLLOUT    | 数据（包括普通数据和优先数据）可写   |
+| POLLWRNORM | 普通数据可写                         |
+| POLLWRBAND | 优先级带数据可写                     |
+| POLLRDHUP  | TCP 连接被对方关闭或对方关闭了写操作 |
+| POLLERR    | 错误                                 |
+| POLLHUP    | 挂起                                 |
+| POLLNVAL   | 文件描述符没有打开                   |
+* epoll
+epoll 则与 select、poll 有以下差异：
+- epoll 使用一组函数来完成任务
+- epoll 把用户关心的文件描述符上的事件放在内核里的一个事件表中，而无须像 select 和 poll 每次调用都需要重复传入参数
+** 内核事件表
+epoll 需要使用一个额外的文件描述符来唯一标识内核中的事件表：
+#+BEGIN_SRC c
+  #include <sys/epoll.h>
+
+  //size 提示内核事件表需要多大
+  int epoll_create(int size);
+#+END_SRC
+该函数返回的文件描述符将用作其他所有 epoll 系统调用的第一个参数，以指定要访问的内核事件表。
+
+操作内核事件表，使用下面这个函数：
+#+BEGIN_SRC c
+  #include <sys/epoll.h>
+
+  typedef union epoll_data {
+    void        *ptr;
+    int          fd;
+    uint32_t     u32;
+    uint64_t     u64;
+  } epoll_data_t;
+
+  struct epoll_event {
+    uint32_t     events;      /* Epoll events */
+    epoll_data_t data;        /* User data variable */
+  };
+
+  int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+#+END_SRC
+op 参数指定对 fd 的操作类型：
+- EPOLL_CTL_ADD : 往事件表中注册 fd 上的事件
+- EPOLL_CTL_MOD : 修改 fd 上的注册事件  
+- EPOLL_CTL_DEL : 删除 fd 上的注册事件
+
+event 结构中的 =events= 成员描述事件类型，与 =poll= 事件类型基本相同，只是宏名称前需要加 'E' 。
+除此之外，epoll 还有两个额外的事件类型 =EPOLLET= 和 =EPOLLONESHOT= 
+** epoll_wait
+epoll_wait 函数在一段超时时间内等待一组文件描述符上的事件：
+#+BEGIN_SRC c
+  #include <sys/epoll.h>
+
+  int epoll_wait(int epfd, struct epoll_event *events,
+                 int maxevents, int timeout);
+#+END_SRC
+当 epoll_wait 检测到事件，就将所有就绪事件从内核事件表中复制到参数 =events= 指向的数组中。
+也就是说， =events= 指向的数组中全部都是就绪事件，而不需要像 =select= 和 =poll= 再来二次判断了。
+
+它们的差异如下：
+#+BEGIN_SRC c
+  //poll 查询谁就绪了
+  int ret = poll(fds, MAX_EVENT_NUMBER, -1);
+  for(int i = 0; i < MAX_EVENT_NUMBER; ++i)
+  {
+    if(fds[i].revents & POLLIN)
+      {
+        int sockfd = fds[i].fd;
+        //...
+      }
+  }
+
+  //epoll 返回后直接处理
+  int ret = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+  for(int i = 0; i < ret; i++)
+  {
+    int sockfd = events[i].data.fd;
+    //...
+  }
+#+END_SRC
+** LT 和 ET 模式
+epoll 对文件描述符操作有两种模式：
+- LT（Level Trigger, 电平触发）：默认此工作模式，相当于效率比较高的 poll
+  + 事件发生时，如果应用程序不处理，这些事件会被保持
+- ET（Edge Trigger，边沿触发）：此模式是 epoll 的高效工作模式
+  + 事件发生时，应用程序应立即处理，否则下次调用 =epoll_wait= 后此事件将被清空
+
+以上模式和中断的电平触发和边沿触发的概念类似。
+
+*需要注意的是：* 当使用 ET 模式时，对应的文件描述符需要设置为非阻塞的方式。
+因为 ET 模式下，当事件触发后，需要一次性读出所有数据。所以需要非阻塞的返回来判断是否已经读空了。
+
+下面是服务端以两种模式工作的代码：
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <assert.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <fcntl.h>
+  #include <sys/epoll.h>
+  #include <pthread.h>
+  #include <stdlib.h>
+  #include <stdbool.h>
+
+  #define MAX_EVENT_NUMBER (1024)
+  #define BUFFER_SIZE      (10)
+
+  static void setnonblocking(int fd)
+  {
+      int old_opt = fcntl(fd, F_GETFL);
+      int new_opt = old_opt | O_NONBLOCK;
+      fcntl(fd, F_SETFL, new_opt);
+  }
+  static void addfd(int epollfd, int fd, bool enable_et)
+  {
+      struct epoll_event event;
+
+      event.data.fd = fd;
+      event.events = EPOLLIN;
+      if(enable_et)
+      {
+          event.events |= EPOLLET;
+      }
+
+      epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
+      setnonblocking(fd);
+  }
+
+  int main(int argc, char *argv[])
+  {
+      int ret = 0;
+      if(argc != 2)
+      {
+          printf("usage: %s <port>\n", argv[0]);
+
+          ret = -1;
+          goto error;
+      }
+
+      int port = atoi(argv[1]);
+
+      struct sockaddr_in server_addr;
+
+      server_addr.sin_family = AF_INET;
+      server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+      server_addr.sin_port = htons(port);
+
+      int server_fd = socket(server_addr.sin_family, SOCK_STREAM, 0);
+      assert(server_fd > 0);
+
+      ret = bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      assert(ret >= 0);
+
+      ret = listen(server_fd, 5);
+      assert(ret >= 0);
+
+      struct epoll_event events[MAX_EVENT_NUMBER];
+
+      int epoll_fd = epoll_create(MAX_EVENT_NUMBER);
+      assert(epoll_fd >= 0);
+
+      addfd(epoll_fd, server_fd, true);
+
+      while(1)
+      {
+          int ret = epoll_wait(epoll_fd, events, MAX_EVENT_NUMBER, -1);
+          if(ret < 0)
+          {
+              ret = -1;
+              perror("epoll failed:");
+              goto error1;
+          }
+      }
+  error1:
+      close(server_fd);    
+  error:
+      return ret;    
+  }
+#+END_SRC
