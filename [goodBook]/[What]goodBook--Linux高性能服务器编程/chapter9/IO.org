@@ -414,7 +414,8 @@ epoll 对文件描述符操作有两种模式：
 因为 ET 模式下，当事件触发后，需要一次性读出所有数据。所以需要非阻塞的返回来判断是否已经读空了。
 
 下面是服务端以两种模式工作的代码：
-#+BEGIN_SRC c
+
+#+BEGIN_SRC C
   #include <sys/types.h>
   #include <sys/socket.h>
   #include <netinet/in.h>
@@ -453,6 +454,92 @@ epoll 对文件描述符操作有两种模式：
       epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
 
       setnonblocking(fd);
+  }
+
+  void lt(struct epoll_event *events, int number, int epollfd, int listenfd)
+  {
+    char buf[BUFFER_SIZE];
+
+    for(int i = 0; i < number; i++)
+    {
+        int sockfd = events[i].data.fd;
+        if(sockfd == listenfd)
+        {
+            struct sockaddr_in client_addr;
+            socklen_t addr_len = sizeof(client_addr);
+            int connfd = accept(listenfd, (struct sockaddr *)&client_addr, &addr_len);
+
+            printf("client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+            addfd(epollfd, connfd, false);
+        }
+        else if(events[i].events & EPOLLIN)
+        {
+            printf("event trigger once!\n");
+            memset(buf, 0, BUFFER_SIZE);
+            int ret = recv(sockfd, buf, BUFFER_SIZE - 1, 0);
+            if(ret <= 0)
+            {
+              close(sockfd);
+              continue;
+            }
+            printf("got %d bytes, the contents are: %s\n", ret, buf);
+        }
+        else
+        {
+            printf("something is wrong.\n");
+        }
+    }
+  }
+
+  void et(struct epoll_event *events, int number, int epollfd, int listenfd)
+  {
+    char buf[BUFFER_SIZE];
+    for(int i = 0; i < number; i++)
+    {
+        int sockfd = events[i].data.fd;
+        if(sockfd == listenfd)
+        {
+            struct sockaddr_in client_addr;
+            socklen_t addr_len = sizeof(client_addr);
+            int connfd = accept(listenfd, (struct sockaddr *)&client_addr, &addr_len);
+
+            printf("client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+            addfd(epollfd, connfd, true);
+        }   
+        else if(events[i].events & EPOLLIN) 
+        {
+            printf("event trigger once!\n");
+            while(1)
+            {
+                memset(buf, 0, BUFFER_SIZE);
+                int ret = recv(sockfd, buf, BUFFER_SIZE - 1, 0);
+                if(ret < 0)
+                {
+                  if((errno == EAGAIN) || (errno == EWOULDBLOCK))
+                  {
+                    printf("read later\n");
+                    break;
+                  }
+                  close(sockfd);
+                  break;
+                }
+                else if(ret == 0)
+                {
+                  close(sockfd);
+                }
+                else
+                {
+                  printf("got %d bytes, the contents are: %s\n", ret, buf);
+                }
+            }
+        }
+        else
+        {
+            printf("something is wrong.\n");
+        }      
+    }
   }
 
   int main(int argc, char *argv[])
@@ -499,6 +586,8 @@ epoll 对文件描述符操作有两种模式：
               perror("epoll failed:");
               goto error1;
           }
+          // lt(events, ret, epoll_fd, server_fd);
+          et(events, ret, epoll_fd, server_fd);
       }
   error1:
       close(server_fd);    
@@ -506,3 +595,11 @@ epoll 对文件描述符操作有两种模式：
       return ret;    
   }
 #+END_SRC
+
+可以看出：
+- 在电平触发模式下，如果数据没有读完，电平触发会一直保持，所以服务端可以每次触发发生时只读一次
+- 在边沿触发模式下，触发只会出现一次，所以服务端在触发发生后，需要确保一次性读完 =socket= 中的内容才行，这样子也是效率最高的做法。
+** EPOLLONESHOT 事件
+在 ET 模式下，如果一个线程在读取完某个 socket 上的数据后开始处理，而在处理过程中此 socket 上又有新数据可读，但此时由另外一个线程来读取这些新数据。
+
+这就出现了两个线程同时操作同一个 socket 的问题，为了一个 socket 在连接任一时刻都只被一个线程处理，可以使用 EPOLLONESHOT 事件实现。
