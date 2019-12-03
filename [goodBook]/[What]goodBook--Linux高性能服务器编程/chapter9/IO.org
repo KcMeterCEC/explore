@@ -603,3 +603,347 @@ epoll 对文件描述符操作有两种模式：
 在 ET 模式下，如果一个线程在读取完某个 socket 上的数据后开始处理，而在处理过程中此 socket 上又有新数据可读，但此时由另外一个线程来读取这些新数据。
 
 这就出现了两个线程同时操作同一个 socket 的问题，为了一个 socket 在连接任一时刻都只被一个线程处理，可以使用 EPOLLONESHOT 事件实现。
+
+=EPOLLONESHOT= 使得操作系统最多触发一次其上注册的一个可读、可写或异常事件。
+
+这样就可以将一个 socket 与一个单独的线程绑定， *当线程处理完此事件后，需要重置其 =EPOLLONESHOT= 事件。*
+- 这样才能确保 socket 可以再次发出事件并被其他的线程处理。
+  
+下面是使用例子：
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <assert.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <fcntl.h>
+  #include <sys/epoll.h>
+  #include <pthread.h>
+  #include <stdlib.h>
+  #include <stdbool.h>
+
+  #define MAX_EVENT_NUMBER    (5)
+  #define BUFFER_SIZE         (10)
+
+  struct fds 
+  {
+      int epollfd;
+      int sockfd;
+  };
+
+  void setnonblocking(int fd)
+  {
+      int old_opt = fcntl(fd, F_GETFL);
+      int new_opt = old_opt | O_NONBLOCK;
+
+      fcntl(fd, F_SETFL, new_opt);
+  }
+
+  void addfd(int epollfd, int fd, bool oneshot)
+  {
+      struct epoll_event event;
+
+      event.data.fd = fd;
+      event.events = EPOLLIN | EPOLLET;
+      if(oneshot)
+      {
+          event.events |= EPOLLONESHOT;
+      }
+
+      epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
+      setnonblocking(fd);
+  }
+
+  void reset_oneshot(int epollfd, int fd)
+  {
+      struct epoll_event event;
+
+      event.data.fd = fd;
+      event.events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+      epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
+  }
+
+  void *worker(void *arg)
+  {
+      int sockfd = ((struct fds *)arg)->sockfd;
+      int epollfd = ((struct fds *)arg)->epollfd;
+
+      char buf[BUFFER_SIZE];
+      memset(buf, 0, BUFFER_SIZE);
+
+      while(1)
+      {
+          int ret = recv(sockfd, buf, BUFFER_SIZE - 1, 0);
+          if(ret == 0)
+          {
+              close(sockfd);
+              printf("client closed the connection!\n");
+              break;
+          }
+          else if(ret < 0)
+          {
+              if(errno == EAGAIN)
+              {
+                  reset_oneshot(epollfd, sockfd);
+                  printf("read laster\n");
+                  break;
+              }
+          }
+          else
+          {
+              printf("thread: %lu, get contents: %s\n", pthread_self(), buf);
+              sleep(5);
+          }
+      }
+      printf("thread: %lu done.\n", pthread_self());
+
+      return (void *)0;
+  }
+
+  int main(int argc, char *argv[])
+  {
+      int ret = 0;
+
+      if(argc != 2)
+      {
+          printf("usage: %s <port>\n", argv[0]);
+
+          return -1;
+      }
+
+      int port = atoi(argv[1]);
+
+      struct sockaddr_in server_addr;
+
+      server_addr.sin_family = AF_INET;
+      server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+      server_addr.sin_port = htons(port);
+
+      int server_fd = socket(server_addr.sin_family, SOCK_STREAM, 0);
+      assert(server_fd > 0);
+
+      ret = bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr));
+      assert(ret == 0);
+
+      ret = listen(server_fd, MAX_EVENT_NUMBER);
+      assert(ret == 0);
+
+      struct epoll_event events[MAX_EVENT_NUMBER];
+
+      int epoll_fd = epoll_create(MAX_EVENT_NUMBER);
+      assert(epoll_fd >= 0);
+
+      addfd(epoll_fd, server_fd, false);
+
+      while(1)
+      {
+          ret = epoll_wait(epoll_fd, events, MAX_EVENT_NUMBER, -1);
+          if(ret < 0)
+          {
+              perror("epoll failed:");
+              break;
+          }
+
+          for(int i = 0; i < ret; i++)
+          {
+              int sockfd = events[i].data.fd;
+
+              if(sockfd == server_fd)
+              {
+                  struct sockaddr_in client_addr;
+                  socklen_t addr_len = sizeof(client_addr);
+                  int connfd = accept(server_fd, (struct sockaddr *)&client_addr, &addr_len);
+
+                  printf("client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+                  addfd(epoll_fd, connfd, true);
+              }
+              else if(events[i].events & EPOLLIN)
+              {
+                  pthread_t thread;
+
+                  struct fds new_fds;
+
+                  new_fds.epollfd = epoll_fd;
+                  new_fds.sockfd = sockfd;
+
+                  pthread_create(&thread, NULL, worker, (void *)&new_fds);
+              }
+              else
+              {
+                  printf("something is wrong\n");
+              }
+          }
+      }
+
+      close(server_fd);
+
+      return ret;
+  }
+#+END_SRC
+
+上面代码的 =sleep= 是为了模拟该线程正在对此事件进行处理，可以通过多个 =telnet= 客户端来给服务端发送数据。
+
+可以看到：每个 =telent= 都有对应的唯一一个处理线程，在处理时间内发送新数据，原来的线程会继续处理。
+* 三组 I/O 复用函数的比较
+| 系统调用                               | select                                                                                                                           | poll                                                                                                      | epoll                                                                                                                      |
+|----------------------------------------+----------------------------------------------------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------+----------------------------------------------------------------------------------------------------------------------------|
+| 事件集合                               | 用户通过 3 个参数分别传入可读、可写及异常等事件，内核通过对这些参数的在线修改来反馈就绪事件。导致用户每次调用都要重置这 3 个参数 | 统一处理所有事件类型，因此只需一个事件集参数。用户通过 events 传入事件，内核通过修改 revents 反馈就绪事件 | 内核通过事件表管理事件。所以每次调用 epoll_wait 时不用反复传入用户感兴趣的事件。 epoll_wait 参数 events 仅用来反馈就绪事件 |
+| 应用程序索引就绪文件描述符的事件复杂度 | O(n)                                                                                                                             | O(n)                                                                                                      | O(1)                                                                                                                       |
+| 最大支持文件描述符数                   | 一般有最大值限制                                                                                                                 | 65535                                                                                                     | 65535                                                                                                                      |
+| 工作模式                               | LT                                                                                                                               | LT                                                                                                        | LT，ET                                                                                                                     |
+| 内核实现和工作效率                     | 采用轮询方式来检测就绪事件，事件复杂度为 O(n)                                                                                    | 采用轮询方式检测就绪事件，事件复杂度为 O(n)                                                               | 采用回调方式检测就绪事件，算法事件复杂度为 O(1)                                                                            |
+* 非阻塞 connect
+客户端为了能够同时发起多个连接并一起等待，可以以非阻塞的方式调用 =connect= ：
+- 将 =socket= 设置为非阻塞状态，然后调用 =connect= 
+- 使用 =select= , =poll= 等来监听这些 =socket= 上的可写事件
+- 当 =select= , =poll= 返回时，调用 =getsockopt= 来读取错误码判断连接是否成功（选项为 SO_ERROR,层级为 SOL_SOCKET）
+  + 当错误码为 0 时代表连接成功
+    
+*目前这种方式并不适用于所有系统*
+
+如下示例代码，使用 poll 来并发检查 connect 状态:
+#+BEGIN_SRC c
+    #include <sys/types.h>                                                                         
+    #include <netinet/in.h>                                                                        
+    #include <arpa/inet.h>                                                                         
+    #include <sys/socket.h>                                                                        
+    #include <stdio.h>                                                                             
+    #include <stdlib.h>                                                                            
+    #include <string.h>                                                                            
+    #include <unistd.h>  
+    #include <netdb.h>     
+    #include <assert.h>    
+    #include <stdint.h>     
+    #include <fcntl.h>   
+    #include <errno.h>
+    #include <sys/ioctl.h>  
+    #include <poll.h>           
+
+  #define CONNECT_NUM (3)                                            
+
+  int set_nonblocking(int fd)
+  {
+      int old_opt = fcntl(fd, F_GETFL);
+      int new_opt = old_opt | O_NONBLOCK;
+
+      fcntl(fd, F_SETFL, new_opt);
+
+      return old_opt;
+  }
+
+  int main(int argc, char *argv[])                                                               
+  {        
+      int ret = 0;                                                                                      
+      if(argc != 3)                                                                              
+      {                                                                                          
+          printf("usage: %s <hostname> <port>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[2]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port); 
+
+      struct hostent *host_info = gethostbyname(argv[1]);
+      assert(host_info);
+    
+      printf("I have found the ip address of host %s is:\n", host_info->h_name);
+
+      int i = 0;
+      do
+      {
+          printf("%s: %s\n", host_info->h_addrtype == AF_INET ? "ipv4" : "ipv6",
+          inet_ntoa(*(struct in_addr *)host_info->h_addr_list[i]));
+
+          i++;
+      }while(host_info->h_addr_list[i]);
+
+      // inet_aton(host_info->h_addr_list[0], &socket_addr.sin_addr);
+      socket_addr.sin_addr.s_addr = *(uint32_t *)host_info->h_addr_list[0];
+
+      int socket_fd[CONNECT_NUM];
+      struct pollfd fdset[CONNECT_NUM];
+      int socket_opt;
+      int error = 0;
+      socklen_t length = sizeof(error);    
+
+      for(int i = 0; i < CONNECT_NUM; i++)
+      {
+          socket_fd[i] = socket(AF_INET, SOCK_STREAM, 0);
+          socket_opt = set_nonblocking(socket_fd[i]); 
+
+          ret = connect(socket_fd[i], (const struct sockaddr *)&socket_addr, sizeof(socket_addr));   
+          if(ret == 0)
+          {
+              printf("connect with server immediately!\n");
+              fcntl(socket_fd[i], F_SETFL, socket_opt);
+          }
+          else if((ret != EINPROGRESS) && (errno != EINPROGRESS))     
+          {
+              perror("connect failed!\n");
+              close(socket_fd[i]);
+              ret = -1;  
+              goto error;
+          }        
+      }
+
+      sleep(1);
+
+      for(int i = 0; i < CONNECT_NUM; i++)
+      {
+          fdset[i].fd = socket_fd[i];
+          fdset[i].events = POLLOUT;
+      }
+
+      if(poll(fdset, CONNECT_NUM, -1) < 0)
+      {
+          perror("poll failed:");
+          ret = -1;  
+          goto error1;
+      }
+
+      for(int i = 0; i < CONNECT_NUM; i++)
+      {
+          if(fdset[i].revents & POLLOUT)
+          {
+              if(getsockopt(fdset[i].fd, SOL_SOCKET, SO_ERROR, &error, &length) < 0)
+              {
+                  perror("gesockopt failed:");
+                  close(fdset[i].fd);
+                  ret = -1;  
+                  goto error;
+              }
+              if(error != 0)
+              {
+                  printf("connection failed: %d\n", error);
+                  close(fdset[i].fd);
+                  ret = -1;  
+                  goto error;        
+              }
+
+              printf("socket %d connection succedded!\n", i);
+
+              fcntl(fdset[i].fd, F_SETFL, socket_opt);  
+          }
+      }
+  error1: 
+      for(int i = 0; i < CONNECT_NUM; i++)
+      {
+          close(socket_fd[i]);
+      }
+  error:                                                                                                
+      return ret;                                                                                  
+  }                                                                                                  
+#+END_SRC
+* 聊天室

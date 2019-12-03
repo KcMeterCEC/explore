@@ -871,6 +871,316 @@ quick_out:
 
 }
 #+END_SRC
+* 共享内存与 POSIX 信号量
+XSI 信号量的操作接口有点怪异，相比较而言 POSIX 版本的信号量则更加优雅。
+
+*还有一点更为重要：XSI 信号量操作函数 =semop()= 并不是强制规定的 cancellation point，而 POSIX 信号量函数 =sem_waiti()= 则是*
+
+当需要使用 =pthread_cancel()= 来使一个线程退出时， =semop()= 并不能确保在所有的类 UNIX 系统上有效。
+
+
+POSIX 信号量具有有名和无名两个版本，但它们的差别仅仅在于创建和销毁，其它的行为是一致的。
+- 无名信号量仅存在于内存中，那么操作信号量的对象需要具有此内存的操作权限，那么只有两种情况可以操作：
+  + 同一个进程内的线程
+  + 不同进程内的线程共享这部分内存
+- 有名信号量通过名称来获取信号量的权限，所以它就没有无名信号量的内存限制问题
+  
+** 创建或打开存在的有名信号量
+#+BEGIN_SRC c
+  #include <fcntl.h>           /* For O_* constants */
+  #include <sys/stat.h>        /* For mode constants */
+  #include <semaphore.h>
+
+  //当打开一个存在的信号量时，使用此两参数的函数
+  sem_t *sem_open(const char *name, int oflag);
+
+  //当创建有名信号量时，使用此函数
+  // oflag 在创建时一般取值 O_CREAT
+  // mode 设定此文件的操作权限
+  // value 指定初值
+  sem_t *sem_open(const char *name, int oflag,
+                  mode_t mode, unsigned int value);
+#+END_SRC
+为了代码更好的兼容，设置信号量名称时需要注意：
+- 名称以左斜杠（“/”）起始，并且保证只能有一个左斜杠
+- 名称的字符长度不能超过 =_POSIX_NAME_MAX= 
+** 释放进程关联信号量的资源
+当一个进程不需要使用此信号量时，可以释放该进程与信号量关联的资源：
+- *并没有销毁信号量*
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  //此函数并不会改变信号量的值
+  int sem_close(sem_t *sem);
+#+END_SRC
+
+** 销毁信号量
+要完全销毁信号量，得需要保证没有进程关联此信号量的前提下使用 =sem_unlink= :
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  int sem_unlink(const char *name);
+#+END_SRC
+如果还有进程关联了信号量，那么 =sem_unlink= 仅仅取消当前进程对该信号量的引用。
+** 获取信号量
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  //阻塞式的等待
+  int sem_wait(sem_t *sem);
+  //非阻塞等待
+  int sem_trywait(sem_t *sem);
+  //超时等待
+  int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout);
+#+END_SRC
+** 释放信号量
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  int sem_post(sem_t *sem);
+#+END_SRC
+
+** 创建无名信号量
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  //创建
+  int sem_init(sem_t *sem, int pshared, unsigned int value);
+  //销毁
+  int sem_destroy(sem_t *sem);
+#+END_SRC
+** 获取信号量的值
+#+BEGIN_SRC c
+  #include <semaphore.h>
+
+  int sem_getvalue(sem_t *sem, int *sval);
+#+END_SRC
+获取此时需要注意，很有可能在获取此值以后，信号量又被其他进程或线程获取，而导致值不一致。
+** 实例
+现在将丑陋的 XSI 信号量更换为 POSIX 信号量。
+
+服务端代码：
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <sys/types.h>
+  #include <sys/ipc.h>
+  #include <sys/shm.h>
+  #include <sys/sem.h>
+  #include <sys/stat.h>
+  #include <sys/fcntl.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <semaphore.h>
+
+  #define BUF_CNT     (5)
+
+  #define SHM_KEY_PATH    "./shm_key"
+  #define SHM_PROJ_ID     'm'
+
+  int main(void)
+  {
+    int ret = 0;
+
+    int shm_id = 0;
+    char *buf = NULL;
+    key_t shm_key;
+
+    sem_t 	*sem_full;
+    sem_t 	*sem_empty;
+    int write_index = 0;
+    int val = 0;
+    /*
+     ,* create semaphore
+     ,*/
+    sem_full = sem_open("/mem_sem_full", O_CREAT | O_EXCL, S_IRWXU, 0);
+    if(sem_full == SEM_FAILED)
+    {
+      perror("can't create semaphore:");
+		
+      goto quick_out;
+    }
+    sem_getvalue(sem_full, &val);
+	
+    printf("the value of full semaphore is %d\n", val);
+	
+    sem_empty = sem_open("/mem_sem_empty", O_CREAT | O_EXCL, S_IRWXU, BUF_CNT);
+    if(sem_empty == SEM_FAILED)
+    {
+      perror("can't create semaphore:");
+		
+      goto quick_out;
+    }
+	
+    sem_getvalue(sem_empty, &val);
+	
+    printf("the value of empty semaphore is %d\n", val);
+
+    /*
+     ,* create share memory
+     ,*/
+    if((ret = creat(SHM_KEY_PATH, S_IRUSR | S_IWUSR)) == -1)
+    {
+      perror("Can not create file!");
+      goto quick_out;
+    }
+
+    if((shm_key = ftok(SHM_KEY_PATH, SHM_PROJ_ID)) == -1)
+    {
+      perror("Can not create shm key");
+      goto quick_out;
+    }
+    printf("key is  %d \n", shm_key);
+
+    if((shm_id = shmget(shm_key, 100, IPC_CREAT | S_IRUSR | S_IWUSR)) == -1)
+    {
+      perror("Can not create shm!");
+      goto quick_out;
+    }
+    printf("share memory id is  %d \n", shm_id);
+
+    if((buf = shmat(shm_id, 0, 0)) == (void *)-1)
+    {
+      perror("Can not map share memory!");
+      goto quick_out;
+    }
+    printf("share memory mapped to virtual add = %p\n", buf);
+
+
+    while(write_index < 10)
+    {
+      //getting an empty flag
+      if((ret = sem_wait(sem_empty)) == -1)
+      {
+        perror("Waitting semaphore failed!");
+        goto quick_out;
+      }
+      char *str_buf = buf + (write_index % BUF_CNT) * 20;
+      sprintf(str_buf, "buf -> %d\n", write_index);
+      printf("write index = %d = %s\n", write_index, str_buf);
+      write_index++;
+      //release a full flag
+      if((ret = sem_post(sem_full)) == -1)
+      {
+        perror("release semaphore failed!");
+        goto quick_out;
+      }
+    }
+    if(shmctl(shm_id, IPC_RMID, 0) < 0)
+    {
+      perror("can not delete sharememory\n");
+    }
+  quick_out:
+    return -1;
+
+  }
+#+END_SRC
+
+客户端代码：
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <sys/types.h>
+  #include <sys/ipc.h>
+  #include <sys/shm.h>
+  #include <sys/sem.h>
+  #include <sys/stat.h>
+  #include <sys/fcntl.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <semaphore.h>
+
+  #define BUF_CNT     (5)
+
+  #define SHM_KEY_PATH    "./shm_key"
+  #define SHM_PROJ_ID         'm'
+
+  int main(void)
+  {
+    int ret = 0;
+    int shm_id = 0;
+    char *buf = NULL;
+    key_t shm_key;
+    int  read_index = 0;
+
+
+    sem_t 	*sem_full;
+    sem_t 	*sem_empty;
+    /*
+     ,*  getting semaphore
+     ,*/
+    if((sem_full = sem_open("/mem_sem_full", 0)) == SEM_FAILED)
+    {
+      perror("Can not open sem");
+      goto quick_out;
+    }
+    if((sem_empty = sem_open("/mem_sem_empty", 0)) == SEM_FAILED)
+    {
+      perror("Can not open sem");
+      goto quick_out;
+    }
+    //initialize semaphore
+    int full_val, empty_val;
+	
+    sem_getvalue(sem_full, &full_val);
+    sem_getvalue(sem_empty, &empty_val);
+    printf("The value of semaphore full is %d\n", full_val);
+    printf("The value of semaphore empty is %d\n", empty_val);
+    /*
+     ,*  getting share memory
+     ,*/
+
+    if((shm_key = ftok(SHM_KEY_PATH, SHM_PROJ_ID)) == -1)
+    {
+      perror("Can not create shm key");
+      goto quick_out;
+    }
+    printf("key is  %d \n", shm_key);
+
+    if((shm_id = shmget(shm_key, 100, S_IRUSR | S_IWUSR)) == -1)
+    {
+      perror("Can not create shm!");
+      goto quick_out;
+    }
+    printf("share memory id is  %d \n", shm_id);
+
+    if((buf = shmat(shm_id, 0, SHM_RDONLY)) == (void *)-1)
+    {
+      perror("Can not map share memory!");
+      goto quick_out;
+    }
+    printf("share memory mapped to virtual add = %p\n", buf);
+
+    while(read_index < 10)
+    {
+      //getting an full flag
+      if((ret = sem_wait(sem_full)) == -1)
+      {
+        perror("Waitting semaphore failed!");
+        goto quick_out;
+      }
+      char *str_buf = buf + (read_index % BUF_CNT) * 20;
+      printf("read index = %d = %s", read_index, str_buf);
+      //release an empty flag
+      read_index++;
+      //release a full flag
+      if((ret = sem_post(sem_empty)) == -1)
+      {
+        perror("release semaphore failed!");
+        goto quick_out;
+      }
+      sleep(3);
+    }
+    if(shmdt(buf) < 0)
+    {
+      perror("can not detach memory!\n");
+    }
+
+  quick_out:
+    return -1;
+
+  }
+#+END_SRC
 * socket 
 socket的魅力就在于它既可以本机内通信，又可以跨平台通信，这为以后程序的扩展性提供了各种可能。
 ** socket 描述符
