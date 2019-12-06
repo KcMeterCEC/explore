@@ -7,7 +7,9 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-*参考资料*: =linux设备驱动开发详解=
+*参考资料*: 
+1. =linux设备驱动开发详解=
+2. [[http://betteros.org/tut/graphics1.php]]
 
 回顾 =framebuffer= 驱动。
 #+BEGIN_HTML
@@ -229,15 +231,15 @@ framebuffer 有几个重要的数据结构需要填充:
 #+BEGIN_SRC c
   struct fb_fix_screeninfo{
           char id[16];              /// 显示器名称
-          unsigned long smem_start; /// 显示缓存的地址
+          unsigned long smem_start; /// 显示缓存的地址(物理地址)
           __u32 smem_len;           /// 显示缓存的大小
-          __u32 type;
+    __u32 type;               /// 缓存类型
           __u32 type_aux;
           __u32 visual;
           __u16 xpanstep;
           __u16 ypanstep;
           __u16 ywrapstep;
-          __u32 line_length;        /// 长度所占用的字节数
+          __u32 line_length;        /// 一行长度所占用的字节数
           unsigned long mmio_start; /// IO物理地址
           __u32 mmio_len;
           __u32 accel;
@@ -256,12 +258,12 @@ framebuffer 有几个重要的数据结构需要填充:
           __u32 bits_per_pixel;     /// 每个像素占用的位数
           __u32 grayscale;          /// 0 = color, 1 = grayscale >1 = FOURCC
 
-          struct fb_bitfield red;  /// 指定RGB偏移及注释
+          struct fb_bitfield red;  /// 指定RGB偏移及透明度
           struct fb_bitfield green;
           struct fb_bitfield blue;
           struct fb_bitfield transp;
 
-          __u32 nonstd;
+    __u32 nonstd;                  /// 当不为 0，代表非标准的像素格式
 
           __u32 activate;
 

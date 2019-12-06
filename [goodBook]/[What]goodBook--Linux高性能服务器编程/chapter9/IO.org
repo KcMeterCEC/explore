@@ -947,3 +947,452 @@ epoll 对文件描述符操作有两种模式：
   }                                                                                                  
 #+END_SRC
 * 聊天室
+使用 I/O 复用实现服务器同时处理网络连接和用户输入。
+** 客户端
+客户端实现两个功能：
+1. 从标准输入读入用户数据，并发送至服务器
+2. 接收服务器的数据并打印至终端
+
+对于客户端来说，有用户输入和 socket 输入，并有 socket 输出和终端输出，所以可以用 I/O 复用函数来监听两个输入，然后对应输出。
+
+#+BEGIN_SRC c
+    #include <sys/types.h>                                                                         
+    #include <netinet/in.h>                                                                        
+    #include <arpa/inet.h>                                                                         
+    #include <sys/socket.h>                                                                        
+    #include <stdio.h>                                                                             
+    #include <stdlib.h>                                                                            
+    #include <string.h>                                                                            
+    #include <unistd.h>  
+    #include <netdb.h>     
+    #include <assert.h>    
+    #include <stdint.h>     
+    #include <fcntl.h>   
+    #include <errno.h>
+    #include <sys/ioctl.h>  
+    #include <poll.h>           
+
+  #define RECV_BUF_SIZE   (250)
+  int main(int argc, char *argv[])                                                               
+  {        
+      int ret = 0;                                                                                      
+      if(argc != 3)                                                                              
+      {                                                                                          
+          printf("usage: %s <hostname> <port>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[2]);                                                                  
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port); 
+
+      struct hostent *host_info = gethostbyname(argv[1]);
+      assert(host_info);
+    
+      printf("I have found the ip address of host %s is:\n", host_info->h_name);
+
+      int i = 0;
+      do
+      {
+          printf("%s: %s\n", host_info->h_addrtype == AF_INET ? "ipv4" : "ipv6",
+          inet_ntoa(*(struct in_addr *)host_info->h_addr_list[i]));
+
+          i++;
+      }while(host_info->h_addr_list[i]);
+
+      socket_addr.sin_addr.s_addr = *(uint32_t *)host_info->h_addr_list[0];
+
+      int socket_fd = socket(socket_addr.sin_family, SOCK_STREAM, 0);
+      assert(socket_fd > 0);
+
+      ret = connect(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr)); 
+      assert(ret == 0);
+
+      struct pollfd poll_fd[2];
+      char recv_buf[RECV_BUF_SIZE];
+
+      while(1)
+      {
+          poll_fd[0].fd = socket_fd;
+          poll_fd[0].events = POLLIN;
+
+          poll_fd[1].fd = STDIN_FILENO;
+          poll_fd[1].events = POLLIN;
+
+          poll(poll_fd, 2, -1);
+
+          if(poll_fd[0].revents & POLLIN)
+          {
+              memset(recv_buf, 0, RECV_BUF_SIZE);
+              recv(socket_fd, recv_buf, RECV_BUF_SIZE, MSG_DONTWAIT);
+              printf("%s", recv_buf);
+          }
+          else if(poll_fd[1].revents & POLLIN)
+          {
+              int *buf = fgets(recv_buf, RECV_BUF_SIZE, stdin);
+              if(buf)
+              {
+                  send(socket_fd, recv_buf, strlen(recv_buf), 0);
+              }
+          }
+          else
+          {
+              perror("something is wrong:");
+              break;
+          }
+      }
+
+      close(socket_fd);
+
+      return ret;                                                                                  
+  }                                                                                                  
+#+END_SRC
+** 服务端
+服务端主要功能是接收数据，并将数据发送给每个登录到该服务器上的除数据发送者的客户端，可以使用 I/O 复用函数来监听连接和数据。
+
+#+BEGIN_SRC c
+  #include <sys/types.h>                                                                         
+  #include <netinet/in.h>                                                                        
+  #include <arpa/inet.h>                                                                         
+  #include <sys/socket.h>                                                                        
+  #include <stdio.h>                                                                             
+  #include <stdlib.h>                                                                            
+  #include <string.h>  
+  #include <stdbool.h>                                                                          
+  #include <unistd.h>     
+  #include <sys/sendfile.h>    
+  #include <fcntl.h>      
+  #include <sys/stat.h>   
+  #include <assert.h>
+  #include <poll.h>  
+
+  #define MAXIMUM_CLIENT_NUM  (5)
+  #define MAXIMUM_RECV_BUF    (250)
+
+  static int client_cnt = -1;
+  static int client_fds[MAXIMUM_CLIENT_NUM];
+  static char buf[MAXIMUM_RECV_BUF];
+  static struct pollfd poll_fd[MAXIMUM_CLIENT_NUM + 1];
+
+  bool client_add(int fd)
+  {
+      bool ret = true;
+      if(client_cnt < MAXIMUM_CLIENT_NUM - 1)
+      {
+          client_fds[++client_cnt] = fd;
+      }
+      else
+      {
+          ret = false;
+      }
+
+      return ret;
+  }
+  bool client_del(int fd)
+  {
+      bool ret = true;
+      if(client_cnt >= 0)
+      {
+          for(int i = 0; i < client_cnt + 1;i++)
+          {
+              if(client_fds[i] == fd)
+              {
+                  client_fds[i] = client_fds[client_cnt];
+                  client_fds[client_cnt] = -1;
+                  client_cnt -= 1;
+                  break;
+              }
+          }
+          ret = false;
+      }
+      else
+      {
+          ret = false;
+      }
+
+      return ret;
+  }
+                                                                                                
+  int main(int argc, char *argv[])                                                               
+  {         
+      int ret = 0;                                                                                     
+      if(argc != 2)                                                                              
+      {                                                                                          
+          printf("usage: %s <port>\n", argv[0]);                                                 
+                                                                                                
+          return -1;                                                                             
+      }                                                                                          
+      int port = atoi(argv[1]); 
+
+      for(int i = 0; i < MAXIMUM_CLIENT_NUM; i++)
+      {
+          client_fds[i] = -1;
+      }                                                                 
+                                                                                                
+      //addr                                                                                     
+      struct sockaddr_in socket_addr;                                                            
+                                                                                                
+      memset(&socket_addr, 0, sizeof(socket_addr));                                              
+      socket_addr.sin_family = AF_INET;                                                          
+      socket_addr.sin_port = htons(port);                                                        
+      socket_addr.sin_addr.s_addr = htonl(INADDR_ANY);                                           
+                                                                                                
+      //socket                                                                                   
+      int socket_fd = socket(AF_INET, SOCK_STREAM, 0);                                           
+      assert(socket_fd > 0);                                                                         
+                                                                                                
+      //bind                                                                                     
+      ret = bind(socket_fd, (const struct sockaddr *)&socket_addr, sizeof(socket_addr));        
+      assert(ret == 0);
+                                                                                     
+      //listen                                                                                   
+      if(listen(socket_fd, 5) < 0)                                                               
+      {                                                                                          
+          perror("listen failed!\n");                                                            
+                                                                                                
+          return -1;                                                                             
+      }   
+    
+      printf("I'm waiting for client.\n");
+
+      while(1)
+      {
+          poll_fd[0].fd = socket_fd;
+          poll_fd[0].events = POLLIN;
+          for(int i = 1; i < client_cnt + 2;i++)
+          {
+              poll_fd[i].fd = client_fds[i - 1];
+              poll_fd[i].events = POLLIN;
+          }
+
+          poll(poll_fd, client_cnt + 2, -1);
+
+          for(int i = 0; i < client_cnt + 2; i++)
+          {
+              if(poll_fd[i].revents & POLLIN)
+              {
+                  if(poll_fd[i].fd == socket_fd)
+                  {
+                      //accept                                                                                   
+                      int client_fd = 0;                                                                         
+                                                                                                                
+                      struct sockaddr_in client_addr;                                                            
+                      socklen_t     addr_len = sizeof(client_addr);                                              
+                      if((client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len)) < 0)        
+                      {                                                                                          
+                          perror("accept failed!\n");                                                            
+                                                                                                                
+                          return -1;                                                                             
+                      }
+                      printf("client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+                      if(client_add(client_fd) == false)
+                      {
+                          printf("client fd buffer is full!\n");
+                          close(client_fd);
+                      }
+                  }
+                  else 
+                  {
+                      int recv_size = recv(poll_fd[i].fd, buf, MAXIMUM_RECV_BUF, 0);
+                      if(recv_size == 0)
+                      {
+                          printf("close one client!\n");
+                          client_del(poll_fd[i].fd);
+                      }
+                      else
+                      {
+                          for(int j = 1; j < client_cnt + 2; j++)
+                          {
+                              if(poll_fd[i].fd != client_fds[j - 1])
+                              {
+                                  send(client_fds[j - 1], buf, recv_size, 0);
+                              }
+                          }
+                      }
+                  }
+              }
+
+          }
+      }                                                                                          
+                                                                                                
+                                                                        
+      close(socket_fd);                                                                          
+                                                                                                
+      return 0;                                                                                  
+  }                                                                                                  
+#+END_SRC
+* 同时处理 TCP 和 UDP 服务
+由于一个 socket 只能绑定一个地址（IP 地址和端口号），对于同一个服务器来说如果要同时监听多个端口（提供不同的服务类型），
+那么就必须创建多个 socket 对应绑定不同的端口号，然后使用 I/O 复用技术监听这多个端口号。
+
+即使是同一个端口，如果服务器要同时处理该端口上的 TCP 和 UDP 请求，也需要创建两个不同的 socket。
+一个用于流式，一个用于数据报式，并且将它们绑定到同一个端口上。
+
+如下示例则是服务器同时处理同一端口上的 TCP 和 UDP 请求：
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <assert.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <errno.h>
+  #include <string.h>
+  #include <fcntl.h>
+  #include <stdlib.h>
+  #include <sys/epoll.h>
+  #include <pthread.h>
+
+  #define MAX_EVENT_NUMBER (1024)
+  #define TCP_BUFFER_SIZE  (512)
+  #define UDP_BUFFER_SIZE  (1024)
+
+  int setnonblocking(int fd)
+  {
+      int old_opt = fcntl(fd, F_GETFL);
+      int new_opt = old_opt | O_NONBLOCK;
+      fcntl(fd, F_SETFL, new_opt);
+
+      return old_opt;
+  }
+  void addfd(int epollfd, int fd)
+  {
+      struct epoll_event event;
+
+      event.data.fd = fd;
+      event.events = EPOLLIN | EPOLLET;
+      epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event);
+
+      setnonblocking(fd);
+  }
+
+  int main(int argc, char*argv[])
+  {
+      if(argc != 2)
+      {
+          printf("usage: %s <port>\n", argv[0]);
+
+          return -1;
+      }
+      int ret = 0;
+
+      int port = atoi(argv[1]);
+
+      struct sockaddr_in addr;
+
+      addr.sin_family = AF_INET;
+      addr.sin_addr.s_addr = htonl(INADDR_ANY);
+      addr.sin_port = htons(port);
+
+      int socket_tcp = socket(addr.sin_family, SOCK_STREAM, 0);
+      assert(socket_tcp > 0);
+
+      ret = bind(socket_tcp, (struct sockaddr *)&addr, sizeof(addr));
+      assert(ret == 0);
+
+      ret = listen(socket_tcp, 5);
+      assert(ret == 0);
+
+      int socket_udp = socket(addr.sin_family, SOCK_DGRAM, 0);
+      assert(socket_udp > 0);
+
+      ret = bind(socket_udp, (struct sockaddr *)&addr, sizeof(addr));
+      assert(ret == 0);
+
+      struct epoll_event events[MAX_EVENT_NUMBER];
+      int epollfd = epoll_create(5);
+      assert(epollfd > 0);
+
+      addfd(epollfd, socket_tcp);
+      addfd(epollfd, socket_udp);
+
+      while(1)
+      {
+          int number = epoll_wait(epollfd, events, MAX_EVENT_NUMBER, -1);
+          if(number < 0)
+          {
+              perror("epoll wait failed:");
+              break;
+          }
+
+          for( int i = 0; i < number; i++)
+          {
+              int sockfd = events[i].data.fd;
+              if(sockfd == socket_tcp)
+              {
+                  struct sockaddr_in client_addr;
+                  socklen_t addr_len = sizeof(client_addr);
+                  int client_fd = accept(socket_tcp, (struct sockaddr *)&client_addr, &addr_len);
+                  assert(client_fd > 0);
+
+                  printf("tcp client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+
+                  addfd(epollfd, client_fd);
+              }
+              else if(sockfd == socket_udp)
+              {
+                  char buf[UDP_BUFFER_SIZE];
+
+                  memset(buf, 0, UDP_BUFFER_SIZE);
+                  struct sockaddr_in client_addr;
+                  socklen_t addr_len = sizeof(client_addr);
+
+                  ret = recvfrom(socket_udp, buf, UDP_BUFFER_SIZE - 1, 0, 
+                  (struct sockaddr *)&client_addr, &addr_len);
+
+                  printf("udp client: %s -> %d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+                  if(ret > 0)
+                  {
+                      sendto(socket_udp, buf, ret, 0, (struct sockaddr *)&client_addr, addr_len);
+                  }
+
+              }
+              else if(events[i].events & EPOLLIN)
+              {
+                  char buf[TCP_BUFFER_SIZE];
+                  while(1)
+                  {
+                      memset(buf, 0, UDP_BUFFER_SIZE);
+                      ret = recv(sockfd, buf, TCP_BUFFER_SIZE - 1, 0);
+                      if(ret < 0)
+                      {
+                          if(errno == EAGAIN || errno == EWOULDBLOCK)
+                          {
+                              break;
+                          }
+                          close(sockfd);
+                          break;   
+                      }
+                      else if(ret == 0)
+                      {
+                          close(sockfd);
+                      }
+                      else
+                      {
+                          send(sockfd, buf, ret, 0);
+                      }
+                  }
+              }
+              else
+              {
+                  printf("something is wrong\n");
+              }
+          }
+      }
+
+      close(socket_tcp);
+
+      return 0;
+  }
+#+END_SRC
+
+客户端使用 =telnet= 测试 TCP 连接， =nc= 测试 UDP 连接。
+
+
