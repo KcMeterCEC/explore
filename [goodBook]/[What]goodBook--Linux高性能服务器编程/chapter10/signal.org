@@ -1,0 +1,24 @@
+#+TITLE: [What]Linux 信号
+#+DATE: <2019-12-06 五> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_10.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+平时对信号的使用是最少的了，正好来复习一下。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 概述
+信号可以由用户、系统或进程发送给目标进程，信号可以由如下条件产生：
+- 对于前台进程，用户可以通过输入特殊的终端字符串来给它发信号。比如 Ctrl+C 会发送中断信号。
+- 系统异常，比如非法访问内存
+- 系统状态变化，比如 alarm 定时器到期引起 SIGALRM 信号
+- 运行 kill 命令或调用 =kill= 函数
+* 信号函数
+* 信号集
+* 统一事件源
+* 网络编程相关信号
+
