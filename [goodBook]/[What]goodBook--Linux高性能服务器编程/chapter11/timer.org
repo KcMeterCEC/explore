@@ -1,0 +1,31 @@
+#+TITLE: [What]Linux 定时器
+#+DATE: <2019-12-10 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_11.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+在用户空间很少用定时器，再来加深一下理解。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+Linux 提供了 3 种定时方法：
+1. socket 选项 SO_RECVTIMEO 和 SO_SNDTIMEO
+2. SIGALRM 信号
+3. I/O 复用系统调用的超时参数
+* socket 选项 SO_RECVTIMEO 和 SO_SNDTIMEO
+SO_RECVTIMEO 和 SO_SNDTIMEO 分别对应设置接收和发送超时。
+
+| 系统调用 | 有效选项    | 系统调用超时后的行为                        |
+|----------+-------------+---------------------------------------------|
+| send     | SO_SNDTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
+| sendmsg  | SO_SNDTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
+| recv     | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
+| recvmsg  | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
+| accept   | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
+| connect  | SO_SNDTIMEO | 返回 -1，errno 的值为 EINPROGRESS           |
+* sigalrm 信号
+* I/O 复用系统调用的超时参数
+* 高性能定时器
