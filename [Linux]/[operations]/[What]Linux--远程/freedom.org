@@ -3,7 +3,7 @@
 #+TAGS: operations
 #+LAYOUT: post 
 #+CATEGORIES: linux, operations, enjoy
-#+NAME: <linux_operations_enjoy_usage.org>
+#+NAMA: <linux_operations_enjoy_usage.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
