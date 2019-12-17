@@ -90,5 +90,8 @@ SO_RECVTIMEO 和 SO_SNDTIMEO 分别对应设置接收和发送超时。
   }
 #+END_SRC
 * sigalrm 信号
+由 =alarm= 和 =setitimer= 函数设置的闹钟一旦超时，将会触发 =SIGALRM= 信号，
+为了处理多个定时任务，就需要不断的触发此信号。
+** 基于升序链表的定时器
 * I/O 复用系统调用的超时参数
 * 高性能定时器
