@@ -1,0 +1,29 @@
+#+TITLE: [What]Linux 中使用 libevent
+#+DATE: <2019-12-22 日> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAMA: <book_linux_server_chapter_12.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+Linux 服务器程序必须处理 I/O 事件、信号、定时这 3 类事件，在处理时需要考虑如下 3 个问题：
+- 统一事件源：尽量统一的处理这 3 类事件，既能使得代码简单易懂，也能避免逻辑错误。
+  + 前面使用 I/O 复用函数来同时处理这 3 类事件，但代码看起来不太优雅
+- 可移植性：尽量让同一份服务端代码可以应用在多种系统中
+- 对并发编程的支持：在多进程和多线程环境下，需要考虑各执行实体如何协同处理且避免竞态。
+  
+轻量级的[[https://libevent.org/][libevent]]便可以很好的解决以上问题。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* I/O 框架库概述
+虽然 I/O 框架库很多，但总体上来讲要么以 Reactor 模式实现，要么以 Proactor 模式实现，要么同时使用两种模式实现。
+
+[[./iolib_reactor.jpg]]
+
+上图是基于 Reactor 模式的实现，包含如下几个组件：
+- 句柄（Handle）
+- 事件多路分发器（EventDemultiplexer）
+- 事件处理器（EventHandler）
+- 具体的事件处理器（ConcreteEventHandler）
