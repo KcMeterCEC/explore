@@ -1,0 +1,109 @@
+#+TITLE: [What]Linux 下编码 mp3 音频文件
+#+DATE:  <2019-12-23 一> 
+#+TAGS: operations
+#+LAYOUT: post 
+#+CATEGORIES: linux, operations, ALSA
+#+NAME: <linux_operations_audio_mp3.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+[[https://lame.sourceforge.io/][lame]] 库很出名，但是这货官网居然没有 API 文档，只有在其头文件中有大致说明，总体来说不算难懂。
+
+[[https://blog.csdn.net/bjrxyz/article/details/73435407][这篇博客]] 也对 lame 的 API 做了说明，再配合头文件来查看大致就可以知道怎么用了。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+以下是测试代码，可以产生单音：
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <assert.h>
+  #include <math.h>
+  #include <string.h>
+  #include <stdlib.h>
+  #include <stdint.h>
+  #include <lame/lame.h>
+
+  #ifndef M_PI
+  #define M_PI    (3.141592653)
+  #endif
+
+  #define AUDIO_SAMP_RATE (32000)
+  #define IN_SAMPLES      (AUDIO_SAMP_RATE * 3)
+  #define MP3_OUT_BUF     (1.25 * IN_SAMPLES + 7200)
+
+  int main(int argc, char * argv[])
+  {
+      int ret = 0;
+
+      if(argc != 2)
+      {
+          printf("usage: %s <audio freq>\n", argv[0]);
+
+          return -1;
+      }
+      float audio_freq = atof(argv[1]);
+      float audio_one_point = 2 * M_PI * audio_freq / AUDIO_SAMP_RATE;
+
+      lame_global_flags *encoder = lame_init();
+      assert(encoder);
+
+      lame_set_in_samplerate(encoder, AUDIO_SAMP_RATE);
+      lame_set_num_channels(encoder, 2);
+      lame_set_mode(encoder, STEREO);
+    
+      ret = lame_init_params(encoder);
+      assert(ret != -1);
+
+      int16_t *in_pcm = malloc(sizeof(int16_t) * IN_SAMPLES * 2);
+      assert(in_pcm);
+      uint8_t *out_mp3 = malloc(sizeof(uint8_t) * MP3_OUT_BUF);
+      assert(out_mp3);
+      FILE *out_file = fopen("output.mp3", "w");
+      assert(out_file);
+
+      for(int i = 0; i < IN_SAMPLES; i++)
+      {
+          in_pcm[2 * i] = cos(i * audio_one_point) * INT16_MAX;
+          in_pcm[2 * i + 1] = sin(i * audio_one_point) * INT16_MAX;
+      }
+
+      ret = lame_encode_buffer_interleaved(encoder,
+                                          in_pcm,
+                                          IN_SAMPLES,
+                                          out_mp3,
+                                          MP3_OUT_BUF);
+      if(ret <= 0)
+      {
+          printf("there is error happened: ");
+          switch(ret)
+          {
+              case 0: printf("output bytes is 0");break;
+              case -1: printf("mp3 buffer is too small");break;
+              case -2: printf("malloc() problem");break;
+              case -3: printf("lame_init_params() isn't called");break;
+              case -4: printf("psycho acoustic problems");break;
+              default: printf("something else");break;
+          }
+          printf("\n");
+      }
+      else
+      {
+          printf("generated mp3 buffer size is %d\n", ret);
+          fwrite(out_mp3, 1, ret, out_file);
+      }
+      ret = lame_encode_flush(encoder, out_mp3, MP3_OUT_BUF);
+      fwrite(out_mp3, 1, ret, out_file);
+
+      fclose(out_file);
+      lame_close(encoder);
+      free(in_pcm);
+      free(out_mp3);
+    
+
+      return ret;
+  }
+#+END_SRC
+使用以下命令编译即可验证：
+#+BEGIN_EXAMPLE
+  gcc main.c -lm -lmp3lame -o encoder
+#+END_EXAMPLE

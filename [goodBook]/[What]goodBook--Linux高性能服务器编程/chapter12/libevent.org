@@ -3,7 +3,7 @@
 #+TAGS: CS
 #+LAYOUT: post
 #+CATEGORIES: book,Linux高性能服务器编程
-#+NAMA: <book_linux_server_chapter_12.org>
+#+NAME: <book_linux_server_chapter_12.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -23,7 +23,14 @@ Linux 服务器程序必须处理 I/O 事件、信号、定时这 3 类事件，
 [[./iolib_reactor.jpg]]
 
 上图是基于 Reactor 模式的实现，包含如下几个组件：
-- 句柄（Handle）
-- 事件多路分发器（EventDemultiplexer）
-- 事件处理器（EventHandler）
-- 具体的事件处理器（ConcreteEventHandler）
+- 句柄（Handle）：一个事件源（I/O，信号，定时器）通常和一个句柄绑定在一起，让事件产生时内核通过这个句柄来通知应用程序。
+  + 在 Linux 中 I/O 事件对应的句柄是文件描述符，信号事件对应的句柄就是信号值。
+- 事件多路分发器（EventDemultiplexer）：通过底层调用 I/O 复用监听事件，事件发生后分发给对应处理器
+- 事件处理器（EventHandler）：对应具体的业务逻辑，用户继承这些回调函数实现自己的处理逻辑
+- 具体的事件处理器（ConcreteEventHandler）：返回与事件处理器相关联的句柄，以对应事件与处理器的对应关系
+
+上图中，Reactor 类是 I/O 框架库的核心，其提供的主要方法是：
+- handle_events()：等待事件发生，依次处理所有就绪事件对应的事件处理器
+- register_handler()：调用 =register_event()= 方法向事件多路分发器注册一个事件
+- remove_handler()：调用 =remove_event()= 方法向事件多路分发器删除一个事件
+* Libevent 源码分析
