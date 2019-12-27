@@ -33,4 +33,5 @@ Linux 服务器程序必须处理 I/O 事件、信号、定时这 3 类事件，
 - handle_events()：等待事件发生，依次处理所有就绪事件对应的事件处理器
 - register_handler()：调用 =register_event()= 方法向事件多路分发器注册一个事件
 - remove_handler()：调用 =remove_event()= 方法向事件多路分发器删除一个事件
-* Libevent 源码分析
+* Libevent 体验
+此处先留坑，待后期真正使用它时再来折腾。

@@ -1,0 +1,78 @@
+#+TITLE: [What]Linux 中多进程编程
+#+DATE: <2019-12-25 三> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,Linux高性能服务器编程
+#+NAME: <book_linux_server_chapter_13.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+对多进程编程的知识总是零零散散，正好再来复习一下。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* fork 系统调用
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <unistd.h>
+
+  pid_t fork(void);
+#+END_SRC
+调用 fork() 函数后，系统便会创建子进程，只是当前内存的复制是写时复制，这些概念耳熟能详。
+
+但也有需要注意的：
+- 子进程的信号位图被清除，也就是原进程设置的信号处理函数不再对新进程起作用
+- 父进程中打开的文件描述符默认在子进程中也是打开的，且文件描述符引用计数加 1，而且父进程的用户根目录、当前工作目录等变量的引用计数都会加 1
+* exec 系统调用
+执行 =path= 或 =file= 指定的可执行文件， =arg= 指定可变参数， =argv[]= 指定参数数组， =envp= 可设置环境变量。
+- 因为此时原程序已经被新的可执行文件完全替换
+
+exec 类调用后，除非新的可执行文件出错，否则是不会返回的。
+#+BEGIN_SRC c
+  #include <unistd.h>
+
+  extern char **environ;
+
+  int execl(const char *path, const char *arg, ...
+            /* (char  *) NULL */);
+  int execlp(const char *file, const char *arg, ...
+             /* (char  *) NULL */);
+  int execle(const char *path, const char *arg, ...
+             /*, (char *) NULL, char * const envp[] */);
+  int execv(const char *path, char *const argv[]);
+  int execvp(const char *file, char *const argv[]);
+  int execvpe(const char *file, char *const argv[],
+              char *const envp[]);
+#+END_SRC
+
+
+* 处理僵尸进程
+[[http://kcmetercec.top/2018/05/24/linux_ps_overview/#org82c3fbc][如之前所说，]] 子进程退出后内核会保存该进程的进程表项，用于被父进程获取该信息，在子进程退出后父进程获取信息前，该进程处于僵尸态。
+
+#+BEGIN_SRC c
+  #include <sys/types.h>
+  #include <sys/wait.h>
+
+  //阻塞的等待，直到该进程的某个子进程结束运行，子进程的退出状态存储于 wstatus 中
+  pid_t wait(int *wstatus);
+  //指定等待某个子进程结束运行
+  pid_t waitpid(pid_t pid, int *wstatus, int options);
+#+END_SRC
+为了能很好的解释子进程的退出状态， =sys/wait.h= 提供了如下宏：
+| 宏                   | 含义                                              |
+|----------------------+---------------------------------------------------|
+| WIFEXITED(wstatus)   | 如果子进程正常结束，返回真                        |
+| WEXITSTATUS(wstatus) | 在 WIFEXITED 返回真后，使用此宏得到子进程的退出码 |
+| WIFSIGNALED(wstatus) | 如果子进程被信号终止，返回真                      |
+| WTERMSIG(wstatus)    | 当 WIFSIGNALED 返回真后，此宏返回对应信号值       |
+| WIFSTOPPED(wstatus)  | 如果子进程被信号停止，返回真                      |
+| WSTOPSIG(wstatus)    | 当 WIFSTOPPED 返回真后，此宏返回对应信号值        |
+
+为了提高程序运行效率，通常的做法是：父进程接收 =SIGCHLD= 信号，当子进程结束后便会发送此信号，父进程再在信号处理函数中进行 =waitpid= 获取子进程退出状态。
+* 管道
+[[http://kcmetercec.top/2018/04/19/linux_operations_process_communication/#org39b5275][管道的应用]]在之前已经总结过了。
+
+只是还需要强调一下：
+父子进程间传递数据，利用的是 =fork= 调用之后两个管道文件描述符都保持打开。
+*但由于管道是单向数据流通信，所以父进程和子进程必须有一个关闭 fd[0]，另一个关闭 fd[1]。*
+所以要实现父子进程之间的双向数据传输，就得使用两个管道。
