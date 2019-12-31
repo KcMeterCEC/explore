@@ -1,0 +1,93 @@
+#+TITLE: [What] c++ 中的左值引用
+#+DATE:<2019-12-30 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_reference.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<primer c++ 5th>>
+
+左值引用(lvalue reference)是 c 中并未有的且很实用的语法特性，所以还是需要总结一下。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 定义
+定义时，引用(reference)标识符必须以符号 & 开头，右值为被绑定的对象，即为对象 *起了另外一个名字* ，也就是说：
+- 引用变量本身并不占用内存空间
+- 所以定义引用变量必须与对象一一绑定(bind)在一起且类型一致，不然逻辑上就说不通
+  + 字面值或某个表达式都不是对象，不能与它们绑定（const 引用是个例外）
+- 引用只能与初始对象绑定，而后不能重新绑定到另一个对象
+- 引用也可以在定义时与另一个引用绑定，相当于绑定到了初始对象上，实际上还是给初始对象新增加了一个别名
+
+#+BEGIN_SRC c++
+  int i = 1024, i2 = 2048; //i 与 i2 都是 int 型变量
+  int &r = i, r2 = i2;//r 是引用，与 i 绑定在一起，r2 是 int 型变量，初值取 i2 的值
+  int i3 = 1024, &ri = i3;//i3 是 int 型变量，r1 是引用，与 i3 绑定在一起
+  int &r3 = i3, &r4 = i2;//r3 是引用，与 i3 绑定在一起，r4 是引用与 i2 绑定在一起
+#+END_SRC
+* 引用与指针
+指针也实现了对其他对象的间接访问，但有两点不同：
+- 指针本身就是一个对象，它会占用内存空间，也可以在其生命周期内指向不同的对象
+- 指针无须在定义时赋值
+  + 但要养成好的习惯来赋值，若开始没有值则赋值为 =nullptr=
+
+也需要注意：
+- 由于指针是需要指向一个对象的，而引用不是对象，它没有实际地址， *所以不能定义指向引用的指针。*
+- 又由于指针是一个对象，所以可以又引用绑定到指针
+#+BEGIN_SRC c++
+  int i = 42;
+  int *p = nullptr;
+  int *&r = p; // r 是一个对 int 型指针的引用
+
+  r = &i; //p 存放变量 i 的地址
+
+  *r = 0; //将 i 的值赋值为 0
+#+END_SRC
+* const 变量与引用
+由于 const 变量也是对象，所以可以将引用与其绑定，称为 *对常量引用(reference to const)* 。
+- 那么很自然的，也不能通过引用来修改 const 变量的值。
+  
+在初始化常量引用时，允许用任意表达式作为初始值：
+- 但普通引用不能这么做
+#+BEGIN_SRC c++
+  int i = 42;
+  const int &r1 = i; //将 const int 引用绑定到普通 int 变量上，也就无法通过 r1 修改 i 的值
+  const int &r2 = 42;//const int 引用，这种情况下是编译器创建了一个匿名的临时量
+  const int &r3 = r1 * 2; //r1 * 2 也是常量，所以可以这么用
+  int &r4 = r1 * 2; //这种用法错误！
+#+END_SRC
+
+** 顶层与底层 const
+当用 const 修饰指针时：
+- *顶层 const(top-level const)* 表示指针本身是个常量
+  + 实际上可以表示任意对象
+- *底层 const(low-level const)* 表示指针所指对象是一个常量
+  + 还有用于声明引用的 const 都是底层 const
+    
+当执行对象的拷贝操作时，顶层 const 不受影响，而对象必须具有相同的底层 const 或两个数据类型必须能转换。
+- 因为顶层 const 变量拷贝给其他变量，并不会影响它自身的值。而底层 const 则是会影响的。
+** constexpr 和 常量表达式
+常量表达式(const expression)是指可以 *在编译时就确定值* 且值不会被改变的表达式。
+
+当我们认定一个变量是常量表达式，可以声明成 =constexpr= 类型，由编译器来验证变量是否是常量表达式：
+#+BEGIN_SRC c++
+  int staff_size = 27; //不是常量表达式
+  constexpr int mf = 20; //是常量表达式
+  constexpr int limit = mf + 1; //是常量表达式
+#+END_SRC
+
+=constexpr= 与指针使用时，只影响指针，并不影响它所指向的变量：
+- 也就是说它是顶层 const
+#+BEGIN_SRC c++
+  const int *p = nullptr; //p 是一个指向整型常量的指针，它不能改变它所指向变量的值
+  constexpr int *q = nullptr; //q 是一个指向整数的常量指针，它不能改变自己的值
+  constexpr const int *j = &i; // j 是一个常量指针，并且指向整型常量
+#+END_SRC
+
+
+
+
+
+

@@ -1,0 +1,136 @@
+#+TITLE: [What] c++ 类型别名
+#+DATE:<2019-12-30 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_varname.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<primer c++ 5th>>
+
+在 c 中使用 =typedef= 关键子为复杂类型定制别名，而 c++ 在此基础上还提供了更为灵活的方法。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* using
+#+BEGIN_SRC c++
+  #include <iostream>
+
+  int main(void)
+  {
+    using b = int;
+    b a = 1;
+
+    std::cout << "The value of a is " << a << std::endl;
+
+    return 0;
+  }
+#+END_SRC
+在命名空间中 =using= 可用于声明使用命名空间中的哪个名字：
+#+BEGIN_SRC c++
+  #include <iostream>
+
+  using std::cin;
+  using std::cout;
+  using std::endl;
+  int main(void)
+  {
+
+    int a,b;
+
+    cin >> a >> b;
+    cout << "The sum of " << a << " + " << b << " is " << a + b << endl;
+
+    return 0;
+  }
+#+END_SRC
+*注意* ： 不要在头文件中使用 =using= 声明，因为这有可能导致使用者出现名字冲突而不好排查问题所在。
+* auto
+当代码变得复杂后，想要声明一个变量时确定其具体类型并不那么容易，c++ 可以使用 =auto= 类型说明符让编译器来分析变量类型。
+
+这样做至少有两点好处：
+- 由编译器根据其初值来确定变量类型，避免程序员设定错误的类型而导致后面的运算错误
+- 当给变量设定的初值类型改变后，对应的这个 auto 变量类型会自动的改变，也降低了出错概率
+
+根据上面的结论，可以知道： *auto定义的变量必须有初始值* 。
+#+BEGIN_SRC c++
+  #include <iostream>
+
+  int main(void)
+  {
+    int a = 10;
+    auto b = a;
+
+    std::cout << "The value of b is " << b << std::endl;
+
+    auto &c = b;//引用也可以使用 auto
+
+    c = 20;
+
+    std::cout << "The value of b is " << b << std::endl;
+
+
+    return 0;
+  }
+#+END_SRC
+
+auto 一般会忽略掉顶层 const，但会保留底层 const:
+#+BEGIN_SRC c++
+  int i = 0;
+  const int ci = i, &cr = ci;
+  auto b = ci;//b 是一个整型变量
+  auto c = cr;//c 是一个整型变量
+  auto d = &i;//d 是一个指向整型的指针
+  auto e = &ci;//e 是一个指向整型常量的指针（因为此时 ci 的 const 相对 e 是底层 const）
+  const auto f = &ci;//f 是一个指向整型常量的常量指针，也就是说需要顶层 const 的话需要显示指明
+#+END_SRC
+* decltype
+=decltype= 可以从表达式的类型推断出要定义变量的类型， *但不会用该表达式的值初始化变量。*
+- 这个过程是由编译器来完成的
+
+#+BEGIN_SRC c++
+  #include <iostream>
+
+  int main(void)
+  {
+    int a = 10;
+    auto b = a;
+
+    std::cout << "The value of b is " << b << std::endl;
+
+    decltype(a) c = 1;
+
+    std::cout << "The value of c is " << c << std::endl;
+
+
+
+    return 0;
+  }
+#+END_SRC
+
+如果 decltype 使用的表达式是一个变量，则 decltype 返回该变量的完整类型：
+#+BEGIN_SRC c++
+  const int ci = 0, &cj = ci;
+
+  decltype(ci) x = 0; // x 是一个 const int 类型的变量
+  decltype(cj) y = x; // y 是一个 const int & 类型的变量
+  decltype(cj) z; //定义错误，z 是一个引用，所以必须与对象绑定
+#+END_SRC
+
+如果 decltype 使用的表达式不是一个变量，则 decltype 返回表达式 *结果对应的类型* ：
+#+BEGIN_SRC c++
+  int i = 42, *p = &i, &r = i;
+  decltype(r + 0) b; //虽然 r 是 int 引用，但 r + 0 的结果是 int，所以 b 是 int 型变量
+  decltype(*p) c; //p 使用解引用， decltype 得到的就是 int & ，所以 c 必须初始化
+  decltype((i)) d;// 这种情况下编译器将 (i) 视为表达式， d 是一个 int &，所以 d 必须初始化
+  decltype(i) e;//这种情况下编译器将 i 视为变量，e 就是一个 int 型变量
+#+END_SRC
+
+
+
+
+
+
+
+

@@ -1,0 +1,91 @@
+#+TITLE: [What] c++ 标准库 string
+#+DATE:<2019-12-31 二> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_string.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<primer c++ 5th>>
+
+因为标准库中的 =string= 类使用很频繁，所以这里也记录一下。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 基础
+** 定义和初始化对象
+=string= 类是可变长的字符序列，比 c 中的字符数组可是好用太多了。
+
+在使用 =string= 前，需要包含其头文件，并且其名称也是定义在命名空间 =std= 中：
+#+BEGIN_SRC c++
+  #include <string>
+  using std::string;
+#+END_SRC 
+
+初始化 =sting= 常用的方式如下:
+#+BEGIN_SRC c++
+  string s1; //使用类默认构造函数
+  string s2 = s1; //s2 拷贝 s1 的数据初始化
+  string s3(s1); //效果同上
+  string s4 = "hiya"; //拷贝字符串赋值给 s3，除开最后一个空字符
+  string s5("hiya"); //直接初始化，效果同上
+  string s6(10, \'c\'); //直接初始化，调用一个构造函数初始化
+  string s7 = string(10, \'c\');//创建一个临时变量，拷贝方式初始化 s7
+#+END_SRC
+** string 对象的常用操作
+| 操作           | 解释                                                            |
+|----------------+-----------------------------------------------------------------|
+| os << s        | 将 s 内容写入流 os 中，返回 os                                  |
+| is >> s        | 从 is 流中读取字符串给 s，多个字符串以空白作区分，返回 is       |
+| getline(is, s) | 从 is 流中读取一行字符串给 s，返回 is，这种方式会保留输入的空白，但不会保存换行符 |
+| s.empty()      | 当 s 为空时返回 true                                            |
+| s.size()       | 返回 s 中字符的个数                                             |
+| s[n]           | 以索引的方式获取 s 中的字符，从 0 开始                          |
+| s1 + s2        | 拼接 s1 和 s2                                                   |
+| s1 = s2        | s2 赋值给 s1                                                    |
+| s1 == s2       | 如果 s1 和 s2 的字符完全一样，则返回 true                       |
+| s1 != s2       | 如果 s1 和 s2 的字符不完全相等，则返回 true                     |
+| <，<=，>，>=   | 利用字符在字典中的顺序进行比较                                  |
+
+*** 关于 size() 方法
+=s.size()= 方法返回的类型是 =string::size_type= ，它是机器无关类型。
+- 但需要注意的是，它是无符号整型，所以 *不要与有符号整型在一个表达式中混用*
+  + 因为有符号整型与无符号整型在运算时，有符号整型会转为无符号型，这会相当迷惑人！
+
+在使用 =size_type= 时，可以与 =auto= 联用：
+#+BEGIN_SRC c
+  auto len = str.size();
+#+END_SRC
+*** COMMENT 关于字符拼接
+除了使用 =string= 对象拼接外，由于标准库允许吧字符字面值和字符串字面值转换为 =string= 对象，
+所以也可以用字面值来拼接。
+#+BEGIN_SRC c++
+  string s1 = "hello,";
+  string s2 = "world";
+
+  s1 += s2; // s1 的内容为 "hello,world"
+
+  string s3 = "hello";
+  string s4 = "world";
+
+  s3 = s3 + ", " + s4 + \'\n\'; //s3 内容为 "hello, world\n"
+#+END_SRC 
+使用字面值拼接的时候，需要注意： *必须要确保加法运算符从左到右可以被编译器转换为 string 对象*
+
+
+#+BEGIN_SRC c++
+  //正确，s1 + "," 会被编译器转换为 string 对象，而后与 "world" 相加
+  string s1 = s1 + "," + "world";
+  //正确，"," + s1 会被编译器转换为 string 对象，而后与 "world" 相加
+  string s1 = "," + s1 + "world";
+  //错误，"," + "world" 对于编译器来讲只是两个字符串字面值，无法完成拼接
+  string s1 = "," + "world" + s1;
+#+END_SRC 
+
+
+
+
+
+
+

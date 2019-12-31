@@ -1,0 +1,46 @@
+#+TITLE: [What] c++ 中的对象初始化
+#+DATE:<2019-12-30 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_initialization.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<primer c++ 5th>>
+
+相比于简洁的 c，c++ 中初始化形式较多，也并不简单，这里专用于总结和归纳其初始化形式及注意事项。
+
+需要明确的一个概念是：
+#+BEGIN_EXAMPLE
+  初始化不是赋值，初始化的含义是在创建变量时赋予其一个初始值，而赋值的含义是把对象的当前值擦除后再以一个新值来替代。
+#+END_EXAMPLE
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 列表初始化(list initialization)
+初始化变量可以用以下 4 种方式：
+#+BEGIN_SRC c
+  int a = 0;
+  int b = {0};
+  int c{0};
+  int d(0);
+#+END_SRC
+其中以花括号形式的初始化称为列表初始化。
+
+当将列表初始化用于内置类型时，如果初始化列表存在丢失信息的风险，编译器将报错：
+#+BEGIN_SRC c
+  //由于浮点数会被取整，所以这里编译器会报错
+  int b = {3.14159f};
+#+END_SRC
+* 默认初始化(default initialization)
+变量没有被指定初值时，则会被默认初始化：
+- 全局变量默认被初始化为 0
+- 局部变量取栈上的内存，其值不确定
+  + 所以要养成好的习惯，局部变量必须先初始化。
+- 类的默认初始值由类本身决定
+  + 并不是所有的类都支持默认初始化
+
+
+
