@@ -57,7 +57,7 @@
 #+BEGIN_SRC c
   auto len = str.size();
 #+END_SRC
-*** COMMENT 关于字符拼接
+*** 关于字符拼接
 除了使用 =string= 对象拼接外，由于标准库允许吧字符字面值和字符串字面值转换为 =string= 对象，
 所以也可以用字面值来拼接。
 #+BEGIN_SRC c++
@@ -89,3 +89,37 @@
 
 
 
+** string 中对字符的处理
+=cctype= 中定义了一组标准库函数处理字符
+- cname 形式头文件是从 c 对应头文件转过来的，只不过 cname 中的变量名属于命名空间 =std= ，所以 c++ 代码应该尽量使用 cname 头文件
+| 函数        | 说明                                                  |
+|-------------+-------------------------------------------------------|
+| isalnum(c)  | 当 c 是字母或数字时为真                               |
+| isalpha(c)  | 当 c 是字母时为真                                     |
+| iscntrl(c)  | 当 c 是控制字符时为真                                 |
+| isdigit(c)  | 当 c 是数字时为真                                     |
+| isgraph(c)  | 当 c 不是空格但可以打印时为真                         |
+| islower(c)  | 当 c 是小写字母时为真                                 |
+| isprint(c)  | 当 c 是可打印字符时为真                               |
+| ispunct(c)  | 当 c 是标点符号时为真                                 |
+| isspace(c)  | 当 c 是空白（空格、制表符、回车、换行、进纸符）时为真 |
+| isupper(c)  | 当 c 是大写字母时为真                                 |
+| isxdigit(c) | 当 c 是 16 进制时为真                                 |
+| tolower(c)  | 当 c 是大写字母，输出小写字母                         |
+| toupper(c)  | 当 c 是小写字母，输出大写字母                         |
+
+*** 范围 for 语句
+要依次获取 string 对象中的字符，范围 for 语句是个很好的选择：
+#+BEGIN_EXAMPLE
+  //从序列 expression 中依次取出一个元素赋值给 declaration ，然后经由 statement 处理
+  for(declaration : expression)
+      statement
+#+END_EXAMPLE
+如果要通过范围 for 语句改变 string 中的内容，那么 declaration 需要是引用：
+#+BEGIN_SRC c
+  string s("Hello world!");
+  for(auto &c : s)
+    c = toupper(c);
+
+  cout << s << endl;
+#+END_SRC
