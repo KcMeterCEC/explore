@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
-学习书籍：<<primer c++ 5th>>
+学习书籍：<<c++ primer 5th>>
 
 在 c 中使用 =typedef= 关键子为复杂类型定制别名，而 c++ 在此基础上还提供了更为灵活的方法。
 #+BEGIN_HTML

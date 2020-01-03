@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
-学习书籍：<<primer c++ 5th>>
+学习书籍：<<c++ primer 5th>>
 
 因为标准库中的 =vector= 类使用很频繁，所以这里也记录一下。
 #+BEGIN_HTML
@@ -63,3 +63,80 @@
 
 需要注意的是：如果循环体内部包含有向 vector 对象添加元素的语句，则 *不能使用范围 for 循环！*
 - 因为这会无限遍历下去
+** 迭代器
+*** 为什么要用迭代器
+=vector= 可以通过下标来访问元素，但并不是所有的容易都支持使用下标，但在标准库容器中都可以使用迭代器。
+
+*** 迭代器的使用
+容器使用方法 =begin= 和 =end= 来获得元素：
+- =begin= 指向第一个元素
+- =end= 指向 *最后一个元素的下一个位置(one past the end)* 
+  
+如果容器为空，则 =begin= 和 =end= 返回的是同一个迭代器，都是尾后迭代器。
+- 利用这个特性可以在 if 中判断 =begin= 和 =end= 是否相等来判断容器是否为空
+#+BEGIN_SRC c++
+  //因为不清楚迭代器准确的类型，所以此处用 auto 比较合适
+  auto b = v.begin, e = v.end();
+#+END_SRC
+迭代器支持如下运算符（和指针类似）：
+| 运算           | 说明                                                        |
+|----------------+-------------------------------------------------------------|
+| *iter          | 返回迭代器 iter 所指元素的引用                              |
+| iter->mem      | 解引用 iter 并获取该元素名为 mem 的成员，等价于 (*iter).mem |
+| ++iter         | 指向容器中的下一个元素                                      |
+| --iter         | 指向容器中的上一个元素                                      |
+| iter1 == iter2 | 两个迭代器相等则返回真                                      |
+| iter1 != iter2 | 两个迭代器不等则返回真                                      |
+#+BEGIN_SRC c++
+  for(auto it = s.begin(); it != s.end() && !isspace(*it); ++it)
+  {
+    ,*it = toupper(*it);
+  }
+#+END_SRC
+需要注意的是:
+- *并不是所有的容易都支持 < 运算符，所以在使用容器时判断是否扫描到了末尾一般使用 “!=” 运算符。*
+- *但凡使用了迭代器的循环体，都不要向迭代器所属的容器添加元素*
+  
+对于 =string= 和 =vector= 的迭代器还支持如下运算：
+| 运算          | 说明                                                 |
+|---------------+------------------------------------------------------|
+| iter + n      | 得到当前迭代器向前移动 n 个元素的迭代器， 注意别溢出 |
+| iter - n      | 得到当前迭代器向后移动 n 个元素的迭代器， 注意别溢出 |
+| iter += n     | 迭代器自身向前移动 n 个元素                          |
+| iter -= n     | 迭代器自身向后移动 n 个元素                          |
+| iter1 - iter2 | 得到两个迭代器之间的距离，其值可正可负               |
+| >，>=，<，<=  | 关系运算，比较的是迭代器位置                         |
+*** 迭代器的类型
+迭代器使用 =iterator= 和 =const_iterator= 来表示迭代器的类型：
+#+BEGIN_SRC c++
+  vector<int>::iterator it;//创建一个能读写 vector<int> 元素的迭代器
+  string::iterator it2; //创建一个能读写 string 中字符的迭代器
+
+  vector<int>::const_iterator it3;//it3 只能读元素不能写元素
+  string::const_iterator it4; //it4 只能读字符不能写字符
+#+END_SRC
+同样的， =begin= 和 =end= 的返回类型也由容器元素是否是常量决定：
+- 当元素是常量， =begin= 和 =end= 返回 =const_iterator= 
+- 当元素是非常量， =begin= 和 =end= 返回 =iterator= 
+
+当元素是非常量但是我们写代码又不想改变其值时，可以用 =cbegin= 和 =cend= 迭代器，它们返回 =const_iterator= 
+*** 标准函数 begin 和 end
+对于数组这种内置类型，是没有 begin 和 end 方法的，为了很好的遍历，可以使用对应的标准函数：
+#+BEGIN_SRC c++
+  #include <iterator>
+
+  int ia[] = {0,1,2,3,4,5,6,7,8,9};
+  int *beg = begin(ia);//指向数组首元素的指针
+  int *last = end(ia);//指向数组尾元素的下一位置的指针
+#+END_SRC
+** 数组初始化 vector
+也可以使用数组来初始化 =vector= 对象，需要指明拷贝区域的首元素地址和尾后地址：
+#+BEGIN_SRC c++
+  int int_arr = {0,1,2,3,4,5};
+
+  //拷贝整个数组到 ivec
+  vector<int> ivec(begin(int_arr), end(int_arr));
+  //拷贝一部分数组(1,2,3)到 subVec
+  vector<int> subVec(int_arr + 1, int_arr + 4);
+#+END_SRC
+

@@ -7,7 +7,7 @@
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
-学习书籍：<<primer c++ 5th>>
+学习书籍：<<c++ primer 5th>>
 
 左值引用(lvalue reference)是 c 中并未有的且很实用的语法特性，所以还是需要总结一下。
 #+BEGIN_HTML
@@ -27,7 +27,8 @@
   int i3 = 1024, &ri = i3;//i3 是 int 型变量，r1 是引用，与 i3 绑定在一起
   int &r3 = i3, &r4 = i2;//r3 是引用，与 i3 绑定在一起，r4 是引用与 i2 绑定在一起
 #+END_SRC
-* 引用与指针
+* 引用与指针、数组
+** 引用与指针
 指针也实现了对其他对象的间接访问，但有两点不同：
 - 指针本身就是一个对象，它会占用内存空间，也可以在其生命周期内指向不同的对象
 - 指针无须在定义时赋值
@@ -44,6 +45,74 @@
   r = &i; //p 存放变量 i 的地址
 
   *r = 0; //将 i 的值赋值为 0
+#+END_SRC
+** 引用与数组
+当指针与数组或引用与数组关联时，需要注意其阅读顺序为： *从数组名字开始按照由内向外的顺序。*
+#+BEGIN_SRC c++
+  int *ptrs[10];//ptrs 是一个含有 10 个元素的数组，每个元素是指向 int 型的指针
+  int &refs[10] = /*?*/; //错误：由于引用不是对象，所以无法创建元素是引用的数组
+  /*
+   ,*先从圆括号读起，首先 Parray 是一个指针，然后从右边看可以知道 Parray 是一个指向大小为 10 的数组的指针
+   ,*最后看左边是 int 型，最终就得出 Parray 是一个指向包含 10 个 int 型元素的数组的指针
+   ,*/
+  int (*Parray)[10] = &arr;
+  /*
+   ,*先从圆括号读起，首先 arrRef 是一个引用，然后从右边看可以知道 arrRef 引用对象是一个大小为 10 的数组
+   ,*最后看左边是 int 型，最终就得出 arrRef 是一个与 10 个 int 型元素的数组绑定的引用
+   ,*/
+  int (&arrRef)[10] = arr;
+  //arry 是一个与 10 个 int 型指针元素的数组绑定的引用
+  int *(&arry)[10] = ptrs;
+#+END_SRC
+
+当使用数组作为一个 auto 变量的初始值时，编译器得到的是指针。但使用 =decltype= 时，得到的就是一个数组：
+#+BEGIN_SRC c++
+  int ia[] = {0,1,2,3,4,5,6,7,8,9};
+  auto ia2(ia);//ia2 是一个整型指针，指向数组的首元素
+  decltype(ia) ia3 = {0,1,2,3,4,5,6,7,8,9};//ia3 根据 ia 推断也是一个含有 10 个数组的数组
+#+END_SRC
+** 范围 for 循环与多维数组
+*要使用范围 for 语句处理多维数组，除了最内层循环外，其他所有循环的控制变量都应该是引用类型。*
+
+#+BEGIN_SRC c++
+  //当要改变数组元素内容时
+  for(auto &row : array)
+    for(auto &col : row)
+      {
+        col = val;
+      }
+  //当不改变数组内容时
+  for(const auto &row : array)//如果这里不用引用，那么得到的不是数组而是指针，下一级 for 循环将会出错
+    for(auto col : row)
+      {
+        cout << col << end;
+      }
+#+END_SRC
+** 指针与多维数组
+基于 c++ 11 ，可以使用 =auto= 或 =decltype= 来简化指针与数组的操作：
+#+BEGIN_SRC c++
+  int ia[3][4];
+
+  //编译器生成的 p 是指向 ia 第一行的指针
+  //外层循环遍历行
+  for(auto p = ia; p != ia + 3; ++p)
+  {
+    //*p 指向每行的第一列，q 是指向每一列的指针
+    //内层循环遍历列
+    for(auto q = *p; q != *p + 4; ++q)
+      cout << *q << " ";
+    cout << endl;
+  }
+
+  //另一种简易实现方式
+  for(auto p = begin(ia); p != end(ia); ++p)
+  {
+    for(auto q = begin(*p); q != end(*p); ++q)
+      {
+        cout << *q << " ";
+      }
+    cout << endl;
+  }
 #+END_SRC
 * const 变量与引用
 由于 const 变量也是对象，所以可以将引用与其绑定，称为 *对常量引用(reference to const)* 。
