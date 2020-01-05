@@ -1,0 +1,25 @@
+#+TITLE: [What] c++ 强制类型转换
+#+DATE:<2020-01-05 日> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_cast.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+c++ 的强制类型转换和 c 有些不一样，这里也需要记录一下。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+命名的强制类型转换具有如下形式：
+#+BEGIN_EXAMPLE
+  cast-name<type>(expression);
+  #type 是要转换的目标类型
+  #expression 是要转换的值
+  #cast-name 是转换的方式
+#+END_EXAMPLE
+关于转换方式有如下几种：
+
+
