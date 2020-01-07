@@ -1,0 +1,22 @@
+#+TITLE: [What] c++ 函数
+#+DATE:<2020-01-06 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_func.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+c++ 中的函数比 c 的函数还是要强大一些，这里还是需要记录一下它的不同之处。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 参数传递
+当形参不是引用类型时，每次调用函数时，都会创建它的形参，并用传入的实参进行初始化。
+
+当形参是引用类型时，它将绑定到对应的实参上，这称为实参被 *引用传递（passed by reference）* ，或函数被 *传引用调用（called by reference）* 。
+- 这种情况下并不会创建形参，效率相对较高。
+
+
