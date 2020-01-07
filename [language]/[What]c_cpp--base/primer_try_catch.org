@@ -1,0 +1,90 @@
+#+TITLE: [What] c++ try...catch
+#+DATE:<2020-01-06 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_try_catch.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+try...catch 是 c 中没有的捕获运行时错误的方式，需要总结一下。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+当程序的某部分检测到一个它无法处理的问题时，需要用到异常处理，发出信号以通知上层。
+
+异常处理机制包含异常检测和异常处理：
+- =throw 表达式(throw expression)= 被用于抛出异常
+- =try 语句块(try block)= 中代码抛出的异常通常会被某个 =catch 子句(catch clause)= 处理， =catch= 子句中的代码被称为 =异常处理代码(exception handler)= 。
+
+c++ 还提供了一套 =异常类(exception class)= 用于在 throw 表达式和相关的 catch 子句之间传递异常的具体信息。
+
+目前 c/c++ 处理错误有下面几种形式，按照严格程度依次排列：
+- assert() : 断言用来捕捉程序绝不应该出错的位置，如果断言发生那么说明程序设计不合格，必须处理。
+  + 这在调试阶段是很好用的工具
+- try...catch : 异常捕捉的错误无法忽视，要忽视也只能显示的忽视，但程序可以勉强继续运行。
+  + 代码应该对 try...catch 进行相应的处理，比如资源回收之类的
+- errno : 调用函数返回错误，通过 errno 这种方式进行标识错误。
+  + 这种情况下代码也应该引起重视，至少应该将错误打印出来。并且 c 也没有 try..catch ，所以写代码要养成好习惯。
+- if...else : 这种一般就是站在业务逻辑的角度提醒用户输入有误之类的
+* throw 表达式
+throw 关键字后跟一个表达式，最后紧跟分号，构成一条抛出异常的表达式语句。
+- 抛出异常后，当前函数将被终止，控制权将转移给能处理该异常的代码。
+#+BEGIN_SRC c++
+  #include <stdexcept>
+  obj = find(device);
+  if(obj)
+  {
+    cout << "I have found device!" << endl;
+  }
+  else
+  {
+    throw std::runtime_error("sorry, I couldn't find device!");
+  }
+#+END_SRC
+* try 语句块
+#+BEGIN_SRC c++
+  try{
+    //要执行的正常语句，该代码块中的语句包含 throw 表达式
+   }catch (exception-declaration){
+    //处理当前 catch 到的 error 
+   }catch (exception-declaration){
+    //处理当前 catch 到的 error 
+   }
+#+END_SRC
+假设 try 中语句块抛出一个 runtime_error 异常
+#+BEGIN_SRC c++
+  try{
+    //...
+   }catch (runtime_error err){
+    cout << err.what() << endl;//输出异常的内容
+   }
+#+END_SRC
+当一段代码抛出异常后，会中断后面的执行代码，此异常会依次向上返回到调用的函数，直到调用它的函数中有 =catch= 子句为止。
+如果顶层的函数依然没有 =catch= 子句，那么一般情况下该程序会被终止。
+  
+
+
+
+* 标准异常
+c++ 标准库定义了一组类，用于报告标准库函数遇到的问题，用户也可以使用这些类，分别定义在以下头文件中：
+- =exception= 头文件定义了最通用的异常类 =exception= ，只报告异常发生，不提供额外信息。
+- =stdexcept= 头文件定义了几种常用的异常类：
+| 类               | 说明                                           |
+|------------------+------------------------------------------------|
+| runtime_error    | 只有在运行时才能检测出的问题                   |
+| range_error      | 运行时错误：生成的结果超出了有意义的值域范围   |
+| overflow_error   | 运行时错误：计算上溢                           |
+| underflow_error  | 运行时错误：计算下溢                           |
+| logic_error      | 程序逻辑错误                                   |
+| domain_error     | 逻辑错误：参数对应的结果值不存在               |
+| invalid_argument | 逻辑错误：无效参数                             |
+| length_error     | 逻辑错误：试图创建一个超出该类型最大长度的对象 |
+| out_of_range     | 逻辑错误：使用一个超出有效范围的值             |
+- =new= 头文件定义了 =bad_alloc= 异常类
+- =type_info= 头文件定义了 =bad_cast= 异常类
+  
+异常类的 =what= 成员函数用于返回异常的内容。
+

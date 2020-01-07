@@ -10,6 +10,8 @@
 学习书籍：<<c++ primer 5th>>
 
 c++ 的强制类型转换和 c 有些不一样，这里也需要记录一下。
+
+强制类型转换会绕过编译器的类型检查机制，在每次使用强制转换前都应该仔细斟酌。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML 
@@ -21,5 +23,21 @@ c++ 的强制类型转换和 c 有些不一样，这里也需要记录一下。
   #cast-name 是转换的方式
 #+END_EXAMPLE
 关于转换方式有如下几种：
+- static_cast:任何具有明确定义的类型转换，只要不包含底层 const，都可以使用 =static_cast=
+#+BEGIN_SRC c++
+  double slope = static_cast<double>(j) / i;
+  void *p = &slope;
+  double *dp = static_cast<double *>(p);
+#+END_SRC
+- const_cast: =const_cast= 只能改变运算对象的底层 const
+#+BEGIN_SRC c++
+  const char *pc;
+  //使用 const_cast 去掉底层 const 性质
+  //如果 pc 所指向的变量不具备写权限，若 p 执行写操作便会产生未定义的行为
+  char *p = const_cast<char *>(pc);
+#+END_SRC
+- reinterpret_cast:为运算对象的位模式提供较低层次上的重新解释
+  + 将对象的内容解释为另一种形式，比如改变指针的类型
+- dynamic_cast
 
 
