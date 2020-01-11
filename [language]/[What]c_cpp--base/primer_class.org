@@ -1,0 +1,358 @@
+#+TITLE: [What] c++ 类
+#+DATE:<2020-01-09 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_class.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+c++ 的类是极为重要的特性，需要好好理解。
+
+类的基本思想是 *数据抽象（data abstraction）* 和 *封装（encapsulation）* 。
+- 数据抽象依赖于 *接口（interface）* 和 *实现（implementation）* 分离的编程技术。
+  + 接口：暴露给用户此类可以执行的操作
+  + 实现：数据成员、负责接口实现的函数体以及定义类所需的各种私有函数
+- 封装实现了类的接口和实现的分离，封装后的类隐藏了它的实现细节，类用户只能使用接口而无法访问实现部分。
+  
+在 c++ 中， =struct= 也是一个类，与 =class= 唯一的区别就是默认的访问权限不一样。
+- =struct= 默认访问权限是 =public= ，而 =class= 则是 =private=
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 类的作用域
+类本身就是一个作用域，类的成员函数的定义嵌套在类的作用域之内。
+
+在类的作用域之外，普通的数据和函数成员只能由对象、引用或指针使用成员函数访问运算符来访问。
+
+对于类类型成员则使用作用域运算符访问。
+* 构造函数
+每个类都分别定义了它的对象被初始化的方式，类通过一个或几个特殊的成员函数来控制其对象的初始化过程，这些函数叫做 *构造函数（constructor）* 。
+
+构造函数的名字和类名相同，只是构造函数没有返回类型。并且构造函数可以有多个，和函数重载一样。
+- 构造函数不能声明成 const 的，因为构造函数就是来初始化成员的，这在逻辑上冲突了。
+** 合成的默认构造函数
+类通过一个特殊的构造函数来控制默认初始化过程，这个函数叫做 *默认构造函数（default constructor）* 。
+- 默认构造函数没有实参
+
+如果类并没有显示地定义 *任何构造函数* ，那么编译器就会隐式地定义一个默认构造函数（如果存在类内的初始值，就用它来初始化成员，否则默认初始化该成员）。
+- 编译器创建的构造函数又被称为 *合成的默认构造函数（synthesized default constructor）* 。
+
+需要注意的是：合成的默认构造函数只适合简单的类，建议养成好的习惯为每个类都定义默认构造函数。
+-  *当类定义了其他的构造函数但不是默认构造函数时，编译器也不会自动创建默认构造函数。*
+- 只有当类的内置类型或复合类型成员全部被赋予了类内初始值时，这个类才适合使用合成的默认构造函数。
+  + 否则生成局部变量时，该类的内置类型和复合类型成员的值是未定义的！
+    
+注意： *类内初始值必须以符号 = 或者花括号表示*
+** 默认构造函数
+当显示的初始化默认构造函数时，如果希望编译器来生成构造函数，可以在默认构造函数的参数列表后写上 “= default” 来要求编译器生成构造函数。
+- *需要在类声明中为数据成员提供初始值，才能使用这种特性*
+- “= default” 既可以和声明出现在类内部，也可以作为定义出现在类外部。
+  + 如果在类内部，则默认构造函数是内联的，在类外部则不是内联的。
+    
+如果一个构造函数为所有参数都提供了默认实参，则它实际上也定义了默认构造函数。
+#+BEGIN_SRC c++
+  struct Sales_data
+  {
+    Sales_data() = default;
+    Sales_data(istream&);
+    Sales_data(const string &no, unsigned int cnt, double price);
+    Sales_data(const string &no);
+    string isbn() const;
+    Sales_data &combine(const Sales_data &);
+    double avg_price() const;
+
+    std::string bookNo;
+    unsigned units_sold = 0;
+    double revenue = 0;
+  };
+#+END_SRC 
+
+当对象被默认初始化或值初始化时自动执行默认构造函数。
+
+默认初始化在以下情况下发生：
+- 在块作用域内不使用任何初始值定义一个非静态变量
+- 当一个类本身含有类类型的成员且使用合成的默认构造函数时
+- 当类类型的成员没有在构造函数初始值列表中显示地初始化时
+
+值初始化在以下情况下发生：
+- 在数组初始化的过程中如果提供的初始值数量少于数组的大小时
+- 当不使用初始值定义一个局部静态变量时
+- 当书写形如 T() 的表达式显式地请求值初始化时
+** 构造函数初始化列表
+ 在构造函数的函数体和参数列表之间加入 *构造函数初始值列表（constructor initialize list）* ，
+负责为新创建的对象的数据成员赋初始值。
+
+如果成员是 const、引用，或者属于某种未提供默认构造函数的类类型，我们必须通过构造函数初始值列表为这些成员提供初值。
+- *因为初始值列表是初始化，而在构造函数内输入赋值！*
+
+构造函数初始值是成员名字的一个列表，每个名字后面紧跟括号或花括号括起来的初始值，不同成员的初始化通过逗号分隔开来。
+- 当某个数据成员被构造函数初始值类别忽略时，它将以与合成默认构造函数相同的方式隐式初始化
+  + 同样的，那些隐式初始化的成员需要具有类内初始值
+
+#+BEGIN_SRC c++
+  Sales_data::Sales_data(const string &no, unsigned int cnt, double price)
+    : bookNo(no), units_sold(cnt), revenue(price * cnt)
+  {
+
+  }
+#+END_SRC
+
+需要注意的是：
+- 构造函数初始值列表只说明用于初始化成员的值，而不限定初始化的具体执行顺序，也就是说 *构造函数初始值列表中初始值的前后位置关系不会影响实际的初始化顺序* 。
+  + 成员的初始化顺序与它们在类定义中的出现顺序一致，可以养成好的习惯：定义顺序和初始化顺序一致。
+    + 为了避免初始化顺序引起的问题，尽量避免使用某些成员初始化其他成员！而应该用形参来初始化
+
+** 委托构造函数
+一个 *委托构造函数（delegating constructor）* 使用它所属类的其他构造函数执行它自己的初始化过程，也就是它把自己的一些或全部职责委托给了其他构造函数。
+
+委托构造函数也有一个成员初始值的列表和一个函数体，但成员初始值列表只有一个唯一的入口，就是类名本身。
+
+#+BEGIN_SRC c++
+  class Sales_data{
+  public:
+    //非委托构造函数
+    Sales_data(std::string s, unsigned cnt, double price):
+      bookNo(s), units_sold(cnt), revenue(cnt * price) {}
+    //委托构造函数
+    Sales_data() : Sales_data("", 0, 0){}
+    Sales_data(std::string s) : Sales_data(s, 0, 0){}
+    //此函数委托默认构造函数，morning构造函数再委托最开始的 3 参数构造函数
+    Sales_data(std::istream &is) : Sales_data()
+    {read(is, *this);}
+  };
+#+END_SRC
+* 拷贝、赋值和析构
+拷贝：对象会在以下几种情况下会被拷贝：
+- 初始化变量
+- 以值的方式传递
+- 返回一个对象
+  
+赋值：当使用了赋值运算符时，会发生对象的赋值操作。
+
+销毁：当对象不再存在时，执行销毁操作。
+
+当类不显示定义这些操作时，编译器将会合成这些操作，一般编译器生成的版本将对对象的每个成员执行拷贝、赋值和销毁操作。
+
+与合成默认构造函数一样，合成的拷贝、赋值和析构操作并不能保证对所有的类都可以工作。
+- 比如当类需要分配类对象之外的资源时，合成版本就会失效。
+* 访问控制与封装
+可以使用 *访问说明符（access specifiers）* 加强类的封装性 ：
+- 定义在 =public= 说明符之后的成员在整个程序内可被访问，作用范围直到下一个访问说明符或到达类结尾为止。
+  + =public= 成员定义了类的接口
+- 定义在 =private= 说明符之后的成员可以被类的成员函数访问，但不能被使用该类的代码访问。
+  + =private= 部分封装了类的实现细节
+* 友元
+** 函数友元
+类可以允许其他类或者函数访问它的非公有成员，方法是令其他类或者函数成为它的 *友元（friend）* 。
+
+在类中，使用 =friend= 关键字开始的函数声明语句，即可使得该函数成为该类的友元（一般在类开始或结束前的位置集中声明友元）。
+- 友元不是类的成员，也不受它所在的区域访问控制级别的约束。
+
+需要注意的是：
+#+BEGIN_EXAMPLE
+  友元的声明仅仅指定了访问的权限，而非一个通常意义上的函数声明。如果我们希望类的用户能够调用某个友元函数，那么我们就必须在友元声明之外再专门对函数进行一次声明。
+
+  一般吧友元声明与类本身放置在同一个头文件中。
+#+END_EXAMPLE
+
+#+BEGIN_SRC c++
+  class Sales_data
+  {
+    friend ostream &print(ostream&, const Sales_data&);
+    friend istream &read(istream&, Sales_data&);
+  public:
+    Sales_data() = default;
+    Sales_data(istream&);
+    Sales_data(const string &no, unsigned int cnt, double price);
+    Sales_data(const string &no);
+    string isbn() const;
+    Sales_data &combine(const Sales_data &);
+
+  private:
+    double avg_price() const;
+
+    std::string bookNo;
+    unsigned units_sold = 0;
+    double revenue = 0.0;
+  };
+  extern ostream &print(ostream&, const Sales_data&);
+  extern istream &read(istream&, Sales_data&);
+#+END_SRC
+** 类友元
+类还可以把其他的类定义成友元，也可以把其他类的成员函数定义成友元。友元函数能定义在类的内部，这样的函数是隐式内联的。
+
+如果一个类指定了友元类，则友元类的成员函数可以访问此类包括非共有成员在内的所有成员。
+#+BEGIN_SRC c++
+  class Screen{
+    //Window_mgr 的成员可以访问 Screen 类的私有部分
+    friend class Window_mgr;
+  };
+
+  class Screen{
+    //仅有 Window_mgr 的 clear 成员可以访问 Screen 类的私有部分
+    friend void Window_mgr::clear(ScreenIndex);
+  };
+#+END_SRC
+* 类中的成员
+** 类型成员
+类可以自定义某种类型在类中的别名，此别名一样具有访问限制，可以是 =public= 或 =private= ：
+- 类型别名需要先定义后使用，所以一般都在类最开始的地方定义
+#+BEGIN_SRC c++
+  class Screen{
+  public:
+    //也可以用 using pos = std::string::size_type;
+    typedef std::string::size_type pos;
+  private:
+    pos cursor = 0;
+    pos height = 0, width = 0;
+    std::string contents;
+  };
+#+END_SRC
+在 =public= 中定义的类型别名，其他用户也可以使用这个名字。
+** 内联成员
+在类声明中定义的成员是内联的，也可以在声明或类外定义的函数返回值前加入 =inline= 关键字显示的将其内联。
+** 可变数据成员
+如果希望在 const 成员函数类修改类的某个数据成员，需要在变量的声明中加入 =mutable= 关键字，此成员就是 *可变数据成员（mutable data member）* 。
+#+BEGIN_SRC c++
+  class Screen{
+  public:
+    void some_member() const;
+  private:
+    mutable size_t access_ctr;
+  };
+
+  void Screen::some_member() const
+  {
+    ++access_ctr;
+  }
+#+END_SRC
+** 基于 const 的重载
+一个 const 成员函数如果以引用的形式返回 *this，那么它的返回类型将是常量引用。
+- 也就是说无法直接通过此返回再次调用其会改变数据成员的函数
+  
+因为非常量版本的函数对于常量对象是不可用的，所以只能在一个常量对象上调用 const 成员函数。
+
+为此可以为操作函数定义一个常量和一个非常量版本，由编译器根据对象是否是 const 决定应该调用哪个版本。
+
+#+BEGIN_SRC c++
+  #include <iostream>
+  #include <string>
+
+  using std::cout;
+  using std::cin;
+  using std::endl;
+  using std::string;
+  using std::ostream;
+
+  class Screen
+  {
+  public:
+      typedef string::size_type pos;
+
+      Screen() = default;
+      Screen(pos w, pos h, char c);
+      Screen(pos w, pos h);
+
+      char get(pos w, pos h) const;
+      char get() const;
+      Screen &move(pos x, pos y);
+      Screen &set(char c);
+      Screen &set(pos x, pos y, char c);
+      Screen &display(ostream &os) ;
+      const Screen &display(ostream &os) const;
+  private:
+      pos height = 0;
+      pos width = 0;
+      pos cursor = 0;
+      string contents;
+
+      void do_display(ostream &os) const;
+  };
+
+  Screen::Screen(pos w, pos h, char c)
+  :width(w), height(h), contents(w * h, c)
+  {
+
+  }
+  Screen::Screen(pos w, pos h)
+  :width(w), height(h), contents(w * h, ' ')
+  {
+
+  }
+
+  char Screen::get() const
+  {
+      return contents[cursor];
+  }
+
+  char Screen::get(pos w, pos h) const
+  {
+      return contents[ h * width + w];
+  }
+
+  Screen & Screen::move(pos x, pos y)
+  {
+      cursor = y * width + x;
+
+      return *this;
+  }
+  Screen & Screen::set(char c)
+  {
+      contents[cursor] = c;
+
+      return *this;
+  }
+  Screen & Screen::set(pos x, pos y, char c)
+  {
+      contents[y * width + x] = c;
+
+      return *this;
+  }
+  Screen & Screen::display(ostream &os) 
+  {
+      do_display(os);
+      return *this;
+  }
+  const Screen & Screen::display(ostream &os) const
+  {
+      do_display(os);
+      return *this;
+  }
+  void Screen::do_display(ostream &os) const
+  {
+      os << contents;
+  }
+
+  int main(void)
+  {
+      Screen myScreen(5, 3);
+      const Screen blank(5, 3);
+
+      //非常量版本
+      myScreen.set('#').display(cout);
+      //常量版本
+      blank.display(cout);
+
+      return 0;
+  }
+
+#+END_SRC
+* 类类型
+每个类定义了唯一的类型， *即使两个类的成员完全一样，这两个类也不是一个类型*
+#+BEGIN_SRC c++
+  struct First{
+    int memi;
+    int getMem();
+  };
+
+  struct Second{
+    int memi;
+    int getMem();
+  };
+
+  First obj1;
+  Second obj2 = obj1; //错误，两个类型不同
+#+END_SRC

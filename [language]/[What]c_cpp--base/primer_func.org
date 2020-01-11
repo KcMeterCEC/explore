@@ -14,9 +14,287 @@ c++ 中的函数比 c 的函数还是要强大一些，这里还是需要记录�
 <!--more-->
 #+END_HTML 
 * 参数传递
-当形参不是引用类型时，每次调用函数时，都会创建它的形参，并用传入的实参进行初始化。
+** 形参与引用
+当形参不是引用类型时，每次调用函数时，都会创建它的形参，并用传入的实参进行初始化，这称为实参被 *值传递（passed by value）* ，或函数被 *传值调用（called by value）* 。
 
 当形参是引用类型时，它将绑定到对应的实参上，这称为实参被 *引用传递（passed by reference）* ，或函数被 *传引用调用（called by reference）* 。
 - 这种情况下并不会创建形参，效率相对较高。
+  
+在有引用这种特性的情况下，显然使用引用替代指针是一个好的习惯。
+
+- 当函数需要改变实参的值时，使用引用。
+- 当函数不需要改变实参，但要改变形参时，使用普通形参。
+- 当函数不需要改变形参时，使用常量引用。
+  + 使用常量引用的好处是，调用函数可以直接传入字面值，并且这个过程还不会发生拷贝，效率较高。
+** 可变形参
+当要输入的形参个数可变时，有以下 3 种方式：
+- 如果所有实参类型相同，可以传递一个名为 =initializer_list= 的标准库类型。
+- 如果实参的类型不同，那就需要使用可变参数模板
+- 与 c 函数交互的情况下可以使用省略号形参
+*** initializer_list 形参
+对于 =initializer_list= 类可用操作如下表：
+| 操作                              | 说明                                     |
+|-----------------------------------+------------------------------------------|
+| initializer_list<T> lst           | 默认初始化一个 T 类型的空列表            |
+| initializer_list<T> lst{a,b,c...} | 使用列表初始化 lst，列表中的元素是 const |
+| lst2(lst)                         | 将 lst 中的元素与 lst2 *共享*            |
+| lst2 = lst                        | 同上                                     |
+| lst.size()                        | 返回列表中元素的数量                     |
+| lst.begin()                       | 返回指向 lst 中首元素的指针              |
+| lst.end()                         | 返回指向 lst 中尾元素的下一位置的指针    |
+
+=initializer_list= 的操作和 =vector= 类型，但是需要注意的是： 
+1. *initializer_list 对象中的元素永远是常量值*
+2. 在直接传入参数时，要使用初始化列表的方式。
+
+
+编写一个可以输出错误信息的函数：
+#+BEGIN_SRC c++
+  #include <iostream>
+  #include <initializer_list>
+
+  using std::cout;
+  using std::cin;
+  using std::endl;
+  using std::initializer_list;
+
+  int int_sum(initializer_list<int> input)
+  {
+    int sum = 0;
+    for(int i : input)
+      {
+        sum += i;
+      }
+
+
+    return sum;
+  }
+
+  int main(void)
+  {
+
+    int sum = int_sum({1,2,3,4,5,6,7,8,9});
+    cout << sum << endl;
+
+    return 0;
+  }
+#+END_SRC
+*** 省略符形参
+省略符形参仅仅用于 c 和 c++ 的通用类型，并且也是便于 c++ 访问某些特殊的 c 代码而设置的。
+** 默认实参
+函数可以给形参设定默认值，称为 *默认实参（default argument）* ，调用含有默认实参的函数时，可以包含该实参，也可以省略该实参。
+
+可以为函数的一个或多个形参定义默认值，一旦某个形参被赋予了默认值， *它后面的所有形参都必须有默认值。*
+
+函数调用时，实参按其位置解析，默认实参负责填补函数调用缺少的 *尾部实参。*
+- 所以在设计含有默认实参的函数时，要让那些经常使用默认值的形参出现在后面
+#+BEGIN_SRC c++
+  typedef string::size_type sz;
+  //为每个形参定义默认值
+  string screen(sz ht = 24, sz wid = 80, char backgrnd = \' \');
+
+  string window;
+  window = screen();  //screen(24, 80, ' ')
+  window = screen(66);//screen(66, 80, ' ')
+  window = screen(66, 256);//screen(66, 256, ' ')
+  window = screen(66, 256, \'#\');//screen(66, 256, '#')
+
+  window = screen(, , \'?\');//错误，不能跳过前两个实参
+  window = screen(\'?\');//实际上是：screen('?', 80, ' ')
+#+END_SRC
+
+对于默认实参的声明，如果有多出声明，那么 *函数的后续声明只能为之前那些没有默认值的形参添加实参，而且该形参右侧的所有形参必须都有默认值*
+#+BEGIN_SRC c++
+  //首先一处声明
+  string screen(sz, sz, char = \'\');
+  //另一处声明
+  string screen(sz, sz, char = \'*\'); //错误，重复声明
+  //另一处声明
+  string screen(sz = 24, sz = 80, char);//正确，在原来基础上添加默认实参
+#+END_SRC
+
+可以用全局变量为默认实参，并且全局变量的值改变了其默认实参的值也会被改变：
+#+BEGIN_SRC c++
+  sz wd = 80;
+  char def = \' \';
+  sz ht();
+
+  string screen(sz = ht(), sz = wd, char = def);
+
+  string window = screen();//screen(ht(), 80, ' ')
+
+  void f2()
+  {
+    def = \'*\';//改变了默认实参
+    sz wd = 100;
+    window = screen(); //screen(ht(), 80, '*')
+  }
+#+END_SRC
+* 返回值
+** 列表初始化返回
+c++11 及以后函数可以返回花括号包围的值的列表，这个值的列表用于初始化函数返回的临时量，然后拷贝给调用此函数的值。
+
+#+BEGIN_SRC c++
+  vector<string> process()
+  {
+    //...
+    return {"abc","def","ijk"};
+  }
+#+END_SRC
+** 返回数组指针
+函数返回数组指针有以下 4 种方式：
+*** 传统方式
+#+BEGIN_EXAMPLE
+  # 数组的维度必须跟在函数的形参列表之后
+  # Type 表示元素的类型
+  # dimension 表示数组的大小
+  # (*function(parameter_list)) 两端的括号必须存在
+  # 最终表示的含义就是：函数 function，带有形参列表 parameter_list，它返回的是一个指向大小为 dimension 的 类型是 Type 的数组的指针
+  Type(*function(parameter_list))[dimension]
+
+  //函数 func，其带有一个形参是 int 类型
+  //它的返回类型是一个大小为10，元素为 int 型数组的指针
+  int (*func(int i))[10];
+#+END_EXAMPLE
+
+*** 类型别名
+也可以使用类型别名来完成这种声明，比前一种更易于阅读：
+#+BEGIN_SRC c++
+  typedef int arrT[10]; //arrt 表示一个含有 10 个整型的数组
+
+  using arrT = int[10];//同上，但这种更易于理解
+
+  arrT *func(int i);//func 返回一个指向含有 10 个整数的数据指针
+#+END_SRC 
+
+*** 尾置返回类型
+也可以使用 *尾置返回类型（trailing return type）* 来简化申明。
+
+尾置返回类型跟在形参列表后并以箭头符号开头，原来返回类型处使用 =auto= 替代：
+#+BEGIN_SRC c++
+  //func 接受一个 int 类型的实参，返回一个指针，该指针指向含有 10 个整数的数组
+  auto func(int i) -> int(*)[10];
+#+END_SRC
+*** 使用 decltype
+使用 decltype 来声明返回类型：
+#+BEGIN_SRC c++
+  int odd[] = {1,3,5,7,9};
+  int even[] = {0,2,4,6,8};
+
+  //返回一个指针，该指针指向含有 5 个整数的数组
+  //decltype(odd) 的结果是数组，所以后面还要加 * 符号
+  decltype(odd) *arrPtr(int i)
+  {
+    return (i % 2) ? &odd : &even;
+  }
+#+END_SRC
+* 函数重载
+同一个作用域内的几个函数名字相同但形参列表不同，称之为 *重载（overloaded）函数* 。
+- 这些函数要保证它们的形参数量或形参类型上要有所不同。
+  + 也就是说仅有返回类型不同是不行的
+    
+当调用重载函数时，有 3 重可能的结果：
+- 编译器找到一个实参 *最佳匹配（best match）* 的函数，并生成调用该函数的代码
+- 找不到任何一个函数与调用的实参匹配，此时编译器发出 *无匹配（no match）* 的错误信息
+- 有多于一个函数可以匹配，但是每一个都不是明显的最佳选择。此时发生 *二义性调用（ambiguous call）* 错误。
+    
+需要注意的是：
+- 一般只有函数用于极为相似的操作时，才使用函数重载
+- 一个拥有顶层 const 的形参无法和另一个没有顶层 const 的形参通过实参区分开来。
+#+BEGIN_SRC c++
+  Record lookup(Phone);
+  Record lookup(const Phone);//重复声明
+
+  Record lookup(Phone *);
+  Record lookup(Phone * const);//重复声明
+#+END_SRC
+- 但如果是底层 const，则可以根据实参是常量对象还是非常量对象区分开来
+  + 当实参是非常量时，编译器会优先选用非常量版本的函数
+#+BEGIN_SRC c++
+  Record lookup(Account &);
+  Record lookup(const Account &);
+
+  Record lookup(Account *);
+  Record lookup(const Account *);
+#+END_SRC
+** const_cast 与 重载
+使用 =const_cast= 返回非常量：
+#+BEGIN_SRC c++
+  //对常量字符串返回常量引用
+  const string &shorterString(const string &s1, const string &s2)
+  {
+    return s1.size() <= s2.size() ? s1 : s2;
+  }
+
+  //对非常量字符串返回非常量引用
+  string &shorterString(string &s1, string &s2)
+  {
+    auto &r = shorterString(const_cast<const string &>(s1),
+                            const_cast<const string &>(s2));
+
+    return const_cast<string &>(r);
+  }
+#+END_SRC
+** 函数匹配
+当重载函数的形参数量相等以及某些形参的类型可以由其他类型转换得来时，需要注意函数匹配。
+
+编译器的函数匹配规则如下：
+- 第一步是选定本次调用对应的重载函数集，集合中的函数称为 *候选函数（candidate function）。*
+  + 候选函数具备两个特征：一是被调用的函数同名，二是声明在调用点可见
+- 第二步考察本次调用提供的实参，从候选函数中选出能被这组实参调用的函数，选出的函数称为 *可行函数（viable function）*
+  + 可行函数具备两个特征：一是形参数量与本次调用实参数量相等，二是每个实参的类型与对应的形参类型相同或能转换成形参的类型
+- 第三步考察实参的类型是否与形参匹配，实参类型与形参类型越接近，它们匹配得越好
+
+#+BEGIN_SRC c++
+  void f();
+  void f(int);
+  void f(int, int);
+  void f(double, double = 3.14);
+
+  //第一步，得到候选函数，以上 4 个函数都是候选函数
+  //第二步，选出可行函数，只有 f(int), f(double, double = 3.14) 是可行函数
+  //第三步，寻找最佳匹配，那么就是 f(double, double = 3.14) 是最佳匹配
+  f(5.6);
+
+  //第一步，得到候选函数，以上 4 个函数都是候选函数
+  //第二步，选出可行函数，只有 f(int,int), f(double, double = 3.14) 是可行函数
+  //第三步，寻找最佳匹配，由于 f(int,int), f(double, double = 3.14) 都有一个形参可以精确匹配。此时编译器会因为这个调用具有二义性而拒绝请求
+  f(42, 2.56);
+#+END_SRC
+
+为了确定最佳匹配，编译器将实参类型到形参类型的转换划分成几个等级，具体排序如下：
+- 精确匹配
+  + 实参类型和形参类型相同
+  + 实参从数组类型或函数类型转换成对应的指针类型
+  + 向实参添加顶层 const 或者从实参中删除顶层 const
+- 通过 const 转换实现的匹配
+- 通过类型提升实现的匹配
+- 通过算数类型的转换实现的匹配
+- 通过类类型的转换实现的匹配
+** 重载函数的指针
+当一个函数有多个重载函数时，函数指针的形参和返回必须精确匹配以确定指向哪一个函数。
+* constexpr 函数
+*constexpr 函数（constexpr function）* 是指能用于常量表达式的函数。
+
+定义 constexpr 函数需要遵循：函数的返回类型及所有形参的类型都必须是字面值类型，且函数体中必须有且只有一条 return 语句：
+- 为了能在编译过程中随时展开，constexpr 函数被隐式地指定为内联函数。
+#+BEGIN_SRC c++
+  constexpr int new_sz()
+  {
+    return 42;
+  }
+
+  constexpr int foo = new_sz(); // foo 是一个常量表达式
+
+  constexpr size_t scale(size_t cnt)
+  {
+    return new_sz() * cnt;
+  }
+
+  int arr[scale(2)]; //scale 的实参是常量表达式，所以其返回也是常量表达式
+
+  int i = 2;
+  int a2[scale(i)];//由于 scale(i) 不是常量表达式，所以此定义错误。
+#+END_SRC
 
 
