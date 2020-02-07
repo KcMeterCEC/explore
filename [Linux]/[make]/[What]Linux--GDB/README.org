@@ -147,6 +147,7 @@ gdb [exec file name] [core file]
 - 使用 =thread <index>= 跳转到对应线程id
   + 可以使用 =set scheduler-locking on= 来锁住调度器，禁止线程切换，以单独运行当前线程
     + 使用 =set scheduler-locking off= 来恢复调度器
+    + 使用 =set scheduler-locking step= 在当前线程单步执行时，其他线程不运行
 - 使用 =bt= 查看当前线程栈
 * 远程与目标板连接
 当目标板具有gdbserver时，可以远程链接主机gdb进行调试。

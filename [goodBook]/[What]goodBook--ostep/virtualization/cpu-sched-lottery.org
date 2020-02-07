@@ -151,6 +151,7 @@ nice 值对应内核中的 =weight= :
 
 加上优先级机制后，每个任务的时间片由下面公式决定:
 [[./cfs_time_slice.jpg]]
+
 - 当前任务的 =weight= 除以总运行任务的 =weight= 的和，再乘以 =sched_latency= 
 #+BEGIN_EXAMPLE
   比如当前系统有任务 A 和 B：
@@ -164,7 +165,8 @@ nice 值对应内核中的 =weight= :
 
 每个任务的 =vruntime= 由下面公式决定：
 [[./cfs_vruntime.jpg]]
-- 可以看到：当 nice 值越高， weight 越大，其 =vruntime= 增加得就越慢，那么它占用 CPU 的资源就越多。
+
+- 可以看到：当 nice 值越小， weight 越大，其 =vruntime= 增加得就越慢，那么它占用 CPU 的资源就越多。
 
 ** 使用红黑树完成调度策略
 红黑树的排序算法使得小 vruntime 的任务始终都在左子树，便可以直接得出下一次该调度的任务。

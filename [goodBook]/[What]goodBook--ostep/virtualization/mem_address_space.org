@@ -1,0 +1,30 @@
+#+TITLE: [What]The Abstraction: Address Spaces
+#+DATE: <2020-02-06 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_mem-address-spaces.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+再来复习一下地址空间的概念。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+从多道程序到时分复用，目的都是为了充分利用计算机昂贵的资源。
+
+但一旦有多个应用程序在内容中并发的运行，就需要避免自身的程序不能被其他程序有意或无意的修改。
+
+为了让程序员不用关注自身代码在物理内存中的摆放地址，操作系统便虚拟化了内存，此时程序所看到的地址空间就被称为 *address space* 。
+
+[[./mem_simple_addressSpace.jpg]]
+
+上图便是一个简易的 address space。
+
+需要明白的是 address space 中的地址都是虚拟地址，让应用程序认为自己独占了整个内存。
+
+虚拟化内存（virtual memory,VM）的目标如下：
+- 让应用程序认为自己独占真个内存空间，不用关心其他程序的内存占用
+- 利用 MMU 等硬件，使得虚拟化内存更加高效
+- 保护进程和操作系统的内存不能被其他程序所破坏
+
