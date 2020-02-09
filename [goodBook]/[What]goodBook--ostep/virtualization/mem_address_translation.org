@@ -1,0 +1,16 @@
+#+TITLE: [What]Mechanism: Address Translation
+#+DATE: <2020-02-09 日> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAMA: <book_ostep_mem-address-translation.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+[[http://kcmetercec.top/2018/03/26/hardware_basic_mmu/][之前站在 MMU 的角度，]]理解虚拟地址到物理地址的转换，現在看看這本神書的角度是如何描述的。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 從一個例子開始
+
+
