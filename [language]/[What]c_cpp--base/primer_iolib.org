@@ -1,0 +1,154 @@
+#+TITLE: [What] c++ IO库
+#+DATE:<2020-02-11 二> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAME: <language_cpp_iolib.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+学习 c++ 标准库下的 IO 操作。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* IO 类
+常用的 IO 标准库类如下：
+| 头文件   | 类型                                                                                 | 说明                                                          |
+|----------+--------------------------------------------------------------------------------------+---------------------------------------------------------------|
+| iostream | istream,wistream,ostream,wostream,iostream,wiostream                                 | 分别是从流读取、写入和读写数据，其中 =w= 代表宽字符版本       |
+| fstream  | ifstream,wifstream,ofstream,wofstream,fstream,wfstream                               | 分别是从文件读取、写入和读写数据，其中 =w= 代表宽字符版本     |
+| sstream  | istringstream,wistringstream,ostringstream,wostringstream,stringstream,wstringstream | 分别是从 string 读取、写入和读写数据，其中 =w= 代表宽字符版本 |
+
+类型 ifstream 和 istringstream 都继承自 istream，也就说对 cin 使用的方法同样适用于 ifstream 和 istringstream 对象。
+- 同理，ofstream 和 ostringstream 都继承自 ostream
+** IO 对象无拷贝或赋值
+IO 对象是不能被拷贝或赋值的，所以进行 IO 操作的函数通常以引用的方式传递和返回流，由于读写一个 IO 对象会改变其状态，所以 *传递和返回的引用也不能是 const 的* 。
+** 条件状态（condition state）
+IO 库提供了如下标志和方法表示当前对 IO 对象的操作状态：
+| 表示或方法        | 说明                                                |
+|-------------------+-----------------------------------------------------|
+| strm::iostate     | strm 是一种 IO 类型，iostate 提供条件状态的完整功能 |
+| strm::badbit      | 流已崩溃，系统级错误，不可恢复                      |
+| strm::failbit     | IO 操作失败，流还可以继续使用                       |
+| strm::eofbit      | 到达文件尾，同时 failbit 也会置位                   |
+| strm::goodbit     | 无错误                                              |
+| s.eof()           | 到达文件尾                                          |
+| s.fail()          | 操作失败                                            |
+| s.bad()           | 流已崩溃                                            |
+| s.good()          | 无错误                                              |
+| s.clear()         | 复位流的所有条件状态                                |
+| s.clear(flags)    | 复位指定状态                                        |
+| s.setstate(flags) | 设置指定状态                                        |
+| s.rdstate()       | 返回当前状态                                        |
+
+由于在 badbit 或 eofbit 被置位时， =fail()= 都会返回 true，那么在判断流状态时可以直接根据 =fail()= 的返回来判断总体上是否正确。
+
+又由于将流对象作为条件使用时，等价于 =!s.fail()= ，那么对流操作的最佳方式为：
+#+BEGIN_SRC c++
+  //1. 循环从流读入数据，失败则停止读入
+  while(cin >> word)
+  {
+    //读操作成功
+  }
+
+  //2. 若读取失败则判断失败原因
+  if(cin >> word)
+  {
+
+  }
+  else
+  {
+    if(cin.eof())
+      //到达文件尾
+    else
+      //流已崩溃
+  }
+#+END_SRC
+
+对条件状态的设置，通常如下操作：
+#+BEGIN_SRC c++
+  //记住当前状态，使用后以便恢复原来的状态
+  auto old_state = cin.rdstate();
+  cin.clear();
+  pricess_input(cin);
+  cin.setstate(old_state);
+
+  //清除固定位，而保持其他位不变
+  cin.clear(cin.rdstate() & ~cin.failbit & ~cin.badbit);
+#+END_SRC
+** 管理输出缓冲
+输出缓冲的目的就是为了将多次输出操作合并为一次，这样减小系统级 IO 调用，提高 IO 吞吐量。
+
+下面这些情况将会导致真正的系统调用：
+- 程序正常结束，作为 main 函数的 return 操作的一部分，缓冲刷新被执行
+- 缓冲区满时，系统需要将缓冲区数据写出去才能让你的数据写入
+- 使用 =endl= 或其他操纵符( =flush= , =ends= ，字符串中有 '\n' 换行符 )来主动刷新缓冲区
+  + =endl= 会插入换行操作
+  + =flush= 仅刷新缓冲区，不会附加任何额外字符
+  + =ends= 会插入一个空字符（注意是空字符，不是空格）后刷新缓冲区
+  + 字符串中有 '\n' 时，只会将换行符前的内容刷新
+- 在每个输出操作之后，用操纵符 =unitbuf= 设置流的内部状态，清空缓冲区， *仅刷新缓冲区，不附加任何字符* 。
+  + 默认情况下， =cerr= 设置了 =unitbuf= ，所以使用 =cerr= 方式输出的内容都是立即刷新的
+#+BEGIN_SRC c++
+  //之后 cout 的所有输出操作都会立即刷新缓冲区
+  cout << unitbuf;
+  //do something
+  //...
+
+  //回到正常的缓冲方式
+  cout << nounitbuf;
+#+END_SRC
+- 一个输出流可能被关联到另一个流，当读写被关联的流时，关联到的流的缓冲区会被刷新。
+  + 比如 =cin= 和 =cerr= 都关联到 =cout= ，当读 =cin= 或写 =cerr= 时会导致 =cout= 的缓冲区被刷新
+  + 标准库默认情况下就是将 =cout= 和 =cin= 关联在一起的，所以读 =cin= 时也会导致 =cout= 缓冲区被刷新。
+  + 使用 =tie()= 方法可以完成主动关联， *每个流只能同时关联到一个流，但多个流可以同时关联到同一个 ostream*
+  
+#+BEGIN_SRC c++
+  //使用流的 tie 方法将其与 cout 关联
+  cin.tie(&cout);
+  //cin 不再与其他流关联，tie 返回之前关联的流的指针
+  ostream *old_tie = cin.tie(nullptr);
+#+END_SRC
+* 文件输入输出
+文件类 =ifstream,ofstream,fstream= 除了继承自 =iostream= 类型的行为外，还增加了新的方法来操作文件：
+| 操作                    | 说明                                  |
+|-------------------------+---------------------------------------|
+| fstream fstrm;          | 创建一个未绑定的文件流                |
+| fstream fstrm(s);       | 创建一个 fstream，并打开名为 s 的文件 |
+| fstream fstrm(s, mode); | 以 mode 模式打开文件                  |
+| fstrm.open(s)           | 打开文件 s                            |
+| fstrm.close()           | 关闭与 fstrm 绑定的文件               |
+| fstrm.is_open()         | 与 fstrm 关联的文件是否处于打开状态   |
+
+** 使用文件流对象
+在新建文件流对象并与文件关联后便可以和 =cin,cout= 一样进行读写操作了。
+
+需要注意的是，在进行流操作时，依然也需要判断其状态标识，以确认操作是否成功。
+
+当 fstream 对象被销毁时，它的 =close()= 方法会被自动调用（析构函数）而关闭文件。
+** 文件模式(file mode)
+每个流都关联一个文件模式，如下列表：
+| 模式   | 说明                                                        |
+|--------+-------------------------------------------------------------|
+| in     | 以读方式打开，仅用于 ifstream,fstream                       |
+| out    | 以写方式打开，仅用于 ofstream,fstream，默认会截断文件       |
+| app    | 每次写操作前都定位到文件末尾，也就是附加写，不与 trunc 共用 |
+| ate    | 打开文件后立即定位到文件末尾                                |
+| trunc  | 截断文件，只有 out 被设定时才可以设定它                     |
+| binary | 以二进制方式操作                                            |
+
+=out= 默认会截断文件的，为了保存已有数据，需要指定 =app= 或 =in= 模式。
+* string 流
+=sstream= 头文件和 =fstream= 类似，也是提供了对 =string= 类的读写操作，并且它们也继承自 =iostream= 类。
+
+同理， =sstream= 也增加了新的方法来操作 string：
+| 操作            | 说明                                    |
+|-----------------+-----------------------------------------|
+| sstream strm;   | strm 是一个未绑定的 =stringstream= 对象 |
+| sstream strm(s) | strm 对象保存 string s 的一个拷贝       |
+| strm.str()      | 返回 strm 所保存的 string 的拷贝        |
+| strm.str(s)     | 将 string s 拷贝到 strm 中              |
+
+string 流通常用于处理一个或多个 string 的拷贝，比如拷贝一段字符串中的内容，然后得到的 string 流是多个单词。

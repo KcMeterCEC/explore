@@ -1,0 +1,40 @@
+#+TITLE: [What]Segmentation
+#+DATE: <2020-02-10 一> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_mem-segmentation.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+如果直接将整个程序的 address space 映射到物理内存，那么物理内存将会有很大的浪费，并且也无法运行太多其他程序，所以需要理解内存分段。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+仅将该程序用到的部分分段映射到物理内存的不同位置，这样在 address space 的其他未使用的部分就不会占用内存空间。
+
+于此同时，对应多段也会有多个物理内存基地址和限制值，通过虚拟地址的高位来区分段，地位得到段内偏移：
+#+BEGIN_SRC c
+  // get top 2 bits of 14-bit VA
+  Segment = (VirtualAddress & SEG_MASK) >> SEG_SHIFT
+  // now get offset
+  Offset = VirtualAddress & OFFSET_MASK
+  if (Offset >= Bounds[Segment])
+      RaiseException(PROTECTION_FAULT)
+  else
+      PhysAddr = Base[Segment] + Offset
+      Register = AccessMemory(PhysAddr)
+#+END_SRC
+
+除了物理内存基地址和大小限制值外，MMU 还需要以下支持：
+- 在 linux 中栈是向下增长的，那么其得出的 offset 其实为负值(Offset - Bounds[Segment])，MMU 要处理这种情况，就有一个寄存器位来存储当前这块内存的增长方向。
+- 同一个程序可以同时启动多个进程，那么他们的代码段实际上是可以共享的，但只能读不能写，为了保护各个内存段，就需要有权限位来表明这个内存段的可操作权限
+  
+[[./mem_seg.jpg]]
+
+为了让物理内存分得更为精细，实际上需要硬件支持识别很多段，这么多段的具体内容组成一个段表（segment table）存放于内存中。
+
+对于操作系统而言，它需要具有如下能力：
+- 进程进行上下文切换时，还要切换两个进程的页表
+- 当应用程序使用 =malloc()= 申请内存时，如果堆空间有限，那么需要从物理内存分配空间，然后修改此部分段表映射至进程虚拟空间
+- 尽量避免内存碎片，并在碎片过多时适当的进行碎片整理。

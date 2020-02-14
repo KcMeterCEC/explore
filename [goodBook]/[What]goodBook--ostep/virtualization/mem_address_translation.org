@@ -3,7 +3,7 @@
 #+TAGS: CS
 #+LAYOUT: post
 #+CATEGORIES: book,ostep
-#+NAMA: <book_ostep_mem-address-translation.org>
+#+NAME: <book_ostep_mem-address-translation.org>
 #+OPTIONS: ^:nil
 #+OPTIONS: ^:{}
 
@@ -11,6 +11,38 @@
 #+BEGIN_EXPORT html
 <!--more-->
 #+END_EXPORT
-* 從一個例子開始
+* 地址转换
+虚拟地址转为物理地址，需要在尽量保证高效的情况下实现此功能，那么就是如下的线性映射方式：
+#+BEGIN_EXAMPLE
+  physical address = virtual address + base
+#+END_EXAMPLE
+这就类似于数组可以高效的随机访问一样，直接在基地址上做一个偏移，没有比这更快的方式了：
+- PC 从虚拟地址处取指令
+- 底层硬件自动将虚拟地址加上基地址得到真正的物理地址
+- 最终从物理地址取指令
+  
+除此之外，还需要有一个限制值，也可以检查虚拟地址是否合法。
 
+* 对硬件的要求
+[[./mem_translation_hd_requirement.jpg]]
+
+为了实现内存的虚拟化，需要硬件做下面这些支持：
+- 可以切换 CPU 的模式为特权模式和用户模式，特权模式具有访问所有硬件的权限，用户模式用于运行应用程序
+- 每个 CPU 都得具有 MMU（memory management unit）提供基地址和地址限制值寄存器，并能够根据虚拟地址转换为物理地址。
+  + 当运行的进程不同，操作系统会填入当前进程对应的基地址和限制值（当然必须是在特权模式下才能更改这些值）
+- 当进程进行了非法访问后，硬件可以通知 CPU 发出异常，让操作系统来处理该异常进程。
+* 对操作系统的要求
+[[./mem_translation_sw_requirement.jpg]]  
+
+操作系统对应的也需要做如下支持：
+- 使用空闲列表维护物理内存当前哪些部分还未使用
+- 当一个新进程启动时，先从物理内存中找出空闲空间得出其基地址和限制值，写入 PCB（process control block） 中，并初始化 MMU
+- 当进程退出后，回收该进程的内存使用空间，重新挂入到空闲列表中
+- 当发生进程切换时，由于一个 CPU 仅有一对基地址和限制值寄存器，所以要将当前进程的基地址和限制值保存到 PCB 中，然后取出新运行进程的基地址和限制值
+- 当出现非法访问时，CPU 会发出异常，OS 要能获取该异常并进行相应的处理。
+  
+结合软件和硬件的配合流程如下图：
+[[./mem_translation_process1.jpg]]
+
+[[./mem_translation_process2.jpg]]
 
