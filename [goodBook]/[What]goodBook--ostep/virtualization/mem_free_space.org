@@ -83,6 +83,209 @@
 一般内存管理库最开始为向操作系统申请一块内存用于用户申请。
 
 当申请的内存过大时，内存管理库又会再次向操作系统申请一大块内存，然后此时申请内存的 API 才返回成功。
+** 示例程序
+下面这段示例代码便是很好的展示了内存碎片是如何产生的：
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <assert.h>
+  #include <sys/mman.h>
+  #include <stdint.h>
+  #include <string.h>
+
+  #define MEM_SIZE    (4096)
+  #define MAGIC       (0x12345678)
+
+  #if __SIZEOF_POINTER == 4
+  #define INT_TYPE    int32_t
+  #else
+  #define INT_TYPE    int64_t
+  #endif
+  typedef struct __node_t
+  {
+      INT_TYPE size;
+      struct __node_t *next;
+  }node_t;
+  typedef struct{
+      INT_TYPE size;
+      INT_TYPE magic;
+  }header_t;
+
+  static node_t *free_head;
+
+  static void print_mem(void)
+  {
+      printf("-----------------\n");
+      printf("The free spaces of memory are:\n");
+
+      node_t *node = free_head;
+    
+      uint8_t free_cnt = 1;
+
+      do
+      {
+          printf("free node <%d> at %p with %ld bytes\n", 
+                  free_cnt++, node, node->size);
+          node = node->next;
+      }while(node);
+      printf("-----------------\n");
+  }
+
+  static void create_mem(void)
+  {
+      free_head = mmap(NULL, MEM_SIZE, PROT_READ | PROT_WRITE,
+              MAP_ANON | MAP_PRIVATE, -1, 0);
+      assert(free_head);
+
+      free_head->size = MEM_SIZE - sizeof(node_t);
+      free_head->next = NULL;
+
+      print_mem();
+  }
+  static void my_free(void *ptr)
+  {
+      header_t *use_head = ptr - sizeof(header_t);
+      assert(use_head->magic == MAGIC);
+
+      node_t *node = free_head;
+      while(node->next)
+      {
+          node = node->next;
+      }
+      node_t *new_node = (node_t *)use_head;
+      new_node->next = NULL;
+      node->next = new_node;
+
+      print_mem();
+  }
+  static void *my_malloc(int size)
+  {
+      void *ptr = NULL;
+
+      node_t *node = free_head;
+      node_t *prev = NULL;
+
+      printf("finding free space...\n");
+      while(node)
+      {
+          printf("find node %p, with space %ld, next-> %p\n",
+                  node, node->size, node->next);
+          if(node->size >= size)
+          {
+              //move or insert a new node
+              uint16_t offset = sizeof(node_t) + size;
+              uint16_t free_size = node->size - size - sizeof(node_t);
+              printf("offset = %d\n", offset);
+              if(node == free_head)
+              {
+                  free_head = (node_t *)((uint8_t *)free_head + offset);
+                  free_head->size = free_size;
+              }
+              else
+              {
+                  node_t *new_node = (node_t *)((uint8_t *)node + offset);
+                  new_node->size = free_size;
+                  new_node->next = NULL;
+
+                  prev->next = new_node;
+              }
+
+              header_t *use_head = (header_t *)node;
+              use_head->magic = MAGIC;
+              use_head->size = size;
+
+              ptr = (void *)((uint8_t *)use_head + sizeof(header_t));
+
+              printf("used header : addr %p, size %ld\n",
+                      use_head, use_head->size);
+
+              break;
+          }
+
+          prev = node;
+          node = node->next;
+      }
+      print_mem();
+
+      if(!ptr)
+      {
+          printf("error: Sorry, I didn't find free space!\n");
+      }
+      else
+      {
+          printf("The address of malloc space is %p\n", ptr);
+      }
+
+
+      return ptr;
+  }
+
+  int main(void)
+  {
+      create_mem();
+
+      uint8_t *m1 = (uint8_t *)my_malloc(1000);
+      assert(m1);
+      memset(m1, 1, 1000);
+      uint8_t *m2 = (uint8_t *)my_malloc(1000);
+      assert(m2);
+      memset(m2, 2, 1000);
+      uint8_t *m3 = (uint8_t *)my_malloc(1000);
+      assert(m3);
+      memset(m3, 3, 1000);
+      uint8_t *m4 = (uint8_t *)my_malloc(1000);
+      assert(m4);
+      memset(m4, 4, 1000);
+
+      printf("\nfree memory:\n");
+      my_free(m2);
+      my_free(m4);
+
+      uint8_t *m5 = (uint8_t *)my_malloc(2000);
+      assert(m5);
+      memset(m5, 5, 1000);
+
+      return 0;
+  }
+#+END_SRC
+* 基础策略
+为了更好的管理空闲空间，有下面这些基础策略。
+** best fit
+将内存空间预选分隔为大小不同的多种块，当用户申请内存时，从遍历空闲列表，从空闲块中找出最小能满足申请需求的一块。
+
+- 优点：尽量的避免内存浪费
+- 缺点：每次查找最小块所耗费的时间较长
+** worst fit
+与 =best fit= 不同，当用户申请内存时，从空闲块中找出最大的一块内存，然后将剩余的内存放入空闲列表。
+
+- 优点：相比 =best fit= 更能避免内存浪费，因为 =best fit= 找到最小块后剩余的空闲部分有很大概率不会满足今后的申请大小需求了
+- 缺点：每次查找最大块所耗费的时间较长
+** first fit
+当用户申请内存时，找到第一个可以满足要求的内存块，剩余的部分放回空闲列表。
+
+- 优点：查询速度相比前两者要快得多
+- 缺点：这种方式将会产生很多小的内存块
+  + 如果内存列表是按照地址依次排列的话，可以将地址连续的小内存块和后面的一个块进行合并，以减少碎片
+** next fit
+使用一个指针保存上一次搜寻到的位置，下一次用户申请时，便从此处继续往后搜寻。
+
+- 优点：相比 =first fit= ，这种方式避免在空闲列表开头的部分存在很多碎片，而是使其均匀分布
+- 缺点：依然会有合并内存碎片的需求
+** 示例
+假设空闲内存列表如下，用户需要申请 15 字节的内存：
+[[./mempic/free_space_management/fit_normal.jpg]]
+
+那么按照 =best fit= 的策略，先遍历列表，找出最小满足块，那么就会选择第三块空闲块，最终的空闲列表如下：
+[[./mempic/free_space_management/fit_best.jpg]]
+
+这样如果用户还想继续再申请两个 15 字节内存的话，这张列表只能成功申请一次了。
+
+按照 =worst fit= 的策略，先遍历列表，找出最大满足块，那么就会选择第二块空闲块，最终的空闲列表如下：
+[[./mempic/free_space_management/fit_worst.jpg]]
+
+可以看到，如果这时用户还想继续再申请两个 15 字节内存的话，这张列表是可以满足了，因为 =worst fit= 策略可以尽量保证空闲块尽量的大，而不是很多无效的小块。
+
+按照 =first fit= 策略
+
 
 
 

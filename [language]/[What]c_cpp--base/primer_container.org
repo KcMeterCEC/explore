@@ -290,3 +290,130 @@ vector 和 string 为了提高扩容操作的效率，就在容器容量不够�
 - reserve 的参数只能扩大内存空间，不能减小， *resize()只改变元素的数目，而不是容器的容量！* 
   - 当 resize() 的值大于 capacity() 时，才会扩大内存空间
 - size() 指的是已保存元素的数目，而 capacity() 则是在不分配新内存空间的前提下，最多可以保存元素的数目
+* 额外的 string 操作
+string 在顺序容器的基础上提供了以下额外操作：
+** 构造 string
+| 操作                   | 说明                                               |
+|------------------------+----------------------------------------------------|
+| string s(cp,n)         | cp 数组中前 n 个字符的拷贝初始化 s                 |
+| string s(s2,pos2)      | string s2 从下标 pos2 开始的字符拷贝初始化 s       |
+| string s(s2,pos2,len2) | string s2 从下标 pos2 开始拷贝 len2 个字符初始化 s |
+| s.substr(pos,n)        | 返回一个 string，s 中从 pos 开始的 n 个字符拷贝    |
+** 改变 string 
+| 操作                  | 说明                                                 |
+|-----------------------+------------------------------------------------------|
+| s.insert(pos,args)    | 在 pos 之前插入 args 指定的字符                      |
+| s.erase(pos,len)      | 删除从位置 pos 开始的 len 个字符                     |
+| s.assign(args)        | 将 s 中的字符替换为 args 指定的字符                  |
+| s.append(args)        | 将 args 追加到 s                                     |
+| s.replace(range,args) | 删除 s 中范围 range 内的字符，替换为 args 指定的字符 |
+
+args 可以是下列形式之一，append() 和 assign() 可以使用所有形式：
+| 形式        | 说明                                |
+|-------------+-------------------------------------|
+| str         | 字符串 str                          |
+| str,pos,len | str 中从 pos 开始最多 len 个字符    |
+| cp,len      | 从 cp 指向的字符数组的前 len 个字符 |
+| cp          | cp 指向的以空字符结尾的字符数组     |
+| n,c         | n个字符 c                           |
+| b,e         | 迭代器 b 和 e 指定的范围内的字符    |
+| 初始化列表  | 花括号包围的，以逗号分隔的字符列表  |
+
+replace() 和 insert() 所允许的 args 形式依赖于 range 和 pos 是如何指定的：
+| replace        | replace    | insert     | insert     | args 可以是 |
+|----------------+------------+------------+------------+-------------|
+| (pos,len,args) | (b,e,args) | (pos,args) | (iter,args |             |
+| 是             | 是         | 是         | 否         | str         |
+| 是             | 否         | 是         | 否         | str,pos,len |
+| 是             | 是         | 是         | 否         | cp,len      |
+| 是             | 是         | 否         | 否         | cp          |
+| 是             | 是         | 是         | 是         | n,c         |
+| 否             | 是         | 否         | 是         | b2,e2       |
+| 否             | 是         | 否         | 是         | 初始化列表  |
+** string 内搜索
+| 操作                      | 说明                                              |
+|---------------------------+---------------------------------------------------|
+| s.find(args)              | 查找 s 中 args 第一次出现的位置                   |
+| s.rfind(args)             | 查找 s 中 args 最后一次出现的位置                 |
+| s.find_first_of(args)     | 在 s 中查找 args 中任何一个字符第一次出现的位置   |
+| s.find_last_of(args)      | 在 s 中查找 args 中任何一个字符最后一次出现的位置 |
+| s.find_first_not_of(args) | 在 s 中查找第一个不在 args 中的字符               |
+| s.find_last_not_of(args)  | 在 s 中查找最后一个不在 args 中的字符             |
+
+args 必须是以下形式之一：
+| 形式     | 说明                                                              |
+|----------+-------------------------------------------------------------------|
+| c,pos    | 从 s 中位置 pos 开始查找字符 c                                    |
+| s2,pos   | 从 s 中位置 pos 开始查找字符串 s2                                 |
+| cp,pos   | 从 s 中位置 pos 开始查找指针 cp 指向的以空字符结尾的 c 风格字符串 |
+| cp,pos,n | 从 s 中位置 pos 开始查找指针 cp 指向的数组前 n 个字符             |
+
+** 比较
+| 操作                          | 说明                                                                      |
+|-------------------------------+---------------------------------------------------------------------------|
+| s.compare(s2)                 | 比较 s 和 s2                                                              |
+| s.compare(pos1,n1,s2)         | 将 s 中从 pos1 开始的 n1 个字符与 s2 进行比较                             |
+| s.compare(pos1,n1,s2,pos2,n2) | 将 s 中从 pos1 开始的 n1 个字符与 s2 中从 pos2 开始的 n2 个字符比较       |
+| s.compare(cp)                 | 比较 s 与 cp 指向的字符数组                                               |
+| s.compare(pos1,n1,cp)         | 同 s.compare(pos1,n1,s2)                                                  |
+| s.compare(pos1,n1,cp,n2)      | 将 s 中从 pos1 开始的 n1 个字符与指针 cp 指向地址开始的 n2 个字符进行比较 |
+** 数值转换
+| 操作           | 说明                                                                              |
+|----------------+-----------------------------------------------------------------------------------|
+| to_string(val) | 返回数值 val 的string                                                             |
+| stoi(s,p,b)    | 返回 s 的起始子串表示整数内容的数值，p保存第一个非数值字符下标，b表示转换所用基数 |
+| stol(s,p,b)    | long 版本                                                                         |
+| stoul(s,p,b)   | unsigned long                                                                     |
+| stoll(s,p,b)   | long long                                                                         |
+| stoull(s,p,b)  | unsigned long long                                                                |
+| stof(s,p)      | float                                                                             |
+| stod(s,p)      | double                                                                            |
+| stold(s,p)     | long double                                                                       |
+* 容器适配器
+除了顺序容器外，标准库还定义了 3 个顺序容器适配器：stack、queue、priority_queue。
+- 适配器（adaptor）：能使某种事物的行为看起来像另外一种事物一样
+  + 比如可以用 vector<int> 来初始化一个 stack ，让其像栈一样被操作
+
+- 所有适配器都要求容器具有添加、删除、访问尾元素的能力，所以 array，forward_list 不能用来构造适配器
+- stack 只要求 push_back、pop_back、back操作，可以用 deque、list、vector 构造
+- queue 要求 back、push_back、front、push_front，所以只能构造于 list 或 deque 之上
+- priority_queue 除了 front、push_back、pop_back 要求之外还需要有随机访问能力，所以只能构造于 vector 或 deque 之上
+    
+| 操作                  | 说明                         |
+|-----------------------+------------------------------|
+| size_type             | 保存当前类型的最大对象的大小 |
+| value_type            | 元素类型                     |
+| container_type        | 底层容器类型                 |
+| A a;                  | 创建一个空适配器             |
+| A a(c);               | 容器 c 初始化 a              |
+| a.empty()             | 为空返回真                   |
+| a.size()              | 元素的数目                   |
+| swap(a,b) / a.swap(b) | 交换 a 和 b 的内容           |
+
+** 栈
+可以使用一个容器来初始化一个新的栈，也可以创建一个空的适配器时来重载默认的容器类型：
+#+BEGIN_SRC c++
+  deque<int> deq;
+  //创建一个元素是 int 的栈，并使用 deq 初始化它
+  stack<int> stk(deq);
+
+  //在 vector 上实现空栈，元素类型是 string
+  stack<string, vector<string>> str_stk;
+  //str_stk2 在 vector 上实现，初始化时保存 svec 的拷贝
+  stack<string, vector<string>> str_stk2(svec);
+#+END_SRC
+
+| 操作            | 说明                       |
+|-----------------+----------------------------|
+| s.pop()         | 删除栈顶，但不返回元素值   |
+| s.push(item)    | 插入新元素到栈顶           |
+| s.emplace(args) | args 构造元素到栈顶        |
+| s.top()         | 返回栈顶元素，但不弹出元素 |
+** 队列
+| 操作                          | 说明                                                                |
+|-------------------------------+---------------------------------------------------------------------|
+| q.pop()                       | 返回queue的首元素，或 priority_queue 的最高优先级元素，但不删除元素 |
+| q.front()                     | 返回首元素，但不删除此元素                                          |
+| q.back()                      | 返回尾元素，但不删除此元素（ *只适用于queue* ）                     |
+| q.top()                       | 返回最高优先级元素，但不删除该元素（ *只适用于 priority_queue* ）   |
+| q.push(item) /q.emplace(args) | 在 queue 末尾或 priority_queue 中恰当位置创建一个元素               |

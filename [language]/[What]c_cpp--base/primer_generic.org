@@ -1,0 +1,58 @@
+#+TITLE: [What] c++ 泛型算法
+#+DATE:<2020-02-18 二> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAME: <language_cpp_generic.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+这是我第一次接触泛型算法，既羞愧又激动……
+
+标准库容器所提供的操作集合很小，因为有泛型算法可用于不同类型的容器和不同类型的元素。
+
+泛型算法：
+- 算法：实现了经典算法的公共接口
+- 泛型：用于不同类型的元素和多种容器类型
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 概述
+大多数算法都定义在头文件 =algorithm= 中，标准库还在头文件 =numeric= 中定义了一组数值泛型算法。
+
+这些算法的操作接口并不是容器，而是由两个迭代器指定的一个元素的范围来操作。
+- 因为使用迭代器相关的操作可以抽象化元素的类型
+- 由于仅使用迭代器，所以 *算法可能改变容器中保存的元素的值，也可能在容器内移动元素，但永远不会直接添加或删除元素*
+
+比如使用 =find= 来寻找容器中是否包含某个特定的值：
+#+BEGIN_SRC c++
+  //con 可以是 vector<int> 类型，也可以是 vector<string> 、string 等等
+  auto result = find(con.cbegin(), con.cend(), val);
+#+END_SRC
+由于内置数组的指针和容器中迭代器的使用一样，所以也可以用于内置数组：
+#+BEGIN_SRC c++
+  int *result = find(begin(ia), end(ia), val);
+  //在 ia[1] 到 ia[3] 中查找是否包含 val
+  int *result2 = find(ia + 1, ia + 4, val);
+#+END_SRC
+* 初识泛型算法
+大部分情况下，标准库提供的算法都是对一个范围内的元素（输入范围）进行操作。
+- 一般前两个参数分别是指向要处理的第一个元素和尾元素之后位置的迭代器
+** 只读算法
+只读算法是指：只会读取输入范围内的元素，但不改变元素。
+
+算法的匹配参数决定了序列中元素的类型必须与输入参数匹配，或者能够进行转换：
+#+BEGIN_SRC c++
+  //使用 accumulate 算法将输入范围内的元素与第三个参数相加
+
+  //第三个参数设定了输入范围内的参数为整型，或者可以转换为整型
+  int sum = accumulate(vec.cbegin(), vec.cend(), 0);
+
+  //将 string 相加，这是因为 string 定义了 + 运算符
+  string sum = accumulate(v.cbegin(), v.cend(), string(""));
+  //如果第三个参数不显示创建 string，那么类型就是 const char *，但此类型并没有 + 运算，所以会报错
+  string sum = accumulate(v.cbegin(), v.cend(), "");
+#+END_SRC
+** 写容器元素的算法
