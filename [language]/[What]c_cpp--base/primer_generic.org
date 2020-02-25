@@ -56,3 +56,27 @@
   string sum = accumulate(v.cbegin(), v.cend(), "");
 #+END_SRC
 ** 写容器元素的算法
+如果算法要修改序列中的元素，那么需要确保序列原大小至少不小于算法写的元素数目。
+- 这就如同保证内存不能越界一样
+
+需要理解上面这句话，因为算法操作的是迭代器，也就是指针， *它并没有调用容器的方法来扩展容器的容量* 。
+*** back_inserter
+插入迭代器（insert iterator）保证算法有足够的元素空间来容纳输出数据，它是一种向容器中 *添加元素* 的迭代器。
+#+BEGIN_SRC c++
+  vector<int> vec;
+  //使用函数 back_inserter 通过输入的容器创建一个插入迭代器
+  auto it = back_inserter(vec);
+  //使用此插入迭代器赋值时，会调用 push_back 将元素值 42 添加到 vec 中
+  *it = 42;
+#+END_SRC
+*** 拷贝算法
+拷贝（copy）算法将输入范围中的元素拷贝到目的序列中：
+#+BEGIN_SRC c++
+  int a1[] = {0,1,2,3,4,5,6,7,8,9};
+  int a2[sizeof(a1) / sizeof(*a1)];
+  //将 a1 的内容拷贝给 a2，返回 a2 尾元素之后的位置
+  auto ret = copy(begin(a1), end(a1), a2);
+#+END_SRC
+** 重排容器元素的算法
+算法库提供了很多排序算法函数便于调用。
+* 定制操作

@@ -1,0 +1,14 @@
+#+TITLE: [What]Introduction to Paging
+#+DATE: <2020-02-25 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_vm-paging.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+了解内存页的由来。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+
