@@ -1,0 +1,55 @@
+#+TITLE: [What]Translation Lookaside Buffers
+#+DATE: <2020-02-28 五> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_vm-tlb.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+前面说过 MMU 中只存放页表基地址，而页表是存放在 SDRAM 中的。
+每次执行指令或读写数据前，都需要先将虚拟地址转换为物理地址，这就需要先读取页表的内容，这无疑是很慢的。
+
+所以需要在 MMU 中增加一个 cache，也就是快表（translation-lookaside buffer, TLB），
+当要进行地址转换时，如果 TLB 中有缓存的转换关系，那么就可以不用访问页表从而大大提高了转换速度。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* TLB 的基础算法
+#+BEGIN_EXAMPLE
+  VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+  (Success, TlbEntry) = TLB_Lookup(VPN)
+  if (Success == True) // TLB Hit
+      if (CanAccess(TlbEntry.ProtectBits) == True)
+          Offset = VirtualAddress & OFFSET_MASK
+          PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+          Register = AccessMemory(PhysAddr)
+      else
+          RaiseException(PROTECTION_FAULT)
+  else // TLB Miss
+      PTEAddr = PTBR + (VPN * sizeof(PTE))
+      PTE = AccessMemory(PTEAddr)
+      if (PTE.Valid == False)
+          RaiseException(SEGMENTATION_FAULT)
+      else if (CanAccess(PTE.ProtectBits) == False)
+          RaiseException(PROTECTION_FAULT)
+      else
+      TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+      RetryInstruction()
+#+END_EXAMPLE
+- 首先根据虚拟地址得出页表偏移，根据此页表偏移查看 TLB 中是否有对应的页表。
+- 如果有对应页表项并且具有访问权限，那么就可以根据 TLB 中此页表的内容的物理块偏移和虚拟地址的 offset 得出最终的物理地址，从而访问内存。
+  + 这种情况下将原来需要访问两次物理内存的操作就减少到了一次（当有 CPU cache 并命中时，连这一次物理内存访问都可以省掉）
+- 如果 TLB 中没有对应的页表项，那么需要根据页表偏移和页表基地址从物理内存中取出页表项，并且如果此页表项有访问权限，那么将此页表项的内容写回 TLB。再次解析就会 TLB 命中并访问到对应内存了。
+  + 这种情况就会有两次物理内存访问，效率低很多。
+
+当频繁出现 TLB miss 时，系统运行效率就会大大降低，所以：
+- 要减小进程的切换频率，一旦进程切换其页表都会 miss 掉
+- 代码尽量操作连续内存，如果内存地址跳跃过大，也很可能会导致 miss。
+* 示例
+现在假设虚拟地址空间是 256 字节，并且页大小是 16 字节，那就会有 16 个页。
+
+那如果现在有个数组，数组的起始虚拟地址是 100（10进制），数据含有 10 个元素，每个元素大小是 4，那么这个数组在对应页表的位置如下：
+
+
+

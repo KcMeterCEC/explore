@@ -198,7 +198,7 @@ sudo make install
 将 /usr/local/qt5.14.0 的内容拷贝到目标板 /opt 中，同理 tslib 的编译结果放在 /usr/local/ 中
 
 ## 配置 Qt 运行时环境
-在开发板编辑文件 /etc/init.d/qt.sh：
+在开发板编辑文件 /etc/init.d/qt.sh，并在对应的 runlevel 文件下为其创建启动符号链接：
 #+BEGIN_EXAMPLE
 export TSLIB_CONSOLEDEVICE=none
 export TSLIB_FBDEVICE=/dev/fb0
