@@ -2,12 +2,12 @@ Qt5 的交叉编译说明
 
 参考网站：https://doc.qt.io/qt-5/embedded-linux.html
 
-# Qt5 的移植与插件
+* Qt5 的移植与插件
 Qt5 的移植相对比较简单，这是因为 Qt5 库在启动时通过获取环境变量的设置，来达到可以配置输出屏幕、输入设备等这些与平台密切相关的参数。
 
 这些是由 Qt5 库的插件来完成这一动态识别的。
 
-## 插件的类型
+** 插件的类型
 Qt5 具有 eglfs、linuxfb、wayland 插件。
 - eglfs : EGL 是 OpenGL 与本地窗口系统的中间接口层，暂不做研究。
 - wayland : 是一个轻量级的桌面系统，也不做研究。
@@ -19,51 +19,47 @@ Qt5 具有 eglfs、linuxfb、wayland 插件。
 对于 linuxfb 插件，一般会在切换插件的同时，也设置其对应的 framebuffer 设备：
 - 对于多个设置参数，需要使用冒号分隔
 #+BEGIN_EXAMPLE
-export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0
+  export QT_QPA_PLATFORM=linuxfb:fb=/dev/fb0
 #+END_EXAMPLE
-
-## 对于 linuxfb 插件的配置
+** 对于 linuxfb 插件的配置
 对于 Qt5.9 及以后的版本，可以支持使用 linux DRM 设备，建议尽量使用这种模式。
 - 并且使用这种模式，液晶的相关参数也会被主动获取
 
 使用这种模式，需要将环境变量 **QT_QPA_FB_DRM** 设置为非零。
 
 环境变量 **QT_QPA_PLATFORM** 还可以通过冒号分隔设置以下参数：
-|参数|说明|
-|-|-|
-|fb=/dev/fbN|指定要刷新的 fb 设备号，目前 Qt 不支持同时刷新多个 framebuffer |
-|size=<width>X<height>|指定液晶显示器的分辨率，插件在启动时会尝试获取显示尺寸，但不见得一定会成功，所以显示指定此参数是有必要的|
-|mmsize=<width>X<height>|指定液晶显示器的物理分辨率，单位是毫米|
-|offset=<width>x<height>|指定实际显示时，显示的内容距离左上角的偏移像素，默认为（0,0）|
-|nographicsmodeswitch|指定不将虚拟终端切换为图形模式|
-|tty=/dev/ttyN|当 nographicsmodeswitch 未设置时，用于设定虚拟控制台|
+| 参数                    | 说明                                                                                                     |
+|-------------------------+----------------------------------------------------------------------------------------------------------|
+| fb=/dev/fbN             | 指定要刷新的 fb 设备号，目前 Qt 不支持同时刷新多个 framebuffer                                           |
+| size=<width>X<height>   | 指定液晶显示器的分辨率，插件在启动时会尝试获取显示尺寸，但不见得一定会成功，所以显示指定此参数是有必要的 |
+| mmsize=<width>X<height> | 指定液晶显示器的物理分辨率，单位是毫米                                                                   |
+| offset=<width>x<height> | 指定实际显示时，显示的内容距离左上角的偏移像素，默认为（0,0）                                            |
+| nographicsmodeswitch    | 指定不将虚拟终端切换为图形模式                                                                           |
+| tty=/dev/ttyN           | 当 nographicsmodeswitch 未设置时，用于设定虚拟控制台                                                     |
 
 **注意：**
 在 Qt5.9 及以后，默认使用 linuxfb 或 eglfs 的情况下，顶级窗口会强制填充整个屏幕。
 如果不想这样强制填充，就需要将环境变量 **QT_QPA_FB_FORCE_FULLSCREEN** 设置为 0 即可。
-
-## unix 类系统信号的处理
+** unix 类系统信号的处理
 默认情况下，对于 eglfs 和 linuxfb 插件而言，Qt 会接收中断（SIGINT），挂起（SIGTSTP），继续（SIGCONT），退出（SIGTERM）
 信号。这样可以在 UI 接收到这些信号时保存当前的设置，用于下次恢复。
 
 但是在调试时，Qt 会经常收到 SIGINT 等信号，所以有可能需要设置环境变量 **QT_QPA_NO_SIGNAL_HANDLER** 为 1 来取消对某些信号的处理。
-
-## 字体
+** 字体
 环境变量 **QT_QPA_FONTDIR** 用于设置 Qt 的字体库路径。
 
 Qt 默认使用 fontconfig 来访问系统字体，如果没有找到就去寻找 QBasicFontDatabase。
-
-# Qt 输入设备
+- 默认 Qt 不带字体文件，需要到字体网站去下载字体
+* Qt 输入设备
 输入设备一般是鼠标、键盘、触摸屏，这些在 linux 中的设备是 /dev/input/event*。
 
 Qt 的 eglfs 或 linuxfb 插件本来就具有对输入事件处理的代码，来完成上层操作，但一般使用 libinput 或 tslib 库来获取输入事件，进行再一次封装。
 
-## 使用 libinput
+** 使用 libinput
 Qt 默认使用 libinput 的 API 获取输入事件，如果没有 libinput 库或 **QT_QPA_EGLFS_NO_LIBINPUT** 环境变量被设置为1，那么 Qt 会使用自身内建的代码。
 
 当使用 libinput 后，Qt 配置时需要链接 libudev 和 libinput，如果有按键输入请求， xkbcommon 也是需要的。
-
-## 如果不使用 libinput
+** 如果不使用 libinput
 如果不使用 libinput ，那么一些环境变量需要被设置，多个参数以冒号分隔。
 - **QT_QPA_EVDEV_MOUSE_PARAMETERS** ：鼠标事件节点
 - **QT_QPA_EVDEV_KEYBOARD_PARAMETERS** ：按键事件节点
@@ -82,16 +78,15 @@ Qt 默认使用 libinput 的 API 获取输入事件，如果没有 libinput 库�
 当 Qt 被配置了 libudev 支持时，可以检查到鼠标的热拔插事件。
 
 关于鼠标，用户可以对环境变量 **QT_QPA_EVDEV_MOUSE_PARAMETERS** 设置以下参数:
-|参数|说明|
-|-|-|
-|/dev/input/...|指定鼠标节点，如果没有指定由 libudev 或 Qt 内建代码来搜寻|
-|nocompress|默认情况下，与上一个Qt鼠标事件相比，不会导致改变位置的输入事件被压缩。 仅在更改位置或按钮状态后才发送新的Qt鼠标事件。 要禁用此行为，请设置nocompress参数。|
-|dejitter|设置抖动限制，默认是关闭的|
-|grab|设置为 1 时，Qt 独占这个设备|
-|abs|指定当前设备使用绝对坐标|
-
-## 键盘
-## 触摸屏 
+| 参数           | 说明                                                                                                                                                       |
+|----------------+------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| /dev/input/... | 指定鼠标节点，如果没有指定由 libudev 或 Qt 内建代码来搜寻                                                                                                  |
+| nocompress     | 默认情况下，与上一个Qt鼠标事件相比，不会导致改变位置的输入事件被压缩。 仅在更改位置或按钮状态后才发送新的Qt鼠标事件。 要禁用此行为，请设置nocompress参数。 |
+| dejitter       | 设置抖动限制，默认是关闭的                                                                                                                                 |
+| grab           | 设置为 1 时，Qt 独占这个设备                                                                                                                               |
+| abs            | 指定当前设备使用绝对坐标                                                                                                                                   |
+** 键盘
+** 触摸屏 
 对于老式的电阻屏、单点式触摸屏幕，用户需要为 Qt 安装 tslib 库，因为它们无法使用 Qt 的多点触摸协议和事件。
 
 设置 **QT_QPA_EGLFS_TSLIB** (for eglfs) 或 **QT_QPA_FB_TSLIB** (for linuxfb) 环境变量为 1，来使能 Qt 的 tslib 支持。
@@ -100,16 +95,15 @@ Qt 默认使用 libinput 的 API 获取输入事件，如果没有 libinput 库�
 
 
 关于触摸屏，用户可以对环境变量 **QT_QPA_EVDEV_MOUSE_PARAMETERS** 设置以下参数:
-|参数|说明|
-|-|-|
-|/dev/input/...|指定触摸屏节点，如果没有指定由 libudev 或 Qt 内建代码来搜寻|
-|rotate|旋转触摸屏坐标|
-|invertx / inverty | 反转 x 和 y 坐标|
-## 调试输入设备
+| 参数              | 说明                                                        |
+|-------------------+-------------------------------------------------------------|
+| /dev/input/...    | 指定触摸屏节点，如果没有指定由 libudev 或 Qt 内建代码来搜寻 |
+| rotate            | 旋转触摸屏坐标                                              |
+| invertx / inverty | 反转 x 和 y 坐标                                            |
+** 调试输入设备
 设置环境变量 QT_LOGGING_RULES 设置为 qt.qpa.input=true ，可以打印输入设备信息
-## 自定义鼠标图标
-
-# 移植 Qt5.14 到 ARM linux
+** 自定义鼠标图标
+* 移植 Qt5.14 到 ARM linux
 Qt 的移植步骤为：
 1. 配置 Qt 编译环境
 2. 配置 Qt 选件
@@ -120,48 +114,49 @@ Qt 的移植步骤为：
 对于使用 buildroot,yocto 或其他开发板厂商做好的发行版，那么对于开发板而言，仅需要配置运行时环境即可。
 - 单位为了在 X86 上能够交叉编译，上面的步骤依然需要做。
 
-## 配置 Qt 编译环境
-### 下载并解压
+** 配置 Qt 编译环境
+*** 下载并解压
 在 https://mirrors.tuna.tsinghua.edu.cn/qt/official_releases/qt/ 版本的 single 中下载 tar.xz 包然后解压缩
-### 编辑配置
+*** 编辑配置
 编辑文件 **qtbase/mkspecs/linux-arm-gnueabi-g++/qmake.conf** 设置编译规则如下：
+- 如果编译器是 hf 版本的，还需要注意在编译器那里加上 hf
 #+BEGIN_EXAMPLE
-#
-# qmake configuration for building with arm-linux-gnueabi-g++
-#
+  #
+  # qmake configuration for building with arm-linux-gnueabi-g++
+  #
 
-MAKEFILE_GENERATOR      = UNIX
-CONFIG                 += incremental
-QMAKE_INCREMENTAL_STYLE = sublib
+  MAKEFILE_GENERATOR      = UNIX
+  CONFIG                 += incremental
+  QMAKE_INCREMENTAL_STYLE = sublib
 
-# 1.设定目标编译架构
-QT_QPA_DEFAULT_PLATFORM = linuxfb
-QMAKE_CFLAGS_RELEASE   += -O2 -march=armv7-a
-QMAKE_CXXFLAGS_RELEASE += -O2 -march=armv7-a
+  # 1.设定目标编译架构
+  QT_QPA_DEFAULT_PLATFORM = linuxfb
+  QMAKE_CFLAGS_RELEASE   += -O2 -march=armv7-a
+  QMAKE_CXXFLAGS_RELEASE += -O2 -march=armv7-a
 
-include(../common/linux.conf)
-include(../common/gcc-base-unix.conf)
-include(../common/g++-unix.conf)
+  include(../common/linux.conf)
+  include(../common/gcc-base-unix.conf)
+  include(../common/g++-unix.conf)
 
-# 2.添加 tslib 的包含路径
-QMAKE_INCDIR += /usr/local/tslib/include
-QMAKE_LIBDIR += /usr/local/tslib/lib
+  # 2.添加 tslib 的包含路径
+  QMAKE_INCDIR += /usr/local/tslib/include
+  QMAKE_LIBDIR += /usr/local/tslib/lib
 
-# 3. 链接 tslib 库
-# modifications to g++.conf
-QMAKE_CC                = arm-linux-gnueabi-gcc -lts
-QMAKE_CXX               = arm-linux-gnueabi-g++ -lts
-QMAKE_LINK              = arm-linux-gnueabi-g++ -lts
-QMAKE_LINK_SHLIB        = arm-linux-gnueabi-g++ -lts
+  # 3. 链接 tslib 库
+  # modifications to g++.conf
+  QMAKE_CC                = arm-linux-gnueabi-gcc -lts
+  QMAKE_CXX               = arm-linux-gnueabi-g++ -lts
+  QMAKE_LINK              = arm-linux-gnueabi-g++ -lts
+  QMAKE_LINK_SHLIB        = arm-linux-gnueabi-g++ -lts
 
-# modifications to linux.conf
-QMAKE_AR                = arm-linux-gnueabi-ar cqs
-QMAKE_OBJCOPY           = arm-linux-gnueabi-objcopy
-QMAKE_NM                = arm-linux-gnueabi-nm -P
-QMAKE_STRIP             = arm-linux-gnueabi-strip
-load(qt_config)
+  # modifications to linux.conf
+  QMAKE_AR                = arm-linux-gnueabi-ar cqs
+  QMAKE_OBJCOPY           = arm-linux-gnueabi-objcopy
+  QMAKE_NM                = arm-linux-gnueabi-nm -P
+  QMAKE_STRIP             = arm-linux-gnueabi-strip
+  load(qt_config)
 #+END_EXAMPLE
-## 配置 Qt 选件
+** 配置 Qt 选件
 #+BEGIN_EXAMPLE
 ./configure \
         -prefix /usr/local/qt5.14.0 \
@@ -172,7 +167,6 @@ load(qt_config)
         -xplatform linux-arm-gnueabi-g++ \
         -optimized-qmake \
         -pch \
-        -qt-sql-sqlite \
         -qt-libjpeg \
         -qt-libpng \
         -qt-zlib \
@@ -180,56 +174,56 @@ load(qt_config)
         -no-opengl \
         -no-sse2 \
         -no-openssl \
-        -no-nis \
         -no-cups \
         -no-glib \
         -no-dbus \
         -no-xcb \
-        -no-xcursor -no-xfixes -no-xrandr -no-xrender \
         -no-separate-debug-info \
         -make examples -nomake tools -nomake tests -no-iconv
 #+END_EXAMPLE
-## 编译 Qt 库
+** 编译 Qt 库
 #+BEGIN_EXAMPLE
-make
-sudo make install
+  make
+  sudo make install
 #+END_EXAMPLE
+*在编译后如果想修改编译器重新编译，那么宁愿删除整个文件夹，重新解压压缩包。*
+- 因为 =make distclean= 清理并不彻底，如果前后编译器分别是不带 hf 和带 hf ，便会出幺蛾子
+- 并且 =make distclean= 需要的时间巨长……
 
 将 /usr/local/qt5.14.0 的内容拷贝到目标板 /opt 中，同理 tslib 的编译结果放在 /usr/local/ 中
 
-## 配置 Qt 运行时环境
+** 配置 Qt 运行时环境
 在开发板编辑文件 /etc/init.d/qt.sh，并在对应的 runlevel 文件下为其创建启动符号链接：
 #+BEGIN_EXAMPLE
-export TSLIB_CONSOLEDEVICE=none
-export TSLIB_FBDEVICE=/dev/fb0
+  export TSLIB_CONSOLEDEVICE=none
+  export TSLIB_FBDEVICE=/dev/fb0
  
-export TSLIB_TSDEVICE=/dev/input/event1
-export TSLIB_CONFFILE=/usr/local/tslib/etc/ts.conf
-export TSLIB_PLUGINDIR=/usr/local/tslib/lib/ts
-export TSLIB_CALIBFILE=/etc/pointercal #指定校准文件
-export LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/tslib/lib:/opt/qt5.14.0/lib
-export PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/usr/local/tslib/bin
+  export TSLIB_TSDEVICE=/dev/input/event1
+  export TSLIB_CONFFILE=/usr/local/tslib/etc/ts.conf
+  export TSLIB_PLUGINDIR=/usr/local/tslib/lib/ts
+  export TSLIB_CALIBFILE=/etc/pointercal #指定校准文件
+  export LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/tslib/lib:/opt/qt5.14.0/lib
+  export PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/usr/local/tslib/bin
 
 
-export QT_QPA_FB_TSLIB=1
-export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event1
-export QT_QPA_PLATFORM_PLUGIN_PATH=/opt/qt5.14.0/plugins
-export QT_QPA_PLATFORM=linuxfb:tty=/dev/fb0
-export QT_QPA_FONTDIR=/opt/qt5.14.0/lib/fonts
-export QT_QPA_GENERIC_PLUGINS=tslib:$TSLIB_TSDEVICE
+  export QT_QPA_FB_TSLIB=1
+  export QT_QPA_EVDEV_TOUCHSCREEN_PARAMETERS=/dev/input/event1
+  export QT_QPA_PLATFORM_PLUGIN_PATH=/opt/qt5.14.0/plugins
+  export QT_QPA_PLATFORM=linuxfb:tty=/dev/fb0
+  export QT_QPA_FONTDIR=/opt/qt5.14.0/lib/fonts
+  export QT_QPA_GENERIC_PLUGINS=tslib:$TSLIB_TSDEVICE
 #+END_EXAMPLE
 
 source 文件：
 #+BEGIN_EXAMPLE
-source /etc/init.d/qt.sh
+  source /etc/init.d/qt.sh
 #+END_EXAMPLE
 
 运行示例：
 #+BEGIN_EXAMPLE
-/opt/qt5.4.1/examples/touch/pinchzoom/pinchzoom
+/opt/qt5.14.0/examples/touch/pinchzoom/pinchzoom
 #+END_EXAMPLE
-
-## 配置 Qtcreator 在 X86 上的交叉编译环境
+** 配置 Qtcreator 在 X86 上的交叉编译环境
 在 qtcreate 中的 =构建和运行= 配置下，需要：
 1. 添加交叉编译器
 2. 在 Qt Versions 中选择交叉编译好的 Qt 库路径。
