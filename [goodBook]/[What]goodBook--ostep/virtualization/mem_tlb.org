@@ -50,6 +50,85 @@
 现在假设虚拟地址空间是 256 字节，并且页大小是 16 字节，那就会有 16 个页。
 
 那如果现在有个数组，数组的起始虚拟地址是 100（10进制），数据含有 10 个元素，每个元素大小是 4，那么这个数组在对应页表的位置如下：
+[[./virtualization/mempic/tlb/tlb_ex.jpg]]
+
+下面假设访问这个数组的代码如下：
+#+BEGIN_SRC c
+  int sum = 0;
+  for(i = 0; i < 10; i++)
+  {
+    sum += a[i];
+  }
+#+END_SRC
+假设最开始 TLB 中并没有缓存 VPN06 这个页表项，那么最开始访问 a[0] 时，会导致 TLB miss，从而 MMU 会从物理内存更新该页表项到 TLB 中。
+
+下次访问 a[1] 时，由于此地址也是在 VPN06 中，所以一定是 TLB hit。访问 a[2] 时同理也会是 TLB hit。
+
+同样的，在首次访问 a[3],a[7] 时也会造成 TLB miss，而在同一页的其他元素访问也是 TLB hit。
+* 谁在处理 TLB miss
+当 TLB miss 出现时，有以下两种方式处理：
+- 由硬件来完成：当 TLB 中没有对应的页表项时，由硬件(hardware-managed TLBs)根据页表的基地址，从物理内存中取出该页表项存入 TLB
+- 由软件完成：当 TLB 中没有对应页表项时，硬件产生异常，系统进入内核态的异常处理代码，这段代码完成更新 TLB 的功能
+  + 这种情况与中断返回有些不一样，中断返回的是中断前的下一条指令继续执行，而 TLB miss 异常处理代码返回点则是造成 TLB miss 的指令处，这样再执行一次该指令便是 TLB hit 了。
+  + 软件处理的方式下，操作系统可以以统一的数据结构来屏蔽硬件的差异
+#+BEGIN_SRC c
+  VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+  (Success, TlbEntry) = TLB_Lookup(VPN)
+  if (Success == True) // TLB Hit
+    if (CanAccess(TlbEntry.ProtectBits) == True)
+      Offset = VirtualAddress & OFFSET_MASK
+      PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+      Register = AccessMemory(PhysAddr)
+      else
+      RaiseException(PROTECTION_FAULT)
+  else // TLB Miss
+     RaiseException(TLB_MISS)
+#+END_SRC
+* TLB 的内容
+由于 TLB 保持了虚拟内存块到物理内存块的映射关系，所以其内容如同下面这般：
+#+BEGIN_EXAMPLE
+  VPN | PFN | other bits
+#+END_EXAMPLE
+other bits 具有如下类似的内容：
+- valid bit : 说明这段缓存是否有效
+- protection bits : 该段内存的权限
+- dirty bit ： 说明内存是否被修改过
+* TLB 与上下文切换
+我们知道，每个进程都有其独立的页表，每次切换进程时都要切换对应进程的页表。
+
+那么毫无疑问：当进程切换时，TLB 中的内容对于该进程也是无意义的，所以需要处理。
+
+目前处理有以下两种方式：
+- 简单粗暴的方式使无效整个 TLB：这会造成进程切换效率低下
+  + 当硬件具有 hardware-managed TLB 时，当页表基地址寄存器被修改后，硬件自动使无效整个 TLB
+  + 当硬件不具有 hardware-managed TLB 时，由操作系统主动将 TLB 的 valid 位置0
+- 硬件具有 address space identifier(ASID) 时，可以保存当前 TLB 项对应的进程。
+  + 这样切换效率就比较高了
+* TLB 的置换策略
+当 TLB 中存放的都是有效数据并且此时又需要置换一个新的 TLB 时，有以下两种常用的置换策略：
+- 最近最少使用算法（least-recently-used,LRU）：每次都置换最近最少使用的那个 TLB
+  + 这种算法利用了局部性原理，但当 TLB 数量为 N 而代码循环需要访问 N + 1 个 TLB 时，会导致 TLB 一直 miss
+- 随机算法：随机置换出一个 TLB
+  + 这种算法虽然看上去效率没有 LRU 高，但是它可以避免上面的 N 个 TLB 对应 N + 1 个循环置换的问题。
+* 真实的 TLB 项
+[[./virtualization/mempic/tlb/tlb_entry.jpg]]
+
+上图是 MIPS 的 TLB 项内容，总共有 64 位。
+
+MIPS 支持 4KB 页表（这也是大部分情况下的设置），那么为了支持 32 位虚拟地址寻址空间，就需要 VPN 有 20 位。
+
+由于 MIPS 将用户空间和内核空间分别设为 2GB，所以 VPN 仅需要 19 位就够了。
+并且 VPN 可以映射的物理地址 PFN 有 24 位，那也就是说 MIPS 最多支持 64GB 的物理地址空间。
+- 但 VPN 只能在特定情况下寻址 2GB，那其余未映射的如何处理？
+
+除此之外，还有下面这些位：
+- G（Global）：说明该页是否是所有进程所共享的
+  + 这种情况下 ASID 位便无效了
+- ASID（address space identifier）：指明该页表映射用于哪个进程
+  + 但只有 8 位，那么进程操作 256 个后，就无法全部保存了
+- C（Coherence）：cache 与硬件的一致性
+- D（Dirty）：页是否被修改过
+- V（Valid）：该页项是否有效
 
 
 
