@@ -1,0 +1,28 @@
+#+TITLE: [What]Paging:Smaller Tables
+#+DATE: <2020-03-18 三> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_vm-smaller_tables.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+当只有一级页表时，页表本身所占用的空间就会很大，而多级页表可以解决这个问题。
+#+BEGIN_EXAMPLE
+  假设页块大小为 4KB，那么对于 32 位系统来说，一个进程需要映射到 1048576 个页块。
+
+  一个页表项为 4 字节，那么一个进程的页表就是 4*1048576 = 4MB。
+
+  假设一个系统中运行了 1000 个进程，那么页表总共就要占用 4000 MB，这显然是无法使用的。
+#+END_EXAMPLE
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 简易办法：使用大页
+如果我们简单粗暴的将页块大小规定为 16 KB，那么对应的页块数量就只有原来的四分之一，最终一个进程的页表就只有 1MB 大小。
+
+但是这样会造成内存的浪费，因为即使每次仅申请几个字节，操作系统也会分配一个页块。
+* 进阶方案：页和段
+
+

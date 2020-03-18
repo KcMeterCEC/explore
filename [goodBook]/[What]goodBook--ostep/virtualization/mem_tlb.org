@@ -132,3 +132,96 @@ MIPS 支持 4KB 页表（这也是大部分情况下的设置），那么为了�
 
 
 
+* TLB 实验
+当访问内存并且 TLB hit 时，此时的操作效率是很高的。
+但当出现 TLB miss 时，由于硬件或软件需要更新 TLB，所以需要从物理内存读取页表项，那么操作效率就低了不少。
+
+如果写一段测试代码，每次以页为跨度单位进行访问：
+- 当访问页的数目小于或等于 TLB 大小时，此时操作效率很高
+- 一旦数目超过此 TLB 大小，便会出现 TLB miss
+- 如果一个大循环不断的超出 TLB 范围，便会一直出现 TLB miss
+  
+基于以上逻辑，可以通过测量循环代码的执行时间，推测出大致当前处理器 TLB 的大小，以及其是否有多级 TLB cache。
+
+简易的测试代码如下：
+#+BEGIN_SRC c
+  #define _GNU_SOURCE
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <assert.h>
+  #include <string.h>
+  #include <sys/time.h>
+  #include <stdint.h>
+  #include <sched.h>
+
+  int main(int argc, char *argv[])
+  {
+      if(argc != 3)
+      {
+          printf("usage: %s <number of pages> <number of trials>\n", argv[0]);
+
+          return 1;
+      }
+
+      cpu_set_t set;
+
+      CPU_ZERO(&set);
+      CPU_SET(1, &set);
+      int ret = sched_setaffinity(0, sizeof(cpu_set_t), &set);
+    
+      if(ret)
+      {
+          printf("can't set affinity:");
+          return -1;
+      }
+
+
+      int page_size = getpagesize();
+      int pages = atoi(argv[1]);
+      int trials = atoi(argv[2]);
+
+      printf("page size: %d, pages: %d, trials: %d\n",
+              page_size, pages, trials);
+
+      int *buf = (int *)malloc(pages * page_size);
+      assert(buf);
+      memset(buf, 0, pages * page_size);
+
+      int jump = page_size / sizeof(int);
+
+      struct timeval start;
+      struct timeval stop;
+
+      ret = gettimeofday(&start, NULL);
+    
+      if(ret)
+      {
+          perror("get time failed:");
+          return 1;
+      }
+      for(int j = 0; j < trials; j++)
+      {
+          for( int i = 0; i < pages * jump; i+= jump)
+          {
+              buf[i] += 1;
+          }
+      }
+      ret = gettimeofday(&stop, NULL);
+      if(ret)
+      {
+          perror("get time failed:");
+          return 1;
+      }
+
+      uint64_t elapse = (stop.tv_sec - start.tv_sec) * 1000000 +
+          (stop.tv_usec - start.tv_usec);
+      double average = (double)elapse * 1000 / (trials * pages);
+
+      printf("elapse : %llu uS, average time : %f nS\n",
+              elapse, average);
+
+
+      return 0;
+  }
+#+END_SRC
