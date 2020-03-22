@@ -58,3 +58,87 @@
 这里的关键点在于：如果一段内存没有被映射，那么大页里面就设置为 invalid，而后其下级的小页就不需要占据物理内存空间了。
  
 [[./mempic/smalltb/pagetlb_overview.jpg]]
+
+如上图所示：如果使用左边一级页表的形式，那么只有 5 个页表项是有效的，其他无效的页表项也要占用内存空间。
+当使用二级页表后，在第一级页表中就已经表示了中间两级是无效的，那么这两级对应的二级页表也就不需要存储空间了。
+- 一级页表也称为 PDE（page directory entries）
+  
+使用多级页表具有如下优先：
+- 多级页表只有在上级页表为 valid 时，本级页表才会占用物理内存空间
+- 在使用一级页表的情况下，页表项本身所占用的内存必须是连续的，比如在 32 位系统中的 4K 页大小，一个进程的页表就要占用 4MB。
+而在使用多级页表的情况下，下级页表可以分散的存储，这样避免了申请连续大内存的压力。
+
+但同时也具有这些缺点：
+- 当出现 TLB miss 时，多级页表的查询效率低于一级页表。
+  + 比如是二级页表时，第一次需要从物理内存取一级页表，第二次才是从物理内存取对应于内存块的页表
+- 多级页表在硬件和软件的复杂度会高于一级页表
+* 示例
+** 只有一级页表
+假设一个进程的 address space 是 16KB，页块大小是 64 字节。那么需要 14 位来表示虚拟地址，其中需要 8 位（256 个页表项）表示页表偏移，6 位表示页内偏移。
+
+[[./mempic/smalltb/ex_linear_tlb.jpg]]
+
+假设当使用一级页表时，该进程的页表如上图所示：
+- 页 0～1 用于存放代码，4～5 用于存放堆，254～255 用于存放栈，其余的页都未映射。
+- 总共有 250 个页表项，总共 1000 字节的物理内存被浪费了
+  
+** 具有二级页表
+下面使用二级页表，由于页大小是 64 字节，那么 14 位占用的 1KB 页表项可以再分为 16 个页，那么二级页表的虚拟地址如下：
+[[./mempic/smalltb/ex_2_tlb_address.jpg]]
+
+假设 2 级页表项的内容如下：
+[[./mempic/smalltb/ex_2_tlb_contents.jpg]]
+
+可以看出，使用 2级页表项所消耗的内存为：
+- 存放一级页表，消耗了 4 × 16 = 64 字节
+- 存放两个二级页表，消耗了 4 × 16 × 2 = 128 字节
+- 最终浪费了 (3 × 16 - 8) × 4 = 160 字节，相比一级页表节省了很多内存
+  
+其转换过程如下，假设访问虚拟地址 0x3F80 处的内存：
+- 首先取出前 4 字节，得到其在一级页表中偏移为 15,那么可以通过一级页表基地址和其偏移得到此时的二级页表有效且基地址为 101
+- 二级页表基地址 101 再加上偏移位 14（1110），对应第 55 个内存块
+- 最终的 6 位为全 0,代表其在物理内存块的偏移为 0,那么对应的物理地址刚好是物理内存块的起始 = 00 1101 1100 0000 = 0x0DC0
+  
+使用二级页表的流程如下：
+#+BEGIN_EXAMPLE
+  VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+  (Success, TlbEntry) = TLB_Lookup(VPN)
+  if (Success == True) // TLB Hit
+      if (CanAccess(TlbEntry.ProtectBits) == True)
+          Offset = VirtualAddress & OFFSET_MASK
+          PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+          Register = AccessMemory(PhysAddr)
+      else
+          RaiseException(PROTECTION_FAULT)
+  else // TLB Miss
+      // first, get page directory entry
+      PDIndex = (VPN & PD_MASK) >> PD_SHIFT
+      PDEAddr = PDBR + (PDIndex * sizeof(PDE))
+      PDE = AccessMemory(PDEAddr)
+      if (PDE.Valid == False)
+          RaiseException(SEGMENTATION_FAULT)
+      else
+          // PDE is valid: now fetch PTE from page table
+          PTIndex = (VPN & PT_MASK) >> PT_SHIFT
+          PTEAddr = (PDE.PFN << SHIFT) + (PTIndex * sizeof(PTE))
+          PTE = AccessMemory(PTEAddr)
+          if (PTE.Valid == False)
+              RaiseException(SEGMENTATION_FAULT)
+          else if (CanAccess(PTE.ProtectBits) == False)
+              RaiseException(PROTECTION_FAULT)
+          else
+              TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+              RetryInstruction()
+#+END_EXAMPLE
+** 使用多级页表
+假设虚拟地址为 30 位，页大小为 512 字节，那么就需要 9 位来表示页内偏移，剩余的 21 位表示页偏移。
+
+假设仅使用二级页表，那么由于页大小是 512 字节，一个页表项为 4 字节，那么一页就可以表示 128 个页表项。
+也就是说 7 位表示第二级页表偏移，剩下的 14 位表示第一级页表偏移，一级页表依然很大，依然会浪费很多内存。
+
+假设使用 3 级页表，那么一级页表，二级页表，以及三级页表都占用 7 位。假设 1 级页表的某个页表项为 invalid，那么其下的二三级页表都不存在，也就不会占用物理内存了。
+
+
+
+
+
