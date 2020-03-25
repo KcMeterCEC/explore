@@ -77,8 +77,8 @@ aplay -vv file.wav
 arecord -vv -fdat output.wav
 #+end_example
 ** 程序中的声卡名的确定
-*** 接受源
-通过命令 =arecoed -l= 就可以发现所有的接受流
+*** 接收源
+通过命令 =arecord -l= 就可以发现所有的接收流
 
 #+begin_example
 List of CAPTURE Hardware Devices 

@@ -1,0 +1,89 @@
+#+TITLE: [What]swapping:Mechanisms
+#+DATE: <2020-03-24 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_vm-swap-mechanisms.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+当内存吃紧时，内存交换机制就很重要了。
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 交换空间
+为了能够将内存页暂存在硬盘中，那么硬盘也需要预留一片区域，这部分区域称为交换空间（swap space）。
+这样操作系统就可以将内存页写入和读出该交换空间，从而在逻辑上扩大了内存。
+
+置换空间的大小决定了逻辑内存有多大，如下所示，由于有了交换空间，使得逻辑页为 12：
+[[./mempic/swap/swap_overview.jpg]]
+
+实际的物理内存页为 4，而交换空间中页为 8。进程 0,1,2 都在物理内存页和交换空间中占有位置。
+在物理内存页中的内容便是经常会被使用到的页，而进程 3 并不处于运行状态，所以它的整个内存页都存在于交换空间中。
+
+需要明白的是： *当内存吃紧时，并不是所有的内存页都需要存放于置换空间。*
+- 比如当启动一个进程时，它的部分代码段会被读取到内存中。当其他进程需要运行时，可以使用这个进程的代码段页，而当前进程的代码段内存页是不用置换到交换空间的。
+因为下次启动该进程时，操作系统可以直接从文件系统中读取该代码段。
+* The Present Bit
+在 PTE 中具有 =present bit= 来表示当前的物理页是存在于物理内存中，还是存在于交换分区中，假设我们使用一级页表，那么执行流程如下：
+- 当发生一次内存访问时，首先查找 TLB 中是否有对应页表项，如果有（TLB hit），则从该页表项得出该物理内存块位置，然后访问该内存
+- 如果 TLB 中没有对应页表项（TLB miss），则从页表基地址寄存器中获取基地址，并根据 VPN 得出偏移量而获取页表项，如果该页表项是 valid 并且 present bit 为 1，则更新 TLB，再次跳转会访问指令，最终从对应物理内存块访问内存
+- 如果 present bit 为 0，则代表该页不存在于物理内存中，硬件产生 page fault，接下来由操作系统的 =page fault handler= 来处理该异常
+* page fault
+当 present bit 为 0 时，此时 PTE 中所保存的位置即使交换空间中的位置。
+
+操作系统处理流程为：
+- 根据此值从交换空间中读取该物理内存页
+- 重新修改 PTE 的内容，present bit 为 1，并且对应的地址为更新的内存块
+- 跳转到访问内存的指令，此时依然会产生 TLB miss，但是最终是可以得出该页是 valid 并且 present bit 为 1，那么 TLB 便可被刷新，再次跳转回去进行内存访问便能成功
+* 当内存吃紧时
+基于上面这种情况，如果当内存本身都比较吃紧时，操作系统为了将交换空间中的页读入到物理内存，那么必然要选择将当前内存中的页置换一部分到交换空间中，这被称为 *页置换策略（page-replacement policy）* 。
+
+页置换策略需要深入考虑，如果置换的页面不合理，那么在很大概率上会频繁的发起 IO 请求读写交换空间，程序的运行效率就会特别低。
+* page fault 控制流
+如下是 MMU 硬件进行虚拟内存到物理内存转换的流程（假设一级页表，并且具有 hardware managed TLB）:
+#+BEGIN_EXAMPLE
+  VPN = (VirtualAddress & VPN_MASK) >> SHIFT
+  (Success, TlbEntry) = TLB_Lookup(VPN)
+  if (Success == True) // TLB Hit
+      if (CanAccess(TlbEntry.ProtectBits) == True)
+          Offset = VirtualAddress & OFFSET_MASK
+          PhysAddr = (TlbEntry.PFN << SHIFT) | Offset
+          Register = AccessMemory(PhysAddr)
+      else
+          RaiseException(PROTECTION_FAULT)
+  else // TLB Miss
+      PTEAddr = PTBR + (VPN * sizeof(PTE))
+      PTE = AccessMemory(PTEAddr)
+      if (PTE.Valid == False)
+          RaiseException(SEGMENTATION_FAULT)
+      else
+          if (CanAccess(PTE.ProtectBits) == False)
+              RaiseException(PROTECTION_FAULT)
+          else if (PTE.Present == True)
+              // assuming hardware-managed TLB
+              TLB_Insert(VPN, PTE.PFN, PTE.ProtectBits)
+              RetryInstruction()
+          else if (PTE.Present == False)
+              RaiseException(PAGE_FAULT)
+#+END_EXAMPLE
+以下是当 present bit 为 0 时产生的 page fault 对应的 page fault handler:
+#+BEGIN_EXAMPLE
+  PFN = FindFreePhysicalPage()
+  if (PFN == -1) // no free page found
+      PFN = EvictPage() // run replacement algorithm
+  DiskRead(PTE.DiskAddr, PFN) // sleep (waiting for I/O)
+  PTE.present = True // update page table with present
+  PTE.PFN = PFN // bit and translation (PFN)
+  RetryInstruction() // retry instruction
+#+END_EXAMPLE
+* 发生页面置换的时机
+操作系统实际上会在内存占满前就发出内存置换，这是为了预留一部分内存执行一些特殊进程。
+
+一般会有高水位（high watermark,HW)和低水位（low watermark,LW）来决定置换策略：
+- 当低于低水位的空闲内存时，系统会启动后台任务来释放更多内存，一直到空闲内存到高水位为止
+
+为了提高页面置换的效率，操作系统通常会将多个页面打包而产生一个大的 IO 请求，从而提高效率。
+- 并且真正的 IO 请求通常是在系统空闲时发出，这样用户体验最好。
+
+
