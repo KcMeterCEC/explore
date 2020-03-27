@@ -1,0 +1,14 @@
+#+TITLE: [What]swapping:Policies
+#+DATE: <2020-03-26 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_vm-swap-policies.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+理解交换策略，当内存吃紧时，系统是如何决定那个内存页面应该被置换到交换分区中的？
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* cache 管理
