@@ -50,7 +50,7 @@
 现在假设虚拟地址空间是 256 字节，并且页大小是 16 字节，那就会有 16 个页。
 
 那如果现在有个数组，数组的起始虚拟地址是 100（10进制），数据含有 10 个元素，每个元素大小是 4，那么这个数组在对应页表的位置如下：
-[[./virtualization/mempic/tlb/tlb_ex.jpg]]
+[[./mempic/tlb/tlb_ex.jpg]]
 
 下面假设访问这个数组的代码如下：
 #+BEGIN_SRC c
@@ -111,7 +111,7 @@ other bits 具有如下类似的内容：
 - 随机算法：随机置换出一个 TLB
   + 这种算法虽然看上去效率没有 LRU 高，但是它可以避免上面的 N 个 TLB 对应 N + 1 个循环置换的问题。
 * 真实的 TLB 项
-[[./virtualization/mempic/tlb/tlb_entry.jpg]]
+[[./mempic/tlb/tlb_entry.jpg]]
 
 上图是 MIPS 的 TLB 项内容，总共有 64 位。
 
