@@ -1,0 +1,24 @@
+#+TITLE: [What] c++ 面向对象程序设计
+#+DATE:<2020-03-30 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAME: <language_cpp_oop.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+再来复习一下 OOP(object-oriented programming) 基本思想：数据抽象与封装、继承和动态绑定。
+- 数据抽象与封装：对于类使用者来说，可以忽略类的具体实现，而使用其接口来达成其目的
+- 继承：可以更容易地定义与其他类相似但不完全相同的新类
+- 动态绑定：使用彼此相似的类编写程序时，可以在一定程度上忽略掉它们的区别
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* OOP:概述
+** 继承（inheritance）
+继承表示多个类联系在一起构成的层次关系，层次的根部为 *基类（base class）* ，其他类直接或间接地从基类继承而来，这些类称为 *派生类（derived class）* 。
+- 基类定义所有类共同拥有的成员
+- 派生类定义各种特有的成员
+
