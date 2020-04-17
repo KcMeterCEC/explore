@@ -1,0 +1,61 @@
+#+TITLE: [What]Concurrency: An Introduction
+#+DATE: <2020-04-17 五> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_concurrency_overview.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+同一个进程的多个线程共享一个 address space，相比较单进程下的单线程主要具有以下两点不同：
+- 在进行切换时，进程切换需要切换页表而线程的切换则不需要，这样切换效率会高很多
+- 单线程的 address space 和 多线程的 adress space 具有一些不同：
+  + 多线程下每个线程都拥有自己的栈且它们共享堆
+[[./single_more.jpg]]
+
+以上各个线程有自己独立的栈，最直观的感受是通过 gdb 来切换到各个 frame 下看栈。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 为什么需要线程
+使用线程有以下几个好处：
+- 可以在逻辑上并行的处理任务，当有多核支持时，代码的运行效率就会更高。
+- 将 IO 密集型任务与 CPU 密集型任务分离，提高 CPU 的利用率。
+- 由于多线程共享内存空间，所以线程间通信比较简单。
+- 多线程切换效率较高。
+
+一般需要在逻辑上区分不同任务时，才以进程作为单位分别执行。
+* 线程的创建
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <assert.h>
+  #include <pthread.h>
+  #include "common.h"
+  #include "common_threads.h"
+  void *mythread(void *arg) {
+    printf("%s\n", (char *) arg);
+    return NULL;
+  }
+
+  int
+  main(int argc, char *argv[]) {
+    pthread_t p1, p2;
+    int rc;
+    printf("main: begin\n");
+    Pthread_create(&p1, NULL, mythread, "A");
+    Pthread_create(&p2, NULL, mythread, "B");
+    // join waits for the threads to finish
+    Pthread_join(p1, NULL);
+    Pthread_join(p2, NULL);
+    printf("main: end\n");
+    return 0;
+  }
+#+END_SRC
+如上面这种简单的创建两个线程的代码，在实际执行的顺序有可能是以下几种：
+[[./thread_create_1.jpg]]
+
+[[./thread_create_2.jpg]]
+
+可以看出来，当这些相同优先级的线程没有相互的同步或互斥机制时，在某个时刻到底是谁在执行是无法提前预知的，并发编程是门学问……
+* 多线程存在的问题
