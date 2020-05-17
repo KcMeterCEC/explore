@@ -1,26 +1,53 @@
-* [What]program --> docker
+#+TITLE: [What]docker -> 操作速查
+#+DATE:  <2020-05-15 五> 
+#+TAGS: docker
+#+LAYOUT: post 
+#+CATEGORIES: program,docker
+#+NAME: <program_docker_operation.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
 
-参考: [[https://www.gitbook.com/book/yeasy/docker_practice/details][Docker - 从入门到实践]]  [[https://docs.docker.com][docker document]]
+笔记: 
+1. [[https://www.gitbook.com/book/yeasy/docker_practice/details][Docker - 从入门到实践]]  
+2. [[https://docs.docker.com][docker document]]
+3. 《第一本 Docker 书》
 
-** 基本概念
-docker 的工作流程和 git 特别类似.
+* 基本概念
+** 核心组件
+Docker 的核心组件：
+1. Docker 客户端和服务器
+2. Docker 镜像（Image）
+3. Docker 仓库（Repository）
+4. Docker 容器（Container）
+
+*** 客户端和服务器
+Docker 是一个 C/S 架构的程序，那么就是说：
+- 由服务端来完成客户端的请求并返回结果
+- 客户端既可以和服务端在同一台主机，也可以远程访问其他主机上的 Docker 服务端
 *** 镜像
-指的就是运行的文件系统环境包, 里面包含了必要的库, 一般镜像是存储于远程库中的,供大家分享.
+指的就是运行的文件系统环境包（就是一个独立的根文件系统），里面包含了必要的库，一般镜像是存储于远程库中的，供大家分享。
 *** 容器
-将远程镜像抓取下来, 然后创建的实体就是容器. 这是用户的实际运行环境.对容器的更改, 可以反映到镜像中.
+将远程镜像抓取下来, 然后创建的实体就是容器。这是用户的实际运行环境，对容器的更改，可以反映到镜像中。
 
-镜像以增量的方式保存以前的更改可以为不同时期的状态创建一个 tag.
+镜像以增量的方式保存，以前的更改可以为不同时期的状态创建一个 tag，这点运行机制和 git 类似。
 
-*当容器中指定的应用终结时, 容器也自动终止*.
-*** 仓库
-用于存储镜像的位置,类似于 github.
-** 准备及安装
-*** 在 ubuntu16.04 中安装及配置
-**** 卸载以前的版本
+*当容器中指定的应用终结时，容器也自动终止。*
+*** 仓库（Registry）
+用于存储镜像的位置，类似于 github。Docker 公司运营着 Docker Hub，在上面可以创建自己的公开或私有镜像。
+** 技术组件
+- 文件系统隔离：每个容器都有自己的根文件系统
+- 进程隔离：每个容器运行在自己的进程环境中
+- 网络隔离：容器间的虚拟网络接口和 IP 地址都是分开的
+- 资源隔离和分组：使用 cgroups 将 CPU 、内存、IO 资源按比例分配给每个 Docker 容器
+- 写时复制：基于 COW 可以很好的节约文件系统的占用空间
+- 日志：用于分析故障
+- 交互式 shell：用户可以通过 shell 与 Docker 容器交互
+* 在 ubuntu 18.04 安装
+** 卸载以前的版本
 #+begin_example
 sudo apt remove docker docker-engine docker.io
 #+end_example
-**** 安装
+** 安装
 #+begin_example
 # 安装基础环境
 sudo apt update
@@ -36,53 +63,69 @@ sudo add-apt-repository \
 sudo apt update
 sudo apt install docker-ce
 #+end_example
-**** 启动及配置
+** 启动及配置
+关于国内镜像加速，参考[[https://yeasy.gitbook.io/docker_practice/install/mirror][此处。]]
 #+begin_example
-#启动
-sudo systemctl enable docker
-sudo systemctl start docker
-#建立用户组,(默认root 和 docker组 的用户才可以访问 docker 引擎的 socker
-sudo groupadd docker
-#将当前用户加入组
-sudo usermod -aG docker ${USER}
-#验证是否加入成功
-groups ${USER}
-#重启系统
-sudo reboot
-#将从阿里云获得的加速器地址加入配置, 然后重新启动(参考阿里云)
-sudo vim /etc/docker/daemon.json
-#+end_example
+  #启动
+  sudo systemctl enable docker
+  sudo systemctl start docker
+  #建立用户组,(默认root 和 docker组 的用户才可以访问 docker 引擎的 socket
+  sudo groupadd docker
+  #将当前用户加入组
+  sudo usermod -aG docker ${USER}
+  #验证是否加入成功
+  groups ${USER}
+  #重启系统
+  sudo reboot
+  #如果抓取镜像很慢，可以从国内云获得的加速器地址加入配置, 然后重新启动
+  #sudo vim /etc/docker/daemon.json
+  {
+    "registry-mirrors": [
+      "https://hub-mirror.c.163.com",
+      "https://mirror.baidubce.com"
+    ]
+  }
+  # 设置完镜像后需要再次重启
+  sudo systemctl enable docker
+  sudo systemctl start docker
 
-** 使用
-*** 镜像
-**** 获取镜像
+  #验证安装是否成功
+  docker run hello-world
+  #查看 docker 信息
+  docker info
+#+end_example
+Docker 服务端通过监听 =/var/run/docker.sock= 这个 Unix socket 文件来获取客户端的 Docker 请求。
+* 使用
+** 镜像
+*** 获取镜像
 镜像存储于 [[https://hub.docker.com/explore/][docker hub]] 中, 类似于 github.
 
 获取镜像的格式为:
 #+begin_example
-# [docker registry address] 指的是 <域名/IP>[:端口号]. 如果不填那就默认是 docker hub 地址
-# [repository name] 指的是 <用户名>/<镜像名>. 如果在 docker hub 地址上不填, 那用户名就默认是 library
+# [docker registry address] 指的是 <域名/IP>[:端口号]，如果不填那就默认是 docker hub 地址
+# [repository name] 指的是 <用户名>/<镜像名>，如果在 docker hub 地址上不填, 那用户名就默认是 library
 # <tag> 则是对应镜像所建立的标签, 和 git 中的 tag 类似
-# 比如 docker pull ubuntu:14.04 就是获取 docker hub 下的 library/ubuntu:14.04
-docker pull [option] [docker registry address]<repository name>:<tag>
+# 比如 docker pull ubuntu:18.04 就是获取 docker hub 下的 library/ubuntu:18.04
+docker pull [option] [docker registry address]<repository name>:[tag]
 #+end_example
-**** 通过镜像启动容器
+*** 通过镜像启动容器
 #+begin_example
 #启动镜像里面的bash
 # -it : 启动一个交互式(i)的终端(t)
 # -rm : 在容器退出后, 删除其所占有的空间
-# ubuntu:14.04 bash : 以 ubuntu:14.04 为基础,并启动里面的bash
-docker run -it --rm ubuntu:14.04 bash
+# ubuntu:18.04 bash : 以 ubuntu:18.04 为基础,并启动里面的 bash
+docker run -it --rm ubuntu:18.04 bash
 #+end_example
-
-**** 查看镜像
+*** 查看镜像
 - docker images / docker image ls : 查看已经下载下来的镜像
+- docker system df : 查看镜像、容器、数据卷所占用的内存空间
 - docker images -a : 在显示所有镜像的同时也显示中间层镜像(多个镜像共用的层)
 - docker images <image name> : 根据仓库命列出镜像
 - docker images <image name>:<tag> : 列出某个镜像的特定标签
 - docker images -f since/before=<image name>:<tag> : 在某个镜像之后(之前)建立的镜像
 - docker image prune : 删除所有的虚悬镜像(dangling image).
-**** 定制镜像
+  + 虚悬镜像就是以前的旧的镜像，已经被新的镜像所替代了，可以删除
+*** 定制镜像
 ***** 使用 commit (不推荐)
 在容器中, 修改的文件系统都会被记录于容器存储层了,使用 =docker commit= 命令将这些变化保存为一个镜像.
 #+begin_example
@@ -232,7 +275,7 @@ Downloading from http://download.openvz.org/template/precreated/ubuntu-14.04-x86
 sha256:f477a6e18e989839d25223f301ef738b69621c4877600ae6467c4e5289822a79B/78.42 MB
 #+end_example
 
-**** 删除镜像
+*** 删除镜像
 删除镜像使用如下指令
 - docker rmi [option] <image1> [<image2> ...]
 对应的删除容器则使用
@@ -242,13 +285,12 @@ sha256:f477a6e18e989839d25223f301ef738b69621c4877600ae6467c4e5289822a79B/78.42 M
 1. 如果有多个标签指向了同一个镜像, 那么就只是删除标签.
 2. 如果有多个镜像以此层为基础, 那么需要其他层删除后才能删除此层
 3. 如果有与此镜像对应的容器存在, 那么需要先删除容器
-
-*** 容器
+** 容器
 容器是独立运行的一个或一组应用, 以及它们的运行态环境. 虚拟机可以理解为模拟运行的一套操作系统和基于系统的应用.
-**** 启动
-***** 首次启动
+*** 启动
+首次启动
 - docker run [option] <image name>:<tag> [command]  或者 docker container run [option] <image name>:<tag> [command]
-  + docker run -t -i ubuntu:14.04 /bin/bash : 启动一个容器并打开其交互终端
+  + docker run -t -i ubuntu:18.04 /bin/bash : 启动一个容器并打开其交互终端
 
 执行这些命令后, docker 在后台运行的标准操作包括:
 - 检查本地是否存在指定的镜像, 不存在就从公有库下载
@@ -258,70 +300,219 @@ sha256:f477a6e18e989839d25223f301ef738b69621c4877600ae6467c4e5289822a79B/78.42 M
 - 从地址池配置一个 ip 地址给容器
 - 执行用户指定的应用程序
 - 执行完毕后容器被终止
-***** 启动已终止的容器
+
+启动已终止的容器
 - docker start <container name> 或者 docker container start 
-**** 后台运行
+*** 后台运行
 在运行命令中加入 =-d= 参数, 容器就不会输出结果打印到宿主机上面. 使用命令 =docker logs <container name> / docker container logs <container name>= 来查看信息输出.
 
 通过命令 =docker ps / docker container ls= 查看正在运行的容器.
-
-**** 终止容器
-
+*** 终止和重启容器
 - docker stop <container name>: 终止一个运行中的容器.
 - docker ps -a : 查看所有的容器信息
 - docker restart <container name>/ docker container restart <container name> : 重启一个容器
-**** 进入容器
-***** attach
+*** 进入容器
 - docker attach <container name> : 进入容器
-***** nsenter
-nsenter 会启动一个新的 shell 进程, 同时会把这个新进程切换到和目标进程相同的命令空间, 这样就相当于进入了容器内部.
-
-为了连接到容器, 还需要找到容器的第一个进程的PID
-#+begin_example
-PID=$(docker inspect --format "{{ .State.Pid}}" <container name>)
-#+end_example
-
-然后连接到容器
-#+begin_example
-nsenter --target ${PID} --mount --uts --ipc --net --pid
-#+end_example
-**** 导出和导入
+  +  *当终端退出后，容器会退出*
+- docker exec -it <container name> bash : 分配终端连接容器
+  + 当终端退出后，容器不会退出
+*** 导出和导入
 - docker export <container name> > <filename.tar> / docker container export <container name> > <filename.tar>: 导出容器快照
 - docker import <URL/file> / docker image import <URL/file>: 将容器快照导入
-
-**** 删除
+*** 删除
 - docker rm <container name> : 删除一个处于终止状态的容器, 加入 =-f= 则会停止一个容器并删除, =docker rm $(docker ps -a -q)= 删除所有处于终止状态的容器
 - docker container rm <container name> / docker container prune
-
-*** 仓库
-**** docker hub 
-- docker login : 仓库
+** 仓库
+*** docker hub 
+- docker login : 登录仓库
+- docker logout : 退出仓库
 - docker search <image name>: 查找镜像
 - docker pull / push <image name> : 抓取或推送到库
-**** 私有仓库
-可以使用 =docker-registry= 来创建本地的私有仓库
+*** 私有仓库
+创建私有仓库：
+- docker run -d -p 5000:5000 --restart=always --name registry registry : 使用官方的 registry 镜像来启动私有仓库
+  + 私有仓库默认被创建在 =/var/lib/registry= 目录下
 
-*** 数据管理
-**** 数据卷
+将本机镜像标记：
+- docker tag IMAGE:[TAG] [REGISTRY_HOST[:REGISTRY_PORT]/]REPOSITORY[:TAG]
+  + 比如 =docker tag ubuntu:latest 127.0.0.1:5000/ubuntu:latest= 将 ubuntu:latest 标记到私有仓库
+
+上传镜像到私有仓库：
+- docker push 127.0.0.1:5000/ubuntu:latest
+
+下载镜像：
+- docker push 127.0.0.1:5000/ubuntu:latest
+** 数据管理
+*** 数据卷
 - 数据卷可以一个或多个容器使用
 - 对数据卷的修改会立即生效
 - 对数据卷的更新不会影响镜像
 - 数据卷会一直存在, 即是容器被删除.
 
-- sudo docker run -d -P --name web -v /webapp training/webapp python app.py : 使用 =-v= 创建一个数据卷并挂载到容器中.
-- docker rm -v : 删除一个数据卷
-- sudo docker run -d -P --name web -v /src/webapp:/opt/webapp taraining/webapp python app.py : 挂载 *本地* 目录 =/src/webapp= 到容器的 /opt/webapp 目录中
-- sudo docker run --rm -it -v ~/.bash_history:/.bash_history ubuntu /bin/bash : 挂载 *本地* 文件 =~/.bash_history= 到容器的 /.bash_history 文件上
-- docker inspect web : 查看数据卷信息
-
-
-**** 数据卷容器
-如果有一些持续更新的数据需要载容器之间共享, 最好创建数据卷容器.
-
-*** 网络访问
-**** 外部访问
+- docker volume create <volume name> : 创建一个数据卷
+- docker volume ls : 查看数据卷
+- docker run -d -P --name web --mount source=my-vol,target=/webapp training/webapp python app.py
+  + 创建一个名为 =web= 的容器，讲数据卷 =my-vol= 挂载到容器的 /webapp 目录
+- docker volume rm <volume name> : 删除一个数据卷
+- docker volume prune : 删除未被挂载使用的数据卷
+- docker inspect web : 查看 =web= 信息
+*** 主机目录
+- docker run -d -P --name web --mount type=bind,source=/src/webapp,target=/opt/webapp taraining/webapp python app.py 
+  + 挂载 *本地* 目录 =/src/webapp= 到容器的 =/opt/webapp= 目录中
+- docker run --rm -it --mount type=bind,source=${HOME}/.bash_history,target=/root/.bash_history ubuntu:18.04 bash
+  + 挂载主机文件 =.bash_history= 到容器的 =.bash_history= 中
+** 网络访问
+*** 外部访问
 使用 =-P / -p= 来指定主机到容器的端口映射(P -> 随机映射 p -> 指定映射), 可以通过 =docker ps= 来查看实际映射情况
-- sudo docker run -d -p 5000:5000 training/webapp python app.py : 本地5000端口映射到容器的5000端口
-- sudo docker run -d -p 127.0.0.1:5000:5000 training/webapp python app.py : 映射到指定地址的指定端口
-- sudo docker run -d -p 127.0.0.1::5000 training/webapp python app.py : 映射到指定地址的任意端口
-- docker port <container name> 5000 : 查看映射端口的配置
+- docker run -d -p 5000:5000 training/webapp python app.py : 本地5000端口映射到容器的5000端口
+- docker run -d -p 127.0.0.1:5000:5000 training/webapp python app.py : 映射到指定地址的指定端口
+- docker run -d -p 127.0.0.1::5000 training/webapp python app.py : 映射到指定地址的任意端口
+- docker port <container name> [port] : 查看映射端口的配置
+*** 容器互联
+- docker network create -d bridge <net name> : 新建一个 docker 网络
+- docker run -it --rm --name <container name> --network <net name> <image> <command> : 运行一个容器并连接到网络
+* 定制镜像
+** 定制的原理
+由于 Docker 是一个 C/S 架构，所以其构建过程为：
+1. 客户端指定构建上下文路径
+2. 客户端讲此上下文路径中的文件打包，发送给服务端
+3. 服务端获取到压缩包以后，开始构建
+   
+
+Docker 通过 Dockerfile 来指定构建镜像的规则，Dockerfile 包含的就是当前这一新镜像的构建脚本。
+
+基于以上过程，一般习惯是：
+1. 新建一个空目录，编写 Dockerfile
+2. 如果 Dockerfile 包含额外的文件需要构建的话， *将那些文件拷贝到此目录*
+3. 运行构建命令，指定此构建上下文路径
+
+如果当前目录有些文件不希望被打包传输的话，需要编写一个 =.dockerignore= 文件来过滤这些文件。
+- 和 git 的 =.gitignore= 一样
+
+Docker 使用 =docker build [opt] <path>= 来调取 =Dockerfile= 进行镜像构建。
+- 其中 =path= 就代表构建上下文路径，一般为点（.），因为我们一般在 Dockerfile 的所在目录运行此命令
+** 基本命令
+Dockerfile 具有常用命令：
+*** FROM : 指定基础镜像
+=FROM= 是 Dockerfile 中的第一条指令，用于指定基础镜像，基于此镜像进行构建。
+
+如果不需要基于任何镜像，那么 =FROM= 后跟 =scratch= ：
+#+BEGIN_EXAMPLE
+  FROM scratch
+#+END_EXAMPLE
+*** RUN : 执行命令
+RUN 命令有两种格式：
+- shell 格式： =RUN <cmd>= ， =cmd= 代表 shell 格式的命令
+- exec 格式： =RUN ["可执行文件", "参数1", "参数2"]=  
+
+*需要注意的是：每个 =RUN= 指令都会新建立一层，所以正确的 Dockerfile 的写法是一个 =RUN= 指令后跟多条 shell 指令* ：
+#+BEGIN_EXAMPLE
+FROM debian:stretch
+
+RUN buildDeps='gcc libc6-dev make wget' \
+    && apt-get update \
+    && apt-get install -y $buildDeps \
+    && wget -O redis.tar.gz "http://download.redis.io/releases/redis-5.0.3.tar.gz" \
+    && mkdir -p /usr/src/redis \
+    && tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1 \
+    && make -C /usr/src/redis \
+    && make -C /usr/src/redis install \
+# 清理掉中间文件，避免镜像臃肿
+    && rm -rf /var/lib/apt/lists/* \
+    && rm redis.tar.gz \
+    && rm -r /usr/src/redis \
+    && apt-get purge -y --auto-remove $buildDeps
+#+END_EXAMPLE
+*** COPY : 复制文件 
+前面说过，Dockerfile 所在目录有可能需要额外文件帮助构建， =COPY= 命令就是将上下文的文件拷贝到镜像中。
+#+BEGIN_EXAMPLE
+  # shell 格式
+  COPY [--chown=<user>:<group>] <src> <dst>
+  # exec 格式
+  COPY [--chown=<user>:<group>] ["<src>",..."<dst>"]
+
+  # 将上下文的 package.json 文件拷贝到镜像环境的 /usr/src/app/ 中
+  # COPY package.json /usr/src/app/
+#+END_EXAMPLE
+- 如果 =dst= 中的目录不存在，Docker 会先行创建目录后再进行拷贝
+*** ADD : 高级复制
+ADD 命令格式与 COPY 基本一致，但是其 =src= 可以是一个 =URL= ，Docker 会到 URL 下载该文件。
+
+如果 =src= 是 =tar= 压缩格式的文件，Docker 也会解压缩该文件然后拷贝到目标路径去。
+
+ADD 命令一般在需要自动解压缩场合时才会被使用，其他场合一般使用 =COPY= 命令
+*** CMD : 容器启动
+CMD 指令用于指定默认的容器主进程的启动命令，其格式和 RUN 相似：
+#+BEGIN_EXAMPLE
+  # shell 格式
+  CMD <cmd>
+  # exec 格式
+  CMD ["可执行文件", "参数1", "参数2"...]
+  # 参数列表格式，在指定了 ENTRYPOINT 指令后，用 CMD 指定具体的参数
+  CMD ["参数1","参数2"....]
+#+END_EXAMPLE
+
+当 =docker run= 命令中包含了启动命令，则会覆盖 =CMD= 命令中的设定：
+#+BEGIN_EXAMPLE
+  # 使用 cat /etc/os-release 替代 CMD 
+  docker run -it ubuntu cat /etc/os-release
+#+END_EXAMPLE
+
+*需要注意的是： CMD 命令中的命令都是以前台的方式运行，如果切换到后台，则意味着主进程退出了，整个 container 也会退出。*
+*** ENTRYPOINT : 入口点
+ENTRYPOINT 也是用于指定容器启动程序及参数，其格式和 CMD 一致，当指定了 ENTRYPOINT 后，CMD 命令的含义就会扩展为：
+#+BEGIN_EXAMPLE
+  # CMD 的内容作为参数传递给 ENTRYPOINT 命令
+  ENTRYPOINT "<CMD>"
+#+END_EXAMPLE
+
+当 =docker run= 命令包含了启动命名。并且指定了 ENTRYPOINT 后，此启动命令便会作为参数传递给 ENTRYPOINT ，相当于将 ENTRYPOINT 指定的命令进行扩展。
+*** ENV : 设置环境变量
+#+BEGIN_EXAMPLE
+  ENV <key> <value>
+  ENV <key1>=<value1> <key2>=<value2> ...
+#+END_EXAMPLE
+*** ARG : 构建参数 
+与 =ENV= 命令效果一样，但此命令作用域仅为当前这一层镜像
+#+BEGIN_EXAMPLE
+  ARG <参数名>[=<默认值>]
+#+END_EXAMPLE
+*** VOLUME : 定义匿名卷
+匿名卷用于定义一个默认的存储空间，存放进程运行时的输出数据，避免向镜像存储层写入大量数据。
+#+BEGIN_EXAMPLE
+  VOLUME ["<路径1>","<路径2>"...]
+  VOLUME <路径>
+#+END_EXAMPLE
+
+如果使用 =docker run= 挂载了卷，则会覆盖该匿名卷。
+*** EXPOSE : 暴露端口
+声明容器运行时提供的服务端口
+#+BEGIN_EXAMPLE
+  EXPOSE <端口1> [<端口2>...]
+#+END_EXAMPLE
+*** WORKDIR : 指定工作目录
+#+BEGIN_EXAMPLE
+  # 指定工作目录，以后各层的当前目录都会受此指令的影响
+  WORKDIR <dir>
+#+END_EXAMPLE
+*** USER : 指定当前用户
+该命令也会影响以后的层
+#+BEGIN_EXAMPLE
+  USER <user name>[:<user group>]
+#+END_EXAMPLE
+*** HEALTHCHECK : 健康检查
+用于告诉 Docker 应该如何进行判断容器的状态是否正常。
+#+BEGIN_EXAMPLE
+  # 设置检查容器健康状况的命令
+  HEALTHCHECK [opt] CMD <cmd>
+  # 如果基础镜像有健康检查，使用此行屏蔽其健康检查命令
+  HEALTHCHECK NONE
+#+END_EXAMPLE
+
+
+
+*** ONBUILD : 为继承层设置指令
+ONBUILD 后跟的指令，只有以当前镜像为基础镜像，去构建下一级镜像的时候才会被执行。
+#+BEGIN_EXAMPLE
+  ONBUILD <cmd>
+#+END_EXAMPLE
