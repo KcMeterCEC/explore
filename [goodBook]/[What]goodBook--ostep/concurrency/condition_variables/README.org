@@ -1,0 +1,112 @@
+#+TITLE: [What]Condition Variables
+#+DATE: <2020-05-26 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_concurrency_condition_variables.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+平时很少使用条件变量，正好来学习一下应用场景。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 条件变量的正确使用
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <pthread.h>
+  #include <stdlib.h>
+
+  static int done = 0;
+  static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+  static pthread_cond_t c = PTHREAD_COND_INITIALIZER;
+
+  static void Pthread_mutex_lock(pthread_mutex_t *mutex)
+  {
+      if(pthread_mutex_lock(mutex))
+      {
+          perror("mutex lock failed:");
+          exit(1);
+      }
+  }
+  static void Pthread_mutex_unlock(pthread_mutex_t *mutex)
+  {
+      if(pthread_mutex_unlock(mutex))
+      {
+          perror("mutex unlock failed:");
+          exit(1);
+      }
+  }
+  static void Pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex)
+  {
+      if(pthread_cond_wait(cond, mutex))
+      {
+          perror("cond wait failed:");
+          exit(1);
+      }
+  }
+  static void Pthread_cond_signal(pthread_cond_t *cond)
+  {
+      if(pthread_cond_signal(cond))
+      {
+          perror("cond signal failed:");
+          exit(1);
+      }
+  }
+  static void Pthread_create(pthread_t *thread, const pthread_attr_t *attr,
+                            void *(*start_routine) (void *), void *arg)
+  {
+      if(pthread_create(thread, attr, start_routine, arg))
+      {
+          perror("pthread create failed:");
+          exit(1);
+      }
+  }
+  static void con_wait(int val) 
+  {
+      Pthread_mutex_lock(&m);
+      while (done != val)
+      {
+          Pthread_cond_wait(&c, &m);
+          printf("wakeup by done: %d, and I need val: %d\n",
+          done, val);
+      }
+    
+      Pthread_mutex_unlock(&m);
+  }
+  static void cond_signal(int val) {
+      Pthread_mutex_lock(&m);
+      done = val;
+      Pthread_cond_signal(&c);
+      Pthread_mutex_unlock(&m);
+  }
+
+  static void *child_wait(void *arg)
+  {
+      int val = (int )arg;
+
+      con_wait(val);
+      printf("thread:%lu has been woken up by parent val: %d\n", 
+      pthread_self(), val);
+  }
+
+  int main(int argc, char *argv[]) 
+  {
+      printf("parent: begin\n");
+      pthread_t p;
+      Pthread_create(&p, NULL, child_wait, (void *)1);
+      Pthread_create(&p, NULL, child_wait, (void *)2);
+      usleep(500000);
+      cond_signal(1);
+      sleep(1);
+      cond_signal(2);
+      usleep(100000);
+    
+      return 0;
+  }
+#+END_SRC
+需要理解的是， =pthread_cond_wait()= 函数在将线程睡眠前，会释放互斥量。在线程被
+唤醒后，会获取互斥量后返回。
+* 生产者与消费者模式
