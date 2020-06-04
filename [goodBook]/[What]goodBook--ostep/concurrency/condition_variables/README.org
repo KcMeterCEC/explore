@@ -157,7 +157,7 @@
 无法避免对已经写过的还未被读取的缓存，再次执行写操作。
 - 如果使用 =assert= 来判断，当 =assert= 为假时，进程就会被杀掉。
 - 也可以在临界区中用 =if= 判断 =count= ，但是这样很可能会浪费 CPU 来做无用功。
-** 简易解决方案
+** 有缺陷的解决方案
 #+BEGIN_SRC c
   int loops; // must initialize somewhere...
   cond_t cond;
@@ -201,3 +201,125 @@
 [[./broken_1.jpg]]
 
 同理，两个生产者和一个消费者线程，也会出现类似的情况。
+
+解决这个问题的方法也比较简单，将 =if= 换为 =while= 来持续判断：
+#+BEGIN_SRC c
+  int loops; // must initialize somewhere...
+  cond_t cond;
+  mutex_t mutex;
+
+  void *producer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      Pthread_mutex_lock(&mutex); // p1
+      while (count == 1) // p2
+        Pthread_cond_wait(&cond, &mutex); // p3
+      put(i); // p4
+      Pthread_cond_signal(&cond); // p5
+      Pthread_mutex_unlock(&mutex); // p6
+    }
+  }
+
+  void *consumer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      Pthread_mutex_lock(&mutex); // c1
+      while (count == 0) // c2
+        Pthread_cond_wait(&cond, &mutex); // c3
+      int tmp = get(); // c4
+      Pthread_cond_signal(&cond); // c5
+      Pthread_mutex_unlock(&mutex); // c6
+      printf("%d\n", tmp);
+    }
+  }
+#+END_SRC 
+
+但是上面的代码依然不完美，其根本原因在于：生产者和消费者都在等待同一个条件变量。
+
+当有一个生产者和两个消费者时，很有可能生产者在等待缓存空闲，但当一个消费者发送信号后，唤醒了另外一个消费者线程，这样大家就都永久的处于睡眠状态了。
+
+[[./broken_2.jpg]]
+
+也就是说，一个消费者不能够唤醒另一个消费者！
+
+** 成熟的解决方案
+基于上面的问题，我们需要使用两个条件变量：
+- 一个变量标识具有空位，由消费者释放，生产者等待。
+- 一个变量标识具有满位，由生产者释放，消费者等待。
+#+BEGIN_SRC c
+  cond_t empty, fill;
+  mutex_t mutex;
+
+  void *producer(void *arg) {
+  int i;
+  for (i = 0; i < loops; i++) {
+  Pthread_mutex_lock(&mutex);
+  while (count == 1)
+  Pthread_cond_wait(&empty, &mutex);
+  put(i);
+  Pthread_cond_signal(&fill);
+  Pthread_mutex_unlock(&mutex);
+  }
+  }
+
+  void *consumer(void *arg) {
+  int i;
+  for (i = 0; i < loops; i++) {
+  Pthread_mutex_lock(&mutex);
+  while (count == 0)
+  Pthread_cond_wait(&fill, &mutex);
+  int tmp = get();
+  Pthread_cond_signal(&empty);
+  Pthread_mutex_unlock(&mutex);
+  printf("%d\n", tmp);
+  }
+  }
+#+END_SRC
+基于上面这种实现方式，我们可以将缓冲区扩大，以让一个生产者可以唤醒多个消费者，提高并发度。
+#+BEGIN_SRC c
+  int buffer[MAX];
+  int fill_ptr = 0;
+  int use_ptr = 0;
+  int count = 0;
+
+  void put(int value) {
+   buffer[fill_ptr] = value;
+   fill_ptr = (fill_ptr + 1) % MAX;
+   count++;
+   }
+
+   int get() {
+   int tmp = buffer[use_ptr];
+   use_ptr = (use_ptr + 1) % MAX;
+   count--;
+   return tmp;
+   }
+   cond_t empty, fill;
+   mutex_t mutex;
+
+   void *producer(void *arg) {
+   int i;
+   for (i = 0; i < loops; i++) {
+   Pthread_mutex_lock(&mutex); // p1
+   while (count == MAX) // p2
+   Pthread_cond_wait(&empty, &mutex); // p3
+   put(i); // p4
+   Pthread_cond_signal(&fill); // p5
+   Pthread_mutex_unlock(&mutex); // p6
+   }
+   }
+
+
+   void *consumer(void *arg) {
+   int i;
+   for (i = 0; i < loops; i++) {
+   Pthread_mutex_lock(&mutex); // c1
+   while (count == 0) // c2
+   Pthread_cond_wait(&fill, &mutex); // c3
+   int tmp = get(); // c4
+   Pthread_cond_signal(&empty); // c5
+   Pthread_mutex_unlock(&mutex); // c6
+   printf("%d\n", tmp);
+   }
+   } 
+#+END_SRC
