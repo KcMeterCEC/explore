@@ -110,3 +110,94 @@
 需要理解的是， =pthread_cond_wait()= 函数在将线程睡眠前，会释放互斥量。在线程被
 唤醒后，会获取互斥量后返回。
 * 生产者与消费者模式
+** 示例代码
+假设生产者与消费者交互的缓存仅仅是一个整型变量，并通过另外一个变量来标识该缓存是
+否为空或为满：
+#+BEGIN_SRC c
+  int buffer;
+  int count = 0; // initially, empty
+
+  void put(int value) {
+    assert(count == 0);
+    count = 1;
+    buffer = value;
+  }
+
+  int get() {
+    assert(count == 1);
+    count = 0;
+    return buffer;
+  }
+#+END_SRC
+可以看到，变量 =count= 的作用就类似于条件变量，根据条件变量的值来确定是否操作缓
+存。那么假设有两个线程分别作为生产者和消费者，并且进行多次的读写操作，就会类似下
+面这样：
+#+BEGIN_SRC c
+  void *producer(void *arg) {
+    int i;
+    int loops = (int) arg;
+    for (i = 0; i < loops; i++) {
+      put(i);
+    }
+  }
+
+  void *consumer(void *arg) {
+    while (1) {
+      int tmp = get();
+      printf("%d\n", tmp);
+    }
+  }
+#+END_SRC
+
+很明显，为了保证能够正确的读写，需要保证两个操作：
+1. 读写不能同时进行
+2. 读写要有先后顺序
+   
+如果仅仅使用一个互斥量来原子化临界区，仅仅能保证对缓存的读写不会同时运行。但是却
+无法避免对已经写过的还未被读取的缓存，再次执行写操作。
+- 如果使用 =assert= 来判断，当 =assert= 为假时，进程就会被杀掉。
+- 也可以在临界区中用 =if= 判断 =count= ，但是这样很可能会浪费 CPU 来做无用功。
+** 简易解决方案
+#+BEGIN_SRC c
+  int loops; // must initialize somewhere...
+  cond_t cond;
+  mutex_t mutex;
+
+  void *producer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      Pthread_mutex_lock(&mutex); // p1
+      if (count == 1) // p2
+        Pthread_cond_wait(&cond, &mutex); // p3
+      put(i); // p4
+      Pthread_cond_signal(&cond); // p5
+      Pthread_mutex_unlock(&mutex); // p6
+    }
+  }
+
+  void *consumer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      Pthread_mutex_lock(&mutex); // c1
+      if (count == 0) // c2
+        Pthread_cond_wait(&cond, &mutex); // c3
+      int tmp = get(); // c4
+      Pthread_cond_signal(&cond); // c5
+      Pthread_mutex_unlock(&mutex); // c6
+      printf("%d\n", tmp);
+    }
+  }
+#+END_SRC 
+使用条件变量，通过互斥量来保证临界区的原子性，通过条件变量来保证先后顺序：
+- 当生产者写完缓存后，它需要等待变量为空（缓存被读取）后才进行后面的写操作。对于
+  消费者来说也是如此。
+
+但是上面这个代码只能在一个线程生产者和一个线程消费者的情况下适用，当有多线程时就
+会出问题：对于条件 =count= 的判断使用的是 =if= 语句，当下次从
+=Pthread_cond_wait= 被唤醒时，由于没有再次判断 =count= ，所以一定会执行对应的缓
+存区操作。
+
+假设一个生产者线程，两个消费者线程，可能出现下面这种情况：
+[[./broken_1.jpg]]
+
+同理，两个生产者和一个消费者线程，也会出现类似的情况。
