@@ -1,0 +1,70 @@
+#+TITLE: [What]Semaphores
+#+DATE: <2020-06-05 五> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_concurrency_semaphores.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+信号量是我平时使用最为频繁的同步和计数工具，看看大师怎么说……
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 信号量的基本使用
+#+BEGIN_SRC c
+  //先初始化再使用
+  #include <semaphore.h>
+  sem_t s;
+  sem_init(&s, 0, 1);
+
+  //当信号量的值为负时，对应多少个线程在等待该信号量
+  int sem_wait(sem_t *s) {
+    //decrement the value of semaphore s by one
+    //wait if value of semaphore s is negative
+                      }
+
+  int sem_post(sem_t *s) {
+    //increment the value of semaphore s by one
+    //if there are one or more threads waiting, wake one
+                 }
+#+END_SRC
+* 二值信号量作为锁
+使用二值信号量可以作为锁来完成临界区的互斥：
+- 进入临界区前获取该锁
+- 退出临界区后释放该锁
+
+根据以上逻辑可以知道锁的初始值为 1：
+#+BEGIN_SRC c
+  sem_t m;
+  sem_init(&m, 0, 1); // initialize to 1; 
+
+  sem_wait(&m);
+  // critical section here
+  sem_post(&m);
+#+END_SRC
+* 信号量用于排序（同步）
+一个线程要等待另一个线程到达某个条件后，才继续往后执行，所以这种情况下信号量的初始值为 0.
+#+BEGIN_SRC c
+  sem_t s;
+
+  void *child(void *arg) {
+    printf("child\n");
+    sem_post(&s); // signal here: child is done
+    return NULL;
+  }
+
+  int main(int argc, char *argv[]) {
+    sem_init(&s, 0, 0); 
+    printf("parent: begin\n");
+    pthread_t c;
+    Pthread_create(&c, NULL, child, NULL);
+    sem_wait(&s); // wait here for child
+    printf("parent: end\n");
+    return 0;
+  }
+#+END_SRC
+
+* 使用信号量解决生产者和消费者问题
+** 简易解决方案
