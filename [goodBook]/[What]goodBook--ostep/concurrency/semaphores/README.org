@@ -67,4 +67,88 @@
 #+END_SRC
 
 * 使用信号量解决生产者和消费者问题
-** 简易解决方案
+根据前面使用条件变量的实现来看，也是需要满位和空位，只是这里的满位和空位是由信号量来表示。
+
+除此之外，对于缓存区的写入也是需要做互斥的：
+#+BEGIN_SRC c
+   int buffer[MAX];
+   int fill = 0;
+   int use = 0;
+
+   void put(int value) {
+     buffer[fill] = value; // Line F1
+     fill = (fill + 1) % MAX; // Line F2
+     }
+
+   int get() {
+     int tmp = buffer[use]; // Line G1
+     use = (use + 1) % MAX; // Line G2
+     return tmp;
+     }
+  void *producer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      sem_wait(&empty); // Line P1
+      sem_wait(&mutex); // Line P1.5 (MUTEX HERE)
+      put(i); // Line P2
+      sem_post(&mutex); // Line P2.5 (AND HERE)
+      sem_post(&full); // Line P3
+      }
+    }
+
+  void *consumer(void *arg) {
+    int i;
+    for (i = 0; i < loops; i++) {
+      sem_wait(&full); // Line C1
+      sem_wait(&mutex); // Line C1.5 (MUTEX HERE)
+      int tmp = get(); // Line C2
+      sem_post(&mutex); // Line C2.5 (AND HERE)
+      sem_post(&empty); // Line C3
+      printf("%d\n", tmp);
+      }
+    }
+#+END_SRC
+
+*需要注意的是：* 互斥量放置位置需要在满位和空位之间，如果互斥量在满位和空位外面，则很大概率会照成死锁。 
+* 读写锁
+读写锁的实现逻辑如下：
+#+BEGIN_SRC c
+  typedef struct _rwlock_t {
+     sem_t lock; // binary semaphore (basic lock)
+     sem_t writelock; // allow ONE writer/MANY readers
+     int readers; // #readers in critical section
+     } rwlock_t;
+
+   void rwlock_init(rwlock_t *rw) {
+    rw->readers = 0;
+    sem_init(&rw->lock, 0, 1);
+     sem_init(&rw->writelock, 0, 1);
+     }
+
+   void rwlock_acquire_readlock(rwlock_t *rw) {
+     sem_wait(&rw->lock);
+     rw->readers++;
+     if (rw->readers == 1) // first reader gets writelock
+       sem_wait(&rw->writelock);
+     sem_post(&rw->lock);
+     }
+
+   void rwlock_release_readlock(rwlock_t *rw) {
+     sem_wait(&rw->lock);
+     rw->readers--;
+     if (rw->readers == 0) // last reader lets it go
+       sem_post(&rw->writelock);
+     sem_post(&rw->lock);
+     }
+
+   void rwlock_acquire_writelock(rwlock_t *rw) {
+     sem_wait(&rw->writelock);
+     }
+
+   void rwlock_release_writelock(rwlock_t *rw) {
+     sem_post(&rw->writelock);
+     }
+#+END_SRC   
+需要注意的是：假设有多个频繁的读操作，有可能会导致写操作无法进行（被饿死），这种情况下使用普通的互斥锁更为高效。
+
+
