@@ -152,3 +152,53 @@
 需要注意的是：假设有多个频繁的读操作，有可能会导致写操作无法进行（被饿死），这种情况下使用普通的互斥锁更为高效。
 
 
+* 哲学家就餐问题
+哲学家获得餐具就是一段临界区，这段临界区需要做互斥，每个哲学家的逻辑如下：
+#+BEGIN_SRC c
+  while (1) {
+    think();
+    get_forks(p);
+    eat();
+    put_forks(p);
+   }
+#+END_SRC 
+这里的关键就在于 =get_forks(),put_forks()= 的处理。
+
+假设有 5 个哲学家，那么就会有 5 个餐具，为了实现 5 个餐具的互斥，假设以下面的方法实现：
+#+BEGIN_SRC c
+  // 5 个餐具的互斥，初始情况下的值为 1
+  sem_t forks[5];
+
+  //获得左边的餐具
+  int left(int p) { return p; }
+  //获得右边的餐具
+  int right(int p) { return (p + 1) % 5; }
+
+  void get_forks(int p) {
+    sem_wait(&forks[left(p)]);
+    sem_wait(&forks[right(p)]);
+  }
+
+  void put_forks(int p) {
+    sem_post(&forks[left(p)]);
+    sem_post(&forks[right(p)]);
+  }
+#+END_SRC
+上面的实现会造成死锁，因为假设有多个线程的话，当一个线程获取了左边的餐具后，右边
+的餐具很可能被它旁边的哲学家获取到了。如此环环相扣，便造成了死锁。
+
+要解开这个环，只需要解开其中几个扣即可：
+#+BEGIN_SRC c
+  void get_forks(int p) {
+    if (p == 4) {
+      sem_wait(&forks[right(p)]);
+      sem_wait(&forks[left(p)]);
+    } else {
+      sem_wait(&forks[left(p)]);
+      sem_wait(&forks[right(p)]);
+    }
+  }
+#+END_SRC
+当第 5 个哲学家获取餐具时，他获取的顺序不同于前 4 种，这种情况下就不会锁住第 4
+个哲学家了。
+
