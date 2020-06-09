@@ -1,0 +1,93 @@
+#+TITLE: [What]Common Concurrency Problems
+#+DATE: <2020-06-09 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_concurrency_problems.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+整理在并发编程时，经常会遇到的一些问题。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+* 非死锁 BUG
+** 违反原子性 BUG
+所谓的违反原子性 BUG，其实就是没有对临界区进行互斥处理。
+
+#+BEGIN_SRC c
+  Thread 1::
+  if (thd->proc_info) {
+    fputs(thd->proc_info, ...);
+   }
+
+  Thread 2::
+  thd->proc_info = NULL;
+#+END_SRC
+
+如上面这段代码，假设线程 2 在线程 1 进入 if 判断后但在执行 fputs 之前执行，就会
+出现 fputs 操作空指针的问题。
+
+解决办法就是将这段临界区进行加锁：
+#+BEGIN_SRC c
+  pthread_mutex_t proc_info_lock = PTHREAD_MUTEX_INITIALIZER;
+
+  Thread 1::
+  pthread_mutex_lock(&proc_info_lock);
+  if (thd->proc_info) {
+    fputs(thd->proc_info, ...);
+   }
+  pthread_mutex_unlock(&proc_info_lock);
+
+  Thread 2::
+  pthread_mutex_lock(&proc_info_lock);
+  thd->proc_info = NULL;
+  pthread_mutex_unlock(&proc_info_lock);
+#+END_SRC
+** 违反顺序 BUG
+#+BEGIN_SRC c
+  Thread 1::
+  void init() {
+    mThread = PR_CreateThread(mMain, ...);
+  }
+
+  Thread 2::
+  void mMain(...) {
+    mState = mThread->State;
+  }
+#+END_SRC
+如上面这段代码，线程 2 必须要等待线程 1 为 =mThread= 赋值后，才能正常使用。
+
+为了完成这种顺序同步，需要使用条件变量或信号量：
+#+BEGIN_SRC c
+  pthread_mutex_t mtLock = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t mtCond = PTHREAD_COND_INITIALIZER;
+  int mtInit = 0;
+
+  Thread 1::
+  void init() {
+    ...
+    mThread = PR_CreateThread(mMain, ...);
+
+    // signal that the thread has been created...
+    pthread_mutex_lock(&mtLock);
+    mtInit = 1;
+    pthread_cond_signal(&mtCond);
+    pthread_mutex_unlock(&mtLock);
+    ...
+      }
+
+  Thread 2::
+  void mMain(...) {
+    ...
+    // wait for the thread to be initialized...
+    pthread_mutex_lock(&mtLock);
+    while (mtInit == 0)
+      pthread_cond_wait(&mtCond, &mtLock);
+    pthread_mutex_unlock(&mtLock);
+
+    mState = mThread->State;
+    ...
+      }
+#+END_SRC
