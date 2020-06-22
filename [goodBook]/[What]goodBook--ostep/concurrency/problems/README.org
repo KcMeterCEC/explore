@@ -154,3 +154,71 @@
   + 解决办法是在中间插入随机的延迟，而打破这种同步
 2. 实际的应用场景会比较复杂，在 =goto= 时还需要释放一些资源以避免重复申请
 *** 互斥
+避免互斥是个令人头痛的问题，如果能够尽量减少锁的使用量，便能大大降低死锁的概率。
+
+假设硬件可以原子的完成以下操作:
+#+BEGIN_SRC c
+  int CompareAndSwap(int *address, int expected, int new) {
+    if (*address == expected) {
+      ,*address = new;
+      return 1; // success
+    }
+    return 0; // failure
+  }
+#+END_SRC
+那么假设我们要增加一个变量的值，就可以使用下面这种方式来完成，而无需使用锁：
+#+BEGIN_SRC c
+  void AtomicIncrement(int *value, int amount) {
+    do {
+      int old = *value;
+      //当 value 的值没有被改变（没有其他线程在操作），那么就改变该变量
+    } while (CompareAndSwap(value, old, old + amount) == 0);
+  }
+#+END_SRC
+
+假设一个更为复杂的场景：在链表的头部插入一个节点
+#+BEGIN_SRC c
+  void insert(int value) {
+    node_t *n = malloc(sizeof(node_t));
+    assert(n != NULL);
+    n->value = value;
+    n->next = head;
+    head = n;
+  }
+#+END_SRC
+
+按照加锁的方式来完成：
+#+BEGIN_SRC c
+  void insert(int value) {
+    node_t *n = malloc(sizeof(node_t));
+    assert(n != NULL);
+    n->value = value;
+    pthread_mutex_lock(listlock);
+    n->next = head;
+    head = n;
+    pthread_mutex_unlock(listlock);
+  }
+#+END_SRC
+
+使用不加锁的方式：
+#+BEGIN_SRC c
+  void insert(int value) {
+    node_t *n = malloc(sizeof(node_t));
+    assert(n != NULL);
+    n->value = value;
+    do {
+      n->next = head;
+      //确保 head 当前没有被改变的时候再继续下一步
+    } while (CompareAndSwap(&head, n->next, n) == 0);
+#+END_SRC
+*** 基于调度的方式避免死锁
+假设有 4 个线程，它们是否获取锁 1 和 锁 2 的方式如下：
+|     | 线程 1 | 线程 2 | 线程3  | 线程 4 |
+|-----+--------+--------+--------+--------|
+| 锁1 | 获取   | 获取   | 不获取 | 不获取 |
+| 锁2 | 获取   | 获取   | 获取   | 不获取 |
+
+可以看到：只有线程 1 和线程 2 会同时获取两个锁，那么只要不让它们有机会同时运行，
+那就可以避免死锁。
+
+比如将线程 1 和线程 2 绑定在同一个逻辑 CPU 上，并且它们具有相同的优先级。
