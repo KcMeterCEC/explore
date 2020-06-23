@@ -1,0 +1,34 @@
+#+TITLE: [What]Event-based Concurrency
+#+DATE: <2020-06-23 二> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_concurrency_event.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+基于事件的并发。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+事件循环简单来讲就是应用程序在等待一个或多个事件，事件到来后根据事件的类型进行对
+应的处理，然后又继续等待下一事件。这就是一个单线程的处理方式。
+- 当需要处理的事务较多或较重时，还是会启用工作线程来并发的完成
+
+伪代码如下：
+#+BEGIN_EXAMPLE
+  while (1) {
+  events = getEvents();
+  for (e in events)
+  processEvent(e);
+  }
+#+END_EXAMPLE
+关于获取事件 API 的使用，在[[http://kcmetercec.top/2019/11/27/book_linux_server_chapter_9/][这篇读书笔记]]中已经记录的很详尽了。
+
+需要注意的是：在处理事件对应事务时不能以阻塞的方式处理，否则会影响后来事件的响应。
+
+比如当客户端请求读取文件，而该文件并没有在内存存在 pagecache。那么就需要从硬盘来
+读取文件内容而服务端如果以阻塞的方式等待，就会导致服务端在响应其他事件的速度很慢。
+- 一个办法是使用异步 IO，以让内核来完成文件的读取操作。
+
