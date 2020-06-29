@@ -1,0 +1,52 @@
+#+TITLE: [What]I/O Devices
+#+DATE: <2020-06-29 Mon> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,ostep
+#+NAME: <book_ostep_IO_devices.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+重新梳理对 I/O 操作的底层认识。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+所谓的 I/O 操作，其实就是 SOC 通过接口与外部进行通信，所谓的操作接口就是操作对应的寄存器。
+
+I/O 操作分为两个步骤：
+1. 获取被操作设备的状态
+2. 对设备进行读写操作
+
+* 获取设备状态
+** 轮询方式
+以轮询的方式获取设备状态，其代码实现相对简单，但如果等待时间过长会使得 CPU 做太多的无用功。
+#+BEGIN_SRC c
+  While (STATUS == BUSY)
+    ; // wait until device is not busy
+  Write data to DATA register
+  Write command to COMMAND register
+  (starts the device and executes the command)
+    While (STATUS == BUSY)
+    ; // wait until device is done with your request
+#+END_SRC
+** 中断方式
+SOC 通过发送请求，然后等待中断信号，这样就可以切换到其他线程运行。等获取到中断后，原来的线程被唤醒，继续执行后面的操作。
+
+中断方式并不是在任何情况下都要优于轮询方式，因为使用中断会执行以下流程：
+- 切换当前进程/线程到其他的进程/线程，这需要对当前的线程/线程上下文进行保存
+- 如果是进程切换还涉及到页表的切换，页表切换后执行新进程有可能还会由于 pagefault 建立新的页表项。
+  - 这个过程所消耗的时间是最多的
+- 由于执行了新进程/线程，会造成 cachemiss，所以 cache 也需要同步
+- 当中断发生后，又需要切换进程/线程，上面 3 个步骤又会再执行一次
+
+所以，当一个 I/O 操作消耗时间很短时，使用轮询的方式反而是一个更加轻量级的办法。
+
+使用中断另一个需要注意的是：当设备有大量数据返回时，可能会频繁产生中断，而 CPU 的主要精力都在这无穷的切换中消耗殆尽。
+
+这种情况下，需要将多个中断合并为一个中断，将多个单次的数据，合并为一个大包的数据操作。
+* 对设备进行读写操作
+所谓的对设备进行读写，就是将内存的内容搬移给设备，或将数据从设备搬移到内存。
+
+这个操作如果由 CPU 来完成的话，那将花费不少时间。明智的做法是使用 DMA 来完成搬移，而让 CPU 做其他的任务。
+

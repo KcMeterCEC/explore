@@ -11,6 +11,10 @@
 1. [[https://www.gitbook.com/book/yeasy/docker_practice/details][Docker - 从入门到实践]]  
 2. [[https://docs.docker.com][docker document]]
 3. 《第一本 Docker 书》
+   
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
 
 * 基本概念
 ** 核心组件
