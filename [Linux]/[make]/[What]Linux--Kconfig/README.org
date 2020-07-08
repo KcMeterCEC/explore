@@ -21,6 +21,7 @@ u-boot 或者 Linux 在进行配置内核时，其调用步骤如下:
   + 编译完成后，在内核根目录会有未压缩的 vmlinux 和符号表 System.map,以及在 arch/xxx/boot/ 目录下会有已经压缩的zImage
 2. make ARCH=<arch> CROSS_COMPILE=<arm-gcc> modules : 编译内核模块
   + 内核模块对应的存在于其源码的路径中
+  + 为了便捷的将编译的模块安装在文件系统，一般还会执行 =make modules_install= ，默认会安装在目标文件系统的 =/lib/modules/$(KERNELRELEASE)=
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML

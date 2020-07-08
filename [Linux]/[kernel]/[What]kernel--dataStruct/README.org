@@ -7,121 +7,535 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+|kernel|5.4.x lts|
+
 罗列内核已经提供的双向链表数据结构的使用方式。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
-linux 在 =linux/list.h= 中提供了 *双向环形链表* 和 *双向链表* 的操作函数, 此代码可以移植到其他应用环境中,方便使用.
+linux 在 =include/linux/list.h= 中提供了 *双向环形链表* 和 *双向链表* 的操作函数, 此代码可以移植到其他应用环境中,方便使用。
+- 在内核编程环境中，需要 =#include <linux/list.h>= 来包含该头文件
 
 需要注意的是:
 1. linux是通过 *将此链表嵌入在其他数据结构中, 从而将很多不同的数据结构链接起来!*. (而不是链表中包含数据).
 2. 函数中的参数 =head= 代表的即为链表头!
-3. =typeof= 是GCC扩展的关键字, 所以不能在编译选项中添加 =-std=c99=!
+3. =typeof= 是GCC扩展的关键字, 所以不能在编译选项中添加 =-std=c99= ，而是使用 =-std=gnu99= .
   - 为了兼容所有编译器，我在[[https://github.com/KcMeterCEC/common_code/tree/master/c/data_structure/list/circular][github]]中移植了通用版本。
-* 使用
-** 双向环形链表
+* 使用双向环形链表
+** 双向环形链表概览
 内核提供了以下宏供操作:
-- LIST_HEAD(name)  : 定义一个名称为 =name= 的双向环形链表.
+- LIST_HEAD(name)  : 定义并初始化一个名称为 =name= 的双向环形链表。
+  + 默认链表的 next 和 prev 指向自己
 - list_entry(ptr, type, member) : 通过链表节点地址 =ptr= , 来反推处包含它的 =type= 类型数据的起始地址, =member= 就是该链表节点在 =type= 中定义的名称
 - list_first_entry(ptr, type, member): 反推节点 =ptr= 的下一个节点被包含的 =type= 类型数据的起始地址, *当 ptr为头指针时, 返回的就是第一个对象*.
 - list_last_entry(ptr, type, member): 反推节点 =ptr= 的上一个节点被包含的 =type= 类型数据的起始地址, *当 ptr 为头指针时, 返回的就是最后一个对象*.
-- list_first_entry_or_null(ptr, type, member): 反推节点 =ptr= 的上一个节点被包含的 =type= 类型数据的起始地址, 如果没有则返回 NULL 
+- list_first_entry_or_null(ptr, type, member): 反推节点 =ptr= 的下一个节点被包含的 =type= 类型数据的起始地址, 如果没有则返回 NULL 
 - list_next_entry(pos, member): 得到与 =pos= 相连的下一个数据结构的地址
-- list_next_entry(pos, member): 得到与 =pos= 相连的下一个数据结构的地址
+- list_prev_entry(pos, member): 得到与 =pos= 相连的上一个数据结构的地址
 - list_for_each(pos, head) : 向下遍历 =pos= 到 =head= 节点, 此宏为一个for语句
 - list_for_each_prev(pos, head) : 向上遍历 =pos= 到 =head= 节点, 此宏为一个for语句
-- list_for_each_safe(pos, head) : 向下遍历 =pos= 到 =head= 节点, 此宏为一个for语句
-- list_for_each_prev_safe(pos, head) : 向上遍历 =pos= 到 =head= 节点, 此宏为一个for语句
+- list_for_each_safe(pos, n, head) : 向下遍历 =pos= 到 =head= 节点, 此宏为一个for语句
+  + 当遍历到一个节点，然后需要删除它式，需要使用此宏
+- list_for_each_prev_safe(pos, n, head) : 向上遍历 =pos= 到 =head= 节点, 此宏为一个for语句
 - list_for_each_entry(pos, head, member): 通过节点, 向下数据结构遍历
 - list_for_each_entry_reverse(pos, head, member): 通过节点,向上数据结构遍历
-- list_for_each_entry_continue(pos, head, member): 通过数据结构,向下数据结构遍历
-- list_for_each_entry_continue_reverse(pos, head, member): 通过数据结构,向下数据结构遍历
-- list_for_each_entry_from(pos, head, member): 寻找与head匹配的数据结构 pos
+- list_prepare_entry(pos, head, member) : 准备一个节点作为起始遍历，用于 =list_for_each_entry_continue= 
+- list_for_each_entry_continue(pos, head, member): 通过数据结构,向下遍历数据结构
+- list_for_each_entry_continue_reverse(pos, head, member): 通过数据结构,向上遍历数据结构
+- list_for_each_entry_from(pos, head, member): 向下寻找与head匹配的数据结构 pos
+- list_for_each_entry_from_reverse(pos, head, member): 向上寻找与head匹配的数据结构 pos
 - list_safe_reset_next(pos, n, member): 得到与 =pos= 相连的下一个数据结构地址, 并将地址复制给 n.
 内核提供了以下函数供操作:
 #+BEGIN_SRC c
-/**
- ,* @brief 初始化链表
- ,*/
-static inline void INIT_LIST_HEAD(struct list_head *list);
-/**
- ,* @brief 在节点 prev,next 之间插入新节点 new
- ,*/
-static inline void __list_add(struct list_head *new,
-                              struct list_head *prev,
-                              struct list_head *next);
+  /**
+   ,* @brief 初始化链表
+   ,*/
+  static inline void INIT_LIST_HEAD(struct list_head *list);
+  /**
+   ,* @brief 在节点 prev,next 之间插入新节点 new
+   ,*/
+  static inline void __list_add(struct list_head *new,
+                                struct list_head *prev,
+                                struct list_head *next);
 
-/**
- ,* @brief 在节点 head 前插入节点 new (以head 为参考)
- ,*/
-static inline void list_add(struct list_head *new, struct list_head *head);
+  /**
+   ,* @brief 在节点 head 后插入节点 new (以head 为参考)
+   ,* @note 这个过程就和入栈是一样的
+   ,*/
+  static inline void list_add(struct list_head *new, struct list_head *head);
 
-/**
- ,* @brief 在节点 head 后插入节点 new (以head 为参考)
- ,*/
-static inline void list_add_tail(struct list_head *new, struct list_head *head);
+  /**
+   ,* @brief 在节点 head 前插入节点 new (以head 为参考)
+   ,* @note 这个过程就和插入一个数据到队列尾一样
+   ,*/
+  static inline void list_add_tail(struct list_head *new, struct list_head *head);
 
-/**
- ,* @brief 删除 prev 和 next 之间的节点
- ,*/
-static inline void __list_del(struct list_head *prev, struct list_head *next);
-/**
- ,* @brief 删除 entry 节点
- ,*/
-static inline void __list_del_entry(struct list_head *entry);
-/// 在上面的基础上还要初始化 entry
-static inline void list_del_init(struct list_head *entry);
-/**
- ,* @brief 节点 new 替换节点 old
- ,*/
-static inline void list_replace(struct list_head *old, struct list_head *new);
-/// 在上面基础上还要初始化 old
-static inline void list_replace_init(struct list_head *old, struct list_head *new);
-/**
- ,* @brief 将节点 list 移出当前链表, 并插入到另一个链表的 head 节点前
- ,*/
-static inline void list_move(struct list_head *list, struct list_head *head);
-/// 与上函数相比, 插入到 head 后
-static inline void list_move_tail(struct list_head *list, struct list_head *head);
-/**
- ,* @brief 判断节点 head 是否是 list 节点的下一个节点
- ,*/
-static inline int list_is_last(struct list_head *list, struct list_head *head);
-/**
- ,* @brief 判断当前链表是否是空链表
- ,*/
-static inline int list_empty(struct list_head *head);
-/**
- ,* @brief 以安全的方式判断当前链表是否是空链表
- ,*/
-static inline int list_empty_careful(const struct list_head *head);
-/**
- ,* @brief 移动head节点到左边
- ,*/
-static inline int list_rotate_left(struct list_head *head);
-/**
- ,* @brief 判断一个链表是否只有一个元素
- ,*/
-static inline int list_is_singular(struct list_head *head);
-/**
- ,* @brief 将链表从 head 节点处切断(不包括 head), 一直到 entry(包括), 并拼接到 list节点处
- ,*/
-static inline int list_cut_position(struct list_head *list,
-                                    struct list_head *head,
-                                    struct list_head *entry);
+  /**
+   ,* @brief 删除 prev 和 next 之间的节点
+   ,*/
+  static inline void __list_del(struct list_head *prev, struct list_head *next);
+  /**
+   ,* @brief 删除 entry 节点，并将此节点的 prev 设置为 NULL
+   ,* @note 将 prev 设置为 NULL 是为了在某些场景下判断
+   ,*/
+  static inline void __list_del_clearprev(struct list_head *entry);
+  /**
+   ,* @brief 删除 entry 节点
+   ,* @note 这种情况下，其实 entry 节点还是指向了它之前前后位置，要是无意操作到便会出幺蛾子
+   ,*/
+  static inline void __list_del_entry(struct list_head *entry);
+  /**
+   ,* @brief 删除 entry 节点，并将此节点的 next 和 prev 指向会引起 Pagefault 的内存地址
+   ,* @note 这样以后，当有代码有意或无意操作该节点时，内核便会以 oops 来提示用户
+   ,*/
+  static inline void list_del(struct list_head *entry);
+  /**
+   ,* @brief 删除节点 entry，将此节点的 next 和 prev 指向自己
+   ,* @brief 这种情况下就是安全的
+   ,*/
+  static inline void list_del_init(struct list_head *entry);
+  /**
+   ,* @brief 节点 new 替换节点 old
+   ,* @brief 替换后，节点 old 依然指向原来的位置，这依然是不安全的
+   ,*/
+  static inline void list_replace(struct list_head *old, struct list_head *new);
+  /**
+   ,* @brief 节点 new 替换节点 old，并将 Old 的前后指向到自己
+   ,* @brief 这种情况下就是安全的
+   ,*/
+  static inline void list_replace_init(struct list_head *old, struct list_head *new);
+  /**
+   ,* @brief 交换两个节点的位置
+   ,*/
+  static inline void list_swap(struct list_head *entry1,
+                               struct list_head *entry2)
+  /**
+   ,* @brief 将节点 list 移出当前链表, 并插入到另一个链表的 head 节点后
+   ,*/
+  static inline void list_move(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 将节点 list 移出当前链表, 并插入到另一个链表的 head 节点前
+   ,*/
+  static inline void list_move_tail(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 将 first 和 last 之间（包括 first 和 last） 的所有节点移动到 head 之前
+   ,* @note 这个操作必须是在同一个链表中
+   ,*/
+  static inline void list_bulk_move_tail(struct list_head *head,
+                                         struct list_head *first,
+                                         struct list_head *last);
+  /**
+   ,* @brief 判断 list 节点是否是该链表的第一个节点
+   ,*/
+  static inline int list_is_first(const struct list_head *list,
+                                  const struct list_head *head)
+  /**
+   ,* @brief 判断 list 节点是否是该链表的最后一个节点
+   ,*/
+  static inline int list_is_last(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 判断当前链表是否是空链表
+   ,*/
+  static inline int list_empty(struct list_head *head);
+  /**
+   ,* @brief 以安全的方式判断当前链表是否是空链表
+   ,*/
+  static inline int list_empty_careful(const struct list_head *head);
+  /**
+   ,* @brief 将 head 开头的链表的节点从右边移动到左边
+   ,*/
+  static inline int list_rotate_left(struct list_head *head);
+  /**
+   ,* @brief 将 list 作为链表头
+   ,*/
+  static inline void list_rotate_to_front(struct list_head *list,
+          struct list_head *head);
+  /**
+   ,* @brief 判断一个链表是否只有一个元素
+   ,*/
+  static inline int list_is_singular(struct list_head *head);
+  /**
+   ,* @brief 将链表从 head 节点处切断(不包括 head), 一直到 entry(包括), 并拼接到 list节点处
+   ,* @note list 节点需要为空，否则 list 之前的链接会被丢失
+   ,*/
+  static inline int list_cut_position(struct list_head *list,
+                                      struct list_head *head,
+                                      struct list_head *entry);
+  /**
+   ,* @brief 将链表从 head 节点处切断(不包括 head), 一直到 entry(不包括), 并拼接到 list节点处
+   ,* @note list 节点需要为空，否则 list 之前的链接会被丢失
+   ,*/
+  static inline void list_cut_before(struct list_head *list,
+                                     struct list_head *head,
+                                     struct list_head *entry);
 
-/**
- ,* @brief 在链表的 head 前拼接一段链表 list
- ,*/
-static inline int list_splice(struct list_head *list, struct list_head *head);
-/// 拼接并初始化 list
-static inline int list_splice_init(struct list_head *list, struct list_head *head);
-/// 在链表后拼接
-static inline int list_splice_tail(struct list_head *list, struct list_head *head);
-static inline int list_splice_tail_init(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 在 head 及其 next 之间插入链表 list，不包括 list 本身
+   ,*/
+  static inline int list_splice(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 在 head 及其 next 之间插入链表 list，不包括 list 本身
+   ,* @note list 会被设置为指向自身，这是比较安全的
+   ,*/
+  static inline int list_splice_init(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 在 head 及其 prev 之间插入链表 list，不包括 list 本身
+   ,*/
+  static inline int list_splice_tail(struct list_head *list, struct list_head *head);
+  /**
+   ,* @brief 在 head 及其 prev 之间插入链表 list，不包括 list 本身
+   ,* @note list 会被设置为指向自身，这是比较安全的
+   ,*/
+  static inline int list_splice_tail_init(struct list_head *list, struct list_head *head);
 
 #+END_SRC
-** 双向链表(*待分析*)
+** 示例
+#+BEGIN_SRC c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <assert.h>
+
+  #include "list.h"
+
+  LIST_HEAD(head);
+
+  typedef struct 
+  {
+    int val;
+    struct list_head node;
+  }obj;
+
+
+  static void print_list(const struct list_head *head)
+  {
+    obj *pobj;
+    list_for_each_entry(pobj, head, node)
+    {
+      printf("%d,", pobj->val);
+    }
+    printf("\n");
+  }
+  static void clear_list(const struct list_head *head)
+  {
+    struct list_head *node, *next;
+    obj *pobj;
+    list_for_each_safe(node, next, head)
+    {
+      pobj = list_entry(node, obj, node);
+      list_del(node);
+      free(pobj);
+    }
+  }
+  /**
+   ,* @note 因为 list_add 是以栈的形式插入的数据，所以从 0~4 插入数据后,
+   ,* 遍历输出的是 4~0 的倒序
+   ,*/
+  static void test_list_add(void)
+  {
+    printf("%s\n", __func__);
+
+    for(int i = 0; i < 5; i++)
+    {
+      obj *pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add(&pobj->node, &head);
+    }
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 因为 list_add 是以队列的形式插入的数据，所以从 0~4 插入数据后,
+   ,* 遍历输出的是 0~4 的正序
+   ,*/
+  static void test_list_add_tail(void)
+  {
+    printf("%s\n", __func__);
+
+    for(int i = 0; i < 5; i++)
+    {
+      obj *pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+    }
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 删除索引 3 处的节点后，遍历输出便是 0，1，2，4
+   ,*/
+  static void test_list_del(void)
+  {
+    printf("%s\n", __func__);
+    obj *tmp = NULL;
+
+    for(int i = 0; i < 5; i++)
+    {
+      obj *pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+
+      if(i == 3)
+      {
+        tmp = pobj;
+      }
+    }
+    list_del(&tmp->node);
+    free(tmp);
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 替换索引 3 处的节点后，遍历输出便是 0，1，2，5， 4
+   ,*/
+  static void test_list_replace(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *tmp = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      obj *pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+      if(i == 3)
+      {
+        tmp = pobj;
+      }
+    }
+    obj *pobj = malloc(sizeof(obj));
+    pobj->val = 5;
+    list_replace_init(&tmp->node, &pobj->node);
+    free(tmp);
+
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 交换索引 3，4 处的节点后，遍历输出便是 0，1，2，4， 3
+   ,*/
+  static void test_list_swap(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *tmp = NULL;
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+      if(i == 3)
+      {
+        tmp = pobj;
+      }
+    }
+	
+    list_swap(&tmp->node, &pobj->node);
+
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 将链表 0，1，2，3，4 中的 3 移动到另一个链表头，
+   ,* 那么另一个链表就是 3,5,6,7,8,9
+   ,*/
+  static void test_list_move(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *tmp = NULL;
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+      if(i == 3)
+      {
+        tmp = pobj;
+      }
+    }
+
+    LIST_HEAD(new_head);
+    for(int i = 5; i < 10; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &new_head);
+    }	
+	
+    list_move(&tmp->node, &new_head);
+
+
+    print_list(&head);
+    clear_list(&head);
+    print_list(&new_head);
+    clear_list(&new_head);
+  }
+  /**
+   ,* @note 将链表 0，1，2，3，4 中的 0,1,2 移动到尾部，
+   ,* 那么链表就是 3，4，0，1，2
+   ,*/
+  static void test_list_bulk_move_tail(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *tmp = NULL, *tmp2 = NULL;
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+      if(i == 0)
+      {
+        tmp = pobj;
+      }
+      else if(i == 2)
+      {
+        tmp2 = pobj;
+      }
+    }
+
+    list_bulk_move_tail(&head, &tmp->node, &tmp2->node);
+
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 将链表 0，1，2，3，4 第一个节点移动到左边，
+   ,* 那么链表就是 1，2，3，4，0
+   ,*/
+  static void test_list_rotate_left(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+    }
+
+    list_rotate_left(&head);
+
+
+    print_list(&head);
+    clear_list(&head);
+  }
+  /**
+   ,* @note 将链表 0，1，2，3，4 中的 2,3 移动到另外一个空链表
+   ,*/
+  static void test_list_cut_position(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *tmp = NULL, *tmp2 = NULL;
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+      if(i == 1)
+      {
+        tmp = pobj;
+      }
+      else if(i == 3)
+      {
+        tmp2 = pobj;
+      }
+    }
+
+    LIST_HEAD(new_head);
+    list_cut_position(&new_head, &tmp->node, &tmp2->node);
+
+    print_list(&head);
+    clear_list(&head);
+
+    print_list(&new_head);
+    clear_list(&new_head);	
+  }
+  /**
+   ,* @note 将链表 5,6,7,8,9 拼接到链表 0,1,2,3,4
+   ,* 那么新链表就是 0~9
+   ,*/
+  static void test_list_splice_init(void)
+  {
+    printf("%s\n", __func__);
+
+    obj *pobj = NULL;
+    for(int i = 0; i < 5; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &head);
+    }
+
+    LIST_HEAD(new_head);
+    for(int i = 5; i < 10; i++)
+    {
+      pobj = malloc(sizeof(obj));
+      assert(pobj);
+
+      pobj->val = i;
+      list_add_tail(&pobj->node, &new_head);
+    }	
+	
+    list_splice_init(&head, &new_head);
+
+
+    print_list(&head);
+    clear_list(&head);
+    print_list(&new_head);
+    clear_list(&new_head);
+  }
+  int main(int argc, char *argv[])
+  {
+    test_list_add();
+    test_list_add_tail();
+    test_list_del();
+    test_list_replace();
+    test_list_swap();
+    test_list_move();
+    test_list_bulk_move_tail();
+    test_list_rotate_left();
+    test_list_cut_position();
+    test_list_splice_init();
+
+    return 0;
+  }
+#+END_SRC
+* 双向链表(*待分析*)
 内核提供了以下宏供操作:
 - HLIST_HEAD(name) : 定义一个名称为 =name= 的双向链表
 内核提供了如下函数供操作:
