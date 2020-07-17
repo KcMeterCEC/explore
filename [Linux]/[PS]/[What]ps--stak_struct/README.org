@@ -1,0 +1,131 @@
+#+TITLE: [What]Linux下的 task_struct
+#+DATE:  <2020-07-17 Fri> 
+#+TAGS: process
+#+LAYOUT: post 
+#+CATEGORIES: linux, ps, detail
+#+NAME: <linux_ps_task_struct.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考: 
+1. 《Linux 内核设计与实现》
+
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
+再来往细节深入一下 task_struct。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 分配 task_struct（进程描述符）
+由于 task_struct（声明于 =include/linux/sched.h= ，代码使用包含 <linux/sched.h>） 是属于会频繁使用到的数据结构（每创建一个进程或线程，都会为其分配一个 task_struct），
+所以内核使用 slab 分配器预先分配多个 task_struct，这样做有以下好处：
+- 由于预先分配了很多 task_struct，内核就在这片内存中使用和释放，避免了内存碎片
+- 由于 task_struct 是预先分配的，所以内核申请该数据结构的速度很快
+  
+关于 slab 预分配的 task_struct 使用详情，可以通过 =/proc/slabinfo= 文件查看
+  
+内核在创建一个新的进程时，会在栈底（栈向下增长）创建一个新的结构 =struct thread_info= （声明于 =arch/xxx/include/asm/thread_info.h= ，代码使用包含 <asm/thread_info.h>），
+在 thread_info 结构中包含了指向 task_struct 的指针 task，该变量指向了该进程的 task_struct 头。
+- 之所以放在栈底，是因为代码可以直接根据偏移方便的得出 thread_info 
+- task_struct 是通过双向循环链表链接起来的，所以只要找到了头，便可以遍历该进程相关的所有线程
+* 进程描述符的存放
+PID(process identification value) 也是存放于 task_struct 中，类型为 pid_t（实际上是 int 类型）。
+
+PID 的最大值限制位于 <linux/threads.h> 中：
+#+BEGIN_SRC c
+  /*
+   ,* The default limit for the nr of threads is now in
+   ,* /proc/sys/kernel/threads-max.
+   ,*/
+
+  /*
+   ,* Maximum supported processors.  Setting this smaller saves quite a
+   ,* bit of memory.  Use nr_cpu_ids instead of this except for static bitmaps.
+   ,*/
+  #ifndef CONFIG_NR_CPUS
+  /* FIXME: This should be fixed in the arch's Kconfig */
+  #define CONFIG_NR_CPUS	1
+  #endif
+
+  /* Places which use this should consider cpumask_var_t. */
+  //! 通过此宏可以得到当前逻辑 CPU 的数量
+  #define NR_CPUS		CONFIG_NR_CPUS
+
+  #define MIN_THREADS_LEFT_FOR_ROOT 4
+
+  /*
+   ,* This controls the default maximum pid allocated to a process
+   ,*/
+  //! 如果没有配置 CONFIG_BASE_SMALL，那么默认最大值就是 4096，否则是 32768
+  #define PID_MAX_DEFAULT (CONFIG_BASE_SMALL ? 0x1000 : 0x8000)
+
+  /*
+   ,* A maximum of 4 million PIDs should be enough for a while.
+   ,* [NOTE: PID/TIDs are limited to 2^29 ~= 500+ million, see futex.h.]
+   ,*/
+  //! 当没有配置 CONFIG_BASE_SMALL 的情况下，如果 long 的长度大于 4，那么极限 PID 可以到 400 多万个
+  #define PID_MAX_LIMIT (CONFIG_BASE_SMALL ? PAGE_SIZE * 8 : \
+    (sizeof(long) > 4 ? 4 * 1024 * 1024 : PID_MAX_DEFAULT))
+
+  //! 每个核上可以跑的进程数
+  /*
+   ,* Define a minimum number of pids per cpu.  Heuristically based
+   ,* on original pid max of 32k for 32 cpus.  Also, increase the
+   ,* minimum settable value for pid_max on the running system based
+   ,* on similar defaults.  See kernel/pid.c:pidmap_init() for details.
+   ,*/
+  #define PIDS_PER_CPU_DEFAULT	1024
+  #define PIDS_PER_CPU_MIN	8
+#+END_SRC 
+之前已经学习过：对于 linux 来讲，无论进程还是线程对于 kernel 都是一个 task_struct，只不过线程的 task_struct 相关内存、文件等资源是共享的。
+在新建一个线程的时候，其实内核也会为线程分配一个 pid，只不过通过 tgid 来抽象化给了用户，让用户在不同线程下得到的 pid 都相同。
+
+基于以上基础，再来看 proc 文件系统下的限制就明了了：
+- =/proc/sys/kernel/pid_max= : 整个系统（内核空间和用户空间）可以同时存在的最多的 pid 数量
+  + 对于内核来讲，就是系统最多可以创建的 task_struct 的数量
+- =/proc/sys/kernel/threads-max= : 单个进程可以创建的最多线程的数量
+  + 对于内核来讲，就是一个 task_struct 链表上最多可以链接的 task_struct 节点的个数
+- =ulimit -u= ：单个用户可以同时创建的最多进程的数量
+  + 对于内核来讲，就是一个 uid 可以对应最多多少个 task_struct
+    
+内核对于任务的操作基本上都是通过 task_struct 来执行的，为此内核提供了 =current= 宏，该宏返回的便是当前被调度到的 task_struct 指针。
+
+对于 ARM32 获取 thread_info 的操作如下：
+#+BEGIN_SRC c
+  //！一般情况下，当 PAGE_SIZE 为 4096 时，栈的大小则是 8K
+  #define THREAD_SIZE_ORDER	1
+  #define THREAD_SIZE		(PAGE_SIZE << THREAD_SIZE_ORDER)
+  #define THREAD_START_SP		(THREAD_SIZE - 8)
+  /*
+   ,* how to get the current stack pointer in C
+   ,*/
+  register unsigned long current_stack_pointer asm ("sp");
+
+  /*
+   ,* how to get the thread information struct from C
+   ,*/
+
+  //! 栈是由高地址向低地址方向增长的，那么当前的栈指针将低位清零后，便得到了栈底的地址
+  //! 这个地址就正好是 thread_info 的地址
+  static inline struct thread_info *current_thread_info(void)
+  {
+    return (struct thread_info *)
+      (current_stack_pointer & ~(THREAD_SIZE - 1));
+  }
+#+END_SRC
+获取到 thread_info 后，便可以获取其 task 指针了：
+#+BEGIN_SRC c
+  //! file: include/asm-generic/current.h
+  #define get_current() (current_thread_info()->task)
+  #define current get_current()
+#+END_SRC 
+* 任务状态
+为了不以进程和线程做区分，下面统一以任务代表一个 task_struct。
+
+task_struct 中的 state 描述了当前 task 的状态。
+
+state 的值有以下几种状态：
+- TASK_RUNNING(0x00)：任务正在被执行或在运行队列中等待执行

@@ -7,7 +7,9 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-|kernel|5.4.x lts|
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
 
 罗列内核已经提供的双向链表数据结构的使用方式。
 #+BEGIN_HTML
