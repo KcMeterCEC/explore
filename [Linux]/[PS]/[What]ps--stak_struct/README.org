@@ -128,4 +128,111 @@ PID 的最大值限制位于 <linux/threads.h> 中：
 task_struct 中的 state 描述了当前 task 的状态。
 
 state 的值有以下几种状态：
-- TASK_RUNNING(0x00)：任务正在被执行或在运行队列中等待执行
+#+BEGIN_SRC c
+  /* Used in tsk->state: */
+  //! 运行，进程正在被执行或在运行队列中等待被执行
+  #define TASK_RUNNING			0x0000
+  //! 可中断，进程处于睡眠状态，它可以被等待的条件唤醒，也可以被信号唤醒
+  #define TASK_INTERRUPTIBLE		0x0001
+  //！ 不可中断，相比可中断状态，它不能被信号唤醒
+  #define TASK_UNINTERRUPTIBLE		0x0002
+  //! 进程没有运行，也不能投入运行
+  #define __TASK_STOPPED			0x0004
+  //! 被其他进程跟踪的进程
+  #define __TASK_TRACED			0x0008
+#+END_SRC
+
+在进行驱动编程时，如果需要支持阻塞操作，那么就需要设置和获取当前线程的状态：
+#+BEGIN_SRC c
+  #define task_is_traced(task)		((task->state & __TASK_TRACED) != 0)
+
+  #define task_is_stopped(task)		((task->state & __TASK_STOPPED) != 0)
+
+  #define task_is_stopped_or_traced(task)	((task->state & (__TASK_STOPPED | __TASK_TRACED)) != 0)
+
+  #define task_contributes_to_load(task)	((task->state & TASK_UNINTERRUPTIBLE) != 0 && \
+                                           (task->flags & PF_FROZEN) == 0 && \
+                                           (task->state & TASK_NOLOAD) == 0)
+
+  //! 不带内存屏障，将任务由睡眠设置为运行一般使用此宏
+  #define __set_current_state(state_value)				\
+    current->state = (state_value)
+
+  //! 带内存屏障，将任务由运行设置为睡眠，一般使用此宏以保证互斥
+  #define set_current_state(state_value)					\
+    smp_store_mb(current->state, (state_value))
+
+  //! 设置为睡眠
+  for (;;) {
+    //! 切换状态
+      set_current_state(TASK_UNINTERRUPTIBLE);
+      //! 确认需要睡眠
+      if (!need_sleep)
+          break;
+
+      //! 开始调度其他任务
+      schedule();
+  }
+  //! 任务已经被唤醒，设置为运行状态
+  __set_current_state(TASK_RUNNING);
+#+END_SRC
+
+
+* 任务的上下文
+当一个任务调用了系统调用或者触发了某个异常陷入内核空间，此时该任务就处于任务上下文中， *这种情况下，current 宏才是有效的。*
+- 如果是中断陷入了内核，此时内核并没有对应相关的任务，这种情况下 current 宏就是无意义的。
+* 进程的家族树
+每个 task_struct 都包含一个指向其父进程的 parent 指针，还包含一个指向子进程的 children 链表。
+#+BEGIN_SRC c
+  /*
+   ,* Pointers to the (original) parent process, youngest child, younger sibling,
+   ,* older sibling, respectively.  (p->father can be replaced with
+   ,* p->real_parent->pid)
+   ,*/
+
+  /* Real parent process: */
+  struct task_struct __rcu	*real_parent;
+
+  /* Recipient of SIGCHLD, wait4() reports: */
+  struct task_struct __rcu	*parent;
+
+  /*
+   ,* Children/sibling form the list of natural children:
+   ,*/
+  struct list_head		children;
+  struct list_head		sibling;
+  struct task_struct		*group_leader;
+#+END_SRC 
+
+通过以下方式便可以遍历一个进程的子进程：
+#+BEGIN_SRC c
+  struct task_struct *task;
+  struct list_head *list;
+
+  list_for_each(list, &current->children)
+  {
+    //得到的 task 即为当前进程的一个子进程
+    task = list_entry(list, struct task_struct, sibling);
+  }
+#+END_SRC
+
+对于初始进程（1 号进程），在 =init/init_task.c= 中已经初始化好了 1 号进程，也就是 =init_task= 。
+
+使用下面的代码，可以搜寻到当前进程的父进程树：
+#+BEGIN_SRC c
+  struct task_struct *task;
+
+  for(task = current; task != &init_task; task = task->parent)
+    {
+      //...
+    }
+#+END_SRC 
+
+在 =task_struct= 中具有一个 =tasks= 元素，这是一个双向链表，将所有的 task_struct 都链接了起来，所以可以通过下面的方式遍历所有的 task_struct:
+#+BEGIN_SRC c
+  #define next_task(p)                                          \
+    list_entry_rcu((p)->tasks.next, struct task_struct, tasks)
+
+  #define for_each_process(p)                                   \
+    for (p = &init_task ; (p = next_task(p)) != &init_task ; )
+#+END_SRC 
