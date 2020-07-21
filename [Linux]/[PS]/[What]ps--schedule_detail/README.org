@@ -1,0 +1,25 @@
+#+TITLE: [What]Linux 调度的实现
+#+DATE:  <2020-07-21 Tue> 
+#+TAGS: process
+#+LAYOUT: post 
+#+CATEGORIES: linux, ps, detail
+#+NAME: <linux_ps_schedule_detail.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考: 
+1. 《Linux 内核设计与实现》
+
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
+之前对 linux 调度有了[[http://kcmetercec.top/2018/05/26/linux_ps_schedule/][粗略的认识]]，现在再来窥探一些细节。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 调度器类（scheduler classes）
+Linux 调度器以模块化的方式提供，这样允许进程可以有针对的选择调度算法。
+
+Linux 会按照优先级顺序遍历调度器类，选择可执行进程的最高优先级调度器，然后去执行该调度器的任务。
