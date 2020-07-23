@@ -23,3 +23,94 @@
 Linux 调度器以模块化的方式提供，这样允许进程可以有针对的选择调度算法。
 
 Linux 会按照优先级顺序遍历调度器类，选择可执行进程的最高优先级调度器，然后去执行该调度器的任务。
+* 完全公平调度（CFS）
+** 基于时间片调度的缺陷
+传统 UNIX 优先级以 nice 值形式输出到用户空间，nice 值越小，获得的时间片越多，这会有下面这些问题：
+- 低 nice 值也就是高优先级的任务获得的时间片很多，但一般情况下高优先级的线程实际上是 IO 密集型。而高 nice 值的低优先级任务往往是 CPU 密集型，获得的时间片反而更小。
+  + 这显然与保证高响应度的同时保证高吞吐量的初衷背道而驰。
+- nice 值是 0 和 1 分配的时间片是 100/95，但 nice 值是 18 和 19 分配的时间片确实 10/5，同样的 nice 值只差 1，但分配比例却相差很大。
+  + 这不能保证公平性，所以 nice 值的时间片应该以几何增加而非算数增加
+- 时间片是定时器节拍的整数倍，但如果一个 nice 值对应一个时间片，当定时器节拍被改变后，原先的时间片大小虽然没有变，但绝对时间就变了。
+  + 所以需要将时间片与定时器节拍分离开来
+- 调度器将提升 IO 密集型任务优先级（占用时间片少），但如果其它任务通过主动睡眠来降低自己的时间片占用，那就会迷惑调度器。
+** 公平调度
+CFS 采用的方法是对时间片分配方式进程根本性的重新设计：通过时间分配处理器比例的方式摒弃时间片，从而保证公平性。
+
+#+BEGIN_QUOTE
+CFS 的出发点基于一个简单的理念：进程调度的效果应如同系统具备一个理想的完美的多任务处理器。
+在这个系统中将能获得 1/n 的处理器时间（n 是指可运行进程的数量）。同时，我们可以调度给它们无限小的时间周期，
+所以在任何可测量周期内，我们给予 n 个进程中每个进程同样多的运行时间。
+#+END_QUOTE
+
+CFS 的做法是允许每个进程运行一段时间、循环轮转、选择运行最少的进程作为下一个运行任务，而不是使用固定分配的时间片。
+- nice 值再 CFS 中被作为进程获得处理器运行的权重。
+  
+CFS 有一个“目标延迟”的概念，对所有任务的最小调度周期：
+- 假设目标延迟是 20ms，具有两个相同优先级的任务，不管它们优先级是多少，每个任务的运行时间都是 10ms
+  + 如果具有 4 个相同优先级的任务，每个任务的运行时间就是 5ms。
+  + 如果任务特别多，CFS 也规定了一个最小粒度以避免无限的切换消耗（通常是 1ms）
+- 假设目标延迟是 20ms，有 nice 值为 0 和 5 的任务，其运行时间分别是 15ms 和 5ms。
+  + 如果 nice 值为 10 和 15，其运行时间依然为 15ms 和 5ms
+  + 可以看到分配比例只与 nice 值的相对值有关
+** 实现 CFS
+CFS 实现的代码位于路径 =kernel/sched/fair.c= ，下面进行依次分析。
+*** 时间记账
+传统的调度器对任务的时间片进行记录，以在任务的时间片耗尽时切换到其他任务，而 CFS 记录的是任务运行的[[http://kcmetercec.top/2018/05/26/linux_ps_schedule/#org357e0e1][虚拟时间]]。
+
+在 task_struct 结构体中有一个 =struct sched_entity se= 成员变量，该成员就是对该任务进行时间记账。
+
+该结构体中具有成员 =u64 vruntime= 就是用于存放进程的虚拟运行时间，该虚拟运行时间的单位是 ns，它已经与定时器节拍不再关联。
+
+而 vruntime 的计算则是在函数 =update_curr= 中完成：
+#+BEGIN_SRC c
+  //此函数执行的公式便是 delta_vtime = delta_ptime * 1024 / weight
+  static inline u64 calc_delta_fair(u64 delta, struct sched_entity *se)
+  {
+    if (unlikely(se->load.weight != NICE_0_LOAD))
+      delta = __calc_delta(delta, NICE_0_LOAD, &se->load);
+
+    return delta;
+  }
+  static void update_curr(struct cfs_rq *cfs_rq)
+  {
+    //当前的任务记录器
+    struct sched_entity *curr = cfs_rq->curr;
+    //当前的运行时间
+    u64 now = rq_clock_task(rq_of(cfs_rq));
+    u64 delta_exec;
+
+    if (unlikely(!curr))
+      return;
+
+    //上一次进入该函数到目前所经过的时间
+    delta_exec = now - curr->exec_start;
+    if (unlikely((s64)delta_exec <= 0))
+      return;
+
+    curr->exec_start = now;
+
+    schedstat_set(curr->statistics.exec_max,
+                  max(delta_exec, curr->statistics.exec_max));
+
+    //该任务当前运行的总时间
+    curr->sum_exec_runtime += delta_exec;
+    schedstat_add(cfs_rq->exec_clock, delta_exec);
+
+    //得到虚拟运行时间
+    curr->vruntime += calc_delta_fair(delta_exec, curr);
+    update_min_vruntime(cfs_rq);
+
+    if (entity_is_task(curr)) {
+      struct task_struct *curtask = task_of(curr);
+
+      trace_sched_stat_runtime(curtask, delta_exec, curr->vruntime);
+      cgroup_account_cputime(curtask, delta_exec);
+      account_group_exec_runtime(curtask, delta_exec);
+    }
+
+    account_cfs_rq_runtime(cfs_rq, delta_exec);
+  }
+#+END_SRC
+*** 进程选择
+*** 调度器入口
+*** 睡眠和唤醒
