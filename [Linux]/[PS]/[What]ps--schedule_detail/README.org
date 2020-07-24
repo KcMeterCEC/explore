@@ -112,5 +112,24 @@ CFS 实现的代码位于路径 =kernel/sched/fair.c= ，下面进行依次分�
   }
 #+END_SRC
 *** 进程选择
+CFS 选择任务的核心就是：选择具有最小 vruntime 的任务来运行。
+
+Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那么最左侧的叶子节点便是 vruntime 最小的节点。
+
+- 选择下一个要运行的任务是通过函数 =__pick_next_entity= 来完成的：
+#+BEGIN_SRC c
+  static struct sched_entity *__pick_next_entity(struct sched_entity *se)
+  {
+    struct rb_node *next = rb_next(&se->run_node);
+
+    if (!next)
+      return NULL;
+
+    return rb_entry(next, struct sched_entity, run_node);
+  }
+#+END_SRC
+
+- 而将一个任务加入红黑树是通过 =enqueue_entity()= 来完成，该函数调用 =__enqueue_entity()= 来完成插入。
+- 删除一个任务是通过 =dequeue_entity()= 来完成
 *** 调度器入口
 *** 睡眠和唤醒
