@@ -132,4 +132,70 @@ Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那�
 - 而将一个任务加入红黑树是通过 =enqueue_entity()= 来完成，该函数调用 =__enqueue_entity()= 来完成插入。
 - 删除一个任务是通过 =dequeue_entity()= 来完成
 *** 调度器入口
+调度器的入口函数是 =schedule()= 位于 =kernel/sched/core.c= 。
+
+该函数会调用 =__schedule()= 函数，其执行逻辑为：
+- 选择优先级最高的调度策略
+- 从该调度策略中选择优先级最高的任务运行
+  
+以上两个重要的执行逻辑是通过函数 =pick_next_task()= 来完成的：
+#+BEGIN_SRC c
+  /*
+   ,* Pick up the highest-prio task:
+   ,*/
+  static inline struct task_struct *
+  pick_next_task(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
+  {
+    const struct sched_class *class;
+    struct task_struct *p;
+
+    /*
+     ,* Optimization: we know that if all tasks are in the fair class we can
+     ,* call that function directly, but only if the @prev task wasn't of a
+     ,* higher scheduling class, because otherwise those loose the
+     ,* opportunity to pull in more work from other CPUs.
+     ,*/
+    if (likely((prev->sched_class == &idle_sched_class ||
+          prev->sched_class == &fair_sched_class) &&
+         rq->nr_running == rq->cfs.h_nr_running)) {
+
+      p = fair_sched_class.pick_next_task(rq, prev, rf);
+      if (unlikely(p == RETRY_TASK))
+        goto restart;
+
+      /* Assumes fair_sched_class->next == idle_sched_class */
+      if (unlikely(!p))
+        p = idle_sched_class.pick_next_task(rq, prev, rf);
+
+      return p;
+    }
+
+  restart:
+  #ifdef CONFIG_SMP
+    /*
+     ,* We must do the balancing pass before put_next_task(), such
+     ,* that when we release the rq->lock the task is in the same
+     ,* state as before we took rq->lock.
+     ,*
+     ,* We can terminate the balance pass as soon as we know there is
+     ,* a runnable task of @class priority or higher.
+     ,*/
+    for_class_range(class, prev->sched_class, &idle_sched_class) {
+      if (class->balance(rq, prev, rf))
+        break;
+    }
+  #endif
+
+    put_prev_task(rq, prev);
+
+    for_each_class(class) {
+      p = class->pick_next_task(rq, NULL, NULL);
+      if (p)
+        return p;
+    }
+
+    /* The idle class should always have a runnable task: */
+    BUG();
+  }
+#+END_SRC 
 *** 睡眠和唤醒
