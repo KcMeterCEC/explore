@@ -32,7 +32,9 @@
 - 之所以放在栈底，是因为代码可以直接根据偏移方便的得出 thread_info 
 - task_struct 是通过双向循环链表链接起来的，所以只要找到了头，便可以遍历系统所有的线程
   
-在有了 task_struct 的情况下还使用 =thread_info= 的原因是：thread_info 相当于一个缩略版的 task_struct，便于内核快速方便的获取到该任务的 task_struct。
+在有了 task_struct 的情况下还使用 =thread_info= 的原因是：
+最开始是将 task_struct 放置于任务的栈底，但是一个 task_struct 占用好几个 kB 的内存，而 kernel 预设的栈大小一般是 8K，这对于栈空间消耗太严重了。
+thread_info 相当于一个缩略版的 task_struct，占用的空间小得多，便于节省任务的栈空间。
 * 任务描述符的存放
 PID(process identification value) 也是存放于 task_struct 中，类型为 pid_t（实际上是 int 类型）。
 
