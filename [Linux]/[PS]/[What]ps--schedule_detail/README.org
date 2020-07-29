@@ -20,9 +20,9 @@
 <!--more-->
 #+END_HTML
 * 调度器类（scheduler classes）
-Linux 调度器以模块化的方式提供，这样允许进程可以有针对的选择调度算法。
+Linux 调度器以模块化的方式提供，这样允许任务可以有针对的选择调度算法。
 
-Linux 会按照优先级顺序遍历调度器类，选择可执行进程的最高优先级调度器，然后去执行该调度器的任务。
+Linux 会按照优先级顺序遍历调度器类，选择可执行任务的最高优先级调度器，然后去执行该调度器的任务。
 * 完全公平调度（CFS）
 ** 基于时间片调度的缺陷
 传统 UNIX 优先级以 nice 值形式输出到用户空间，nice 值越小，获得的时间片越多，这会有下面这些问题：
@@ -34,16 +34,16 @@ Linux 会按照优先级顺序遍历调度器类，选择可执行进程的最�
   + 所以需要将时间片与定时器节拍分离开来
 - 调度器将提升 IO 密集型任务优先级（占用时间片少），但如果其它任务通过主动睡眠来降低自己的时间片占用，那就会迷惑调度器。
 ** 公平调度
-CFS 采用的方法是对时间片分配方式进程根本性的重新设计：通过时间分配处理器比例的方式摒弃时间片，从而保证公平性。
+CFS 采用的方法是对时间片分配方式任务根本性的重新设计：通过时间分配处理器比例的方式摒弃时间片，从而保证公平性。
 
 #+BEGIN_QUOTE
-CFS 的出发点基于一个简单的理念：进程调度的效果应如同系统具备一个理想的完美的多任务处理器。
-在这个系统中将能获得 1/n 的处理器时间（n 是指可运行进程的数量）。同时，我们可以调度给它们无限小的时间周期，
-所以在任何可测量周期内，我们给予 n 个进程中每个进程同样多的运行时间。
+CFS 的出发点基于一个简单的理念：任务调度的效果应如同系统具备一个理想的完美的多任务处理器。
+在这个系统中将能获得 1/n 的处理器时间（n 是指可运行任务的数量）。同时，我们可以调度给它们无限小的时间周期，
+所以在任何可测量周期内，我们给予 n 个任务中每个任务同样多的运行时间。
 #+END_QUOTE
 
-CFS 的做法是允许每个进程运行一段时间、循环轮转、选择运行最少的进程作为下一个运行任务，而不是使用固定分配的时间片。
-- nice 值再 CFS 中被作为进程获得处理器运行的权重。
+CFS 的做法是允许每个任务运行一段时间、循环轮转、选择运行最少的任务作为下一个运行任务，而不是使用固定分配的时间片。
+- nice 值再 CFS 中被作为任务获得处理器运行的权重。
   
 CFS 有一个“目标延迟”的概念，对所有任务的最小调度周期：
 - 假设目标延迟是 20ms，具有两个相同优先级的任务，不管它们优先级是多少，每个任务的运行时间都是 10ms
@@ -59,7 +59,7 @@ CFS 实现的代码位于路径 =kernel/sched/fair.c= ，下面进行依次分�
 
 在 task_struct 结构体中有一个 =struct sched_entity se= 成员变量，该成员就是对该任务进行时间记账。
 
-该结构体中具有成员 =u64 vruntime= 就是用于存放进程的虚拟运行时间，该虚拟运行时间的单位是 ns，它已经与定时器节拍不再关联。
+该结构体中具有成员 =u64 vruntime= 就是用于存放任务的虚拟运行时间，该虚拟运行时间的单位是 ns，它已经与定时器节拍不再关联。
 
 而 vruntime 的计算则是在函数 =update_curr= 中完成：
 #+BEGIN_SRC c
@@ -111,7 +111,7 @@ CFS 实现的代码位于路径 =kernel/sched/fair.c= ，下面进行依次分�
     account_cfs_rq_runtime(cfs_rq, delta_exec);
   }
 #+END_SRC
-*** 进程选择
+*** 任务选择
 CFS 选择任务的核心就是：选择具有最小 vruntime 的任务来运行。
 
 Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那么最左侧的叶子节点便是 vruntime 最小的节点。
@@ -155,6 +155,7 @@ Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那�
      ,* higher scheduling class, because otherwise those loose the
      ,* opportunity to pull in more work from other CPUs.
      ,*/
+    //! 当所有可运行任务都是 CFS 任务（NICE 策略）时，可以使用快捷方式得到下一个将要运行的任务
     if (likely((prev->sched_class == &idle_sched_class ||
           prev->sched_class == &fair_sched_class) &&
          rq->nr_running == rq->cfs.h_nr_running)) {
@@ -188,6 +189,7 @@ Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那�
 
     put_prev_task(rq, prev);
 
+    //! 从最高优先级策略开始遍历每个调度类，获取最高优先级可运行任务
     for_each_class(class) {
       p = class->pick_next_task(rq, NULL, NULL);
       if (p)
@@ -199,3 +201,144 @@ Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那�
   }
 #+END_SRC 
 *** 睡眠和唤醒
+- 睡眠：任务从可执行红黑树中移出，被放入等待队列
+- 唤醒：任务被设置为可执行状态，然后从等待队列中移到可执行红黑树
+  
+上述过程在[[http://kcmetercec.top/2018/04/07/linux_driver_char_overview/#org9164991][此处]]有完整的示例。
+
+可以看到：调度器真正调度的是[[http://kcmetercec.top/2018/05/24/linux_ps_overview/#org60473d1][处于运行状态]]的任务！
+
+为了避免任务的休眠和唤醒产生竞争条件，通常的处理代码如下：
+#+BEGIN_SRC c
+  //为当前任务创建一个节点，名叫 wait
+  DEFINE_WAIT(wait);
+
+  //将当前任务节点加入等待队列 q 中
+  add_wait_queue(q, &wait);
+
+  //当事件不满足时，进入睡眠
+  while(!condition)
+    {
+      //将当前任务设置为 TASK_INTERRUPTIBLE 状态
+      prepare_to_wait(&q, &wait, TASK_INTERRUPTIBLE);
+      //如果当前任务被信号唤醒，则处理信号
+      if(signal_pending(current))
+        {
+          //一般返回 restart 错误，然后退出循环
+          ret = -ERESTARTSYS;
+          break;
+        }
+      //在调用 schedule() 前需要释放必要的锁
+      //主动调度到其它任务运行
+      schedule();
+      //在返回 schedule() 后需要获取必要的锁
+    }
+  //将当前任务设置为运行态，并移出等待队列
+  finish_wait(&q, &wait);
+#+END_SRC
+
+=inotify_read()= 提供了标准使用方式：
+#+BEGIN_SRC c
+  static ssize_t inotify_read(struct file *file, char __user *buf,
+            size_t count, loff_t *pos)
+  {
+    struct fsnotify_group *group;
+    struct fsnotify_event *kevent;
+    char __user *start;
+    int ret;
+    //! 为当前任务创建等待节点
+    DEFINE_WAIT_FUNC(wait, woken_wake_function);
+
+    start = buf;
+    group = file->private_data;
+
+    //将当前任务加入等待队列
+    add_wait_queue(&group->notification_waitq, &wait);
+    while (1) {
+      //获取条件
+      spin_lock(&group->notification_lock);
+      kevent = get_one_event(group, count);
+      spin_unlock(&group->notification_lock);
+
+      pr_debug("%s: group=%p kevent=%p\n", __func__, group, kevent);
+
+      //条件为真则处理
+      if (kevent) {
+        ret = PTR_ERR(kevent);
+        if (IS_ERR(kevent))
+          break;
+        ret = copy_event_to_user(group, kevent, buf);
+        fsnotify_destroy_event(group, kevent);
+        if (ret < 0)
+          break;
+        buf += ret;
+        count -= ret;
+        continue;
+      }
+
+      ret = -EAGAIN;
+      //如果用户空间以非阻塞处理，则依然退出
+      if (file->f_flags & O_NONBLOCK)
+        break;
+      ret = -ERESTARTSYS;
+      //如果是信号唤醒则退出
+      if (signal_pending(current))
+        break;
+
+      if (start != buf)
+        break;
+
+      //将当前任务设置为 TASK_INTERRUPTIBLE 状态，并进行超时判断调度
+      //当任务被唤醒后，状态会被设置为 TASK_RUNNING
+      wait_woken(&wait, TASK_INTERRUPTIBLE, MAX_SCHEDULE_TIMEOUT);
+    }
+    //退出循环后将当前任务移出等待队列
+    remove_wait_queue(&group->notification_waitq, &wait);
+
+    if (start != buf && ret != -EFAULT)
+      ret = buf - start;
+    return ret;
+  }
+#+END_SRC
+
+唤醒则是通过 =wake_up()= 类宏来将 *指定队列上所有任务唤醒* ：
+- 将任务设置为 TASK_RUNNING 状态
+- 将任务放入调度用的红黑树中 
+
+*** 抢占和上下文切换
+* 抢占和上下文切换
+上下文切换就是将一个任务切换到另一个任务运行，其实现是由 =kernel/sched/core.c= 中的 =context_switch()= 来实现的。
+
+此函数会被 =schedule()= 调用，其执行步骤如下：
+- 将虚拟内存从上一个任务切换到新的任务
+- 将处理器状态从上一个任务切换到新的任务
+  + 保存、恢复栈信息，寄存器信息等
+    
+内核会检测任务 =need_resched= 标记来确认是否调用 =schedule()= 来进行上下文切换，比如当有高优先级任务需要运行时，该标记就会被置位。
+
+在 =include/linux/sched.h= 中提供一些对标记的操作函数：
+| 名称                                            | 说明               |
+|-------------------------------------------------+--------------------|
+| need_resched()                                  | 获取该标记是否置位 |
+| set_tsk_need_resched(struct task_struct *tsk)   | 将该任务的标记置位 |
+| clear_tsk_need_resched(struct task_struct *tsk) | 将该任务的标记清零 |
+
+该标记被 =thread_info= 中的 flags 成员保存。
+
+用户任务抢占会在以下情况时发生：
+- 用户进行系统调用时，内核会检查 =need_resched= 标记
+- 执行中断处理程序时，内核会检查 =need_resched= 标记
+  
+内核任务抢占：只要任务没有持有锁，内核就可以进行抢占。
+
+在 =thread_info= 有个 =preempt_count= 计数器，每当获得一个锁时该计数值加 1，释放锁时该计数值减 1。
+所以可以判断当 =preempt_count= 为 0 时，代表它没有获取到锁，是可以执行抢占的。
+
+也就是说：当 =need_resched= 标记置位并且 =preempt_count= 值为 0 时，就可以执行内核抢占。
+
+内核抢占会发生在：
+- 执行中断处理程序时
+- 内核代码再一次具有可抢占性时
+- 内核代码显式调用 =schedule()= 时
+- 内核中的任务阻塞时
+

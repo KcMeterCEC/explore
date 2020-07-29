@@ -15,11 +15,11 @@
 |----------------+-------|
 | v5.4.x lts     | arm32 |
 
-再来往细节深入一下 task_struct。
+再来往细节深入一下 task_struct，由于 kernel 不明确区分进程和线程，所以统一使用任务来称呼。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
-* 分配 task_struct（进程描述符）
+* 分配 task_struct（任务描述符）
 由于 task_struct（声明于 =include/linux/sched.h= ，代码使用包含 <linux/sched.h>） 是属于会频繁使用到的数据结构（每创建一个进程或线程，都会为其分配一个 task_struct），
 所以内核使用 slab 分配器预先分配多个 task_struct，这样做有以下好处：
 - 由于预先分配了很多 task_struct，内核就在这片内存中使用和释放，避免了内存碎片
@@ -27,11 +27,13 @@
   
 关于 slab 预分配的 task_struct 使用详情，可以通过 =/proc/slabinfo= 文件查看
   
-内核在创建一个新的进程时，会在栈底（栈向下增长）创建一个新的结构 =struct thread_info= （声明于 =arch/xxx/include/asm/thread_info.h= ，代码使用包含 <asm/thread_info.h>），
-在 thread_info 结构中包含了指向 task_struct 的指针 task，该变量指向了该进程的 task_struct 头。
+内核在申请一个新的 task_struct 时，会在栈底（栈向下增长）创建一个新的结构 =struct thread_info= （声明于 =arch/xxx/include/asm/thread_info.h= ，代码使用包含 <asm/thread_info.h>），
+在 thread_info 结构中包含了指向 task_struct 的指针 task，该变量指向了该任务的 task_struct。
 - 之所以放在栈底，是因为代码可以直接根据偏移方便的得出 thread_info 
-- task_struct 是通过双向循环链表链接起来的，所以只要找到了头，便可以遍历该进程相关的所有线程
-* 进程描述符的存放
+- task_struct 是通过双向循环链表链接起来的，所以只要找到了头，便可以遍历系统所有的线程
+  
+在有了 task_struct 的情况下还使用 =thread_info= 的原因是：thread_info 相当于一个缩略版的 task_struct，便于内核快速方便的获取到该任务的 task_struct。
+* 任务描述符的存放
 PID(process identification value) 也是存放于 task_struct 中，类型为 pid_t（实际上是 int 类型）。
 
 PID 的最大值限制位于 <linux/threads.h> 中：
@@ -70,7 +72,7 @@ PID 的最大值限制位于 <linux/threads.h> 中：
   #define PID_MAX_LIMIT (CONFIG_BASE_SMALL ? PAGE_SIZE * 8 : \
     (sizeof(long) > 4 ? 4 * 1024 * 1024 : PID_MAX_DEFAULT))
 
-  //! 每个核上可以跑的进程数
+  //! 每个核上可以跑的任务数
   /*
    ,* Define a minimum number of pids per cpu.  Heuristically based
    ,* on original pid max of 32k for 32 cpus.  Also, increase the
@@ -130,15 +132,15 @@ task_struct 中的 state 描述了当前 task 的状态。
 state 的值有以下几种状态：
 #+BEGIN_SRC c
   /* Used in tsk->state: */
-  //! 运行，进程正在被执行或在运行队列中等待被执行
+  //! 运行，任务正在被执行或在运行队列中等待被执行
   #define TASK_RUNNING			0x0000
-  //! 可中断，进程处于睡眠状态，它可以被等待的条件唤醒，也可以被信号唤醒
+  //! 可中断，任务处于睡眠状态，它可以被等待的条件唤醒，也可以被信号唤醒
   #define TASK_INTERRUPTIBLE		0x0001
   //！ 不可中断，相比可中断状态，它不能被信号唤醒
   #define TASK_UNINTERRUPTIBLE		0x0002
-  //! 进程没有运行，也不能投入运行
+  //! 任务没有运行，也不能投入运行
   #define __TASK_STOPPED			0x0004
-  //! 被其他进程跟踪的进程
+  //! 被其他任务跟踪的任务
   #define __TASK_TRACED			0x0008
 #+END_SRC
 
@@ -176,13 +178,11 @@ state 的值有以下几种状态：
   //! 任务已经被唤醒，设置为运行状态
   __set_current_state(TASK_RUNNING);
 #+END_SRC
-
-
 * 任务的上下文
 当一个任务调用了系统调用或者触发了某个异常陷入内核空间，此时该任务就处于任务上下文中， *这种情况下，current 宏才是有效的。*
 - 如果是中断陷入了内核，此时内核并没有对应相关的任务，这种情况下 current 宏就是无意义的。
-* 进程的家族树
-每个 task_struct 都包含一个指向其父进程的 parent 指针，还包含一个指向子进程的 children 链表。
+* 任务的家族树
+每个 task_struct 都包含一个指向其父任务的 parent 指针，还包含一个指向子任务的 children 链表。
 #+BEGIN_SRC c
   /*
    ,* Pointers to the (original) parent process, youngest child, younger sibling,
@@ -204,21 +204,21 @@ state 的值有以下几种状态：
   struct task_struct		*group_leader;
 #+END_SRC 
 
-通过以下方式便可以遍历一个进程的子进程：
+通过以下方式便可以遍历一个任务的子任务：
 #+BEGIN_SRC c
   struct task_struct *task;
   struct list_head *list;
 
   list_for_each(list, &current->children)
   {
-    //得到的 task 即为当前进程的一个子进程
+    //得到的 task 即为当前任务的一个子任务
     task = list_entry(list, struct task_struct, sibling);
   }
 #+END_SRC
 
-对于初始进程（1 号进程），在 =init/init_task.c= 中已经初始化好了 1 号进程，也就是 =init_task= 。
+对于初始任务（1 号进程），在 =init/init_task.c= 中已经初始化好了 1 号进程，也就是 =init_task= 。
 
-使用下面的代码，可以搜寻到当前进程的父进程树：
+使用下面的代码，可以搜寻到当前任务的父任务树：
 #+BEGIN_SRC c
   struct task_struct *task;
 
