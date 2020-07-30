@@ -341,4 +341,32 @@ Linux 使用红黑树来将所有处于运行状态的任务挂接起来，那�
 - 内核代码再一次具有可抢占性时
 - 内核代码显式调用 =schedule()= 时
 - 内核中的任务阻塞时
+* 实时调度策略
+[[http://kcmetercec.top/2018/05/26/linux_ps_schedule/#org0ebe07d][实时调度策略]]在内核中的定义是 SCHED_FIFO 和 SCHED_RR ，而 CFS 调度策略是 SCHED_NORMAL.
 
+#+BEGIN_QUOTE
+Linux 的实时调度算法提供了一种软实时工作方式：内核调度进程尽力使进程在它的限定时间到来前运行，但内核不保证一定能满足。
+#+END_QUOTE
+
+有关调度的系统调用如下：
+
+与调度策略和优先级：
+- sched_setscheduler() / sched_getscheduler() : 设置和获取任务的调度策略
+  + 对应读写内核 task_struct 的 policy 和 rt_priority 成员
+- sched_setparram() / sched_getparram() : 设置和获取 RT 任务的优先级
+  + 对应读写内核 sched_param 的 rt_priority 成员
+- sched_get_priority_max() / sched_get_priority_min() : 获取 RT 优先级的最大和最小值
+  + 内核最大优先级定义在 =include/linux/sched/prio.h= 中的 =MAX_USER_RT_PRIO= ，默认是 100，所以范围就是 0~99
+- nice() : 设置 CFS 任务的 nice 值
+  + 对应内核 task_struct 的 static_prio 和 prio 成员
+
+与处理器绑定有关的系统调用：
+- sched_setaffinity() / sched_getaffinity() : 设置和获取任务对 CPU 的亲和性
+  + 对应内核 task_struct 的 nr_cpus_allowed 成员，默认掩码为全 1 ，代表任务可以在所有的 CPU 上运行
+    
+主动放弃处理器时间：
+- sched_yield()
+
+对于 CFS 策略而言，任务会被放入优先级队列的末尾，并放入过期队列中。
+
+但对于 RT 策略而言，由于任务没有时间的概念，它们只会被放入到优先级队列的末尾。
