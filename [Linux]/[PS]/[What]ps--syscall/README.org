@@ -1,0 +1,126 @@
+#+TITLE: [What]Linux 系统调用
+#+DATE:  <2020-07-30 Thu> 
+#+TAGS: process
+#+LAYOUT: post 
+#+CATEGORIES: linux, ps, detail
+#+NAME: <linux_ps_syscall.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考: 
+1. 《Linux 内核设计与实现》
+
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
+系统调用是用户空间访问内核的唯一手段，系统调用用于：
+- 为用户空间提供硬件抽象，简化操作
+- 保证系统的稳定和安全，内核可以基于权限、用户类型及其它规则对访问进行裁决
+- 便于实现多任务和虚拟内存
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 系统调用的定义
+在 =include/linux/syscalls.h= 中定义了一系列宏，用于方便的定义系统调用：
+#+BEGIN_SRC c
+  //……
+  #ifndef SYSCALL_DEFINE0
+  #define SYSCALL_DEFINE0(sname)                  \
+    SYSCALL_METADATA(_##sname, 0);                \
+    asmlinkage long sys_##sname(void);            \
+    ALLOW_ERROR_INJECTION(sys_##sname, ERRNO);		\
+    asmlinkage long sys_##sname(void)
+  #endif /* SYSCALL_DEFINE0 */
+
+  #define SYSCALL_DEFINE1(name, ...) SYSCALL_DEFINEx(1, _##name, __VA_ARGS__)
+  #define SYSCALL_DEFINE2(name, ...) SYSCALL_DEFINEx(2, _##name, __VA_ARGS__)
+  #define SYSCALL_DEFINE3(name, ...) SYSCALL_DEFINEx(3, _##name, __VA_ARGS__)
+  #define SYSCALL_DEFINE4(name, ...) SYSCALL_DEFINEx(4, _##name, __VA_ARGS__)
+  #define SYSCALL_DEFINE5(name, ...) SYSCALL_DEFINEx(5, _##name, __VA_ARGS__)
+  #define SYSCALL_DEFINE6(name, ...) SYSCALL_DEFINEx(6, _##name, __VA_ARGS__)
+
+  #define SYSCALL_DEFINE_MAXARGS	6
+  //……
+#+END_SRC 
+=SYSCALL_DEFINEx= 指定要定义的系统调用参数的个数，比如 SYSCALL_DEFINE0 代表此系统调用无参数：
+#+BEGIN_SRC c
+  //! 比如 SYSCALL_DEFINE0(getpid) 展开为
+  SYSCALL_METADATA(_getpid, 0);
+  asmlinkage long sys_getpid(void);
+  ALLOW_ERROR_INJECTION(sys_getpid, ERRNO);
+
+  /**
+   ,* asmlinkage 限定词：通知编译器仅从栈中提取该函数的参数
+   ,* long 返回值：兼容 32 和 64 位系统
+   ,*/
+  asmlinkage long sys_getpid(void)
+#+END_SRC 
+
+在 Linux 中每个系统调用都被赋予独一无二的系统调用号，就如同 ID 一样关联。
+
+用户空间执行系统调用，内核就是根据 ID 号来判断该执行哪个系统调用。当内核系统调用被删除后其 ID 号也需要保留，
+不然之前用户空间的系统调用就无法对应了。
+
+Linux 内核有一个 =sys_ni_syscall()= 函数，用于针对无效系统调用而返回错误。假设一个系统调用被删除后，此函数就会返回错误。
+
+内核将系统调用存储于 =sys_call_table= 中，每个体系架构都对应这样一张表，该表为系统调用指定了唯一的系统调用号。
+- 从 0 开始，该系统调用在表中索引的位置便是其系统调用号
+
+对于 ARM32 而言，其构建 =sys_call_table= 位于 =arch/arm/kernel/entry-common.S= 文件中：
+- *此处有疑问*
+#+BEGIN_SRC asm
+    //……
+      /* saved_psr and saved_pc are now dead */
+
+    uaccess_disable tbl
+
+    adr	tbl, sys_call_table		@ load syscall table pointer
+
+    //……
+    get_thread_info tsk
+    /*
+     ,* Reload the registers that may have been corrupted on entry to
+     ,* the syscall assembly (by tracing or context tracking.)
+     ,*/
+   TRACE(	ldmia	sp, {r0 - r3}		)
+
+  local_restart:
+    ldr	r10, [tsk, #TI_FLAGS]		@ check for syscall tracing
+    stmdb	sp!, {r4, r5}			@ push fifth and sixth args
+
+    tst	r10, #_TIF_SYSCALL_WORK		@ are we tracing syscalls?
+    bne	__sys_trace
+
+    invoke_syscall tbl, scno, r10, __ret_fast_syscall
+
+    add	r1, sp, #S_OFF
+  2:	cmp	scno, #(__ARM_NR_BASE - __NR_SYSCALL_BASE)
+    eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
+    bcs	arm_syscall
+    mov	why, #0				@ no longer a real syscall
+    b	sys_ni_syscall			@ not private func
+    //……
+#+END_SRC
+
+* 系统调用处理程序
+用户空间无法直接执行系统调用，而是请求内核来代表用户空间执行系统调用。
+
+用户空间通过引发软中断异常，由于异常使硬件通知内核，跳转到软中断处理程序，而该处的处理程序便是系统调用 =system_call()= .
+
+ARM 是通过 SWI 指令来触发软中断，然后陷入到内核的。内核判断通过软中断传入进来的调用号来执行对应的系统调用。
+
+关于调用的参数，可以将参数存入寄存器来实现传递，但当参数个数太多时，则需要一个单独的寄存器存放指向所有这些参数在用户空间地址的指针。
+
+调用的返回值也是通过寄存器传递。
+* 系统调用要考虑的问题
+实现一个系统调用并不简单，需要考虑以下方面：
+- 系统调用的用途是什么？不应该采用多用途的系统调用
+- 系统调用的参数、返回值和错误码是什么？应该尽量力求简洁。
+- 系统调用要兼容不同架构的稳定运行，需要考虑其兼容性。
+- 调用该系统的用户/进程是否有相应的权限对对应资源的读写？
+- 当系统调用有指针时，需要对其指针的合法性进行严格的检查。
+  + 所以我们需要[[https://mp.weixin.qq.com/s/H3nXlOpP_XyF7M-1B4qreQ][copy_from_user 这类函数。]]
+* 系统调用上下文
+当进入系统调用后，内核就处于任务上下文，而 =current= 指针则代表了当前任务。
