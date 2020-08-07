@@ -7,6 +7,13 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+参考: 
+1. 《Linux 内核设计与实现》
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
 整理内核中断的使用方式。
 #+BEGIN_HTML
 <!--more-->
@@ -124,7 +131,7 @@ ARM 处理器相应中断的时候，总是从固定的地址（一般是指中�
 
 [[./interrupt_IRQ.jpg]]
 
-* Linux内核中的中断与时钟
+* Linux内核中的中断
 ** 概念
 *** 中断类型
 - 根据中断的来源分为内部和外部中断，比如操作系统从用户态切换到内核态需要借助软件中断
@@ -149,86 +156,157 @@ irq_set_affinity(irq, cpumask_of(i));
 *注意*: 如果整个中断处理的工作本来就很少，那么就完全可以直接在顶半部分完成。
 
 查看 =/proc/interrupts= 文件可以获得系统中中断的统计信息，并能统计出每一个中断号上的中断在每个CPU上发生的次数。
+*** 中断上下文
+当执行一个中断处理程序时，内核处于中断上下文（interrupt contex）。
+
+当内核代表进程执行时（执行系统调用或运行内核线程），此时处于进程上下文，可以通过 current 宏获取当前任务。
+- 并且因为进程是以进程上下文的形式连接到内核中的，因此进程上下文可以睡眠，也可以调用调度程序。
+
+但中断上下文和进程没有半毛钱关系，与 current 宏也没有绝对关系。
+- *因为中断不属于调度器的一部分，它没有后备进程，所以中断上下文不可以睡眠*
 ** 中断编程
 *** 申请和释放中断
 要先申请中断才能够使用，并且在不使用后需要释放中断。
 #+BEGIN_SRC c
-typedef int irqreturn_t;
-typedef irqreturn_t (*irq_handler_t)(int, void *);
-/**
- ,* @brief 申请一个中断
- ,* @param irq: 要申请的硬件中断号
- ,* @param handler: 中断处理的顶半函数
- ,* @param flags: 中断的触发方式及处理方式
- ,*        + IRQF_TRIGGER_RISING
- ,*        + IRQF_TRIGGER_FAILING
- ,*        + IRQF_TRIGGER_HIGH
- ,*        + IRQF_TRIGGER_LOW
- ,*        + IRQF_SHARED : 多个设备共享中断
- ,* @param dev: 要传递给中断服务程序的私有数据,一般为设备的设备结构体地址或NULL
- ,* @retval
- ,*        + 0 成功
- ,*        + -EINVAL : 中断号无效或处理函数指针为NULL
- ,*        + -EBUSY : 中断已经被占用且不能共享
- ,*/
-int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+  /**
+   ,* enum irqreturn
+   ,* @IRQ_NONE		interrupt was not from this device or was not handled
+   ,* @IRQ_HANDLED		interrupt was handled by this device
+   ,* @IRQ_WAKE_THREAD	handler requests to wake the handler thread
+   ,*/
+  enum irqreturn {
+                  IRQ_NONE		= (0 << 0),
+                  IRQ_HANDLED		= (1 << 0),
+                  IRQ_WAKE_THREAD		= (1 << 1),
+  };
 
-/**
- ,* @brief 此函数会在合适的时候自动释放中断资源
- ,*/
-int devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
+  typedef enum irqreturn irqreturn_t;
+  typedef irqreturn_t (*irq_handler_t)(int, void *);
+  /**
+   ,* @brief 申请一个中断
+   ,* @param irq: 要申请的硬件中断号
+   ,* @param handler: 中断处理的顶半函数
+   ,* @param flags: 中断的触发方式及处理方式
+   ,*        + IRQF_TRIGGER_RISING
+   ,*        + IRQF_TRIGGER_FAILING
+   ,*        + IRQF_TRIGGER_HIGH
+   ,*        + IRQF_TRIGGER_LOW
+   ,*        + IRQF_SHARED : 多个设备共享中断
+   ,* @param name: 中断对应的名称
+   ,* @param dev: 要传递给中断服务程序的私有数据,一般为设备的设备结构体地址或NULL
+   ,* @retval
+   ,*        + 0 成功
+   ,*        + -EINVAL : 中断号无效或处理函数指针为NULL
+   ,*        + -EBUSY : 中断已经被占用且不能共享
+   ,*/ int request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev);
 
-/**
- ,* @brief 在模块卸载前自动释放
- ,* @note 在实际使用时，如果在驱动卸载时不使用此功能，那么在驱动重新装载就会
- ,* 由于申请不到中断资源而进入 Oops，原因不明....
- ,*/
-void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+  /**
+   ,* @brief 此函数会在合适的时候自动释放中断资源
+   ,*/
+  int devm_request_irq(struct device *dev, unsigned int irq, irq_handler_t handler, unsigned long irqflags, const char *devname, void *dev_id);
 
-/**
- ,* @brief 释放中断
- ,*/
-void free_irq(unsigned int irq, void *dev_id);
+  /**
+   ,* @brief 在模块卸载前自动释放
+   ,* @note 在实际使用时，如果在驱动卸载时不使用此功能，那么在驱动重新装载就会
+   ,* 由于申请不到中断资源而进入 Oops，原因不明....
+   ,*/
+  void devm_free_irq(struct device *dev, unsigned int irq, void *dev_id);
+
+  /**
+   ,* @brief 释放中断
+   ,*/
+  void free_irq(unsigned int irq, void *dev_id);
 #+END_SRC
+关于 =dev_id= 需要注意的是：dev_id 除了可以传递私有数据外，还是用于区分共享中断。
+
+当以共享中断的方式申请中断处理程序后，free_irq 中的 dev_id 必须与申请的保持一直，这样系统才会删除对应的中断处理函数。
 *** 使能和屏蔽中断
 在申请了中断资源后，便可以使能及失能中断。
 #+BEGIN_SRC c
 
-/**
- ,* @brief 使能中断
- ,*/
-void enable_irq(int irq);
-/**
- ,* @brief 等待目前的中断处理完成后关闭中断
- ,* @note: 不能在中断的顶半部分调用此函数，因为它会一直等待底半部分，而底半还没有执行，就会卡死
- ,*/
-void disable_irq(int irq);
-/**
- ,* @brief 给中断处理发送消息，处理完成后自动关闭，此函数会立即返回
- ,*/
-void disable_irq_nosync(int irq);
+  /**
+   ,* @brief 使能中断
+   ,* @note 使能中断控制器对应的 irq
+   ,*/
+  void enable_irq(int irq);
+  /**
+   ,* @brief 等待目前的中断处理完成后关闭中断
+   ,* @note: 不能在中断的顶半部分调用此函数，因为它会一直等待底半部分，而底半还没有执行，就会卡死
+   ,* @note 关闭中断控制器对应的 irq
+   ,*/
+  void disable_irq(int irq);
+  /**
+   ,* @brief 给中断处理发送消息，处理完成后自动关闭，此函数会立即返回
+   ,*/
+  void disable_irq_nosync(int irq);
 
-//关闭本CPU内的所有中断，并保存当前的中断状态
-#define local_irq_save(flags) ...
-//根据关闭前的状态恢复中断
-#define local_irq_restore(flags) ...
+  //关闭本CPU内的所有中断，并保存当前的中断状态
+  #define local_irq_save(flags) ...
+  //根据关闭前的状态恢复中断
+  #define local_irq_restore(flags) ...
 
-//关闭本CPU内所有中断
-void local_irq_disable(void);
-//打开本CPU内的所有中断
-void local_irq_enable(void);
+  //关闭本CPU内所有中断
+  void local_irq_disable(void);
+  //打开本CPU内的所有中断
+  void local_irq_enable(void);
+
+  //等待对应的中断退出，相当于同步作用
+  void synchronize_irq(unsigned int irq);
 
 #+END_SRC
+*** 获取中断状态
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 如果本地处理器上的中断系统被禁止，则返回 true，否则返回 false
+   ,*/
+  irqs_disable();
+  /**
+   ,* @brief : 当内核处于 NMI,IRQ,SoftIRQ 上下文或底半处理被关闭时，返回真
+   ,* @note : 现在一般不使用了
+   ,*/
+  in_interrupt();
+  /**
+   ,* @brief : 当内核处于 SoftIRQ 上下文或底半处理被关闭时，返回真
+   ,* @note : 现在一般不使用了
+   ,*/
+  in_softirq();
+  /**
+   ,* @brief : 当内核处于 IRQ 上下文时，返回真
+   ,*/
+  in_irq();
+  /**
+   ,* @brief : 当内核处于 SoftIRQ 上下文时，返回真
+   ,*/
+  in_serving_softirq();
+  /**
+   ,* @brief : 当内核处于 NMI 上下文时，返回真
+   ,*/
+  in_nmi();
+  /**
+   ,* @brief : 当内核处于 任务 上下文时，返回真
+   ,*/
+  in_task();
+  
+#+END_SRC 
 *** 底半处理机制
+顶半和底半之间的划分有一些借鉴：
+- 如果一个任务对时间非常敏感，将其放在中断处理程序中执行
+- 如果一个任务和硬件相关，将其放在中断处理程序中执行
+- 如果一个任务要保证不被其他中断打断，将其放在中断处理程序中执行
+- 其他所有任务，考虑放置在下半部执行    
+
 Linux 实现底半部的机制主要有 tasklet、工作队列、软中断和线程化irq.
 - *此处软中断指的是由软件模拟的中断机制，而不是ARM中的由软件触发的硬件中断！*.
 - 软中断和tasklet运行于软中断上下文，仍然属于原子上下文的一种，而工作队列运行于进程上下文。
-*因此，在软中断和takelet处理函数中不允许睡眠，而在工作队列处理函数中允许睡眠*.
+  + *因此，在软中断和takelet处理函数中不允许睡眠，而在工作队列处理函数中允许睡眠*.
 - =local_bh_disable() and local_bh_enable()= 是内核中用于禁止和使能的软中断及tasklet底半部机制的函数。
 
 *注意*: 软中断以及基于软中断的tasklet如果在某段时间大量出现的话,内核会把后续软中断放入 ksoftirqd 内核线程中执行。
+- 因为软中断的优先级高于任务调度，如果软中断的调度频率过高那任务调度就会被饿死。
 **** tasklet
 tasklet 的执行上下文是软中断，执行时机通常是顶半部返回的时候。只需要定义 tasklet 及其处理函数，并将两者关联即可。
+
+takelet 执行通常是在中断退出后立即执行，软中断依次运行挂在其等待队列上的 tasklet 处理函数。
 #+BEGIN_SRC c
 /**
  ,* @brief 定义一个tasklet结构 my_tasklet, 与 my_tasklet_func(data) 函数关联
@@ -273,7 +351,7 @@ void __exit xxx_exit(void)
 
 #+END_SRC
 **** 工作队列
-工作队列的执行上下文是内核线程，因此 *可以调度和睡眠*.
+工作队列的执行上下文是内核线程，因此 *可以调度和睡眠*，当需要处理的底半任务可能会引起睡眠时，就应该使用工作队列。
 #+BEGIN_SRC c
 /**
  ,* 定义数据结构及操作函数
@@ -318,6 +396,35 @@ void xxx_exit(void)
 #+END_SRC
 **** 软中断(不建议使用)
 软中断的执行时机通常是顶半部分返回的时候，tasklet是基于软中断实现的，因此也运行于软中断上下文。
+- 每一个核上都对应一个 =ksoftirqd= ，用于高频出现软中断或 tasklet 时的线程化处理
+
+软中断不建议使用的原因是：同一份软中断函数在多核环境下有可能被多个核同时执行，所以需要考虑这种互斥性。
+而 tasklet 的调度策略是不会在多个核上运行同一个 tasklet 函数，这样相对就更容易实现一点
+#+BEGIN_SRC c
+  /* PLEASE, avoid to allocate new softirqs, if you need not _really_ high
+     frequency threaded job scheduling. For almost all the purposes
+     tasklets are more than enough. F.e. all serial device BHs et
+     al. should be converted to tasklets, not to softirqs.
+  ,*/
+  //! 内核已经建议不直接使用 softirq 而是使用其 tasklet
+
+  enum
+    {
+     HI_SOFTIRQ=0, //优先级高的 tasklets
+     TIMER_SOFTIRQ,//定时器下半部
+     NET_TX_SOFTIRQ,//发送网络数据包
+     NET_RX_SOFTIRQ,//接收网络数据包
+     BLOCK_SOFTIRQ,//BLOCK 装置
+     IRQ_POLL_SOFTIRQ,
+     TASKLET_SOFTIRQ,//正常优先级的 tasklets
+     SCHED_SOFTIRQ,//调度程序
+     HRTIMER_SOFTIRQ, /* Unused, but kept as tools rely on the
+                         numbering. Sigh! *///高精度定时器
+     RCU_SOFTIRQ,    /* Preferable RCU should always be the last softirq *///RCU 锁
+
+     NR_SOFTIRQS //10
+    };
+#+END_SRC
 
 用 =softirq_action= 结构体表示一个软中断，使用 =open_softirq()= 注册软中断对应的处理函数， =raise_softirq()= 触发一个软中断。
 #+BEGIN_SRC c

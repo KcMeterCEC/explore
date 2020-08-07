@@ -7,32 +7,39 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-参考宋宝华老师的书 =Linux设备驱动开发详解= ，来整理驱动并发操作。
+参考: 
+1. 《Linux 内核设计与实现》
+2. 《Linux 设备驱动开发详解》
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
 * 并发与竞态
 在并发运行模式下，如果不对共享资源进行保护，那么就会破坏该资源的操作(竞态)。
 
-在Linux内核中，主要的竞态发生于以下几种：
+在 Linux 内核中，主要的竞态发生于以下几种情况：
 1. 多核上运行各自的进程(或线程)导致竞态
   + 这种情况是真正的并行运行
 2. 单核上的多个进程(或线程)由于优先级和时间片的关系导致竞态
-3. 进程(或线程)被中断(硬中断、软中断、Tasklet、底半部)打断导致竞态
+3. 进程(或线程)被中断(硬中断、软中断(softirq,tasklet))打断导致竞态
 4. 中断被更高优先级的中断打断导致竞态
   + Linux2.6.35之后取消了中断嵌套
 5. 多核中断和中断之间的打断导致竞态
 
 解决这些问题的根本在于对共享资源的互斥访问，访问共享资源的 *代码区域* 称为临界区(Critical Sections).
 * 编译乱序和执行乱序以及解决
-除了对共享资源的注意外，还需要理解编译器和CPU对一些代码的非顺序操作而导致的结果异常。
+除了对共享资源的注意外，还需要理解编译器和 CPU 对一些代码的非顺序操作而导致的结果异常。
 
 ** 编译乱序优化
-编译乱序优化：编译器可以对访存的指令进行乱序，减少逻辑上不必要的访存，以及尽量提高Cache命中率和CPU的Load/Store单元的工作效率。
+编译乱序优化：编译器可以对访存的指令进行乱序，减少逻辑上不必要的访存，以及尽量提高 Cache 命中率和 CPU 的 Load/Store 单元的工作效率。
 *因此在打开编译器优化以后，可能会看到生成的汇编并没有严格按照代码逻辑顺序执行。*
 
 但这种乱序优化就可能会导致代码的运行结果与预期不符合。
-*** 解决
+
 使用 =barrier()= 保证其后面的代码不能跑到前面去。
 #+BEGIN_SRC c
 /*include/linux/compiler-gcc.h*/
@@ -48,13 +55,13 @@
 #define barrier_data(ptr) __asm__ __volatile__("": :"r"(ptr) :"memory")
 #+END_SRC
 ** 执行乱序(Out-of-Order Execution)
-在处理器中执行时，后发射的指令还是可能先执行完。高级的CPU可以根据自己缓存的组织特性，将访存指令重新排序执行。
+在处理器中执行时，后发射的指令还是可能先执行完。高级的 CPU 可以根据自己缓存的组织特性，将访存指令重新排序执行。
 - 为了较高的缓存命中率，连续地址的访问可能会先执行。
 - 有的还允许访存的非阻塞,即如果前面一条访存指令缓存不命中，造成长延时的存储访问，后面的访存指令可以先执行，以便从缓存中取数。
-  + 所有即使是汇编上看顺序正确的指令，其执行的顺序也是不可预知的。
+  + 所以即使是汇编上看顺序正确的指令，其执行的顺序也是不可预知的。
 #+begin_example
-对于大多数体结构而言，尽管每个CPU都是乱序执行，但是这一乱序对于单个程序执行是不可见的，因为单个CPU在碰到依赖点(后面的指令依赖于前面执行的执行结果)
-的时候会等待，所以程序员可能感觉不到这个乱序过程。但是这个依赖点等待的过程，在SMP处理器里面对于其他核是不可见的。
+对于大多数体结构而言，尽管每个CPU都是乱序执行，但是这一乱序对于单个程序执行是不可见的，因为单个 CPU 在碰到依赖点(后面的指令依赖于前面执行的执行结果)
+的时候会等待，所以程序员可能感觉不到这个乱序过程。但是这个依赖点等待的过程，在 SMP 处理器里面对于其他核是不可见的。
 
 比如CPU0上有语句
 
@@ -73,12 +80,12 @@ CPU1上有语句
 #+end_example
 
 #+begin_example
-虽然单个CPU在碰到依赖点会等待，当程序在访问外设的寄存器时，这些寄存器的访问顺序在CPU逻辑上构不成依赖关系。
+虽然单个CPU在碰到依赖点会等待，当程序在访问外设的寄存器时，这些寄存器的访问顺序在 CPU 逻辑上构不成依赖关系。
 #+end_example
-*** 解决
+
 处理器为了解决多核间一个核的内存行为对另外一个核的可见问题和访问外设寄存器的顺序问题，引入了一些内存屏障指令。
 
-Linux内核的自旋锁、互斥体等互斥逻辑都需要使用内存屏障指令：在请求获得锁时调用屏障指令，在解锁时也调用屏障指令。
+Linux 内核的自旋锁、互斥体等互斥逻辑都需要使用内存屏障指令：在请求获得锁时调用屏障指令，在解锁时也调用屏障指令。
 
 对于外设寄存器的读写，Linux封装了以下读写宏以保证顺序执行：
 #+BEGIN_SRC c
@@ -90,13 +97,11 @@ static inline void iowrite8(u8 value, volatile void __iomem *addr);
 static inline void iowrite16(u16 value, volatile void __iomem *addr);
 static inline void iowrite32(u32 value, volatile void __iomem *addr);
 #+END_SRC
-
 * 中断屏蔽(仅单核使用)
-在 *单CPU范围内* 可以在进入临界区之前屏蔽中断，在退出临界区之后打开中断避免竞态。
-(由于设备驱动是应用在各种CPU上的，无法保证是单CPU，所以不推荐驱动使用此方法)
+在 *单 CPU 范围内* 可以在进入临界区之前屏蔽中断，在退出临界区之后打开中断避免竞态。
+- 由于设备驱动是应用在各种CPU上的，无法保证是单CPU，所以不推荐驱动使用此方法
 
-屏蔽中断后使得中断与进程之间的并发不再发生，而且由于Linux内核的进程调度等操作都依赖中断来实现，
-内核抢占进程之间的并发也得以避免了。
+屏蔽中断后使得中断与进程之间的并发不再发生，而且由于 Linux 内核的进程调度等操作都依赖中断来实现，内核抢占进程之间的并发也得以避免了。
 
 #+begin_example
 由于Linux的异步I/O、进程调度等很多重要操作都依赖于中断，所以要尽量保证中断屏蔽时间够短。
@@ -129,54 +134,66 @@ local_irq_save(flags);
 local_irq_restore(flags);
 
 /**
- ,* @brief 仅仅操作底半
+ ,* @brief 仅仅互斥底半
  ,*/
 local_bh_disable();
 
 local_bh_enable();
 #+END_SRC
 * 原子操作
-原子操作主要用于保证对整形变量的修改是互斥的。
+原子操作主要用于保证对整形变量的修改是互斥的，一般用于计数器中。
+
+原子操作根据不同的构架其实现不同，所以位于 =/arch/xxx/include/asm/atomic.h= 中。
+
+而 kernel 又在此基础之上封装了通用操作，位于 =/include/linux/atomic-fallback.h= 中。
+
+以下是一些 32 位整型常用的操作：
+- 对于 32 位整型操作的是 =atomic_t= ，而对于 64 位整型操作的就算 =atomic64_t=
+  + 而者都有类似的操作集
 #+BEGIN_SRC c
-typedef struct {
-        int counter;
-} atomic_t;
-//定义原子变量并置0
-atomic_t v = ATOMIC_INIT(0);
+  typedef struct {
+          int counter;
+  } atomic_t;
+  //定义原子变量并置 0
+  atomic_t v = ATOMIC_INIT(0);
 
-//设置原子变量v的值为i
-#define atomic_set(v, i) WRITE_ONCE(((v)->counter), (i))
-//读取
-#define atomic_read(v)  READ_ONCE((v)->counter)
+  //设置原子变量 v 的值为 i
+  #define atomic_set(v, i) WRITE_ONCE(((v)->counter), (i))
+  //读取
+  #define atomic_read(v)  READ_ONCE((v)->counter)
 
-static inline void atomic_add(int i, atomic_t *v);
-static inline void atomic_sub(int i, atomic_t *v);
+  static inline void atomic_add(int i, atomic_t *v);
+  static inline void atomic_sub(int i, atomic_t *v);
 
-//自加1
-static inline void atomic_inc(atomic_t *v);
-//自减1
-static inline void atomic_dec(atomic_t *);
+  //自加1
+  static inline void atomic_inc(atomic_t *v);
+  //自减1
+  static inline void atomic_dec(atomic_t *);
 
-//减去值后判断是否为0
-#define atomic_sub_and_test(i, v)(atomic_sub_return((i), (v)) == 0)
-//自减后判断是否为0
-#define atomic_dec_and_test(v)(atomic_dec_return(v) == 0)
-//自增后判断是否为0
-#define atomic_inc_and_test(v)(atomic_inc_return(v) == 0)
+  //减去值后判断是否为0
+  #define atomic_sub_and_test(i, v)(atomic_sub_return((i), (v)) == 0)
+  //自减后判断是否为0
+  #define atomic_dec_and_test(v)(atomic_dec_return(v) == 0)
+  //自增后判断是否为0
+  #define atomic_inc_and_test(v)(atomic_inc_return(v) == 0)
 
 
-//设置地址 addr 处第 nr 位为1
-static inline void set_bit(int nr, volatile unsigned long *addr);
-static inline void clear_bit(int nr, volatile unsigned long *addr);
-//翻转
-static inline void change_bit(int nr, volatile unsigned long *addr);
+  /**
+   ,* @note : 原子位操作是对普通的指针进行的操作，所以并没有限制指向的类型一定要是 atomic_t 
+   ,* 当这些函数前面跟两个下划线时，代表是不保证原子性的位操作，比如 __set_bit()
+   ,*/
+  //设置地址 addr 处第 nr 位为1
+  static inline void set_bit(int nr, volatile unsigned long *addr);
+  static inline void clear_bit(int nr, volatile unsigned long *addr);
+  //翻转
+  static inline void change_bit(int nr, volatile unsigned long *addr);
 
-//先测试可以操作 然后再操作
-static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
-static inline int test_and_clear_bit(int nr, volatile unsigned long *addr);
-static inline int test_and_change_bit(int nr, volatile unsigned long *addr);
+  //先测试可以操作 然后再操作
+  static inline int test_and_set_bit(int nr, volatile unsigned long *addr);
+  static inline int test_and_clear_bit(int nr, volatile unsigned long *addr);
+  static inline int test_and_change_bit(int nr, volatile unsigned long *addr);
 #+END_SRC
-示例：设备最多只能被一个进程打开
+示例：以非阻塞的形式实现设备最多只能被一个进程打开
 #+BEGIN_SRC c
 static atomic_t xxx_available = ATOMIC_INIT(1);
 
@@ -204,6 +221,9 @@ static int xxx_release(struct inode *inode, struct file *filp)
 * 自旋锁(Spin Lock)
 ** 自旋锁的基本使用
 获得自旋锁的进程可以操作资源，等待自旋锁的进程就在原地死等，所以在使用自旋锁的场合也应该尽快退出。
+- 与架构有关的代码在 =/arch/xxx/include/asm/spinlock.h= ，用户使用的接口位于 =/include/linux/spinlock.h= 
+  
+由于自旋锁不会导致睡眠，所以可以在中断、软中断（tasklet）中使用。
 
 自旋锁相关操作函数如下：
 #+BEGIN_SRC c
@@ -241,8 +261,16 @@ spin_lock(&lock);
 //临界区处理
 spin_unlock(&lock);
 #+END_SRC
+
+当进程上下文和软中断上下文都会访问一段共享数据时：
+- 进程上下文成对的使用： spin_lock_bh(), spin_unlock_bh()
+- 在软中断中成对的使用： spin_lock() , spin_unlock()
+
+当进程上下文和中断上下文都会访问一段共享数据时：
+- 进程上下文成对的使用： spin_lock_irqsave(), spin_unlock_irqrestore()
+- 在中断中成对的使用： spin_lock() , spin_unlock()
 *** 自旋锁的衍生
-自旋锁可以避免临界区不受本CPU和其他CPU的进程打扰，但可能会受到中断和底半部的影响。
+自旋锁可以避免临界区不受本 CPU 和其他 CPU 的进程打扰，但可能会受到中断和底半部的影响。
 所以需要使用其衍生方法：
 - 一般在中断中使用 =spin_lock()/spin_unlock()= , 在进程中使用 =spin_lock_irqsave()/spin_unlock_irqrestore()=
 #+BEGIN_SRC c
@@ -305,6 +333,7 @@ static int xxx_release(struct inode *inode, struct file *filp)
 #+END_SRC
 ** 读写自旋锁
 读写自旋锁允许读并发，写只能有一个进程操作，读写不能同时操作。
+- 其实现位于 =/include/linux/rwlock.h=
 
 相关操作函数如下:
 #+BEGIN_SRC c
@@ -340,16 +369,17 @@ rwlock_init(&my_rwlock);
 
 一般操作如下:
 #+BEGIN_SRC c
-rwlock_t lock;
-rwlock_init(&lock);
+  rwlock_t lock;
+  rwlock_init(&lock);
 
-read_lock(&lock);
-//临界资源
-read_unlock(&lock);
+  read_lock(&lock);
+  //临界资源
+  read_unlock(&lock);
 
-write_lock_irqsave(&lock, flags);
-//临界资源
-write_unlock_irqrestore(&lock, flags);
+  //! 当在中断中会读写共享资源时，就需要禁止中断
+  write_lock_irqsave(&lock, flags);
+  //临界资源
+  write_unlock_irqrestore(&lock, flags);
 #+END_SRC
 ** 顺序锁
 顺序锁是对读写锁的优化，读操作不会被写操作阻塞，读操作不用等待写操作完成，写操作也不用等待读操作完成。
@@ -357,6 +387,12 @@ write_unlock_irqrestore(&lock, flags);
 #+begin_example
 虽然读写之间不互相排斥，但如果读执行单元在读操作期间，写操作已经发生，那么就需要重新读取数据。
 #+end_example
+
+顺序锁的应用场景：
+- 数据存在很多读者
+- 写者很少
+- 希望写优先于读，且不允许读者让写者饥饿
+- 数据很简单，但无法使用原子操作
 相关的操作函数:
 #+BEGIN_SRC c
 //file: include/linux/seqlock.h
@@ -399,11 +435,11 @@ do
 }while(read_seqretry(&lock, seqnum));
 #+END_SRC
 ** 读-复制-更新
-RCU(Read-Copy-Update)在读端没有锁、内存屏障、原子指令类的开销，几乎可以认为是直接读，RCU在写执行单元访问它的共享资源前首先复制一个副本，
-然后对副本进行修改，最后使用回调机制在适当的时机 *把指向原来数据的指针重新指向新的被修改的数据。* 这个时机就是所有引用数据的CPU都退出对
+RCU(Read-Copy-Update) 在读端没有锁、内存屏障、原子指令类的开销，几乎可以认为是直接读，RCU在写执行单元访问它的共享资源前首先复制一个副本，
+然后对副本进行修改，最后使用回调机制在适当的时机 *把指向原来数据的指针重新指向新的被修改的数据。* 这个时机就是所有引用数据的 CPU 都退出对
 共享数据读操作的时候。等待适当时机的时期称为宽限期(Grace Period).
 
-RCU既允许多个读操作又允许多个写操作。 *但是RCU不能替代读写锁，因为如果写操作比较多时，对读执行单元的性能提高不能弥补写执行单元同步导致的损失。*
+RCU 既允许多个读操作又允许多个写操作。 *但是RCU不能替代读写锁，因为如果写操作比较多时，对读执行单元的性能提高不能弥补写执行单元同步导致的损失。*
 
 操作函数:
 #+BEGIN_SRC c
@@ -564,6 +600,7 @@ int delete(long key)
 #+END_SRC
 * 信号量
 目前来说信号量更多的被用于同步。
+- 由于信号量可能会导致睡眠，所以不能用于中断和软中断（tasklet）中。
 
 与信号量相关操作函数:
 #+BEGIN_SRC c

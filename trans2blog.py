@@ -11,7 +11,7 @@ import os
 import shutil
 import filecmp
 
-blog_source = "/home/pi/github/kcmetercec.github.io/hexo/source/_posts/";
+blog_source = "/home/cec/github/kcmetercec.github.io/hexo/source/_posts/";
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 
 def get_real_name(file_path, pwd_path):
@@ -45,7 +45,7 @@ def get_real_name(file_path, pwd_path):
             if os.path.exists(blog_file) == False or filecmp.cmp(name_file, blog_file) == False:
                 print("%s \n ==> \n %s" %(file_path, blog_file))
                 print("---------->update\n")
-                shutil.copy(name_file,"/home/pi/github/kcmetercec.github.io/hexo/source/_posts/")
+                shutil.copy(name_file,"/home/cec/github/kcmetercec.github.io/hexo/source/_posts/")
             os.remove(name_file)
 
 def sweep_dir(root_dir):
