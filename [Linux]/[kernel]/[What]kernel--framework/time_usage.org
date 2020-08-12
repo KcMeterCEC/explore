@@ -7,72 +7,313 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
-整理内核中断的使用方式。
+参考: 
+1. 《Linux 内核设计与实现》
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* 内核时钟
+** 系统定时器的频率
+内核在 =/include/asm-generic/param.h= 中规定了系统定时器的频率为 100，也就是每 10ms 中断一次：
+#+BEGIN_SRC c
+  /* SPDX-License-Identifier: GPL-2.0 */
+  #ifndef __ASM_GENERIC_PARAM_H
+  #define __ASM_GENERIC_PARAM_H
+
+  #include <uapi/asm-generic/param.h>
+
+  # undef HZ
+  # define HZ		CONFIG_HZ	/* Internal kernel timer frequency */
+  # define USER_HZ	100		/* some user interfaces are */
+  # define CLOCKS_PER_SEC	(USER_HZ)       /* in "ticks" like times() */
+  #endif /* __ASM_GENERIC_PARAM_H */
+#+END_SRC
+
+对于 =CONFIG_HZ= 的值，在 =/arch/arm/Kconfig= 中有如下配置：
+#+BEGIN_SRC c
+  config HZ
+  int
+  default HZ_FIXED if HZ_FIXED != 0
+    default 100 if HZ_100
+    default 200 if HZ_200
+    default 250 if HZ_250
+    default 300 if HZ_300
+    default 500 if HZ_500
+    default 1000
+#+END_SRC
+
+如果提高时钟频率，那么就会提高时间驱动事件的解析度和准确度：
+- 依赖定时执行的系统调用，能够以更高的精度运行
+- 对诸如资源消耗和系统运行时间等的测量会有更精细的解析度
+- 提高任务抢占的准确度
+  
+但由于系统的中断频率增大了，CPU 会花更多的时间来处理这些中断，做更多的无用功。
+- 这同时也会造成 cache miss
+** jiffies
+*** 概念
+全局变量 jiffies 用来记录自系统启动以来产生的节拍的总数，也就是系统定时器中断的总次数。 
+
+既然 jiffies 用于记录产生节拍的总数，那么在一秒时间内产生的节拍数就等于宏 =HZ= ，那么就会有以下的转换关系：
+#+BEGIN_EXAMPLE
+  //将以秒为单位的时间转换为 jiffies:
+  jiffies = seconds * HZ
+  //将 jiffies 转换为以秒为单位的时间
+  seconds = jiffies / HZ
+
+  //jiffies 从现在开始的 1/10 秒
+  unsigned long fraction = jiffies + HZ / 10;
+#+END_EXAMPLE
+*** API
+目前内核在 jiffies.h 中提供了以下操作函数/宏便于操作 jiffies:
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 得到 jiffies 的值
+   ,*/
+  u64 get_jiffies_64(void);
+  /**
+   ,* @brief : 当 a 的时间在 b 之后，返回真
+   ,*/
+  time_after(a,b);
+  time_after64(a,b);
+  //a 与 jiffies 进行比较
+  time_is_after_jiffies(a);
+  time_is_after_jiffies64(a);
+  /**
+   ,* @brief : 当 a 的时间在 b 之前，返回真
+   ,*/
+  time_before(a,b);
+  time_before64(a,b);
+  //a 与 jiffies 进行比较
+  time_is_before_jiffies(a);
+  time_is_before_jiffies64(a);
+  /**
+   ,* @brief : 当 a 的时间在 b 之后或等于 b，返回真
+   ,*/
+  time_after_eq(a,b);
+  time_after_eq64(a,b);
+  //a 与 jiffies 进行比较
+  time_is_after_eq_jiffies(a);
+  time_is_after_eq_jiffies64(a);
+  /**
+   ,* @brief : 当 a 的时间在 b 之前或等于 b，返回真
+   ,*/
+  time_before_eq(a,b);
+  time_before_eq64(a,b);
+  //a 与 jiffies 进行比较
+  time_is_before_eq_jiffies(a);
+  time_is_before_eq_jiffies64(a);
+  /**
+   ,* @brief : 当 a 的时间在 b 与 c 之间，区间为 [b,c] 返回真
+   ,*/
+  time_in_range(a,b,c);
+  time_in_range64(a, b, c);
+  /**
+   ,* @brief : 当 a 的时间在 b 与 c 之间，区间为 [b,c) 返回真
+   ,*/
+  time_in_range_open(a,b,c);
+  /**
+   ,* @brief : jiffies 与时间的相互转换
+   ,*/
+  unsigned int jiffies_to_msecs(const unsigned long j);
+  unsigned int jiffies_to_usecs(const unsigned long j);
+  u64 jiffies_to_nsecs(const unsigned long j);
+  u64 jiffies64_to_nsecs(u64 j);
+  u64 jiffies64_to_msecs(u64 j);
+  void jiffies_to_timespec64(const unsigned long jiffies,
+                             struct timespec64 *value);
+  void jiffies_to_timespec(const unsigned long jiffies,
+                           struct timespec *value);
+  void jiffies_to_timeval(const unsigned long jiffies,
+                          struct timeval *value);
+  clock_t jiffies_delta_to_clock_t(long delta);
+  unsigned int jiffies_delta_to_msecs(long delta);
+  //将 jiffies 由 HZ 表示的节拍计数转换成一个由 USER_HZ 表示的节拍计数
+  u64 jiffies_64_to_clock_t(u64 x);
+
+  unsigned long msecs_to_jiffies(const unsigned int m);
+  unsigned long usecs_to_jiffies(const unsigned int u);
+  unsigned long timespec64_to_jiffies(const struct timespec64 *value);
+  unsigned long timespec_to_jiffies(const struct timespec *value);
+  unsigned long timeval_to_jiffies(const struct timeval *value);
+  unsigned long clock_t_to_jiffies(unsigned long x);
+  u64 nsec_to_clock_t(u64 x);
+  u64 nsecs_to_jiffies64(u64 n);
+  unsigned long nsecs_to_jiffies(u64 n);
+#+END_SRC
+*** 内部表示
+jiffies 的定义是在 =vmlinux.lds.S= 中定义的：
+#+BEGIN_SRC c
+  #ifndef __ARMEB__
+  jiffies = jiffies_64;
+  #else
+  jiffies = jiffies_64 + 4;
+  #endif
+
+  //jiffies_64 的定义位于 /kernel/time/timer.c 中
+  __visible u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
+
+  //在 /include/linux/jiffies.h 中进行了申明
+  /*
+   ,* The 64-bit value is not atomic - you MUST NOT read it
+   ,* without sampling the sequence number in jiffies_lock.
+   ,* get_jiffies_64() will do this for you as appropriate.
+   ,*/
+  extern u64 __cacheline_aligned_in_smp jiffies_64;
+  //unsigned long 在 32 位架构上是 32 位，在 64 位架构上就是 64 位
+  extern unsigned long volatile __cacheline_aligned_in_smp __jiffy_arch_data jiffies;
+#+END_SRC
+
+这里还会使用 =jiffies_64= 的原因是：
+#+BEGIN_EXAMPLE
+  在 32 位架构上，如果时钟频率是 100 Hz，那么 jiffies 的值会在 497 天后就溢出。所以需要使用 jiffies_64 来管理系统的时间，以避免溢出。
+
+  但考虑到性能和历史的原因，用户通常会使用 jiffies 来做时间的相对比较，那么就依然保留 jiffies 以保证内核代码的兼容性。
+#+END_EXAMPLE
+
+但在 32 位架构上，进行相对比较时，依然会需要考虑 jiffies 的溢出问题，所以用户需要使用上面提供的 time_after 之类的函数来处理该问题。
+#+BEGIN_SRC c
+  /**
+   ,* 错误的使用方式
+   ,*/
+  unsigned long timeout = jiffies + HZ / 2;//计划 0.5 秒后超时
+
+  //假设 jiffies 在赋值给 timeout 之后发生了溢出，那么 if(timeout > jiffies)
+  //将会保持很长一段时间为真
+    if(timeout > jiffies){
+      //没有超时
+    }
+    else{
+      //已超时
+    }
+  /**
+   ,* 正确的使用方式
+   ,*/
+  if(time_before(jiffies, timeout)){
+    //没有超时
+   }
+   else{
+     //发生超时
+   }
+#+END_SRC
+*** 用户空间与 HZ
+由于 HZ 这个宏有可能会改变，用户空间的时间如果直接依赖于这个宏那么时间关系就可能会因为不同内核不同 HZ 而出错。
+
+所以内核使用了 =jiffies_64_to_clock_t()= 这类函数屏蔽掉 HZ 改变所带来的影响。
+#+BEGIN_SRC c
+  //经过此函数转换得到的就算用户空间所看到的值
+  u64 jiffies_64_to_clock_t(u64 x)
+  {
+  #if (TICK_NSEC % (NSEC_PER_SEC / USER_HZ)) == 0
+    //! 当 USER_HZ 可以被整除时，使用下面两种计算方式
+  # if HZ < USER_HZ
+    x = div_u64(x * USER_HZ, HZ);
+  # elif HZ > USER_HZ
+    x = div_u64(x, HZ / USER_HZ);
+  # else
+    /* Nothing to do */
+    //! 当内核的 HZ 等于 USER_HZ 时，就不需要做转换
+  # endif
+  #else
+    /*
+     ,* There are better ways that don't overflow early,
+     ,* but even this doesn't overflow in hundreds of years
+     ,* in 64 bits, so..
+     ,*/
+    x = div_u64(x * TICK_NSEC, (NSEC_PER_SEC / USER_HZ));
+  #endif
+    return x;
+  }
+#+END_SRC
 * 内核定时器
+** 定时器中断
 软件定时器是基于硬件定时器基础上实现的。
 
 内核在时钟中断发生后检测各定时器是否到期，到期后的定时器处理函数将作为软中断在底半部分执行。
+
+其核心函数便是 =tick_periodic()= ：
+#+BEGIN_SRC c
+  /*
+   ,* Periodic tick
+   ,*/
+  static void tick_periodic(int cpu)
+  {
+    if (tick_do_timer_cpu == cpu) {
+      //使用顺序锁更新 jiffies
+      write_seqlock(&jiffies_lock);
+
+      /* Keep track of the next tick event */
+      tick_next_period = ktime_add(tick_next_period, tick_period);
+
+      //完成对 jiffies_64 的更新
+      do_timer(1);
+      write_sequnlock(&jiffies_lock);
+      update_wall_time();
+    }
+
+    //对进程的运行时间进行记录，并在软中断中执行到期的定时器
+    update_process_times(user_mode(get_irq_regs()));
+    profile_tick(CPU_PROFILING);
+  }
+#+END_SRC
 ** 基本接口
 #+BEGIN_SRC c
-struct timer_list {
-        /*
-         ,* All fields that change during normal runtime grouped to the
-         ,* same cacheline
-         ,*/
-        struct hlist_node   entry;
-        unsigned long       expires;//!到期时间(jiffies)
-        void                (*function)(unsigned long); //! 定时器到期后的运行函数
-        unsigned long       data;//! 传入给运行函数的值
-        u32                 flags;
-        int                 slack;
+  struct timer_list {
+    /*
+     ,* All fields that change during normal runtime grouped to the
+     ,* same cacheline
+     ,*/
+    //! 定时器链表入口
+    struct hlist_node	entry;
+    //! 以 jiffies 为单位的定时值
+    unsigned long		expires;
+    //! 处理函数
+    void			(*function)(struct timer_list *);
+    u32			flags;
 
-        #ifdef CONFIG_TIMER_STATS
-        int                 start_pid;
-        void                *start_site;
-        char                start_comm[16];
-        #endif
-        #ifdef CONFIG_LOCKDEP
-        struct lockdep_map  lockdep_map;
-        #endif
-};
-// 一个timer_list 结构体就代表一个软件定时器类
-struct timer_list my_timer;
+  #ifdef CONFIG_LOCKDEP
+    struct lockdep_map	lockdep_map;
+  #endif
+  };
+  // 一个timer_list 结构体就代表一个软件定时器类
+  struct timer_list my_timer;
 
-/**
- ,* @brief 初始化定时器
- ,*/
-//初始化 timer_list 的 entry 的 next 为NULL， 并给 base 指针赋值
-void init_timer(struct timer_list *timer);
+  /**
+   ,* @brief 初始化定时器
+   ,*/
+  timer_setup(timer, callback, flags);
 
-/**
- ,* @brief 初始化定时器并赋值
- ,*/
-TIMER_INITIALIZER(_function,_expires,_data)
+  //定义并初始化一个软件定时器
+  DEFINE_TIMER(_name, _function);
+  /**
+   ,* 添加定时器到链表
+   ,*/
+  void add_timer(struct timer_list *timer);
 
-//定义并初始化一个软件定时器
-DEFINE_TIMER(_name, _function, _expires, _data)
+  /**
+   ,* @brief : 从链表删除一个定时器
+   ,* @note: 当一个超时函数已经执行后，不需要调用该函数，因为超时定时器会自动被移出
+   ,* 该函数是用于移出还未超时的定时器
+   ,*/
+  int del_timer(struct timer_list *timer);
+  /**
+   ,* @brief : 从链表删除一个定时器，等待可能再其它处理器上运行的定时器处理程序都退出
+   ,* @note: 当一个超时函数已经执行后，不需要调用该函数，因为超时定时器会自动被移出
+   ,* 该函数是用于移出还未超时的定时器
+   ,* 该函数不能再中断和软中断上下文中使用，因为它可能会引起睡眠
+   ,*/
+  int del_timer_sync(struct timer_list *timer);
 
-//初始化定时器并赋值
-setup_timer(timer, fn, data)
-
-/**
- ,* 添加定时器到链表
- ,*/
-void add_timer(struct timer_list *timer);
-
-/**
- ,* 从链表删除一个定时器
- ,*/
-int del_timer(struct timer_list *timer);
-
-/**
- ,* 修改定时器的到期值
- ,*/
-int mod_timer(struct timer_list *timer, unsigned long expires);
-
+  /**
+   ,* @brief : 修改定时器的到期值
+   ,* @note : 使用此函数后，定时器将会被激活
+   ,* 设置定时器的到期值时也应该使用此函数，因为当多核并发访问该定时器时，它能处理临界区问题。
+   ,*/
+  int mod_timer(struct timer_list *timer, unsigned long expires);
 #+END_SRC
 ** 使用模板
 #+BEGIN_SRC c
@@ -86,10 +327,8 @@ xxx_func1(...)
         struct xxx_dev *dev = filp->private_data;
         ...
         init_timer(&dev->xxx_timer);
-        dev->xxx_timer.function = &xxx_do_timer;
-        dev->xxx_timer.data = (unsigned long)dev;
-        dev->xxx_timer.expires = jiffies + delay;
-        add_timer(&dev->xxx_timer);
+        timer_setup(&dev->xxx_timer, xxx_do_timer, 0);
+        mod_timer_timer(&dev->xxx_timer, jiffies + delay);
         ...
 }
 xxx_func2(...)
@@ -101,20 +340,8 @@ static void xxx_do_timer(unsigned long arg)
         struct xxx_device *dev = (struct xxx_device *)arg;
 
         //再次执行定时器
-        dev->xxx_timer.expires = jiffies + delay;
-        add_timer(&dev->xxx_timer);
+        mod_timer_timer(&dev->xxx_timer, jiffies + delay);
 }
-#+END_SRC
-** 关于 jiffies
-linux 在 =include/linux/jiffies.h= 中提供了通过时间来转换出 jiffies 的功能。
-#+BEGIN_SRC c
-unsigned int jiffies_to_msecs(const unsigned long j);
-unsigned int jiffies_to_usecs(const unsigned long j);
-u64 jiffies_to_nsecs(const unsigned long j);
-
-unsigned long __msecs_to_jiffies(const unsigned int m);
-unsigned long _usecs_to_jiffies(const unsigned int u);
-unsigned long nsecs_to_jiffies(u64 n);
 #+END_SRC
 ** 快捷使用
 linux 还封装了快捷定时机制，本质是使用工作队列和定时器实现。
@@ -133,40 +360,43 @@ int cancel_delayed_work(struct delay_work *work);
 int cancel_delayed_work_sync(struct delay_work *work);
 #+END_SRC
 * 内核延时
+** 忙等待
+忙等待就是死等，可以等待的也是时钟节拍的整数倍：
+- 这显示不是什么明智的做法
+#+BEGIN_SRC c
+  //! 忙等待 10 个节拍
+  unsigned long timeout = jiffies + 10;
+
+  //当 jiffies 没有到 timeout 时，就卡在这里死等
+  while(time_before(jiffies , timeout));
+#+END_SRC
 ** 短延时
 #+BEGIN_SRC c
-/**
- ,* @note: linux在开机时会运行一个循环延时校准，计算出lpj(Loops Per jiffy)，消耗时间几百毫秒
- ,* 如果在 bootargs 中设置 lpj=xxx,则可以省略这个时间
- ,*/
-//忙等待，根据CPU频率进行一定次数的循环
-void ndelay(unsigned long nsecs);
-void udelay(unsigned long usecs);
-void mdelay(unsigned long msecs);
+  /**
+   ,* @note: linux在开机时会运行一个循环延时校准，计算出lpj(Loops Per jiffy)，消耗时间几百毫秒
+   ,* 如果在 bootargs 中设置 lpj=xxx,则可以省略这个时间
+   ,*/
+  //忙等待，根据CPU频率进行一定次数的循环
+  //所以这些函数也不能延迟太长的时间
+  void ndelay(unsigned long nsecs);
+  void udelay(unsigned long usecs);
+  void mdelay(unsigned long msecs);
 
-/**
- ,* @note 一般忙等待使用到微秒已经足够，对于毫秒以及以上的延时使用睡眠函数
- ,*/
-void usleep_range(unsigned long min, unsigned long max);
-void msleep(unsigned int millisecs);
-unsigned long msleep_interruptible(unsigned int millisecs);//可以被打断
-void ssleep(unsigned int seconds);
-#+END_SRC
-** 长延时
-内核中进行延时的一个很直观的方法是比较当前的 jiffies 和目标 jiffies
-#+BEGIN_SRC c
-// 延时100个jiffies
-unsigned long delay = jiffies + 100;
-while(time_before(jiffies,delay));
-
-//延时2秒
-unsigned long delay = jiffies + 2 * Hz;
-while(time_before(jiffies, delay));
+  /**
+   ,* @note 一般忙等待使用到微秒已经足够，对于毫秒以及以上的延时使用睡眠函数
+   ,*/
+  void usleep_range(unsigned long min, unsigned long max);
+  void msleep(unsigned int millisecs);
+  unsigned long msleep_interruptible(unsigned int millisecs);//可以被打断
+  void ssleep(unsigned int seconds);
 #+END_SRC
 ** 睡着延时
 #+BEGIN_SRC c
-/**
- ,* @brief 使当前任务休眠至指定的 jiffies 之后再被唤醒
- ,*/
-signed long schedule_timeout(signed long timeout);
+  /**
+   ,* @brief 使当前任务休眠至指定的 jiffies 之后再被唤醒
+   ,* @note : 此函数不能在中断和软中断上下文中调用
+   ,*/
+  //在进入睡眠前，必须先设置任务状态
+  set_current_state(TASK_INTERRUPTIBLE);
+  signed long schedule_timeout(signed long timeout);
 #+END_SRC
