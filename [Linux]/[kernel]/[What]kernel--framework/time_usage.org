@@ -229,6 +229,84 @@ jiffies 的定义是在 =vmlinux.lds.S= 中定义的：
     return x;
   }
 #+END_SRC
+*** jiffies 的测试模块
+#+BEGIN_SRC c
+  #define pr_fmt(fmt)     "jiffies_test:" fmt
+
+  #include <linux/init.h>
+  #include <linux/module.h>
+  #include <linux/jiffies.h>
+  #include <asm-generic/param.h>
+  #include <uapi/linux/time.h>
+
+  static void jiffies_test(void)
+  {
+      pr_info("The HZ of current system is %d\n", HZ);
+      pr_info("The USER_HZ of current system is %d\n", USER_HZ);
+      pr_info("The jiffies of current system is %llu\n", get_jiffies_64());
+
+      pr_info("time_is_after_jiffies() = %d\n", time_is_after_jiffies(get_jiffies_64() + 10));
+      pr_info("time_is_beofre_jiffies() = %d\n", time_is_before_jiffies(get_jiffies_64() - 10));
+
+      pr_info("jiffies 200 to msecs = %u\n", jiffies_to_msecs(200));
+      pr_info("jiffies 1 to usecs = %u\n", jiffies_to_usecs(1));
+      pr_info("jiffies 1 to nsecs = %llu\n", jiffies_to_nsecs(1));
+
+      struct timespec spec;
+      jiffies_to_timespec(3, &spec);
+      pr_info("jiffies_to_timespec , sec = %ld, nsec = %ld\n", spec.tv_sec, spec.tv_nsec);
+
+      struct timeval val;
+      jiffies_to_timeval(3, &val);
+      pr_info("jiffies_to_timeval , sec = %ld, usec = %ld\n", val.tv_sec, val.tv_usec);
+
+      pr_info("msecs 10 to jiffies = %lu\n", msecs_to_jiffies(10));
+      pr_info("usecs 30 to jiffies = %lu\n", usecs_to_jiffies(30));
+      pr_info("nsecs 500 to jiffies = %lu\n", nsecs_to_jiffies(500));
+  }
+
+  static int __init jiffies_init(void)
+  {
+      pr_info("%s -> %d\n" , __func__, __LINE__);
+
+      jiffies_test();
+      return 0;
+  }
+  module_init(jiffies_init);
+
+  static void __exit jiffies_exit(void)
+  {
+      pr_info("%s -> %d\n" , __func__, __LINE__);
+  }
+  module_exit(jiffies_exit);
+
+  MODULE_AUTHOR("kcmetercec <kcmeter.cec@gmail.com>");
+  MODULE_LICENSE("GPL v2");
+  MODULE_DESCRIPTION("A simple test module");
+  MODULE_ALIAS("a simplest module");
+  MODULE_VERSION("ver1.0");
+#+END_SRC
+
+对应的输出为：
+#+BEGIN_EXAMPLE
+  # insmod jiffies_api.ko
+  [ 1320.945028] jiffies_test:jiffies_init -> 37
+  [ 1320.945946] jiffies_test:The HZ of current system is 100
+  [ 1320.946849] jiffies_test:The USER_HZ of current system is 100
+  [ 1320.947947] jiffies_test:The jiffies of current system is 4295060216
+  [ 1320.949883] jiffies_test:time_is_after_jiffies() = 1
+  [ 1320.950817] jiffies_test:time_is_beofre_jiffies() = 1
+  [ 1320.951761] jiffies_test:jiffies 200 to msecs = 2000
+  [ 1320.952654] jiffies_test:jiffies 1 to usecs = 10000
+  [ 1320.953606] jiffies_test:jiffies 1 to nsecs = 10000000
+  [ 1320.955595] jiffies_test:jiffies_to_timespec , sec = 0, nsec = 30000000
+  [ 1320.956996] jiffies_test:jiffies_to_timeval , sec = 0, usec = 30000
+  # 10 ms 刚好对应 1 个 jiffies
+  [ 1320.958620] jiffies_test:msecs 10 to jiffies = 1
+  # 但 30 us 就无法保证精度了
+  [ 1320.959556] jiffies_test:usecs 30 to jiffies = 1
+  [ 1320.960534] jiffies_test:nsecs 500 to jiffies = 0
+#+END_EXAMPLE
 * 内核定时器
 ** 定时器中断
 软件定时器是基于硬件定时器基础上实现的。
@@ -326,21 +404,20 @@ xxx_func1(...)
 {
         struct xxx_dev *dev = filp->private_data;
         ...
-        init_timer(&dev->xxx_timer);
-        timer_setup(&dev->xxx_timer, xxx_do_timer, 0);
-        mod_timer_timer(&dev->xxx_timer, jiffies + delay);
+        timer_setup(&dev->xxx_timer, xxx_do_timer, TIMER_XXXX);
+        mod_timer(&dev->xxx_timer, jiffies + delay);
         ...
 }
 xxx_func2(...)
 {
-        del_timer(&dev->xxx_timer);
+        del_timer_sync(&dev->xxx_timer);
 }
 static void xxx_do_timer(unsigned long arg)
 {
         struct xxx_device *dev = (struct xxx_device *)arg;
 
         //再次执行定时器
-        mod_timer_timer(&dev->xxx_timer, jiffies + delay);
+        mod_timer(&dev->xxx_timer, jiffies + delay);
 }
 #+END_SRC
 ** 快捷使用
@@ -358,6 +435,58 @@ schedule_delayed_work(&work, msecs_to_jiffies(poll_interval));
 //取消delayed_work
 int cancel_delayed_work(struct delay_work *work);
 int cancel_delayed_work_sync(struct delay_work *work);
+#+END_SRC
+** 内核定时器测试模块
+#+BEGIN_SRC c
+  #define pr_fmt(fmt)     "timer_test:" fmt
+
+  #include <linux/init.h>
+  #include <linux/module.h>
+  #include <linux/timer.h>
+  #include <linux/jiffies.h>
+  #include <asm-generic/param.h>
+  #include <uapi/linux/time.h>
+
+  static struct timer_list m_timer;
+  static u64 jiffies_backup;
+
+  static void callback_func(struct timer_list *val)
+  {
+      u64 current_jiffies = get_jiffies_64();
+      pr_info("current jiffies is %llu\n", current_jiffies);
+      pr_info("delta time is %lu\n", jiffies_delta_to_msecs(current_jiffies - jiffies_backup));
+
+      //! 设置 1 秒以后循环溢出
+      jiffies_backup = current_jiffies;
+      mod_timer(&m_timer, jiffies_backup + HZ);
+  }
+
+  static int __init timer_init(void)
+  {
+      pr_info("%s -> %d\n" , __func__, __LINE__);
+
+      timer_setup(&m_timer, callback_func, TIMER_DEFERRABLE);
+      //! 设置 1 秒以后溢出
+      jiffies_backup = get_jiffies_64();
+      mod_timer(&m_timer, jiffies_backup + HZ);
+
+      return 0;
+  }
+  module_init(timer_init);
+
+  static void __exit timer_exit(void)
+  {
+      del_timer_sync(&m_timer);
+      pr_info("%s -> %d\n" , __func__, __LINE__);
+  }
+  module_exit(timer_exit);
+
+  MODULE_AUTHOR("kcmetercec <kcmeter.cec@gmail.com>");
+  MODULE_LICENSE("GPL v2");
+  MODULE_DESCRIPTION("A simple test module");
+  MODULE_ALIAS("a simplest module");
+  MODULE_VERSION("ver1.0");
+
 #+END_SRC
 * 内核延时
 ** 忙等待
