@@ -1,0 +1,20 @@
+#+TITLE: [What]Linux 内存管理上的一些细节
+#+DATE:  <2020-08-17 一> 
+#+TAGS: memory
+#+LAYOUT: post 
+#+CATEGORIES: linux, memory, detail
+#+NAME: <linux_memory_detail.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+参考: 
+1. 《Linux 内核设计与实现》
+
+
+| kernel version | arch  |
+|----------------+-------|
+| v5.4.x lts     | arm32 |
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML

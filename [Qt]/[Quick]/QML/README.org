@@ -1,0 +1,88 @@
+#+TITLE: [What]Qt Quick QML 预览
+#+DATE:  <2020-08-17 一> 
+#+TAGS: Qt
+#+LAYOUT: post 
+#+CATEGORIES: Qt, Quick
+#+NAMA: <Qt_quick_qml_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+学习书籍：
+1. [[http://qmlbook.github.io/index.html][《QmlBook》]]
+   
+Qt 版本：Qt 5.12.8
+
+传统的工业嵌入式 Linux 是用 Qt widget 来做界面，但这种方式有以下不足：
+1. 如果上层架构设计得不好，很容易将业务逻辑和用户交互在混杂在一起，后期维护困难。
+2. 基于 Qt widget 的自定义控件需要涉及的方面较为繁杂，开发效率不高
+
+目前越来越多的嵌入式 SOC 都会带有 GPU，那么基于 GPU 加速的 QML 便在运行效率上和 widget 的差距越来越小，并且：
+1. 业务逻辑使用 c++ 编写成后端的方式，给前端提供最终的数据，基于 QML 专注于用户交互，便于维护代码
+2. QML 和 c++ 完全可以分为两个人或多个人并行开发，提高开发效率
+3. QML 内建的渲染方式比 widget 美观不少，这在赶进度的同时也可以开发出卖相不错的界面
+
+综上所述，有必要来系统的了解一下 Qt Quick，以避免在实际项目中踩天坑。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 什么是 Qt Quick
+Qt Quick 是 Qt5 主打的用户交互技术的统称，它包括：
+1. QML：用于用户交互的标记型语言
+2. JavaScript：动态脚本语言
+3. Qt C++：基于标准 c++ 的增强型版本
+   
+其中 QML/JavaScript 结合用于前端开发，Qt C++ 用于后端开发。
+
+* QML 语法概览
+QML 是陈述式的语言，相比 c++ 来讲更接近人类的语言，所以在实现时用户更多关注的是具体表述层面，而不在语法层面，开发效率自然就上去了。
+** 层级结构
+QML 将复杂的界面分成了多个层级，每一层都可以具有自己的子控件，子控件继承父控件的坐标系统，也就是子控件的坐标是相对父控件而言的。
+- 这一点和 QWidget 一致
+
+比如使用 QML 在一个矩形中绘制一个图片和对图片说明的文字，其代码如下：
+#+BEGIN_SRC js
+  import QtQuick 2.12
+
+  //矩形作为 QML 的基础层
+  Rectangle{
+      //root 标识该层为基础层，id 标识该元素的名称，不得与其它元素 id 相冲突
+      id: root
+
+      //指定属性名称及其值
+      width:120; height: 240
+
+      //颜色属性，# 代表 16 进制
+      color: "#4A4A4A"
+
+      //创建 root 层的子控件，该控件用于显示一张图片
+      Image {
+
+          id: triangle
+
+          //指定该图片的坐标，相对父控件的相对坐标
+          x: (parent.width - width) / 2; y: 40
+
+          //指定图片的路径，图片存放在当前目录的 images 目录中
+          source: "images/triangle_red.png"
+      }
+
+      //再创建一个 root 层的子控件，该控件用于显示文字
+      Text{
+          //这里没有给这个字符串设置 id
+
+          //设置 y 坐标是相对于图片坐标的偏移
+          //这里引用了上面图片的 id
+          y:triangle.y + triangle.height + 20
+
+          //设置宽度与 root 元素一致
+          //这里引用了 root 元素的 id
+          width: root.width
+
+          //设置字体颜色，对齐方式，字符串内容
+          color: 'white'
+          //由于这里设置了居中对齐，所以都不需要设置字符串的 x 坐标了
+          horizontalAlignment: Text.AlignHCenter
+          text: 'Triangle'
+      }
+  }
+#+END_SRC
