@@ -15,6 +15,15 @@
 |----------------+-------|
 | v5.4.x lts     | arm32 |
 
+
+相对于[[http://kcmetercec.top/categories/linux/memory/overview/][之前的内存课程]]稍微深入一点。
 #+BEGIN_HTML
 <!--more-->
 #+END_HTML
+* 页
+虽然在硬件上 CPU 可以寻址的最小单位是字节，但是由于 MMU 是以页为单位来管理物理内存的，所以对于虚拟内存而言，页就是最小单位。
+
+所以内核也将页作为内存管理的基本单位，在 =<linux/mm_types.h>= 中使用 =struct page= 来表示物理页，简洁版如下：
+#+BEGIN_SRC c
+
+#+END_SRC 
