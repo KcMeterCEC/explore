@@ -3,7 +3,7 @@
 #+TAGS: Qt
 #+LAYOUT: post 
 #+CATEGORIES: Qt, Quick
-#+NAMA: <Qt_quick_qml_overview.org>
+#+NAME: <Qt_quick_qml_overview.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
@@ -810,8 +810,6 @@ rectangle 需要显示设置其 =width= 和 =height= 属性，否则它就是不
 #+END_SRC
 
 [[./pic/pos_grid.jpg]]
-
-
 ** 布局
 =Item= 元素就含有 =anchors= 属性，用于对可视元素进行布局。
 - 当使用 =anchors= 属性对元素进行约束后，该元素就可以和父元素进行等比例缩放了
@@ -977,9 +975,103 @@ rectangle 需要显示设置其 =width= 和 =height= 属性，否则它就是不
 
 实际效果：
 [[./pic/layout.jpg]]
-
-
-
-
-
 ** 输入
+*** =TextInput=
+=TextInput= 元素用于允许用户可以输入字符串，常用的属性有：
+- =validator= : 允许用户输入内容的格式
+- =inputMask= ：限制输入的类型
+- =echoMode= ：如何显示用户输入的内容
+  
+#+BEGIN_SRC js
+  import QtQuick 2.12
+
+  Rectangle{
+      id: root
+
+      width: 150; height: 30
+
+      color: "white"
+
+      //TextInput 并不带有可是外观，实际开发中需要将其基于其他装饰封装为组件
+      Rectangle{
+          anchors.centerIn: parent;
+
+          width: 120; height: 20
+          color: "lightgreen"
+          border.color: "gray"
+          TextInput{
+              anchors.fill: parent
+              anchors.margins: 2
+
+              focus: true
+
+              text: "This is a text"
+          }
+      }
+  }
+#+END_SRC
+
+[[./textInput.jpg]]
+*** =TextEdit=
+=TextEdit= 相比 =TextInput= 具有多行输入功能。
+
+#+BEGIN_SRC js
+  import QtQuick 2.12
+
+  Rectangle{
+      id: root
+
+      width: 150; height: 60
+
+      color: "white"
+
+      Rectangle{
+          anchors.fill: parent
+          anchors.margins: 5
+
+          color: "lightgreen"
+
+          TextEdit{
+              anchors.fill: parent
+
+              text: "text edit"
+          }
+      }
+  }
+#+END_SRC
+
+** 获取键盘事件
+=Keys= 属性包含了按键事件，用户可以为这些按键事件定义处理任务：
+#+BEGIN_SRC js
+  import QtQuick 2.12
+
+  Rectangle{
+      id: root
+
+      width: 400;height: 200
+      color: "white"
+
+      Rectangle{
+          x : 100; y : 100
+
+          width: 50; height: 50;
+          color: "lightcoral"
+
+          focus: true
+          Keys.onLeftPressed: x -= 8
+          Keys.onRightPressed: x += 8
+          Keys.onUpPressed: y -= 8
+          Keys.onDownPressed: y += 8
+          Keys.onPressed: {
+              switch(event.key){
+              case Qt.Key_Plus:
+                  scale += 0.2
+                  break;
+              case Qt.Key_Minus:
+                  scale -= 0.2
+                  break;
+              }
+          }
+      }
+  }
+#+END_SRC
