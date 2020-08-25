@@ -1,0 +1,112 @@
+#+TITLE: [What]Qt Quick QML 中的动画元素
+#+DATE:  <2020-08-22 六> 
+#+TAGS: Qt
+#+LAYOUT: post 
+#+CATEGORIES: Qt, Quick
+#+NAME: <Qt_quick_qml_fluid_overview.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+学习书籍：
+1. [[http://qmlbook.github.io/index.html][《QmlBook》]]
+   
+Qt 版本：Qt 5.12.8
+
+传统的工业嵌入式 Linux 是用 Qt widget 来做界面，但这种方式有以下不足：
+1. 如果上层架构设计得不好，很容易将业务逻辑和用户交互在混杂在一起，后期维护困难。
+2. 基于 Qt widget 的自定义控件需要涉及的方面较为繁杂，开发效率不高
+
+目前越来越多的嵌入式 SOC 都会带有 GPU，那么基于 GPU 加速的 QML 便在运行效率上和 widget 的差距越来越小，并且：
+1. 业务逻辑使用 c++ 编写成后端的方式，给前端提供最终的数据，基于 QML 专注于用户交互，便于维护代码
+2. QML 和 c++ 完全可以分为两个人或多个人并行开发，提高开发效率
+3. QML 内建的渲染方式比 widget 美观不少，这在赶进度的同时也可以开发出卖相不错的界面
+
+综上所述，有必要来系统的了解一下 Qt Quick，以避免在实际项目中踩天坑。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 动画
+动画（Animations）用于控制一个对象的属性在改变时的中间插值过程。
+
+所有的动画都共用一个定时器，所以这些动画可以实现同步。
+
+一个动画是改变了一个对象的多个属性来完成的，所以动画具有很多元素来实现这些属性的修改，以下是常用的元素：
+- =PropertyAnimation= : 动态的修改属性的值
+- =NumberAnimation= : 动态的修改类型为 qreal 的值
+- =ColorAnimation= : 动态的修改颜色值
+- =RotationAnimation= : 动态的修改旋转角度
+ 
+除此之外还有以下元素用于特定场合：
+- =PauseAnimation= : 暂停动画
+- =SequentialAnimation= : 将多个动画串联
+- =ParallelAnimation= : 将多个动画并联
+- =AnchorAnimation= : 动态修改 anchor 的值
+- =ParentAnimation= : 动态修改父元素的值
+- =SmoothedAnimation= : 平滑的修改一个值
+- =SpringAnimation= : 弹性修改值
+- =PathAnimation= : 根据一个路径来修改
+- =Vector3dAnimation= : 动态修改 QVector3d 的值
+  
+而有些时候，我们还会需要动画期间修改属性值或运行一个脚本，为此 Qt Quick 提供了：
+- =PropertyAction= : 在动画期间立即修改的属性
+- =ScriptAction= : 在动画期间运行脚本 
+** 示例
+当我们想点击一下鼠标将一个对象动态移动时，可以如下：
+#+BEGIN_SRC js
+  import QtQuick 2.12
+
+  //以一张图片作为根 root
+  Image{
+      id: root
+
+      source: "pic/background.png"
+
+      //定义图像间隔，动画执行时间，运行标志
+      property int padding: 40
+      property int duration: 4000
+      property bool running: false
+
+      Image{
+          id: box
+          //图像位于起始 x 处，y 轴位于父图像中间
+          x : root.padding
+          y : (root.height - height) / 2
+          source : "pic/box_green.png"
+
+          //修改图片 x 坐标的动画
+          NumberAnimation on x{
+              //终点位置
+              to: root.width - box.width - root.padding
+              //运行时间
+              duration: root.duration
+              //开始执行动画的标记
+              running: root.running
+          }
+
+          //修改图片的旋转角度
+          RotationAnimation on rotation{
+              //最终要旋转 360°
+              to: 360
+              //运行时间
+              duration: root.duration
+              //开始执行动画的标记
+              running: root.running
+          }
+      }
+
+      //当鼠标点击后，将运行标志位置为真
+      MouseArea{
+          anchors.fill: parent
+          onClicked: root.running = true
+      }
+  }
+
+#+END_SRC
+
+
+
+** 使用动画
+动画的触发方式有以下 3 种：
+1. 当所有的元素被加载后，动画自动启动
+2. 当属性的值被改变后，动画启动
+3. 当显示的使用 =stat()= 或 =running= 被设置为真时
