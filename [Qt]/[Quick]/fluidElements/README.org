@@ -3,7 +3,7 @@
 #+TAGS: Qt
 #+LAYOUT: post 
 #+CATEGORIES: Qt, Quick
-#+NAME: <Qt_quick_qml_fluid_overview.org>
+#+NAMA: <Qt_quick_qml_fluid_overview.org>
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 

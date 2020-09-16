@@ -1,0 +1,253 @@
+#+TITLE: [What]Keysight VISA 快速入门
+#+DATE: <2020-09-15 二> 
+#+TAGS: protocol_rf
+#+LAYOUT: post 
+#+CATEGORIES: RF, protocol, VISA
+#+NAME: <program_with_visa.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+- 学习手册：《VISA User Guide》
+
+VISA(Virtual Instrument Software Architecture)是用于工业仪器的 I/O 控制的标准接口。
+
+对于 HP/Agilent/Keysight 而言，需要安装 [[https://www.keysight.com/main/software.jspx?cc=CN&lc=chi&nid=-33330.977662&id=2175637&pageMode=CV][IO libraries suite]] 以提供对设备操作的完整支持。
+- 对于像 GPIB 卡这种的连接方式，还需要安装其对应的驱动，比如 [[https://www.keysight.com/main/software.jspx?ckey=1188958&lc=chi&cc=CN&nid=-32516.426029&id=1188958][82357B]] 。
+- 不同设备使用的 GPIB 命令会有所不同，这也需要查看对应的产品手册
+
+该软件的 UI 操作比较简单，重点还是放在如何使用 VISA 接口对远程设备进行二次开发。
+
+本篇只列出与设备通信编码的基本必要部分，其它详细部分还是要查阅手册。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 编码前的准备
+** 选择正确的 API 类
+首先要知道，Keysight 提供了 VISA 相关的 API 类别如下：
+- VISA(Keysight Virtual Instrument Software Architecture)
+- VISA.NET(VISA for Microsoft.NET)
+- VISA COM(VISA for the Common Object Model)
+- SICL(Keysight Standard Instrument Control Library)
+
+其中仅有 VISA 和 SICL 类 API 才是同时支持 Windows 和 Linux 的，并且如果不是为了兼容以前的接口，那么建议仅使用 VISA 类 API。
+
+为了能更好的支持 Windows 和 Linux，那么使用 cmake 来构建这个二次开发库是比较好的选择。
+** 明确库的路径
+既然要使用 VISA API，就需要知道其接口库的路径。最简单的办法：
+- 在 Windows 中查看 IO libraries suite 的 About
+- 在 Linux 中默认安装路径是在 =/opt/keysight/iolibs/= 中
+
+[[./pic/lib_path.jpg]]
+
+在明确库的路径后，在实际编码时都需要包含 =visa.h= 头文件：
+#+BEGIN_SRC c
+  #include "visa.h"
+#+END_SRC
+=visa.h= 文件包含了 =visatype.h= 头文件用于定义各种类型。
+** VISA 中的基本概念
+*** resource
+资源（resource）在 VISA 中指代可以与 VISA 进行通信的设备，每个资源都包含以下特征：
+- 可以通过读写来获取或设置该资源的状态和会话
+- 可以事件的方式进行通信
+- 可以对该设备进行一些具体的操作
+*** Attribute
+属性（Attribute）与资源和会话关联，用户可以通过属性来读写资源的状态或会话。
+- 会话（session）就是指主机与设备之间建立的一个通道
+#+BEGIN_SRC c
+  ViBoolean state, newstate;
+
+  newstate=VI_TRUE;
+
+  //获取属性 VI_ATTR_TERMCHAR_EN 的值
+  viGetAttribute(vi, VI_ATTR_TERMCHAR_EN, &state);
+
+  //如果属性值不为真，则将其设置为真
+  if (state err !=VI_TRUE)
+  {
+    viSetAttribute(vi, VI_ATTR_TERMCHAR_EN, newstate);
+  }
+#+END_SRC
+* 使用会话连接设备
+既然会话（Session）是用于建立主机与设备通信的通道，那么在操作设备（资源）前首先就是要打开该会话。
+- 在打开会话前，还要打开会话管理器。这是用于管理所有会话的管理者（会话管理者仅需要打开打开一次）。
+#+BEGIN_SRC c
+  //打开会话管理器
+  viOpenDefaultRM(sesn);
+  /**
+   ,* @brief : 与设备建立一个会话
+   ,* @par : sesn -> 由会话管理器建立的句柄
+   ,* @par : rarcName -> 资源的地址
+   ,* @par : accessMode -> 访问该资源的模式
+   ,* @par : timeout -> 建立会话的超时时间
+   ,* @par : vi -> 新建会话的句柄，用于之后的操作
+   ,*/
+  viOpen(sesn, rsrcName, accessMode, timeout,   vi);
+#+END_SRC
+完整的打开和关闭会话的示例如下：
+#+BEGIN_SRC c
+  ViSession defaultRM, dmm;
+
+  //打开会话管理器
+  viOpenDefaultRM(&defaultRM);
+  //新建一个会话，由 dmm 来存储该会话句柄
+  //VI_NULL 代表使用默认操作模式，也无需设置超时
+  viOpen(defaultRM, "GPIB0::22::INSTR",VI_NULL,   VI_NULL,&dmm);
+
+  //关闭普通会话
+  viClose(dmm);
+  //关闭会话管理器
+  viClose(defaultRM);
+#+END_SRC
+关于设备的名称，其实最简单的方式是在连接上外部设备后，由 io libraries suite 工具查看。
+
+以 GPIB 控制类设备的命名规则是：
+#+BEGIN_EXAMPLE
+  # 比如 GPIB0::19::INSTR 代表与 PC 连接的 GPIB 0 号设备的地址是 19，属于控制类
+  GPIB[board]::primary address[::secondary address][::INSTR]
+#+END_EXAMPLE
+
+除了显示的指定设备名称外，还可以搜寻设备：
+
+#+BEGIN_SRC c
+  /**
+   ,* @brief : 查找设备
+   ,* @par : sesn -> 由会话管理器创建的句柄
+   ,* @par : expr -> 要搜寻设备的种类，对于 GPIB 使用值 GPIB[0-9]*::?*INSTR 即可
+   ,* @par : findList -> 存储查找到的设备列表
+   ,* @par : retcnt -> 返回查找到的设备数量
+   ,* @par : instrDesc -> 存储设备的名称
+   ,*/
+  viFindRsrc(sesn, expr, findList, retcnt,instrDesc);
+  //如果有更多的设备，可以使用该函数继续搜寻
+  viFindNext(findList, instrDesc);
+  //在得到 instrDesc 之后，就可以释放 findList 资源了
+  viClose (findList);
+#+END_SRC
+
+完整的示例如下：
+#+BEGIN_SRC c
+  ViChar buffer [VI_FIND_BUFLEN];
+  ViRsrc matches=buffer;
+  ViUInt32 nmatches;
+  ViFindList list;
+
+
+  viFindRsrc(defaultRM, "?*INSTR", &list, &nmatches, matches);
+  viFindNext(list, matches);
+  viClose(list);
+#+END_SRC
+* 发送 I/O 命令
+VISA 提供两种 I/O 命令：
+- 格式化的 I/O：类似于 printf/scanf 函数
+- 非格式化的 I/O：类似于 write/read 函数
+  
+需要注意的是： *实际编程只能使用其中一种，不能混合使用*
+** 格式化 I/O
+VISA 在格式化 I/O 的底层也具有一个收发缓存，当缓存中有换行符时或缓存满时，都会发送命令到设备。   
+- 可以使用 =viSetBuf()= 函数设置缓存的大小
+- 当对属性 =VI_ATTR_WR_BUF_OPER_MODE= 设置 =VI_FLUSH_ON_ACCESS= 时，缓存也会在每次调用写函数后被冲刷
+- 当对属性 =VI_ATTR_RD_BUF_OPER_MODE= 设置 =VI_FLUSH_ON_ACCESS= 时，缓存也会在每次调用读函数后被冲刷
+- 也可以调用 =viFlush()= 函数主动冲刷
+#+BEGIN_SRC c
+  //viPrintf 以逗号分隔输入的参数
+  viPrintf(vi, writeFmt[, arg1][, arg2][, ...]);
+  //viVPrintf 以参数列表的形式输入参数
+  viVPrintf(vi, writeFmt, params);
+
+  //与 viScanf 同理
+  viScanf(vi, readFmt[, arg1][, arg2][, ...]);
+  viVScanf(vi, readFmt, params);
+
+  //viPrintf 与 viScanf 的结合
+  viQueryf(vi, writeFmt, readFmt[, arg1] [, arg2][, ...]);
+  viVQueryf(vi, writeFmt, readFmt, params);
+#+END_SRC
+
+完整的示例如下：
+#+BEGIN_SRC c
+  /*formatio.c  
+    This example program makes a multimeter measurement with a comma  
+    separated list passed with formatted I/O and prints the results.   
+    Note that you must change the device address. */ 
+ 
+  #include <visa.h>
+  #include <stdio.h> 
+
+  void main () 
+  {   
+    ViSession defaultRM, vi;  
+    double res;  
+    double list [2] = {1,0.001};   
+	
+    /* Open session to GPIB device at address 22 */  
+    viOpenDefaultRM (&defaultRM);  
+    viOpen (defaultRM, "GPIB0::22::INSTR", VI_NULL,VI_NULL, &vi);   
+	
+    /* Initialize device */  
+    viPrintf (vi, "*RST\n");   
+	
+    /* Set up device and send comma separated list */  
+    viPrintf (vi, "CALC:DBM:REF 50\n");  
+    viPrintf (vi, "MEAS:VOLT:AC? %,2f\n", list);   
+	
+    /* Read results */  
+    viScanf (vi, "%lf", &res);   
+	
+    /* Print results */  
+    printf ("Mesurement Results: %lf\n", res);   
+	
+    /* Close session */  
+    viClose (vi);  
+    viClose (defaultRM);
+  }
+#+END_SRC
+** 非格式化 I/O
+VISA 提供了 =viRead= 和 =viWrite= 函数以实现底层的读写操作。
+#+BEGIN_SRC c
+  //同步的读写
+  viRead(vi, buf, count, retCount);
+  viWrite(vi, buf, count, retCount);
+
+  //异步的读写
+  viReadAsync(vi, buf, count, retCount);
+  viWriteASync(vi, buf, count, retCount);
+#+END_SRC
+完整示例如下：
+#+BEGIN_SRC c
+  /*nonfmtio.c  
+    This example program measures the AC voltage on a multimeter and  prints the results. 
+    Note that you must change the device address. */ 
+  
+  #include <visa.h>
+  #include <stdio.h> 
+
+  void main () 
+  {   
+    ViSession defaultRM, vi;  
+    char strres [20];  
+    unsigned int actual;   
+	
+    /* Open session to GPIB device at address 22 */  
+    viOpenDefaultRM (&defaultRM);  
+    viOpen (defaultRM, "GPIB0::22::INSTR", VI_NULL,VI_NULL, &vi);   
+	
+    /* Initialize device */  
+    viWrite (vi, (ViBuf)"*RST\n", 5, &actual);   
+	
+    /* Set up device and take measurement */  
+    viWrite (vi, (ViBuf)"CALC:DBM:REF 50\n", 16, &actual);  
+    viWrite (vi, (ViBuf)"MEAS:VOLT:AC? 1, 0.001\n", 23, &actual);   
+	
+    /* Read results */  
+    viRead (vi, (ViBuf)strres, 20, &actual);    
+	
+    /* NULL terminate the string */  
+    strres [actual]=0;    
+    /* Print results */  
+    printf ("Mesurement Results: %s\n", strres);   
+	
+    /* Close session */  
+    viClose (vi);  
+    viClose (defaultRM);
+  }
+#+END_SRC

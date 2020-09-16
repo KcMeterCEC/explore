@@ -1,0 +1,69 @@
+#+TITLE: [What] c++ 动态内存与智能指针
+#+DATE:<2020-08-27 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_smart_pointer.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+
+整理智能指针的用法。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 动态内存与智能指针
+c11 提供了几种智能指针（smart pointer）负责自动释放所指向的对象：
+- =shared_ptr= : 允许多个指针指向同一个对象
+- =unique_ptr= : 仅允许一个指针指向对象
+- =weak_ptr= : 指向 =shared_ptr= 所管理的对象，它是一种弱引用
+  
+这些类都定义在 =memory= 头文件中
+** shared_ptr
+=shared_ptr= 和 =unique_ptr= 都支持操作如下表：
+| 操作             | 说明                                            |
+|------------------+-------------------------------------------------|
+| shared_ptr<T> sp | 创建一个指向 T 类型的指针 sp，sp 默认指向空指针 |
+| unique_ptr<T> up | 创建一个指向 T 类型的指针 up，up 默认指向空指针 |
+| p                | 若 p 指向一个对象，则为 true                    |
+| *p               | 解引用 p，以获取它指向的对象                    |
+| p->mem           | 得到 p 的 mem 成员                              |
+| p.get()          | 返回 p 中保存的指针                             |
+| swap(p, q)       | 交换 p 和 q 中的指针                            |
+| p.swap(q)        | 交换 p 和 q 中的指针                            |
+
+=shared_ptr= 独有的操作如下表：
+| 操作                  | 说明                                                         |
+|-----------------------+--------------------------------------------------------------|
+| make_shared<T> (args) | 返回一个指向 T 类型的 shared_ptr，并使用 args 来初始化该对象 |
+| shared_ptr<T> p(q)    | 使用 q 来初始化 p，也就是说 p 和 q 指向了同一个对象          |
+| p = q                 | p 指向 q 指向的对象，p 原来指向对象的引用计数会递减          |
+| p.unique()            | 当仅有一个指针指向对象时，返回 true                          |
+| p.use_count()         | 返回有几个指针指向对象                                       |
+*** 默认指向空指针
+与创建普通指针不一样， =shared_ptr= 默认创建的时候指向空，也就是说该变量的值为 0，但变量本身还是要占内存的。
+- 默认指向空就避免了使用未初始化的野指针而导致内存被践踏。
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <memory>
+  #include <string>
+
+  using std::cin;
+  using std::cout;
+  using std::endl;
+  using std::string;
+  using std::shared_ptr;
+
+  int main(void)
+  {
+    shared_ptr<string> p;
+
+    cout << "The value of p is " << p << endl;
+    cout << "The address of p is " << &p << endl;
+
+    return 0;
+  }
+#+END_SRC
+*** make_shared 函数

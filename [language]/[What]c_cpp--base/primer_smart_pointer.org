@@ -1,0 +1,103 @@
+#+TITLE: [What] c++ 动态内存与智能指针
+#+DATE:<2020-08-27 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, primer
+#+NAMA: <language_cpp_smart_pointer.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习书籍：<<c++ primer 5th>>
+
+
+整理智能指针的用法。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 动态内存与智能指针
+c11 提供了几种智能指针（smart pointer）负责自动释放所指向的对象：
+- =shared_ptr= : 允许多个指针指向同一个对象
+- =unique_ptr= : 仅允许一个指针指向对象
+- =weak_ptr= : 指向 =shared_ptr= 所管理的对象，它是一种弱引用
+  
+这些类都定义在 =memory= 头文件中
+** shared_ptr
+=shared_ptr= 和 =unique_ptr= 都支持操作如下表：
+| 操作             | 说明                                            |
+|------------------+-------------------------------------------------|
+| shared_ptr<T> sp | 创建一个指向 T 类型的指针 sp，sp 默认指向空指针 |
+| unique_ptr<T> up | 创建一个指向 T 类型的指针 up，up 默认指向空指针 |
+| p                | 若 p 指向一个对象，则为 true                    |
+| *p               | 解引用 p，以获取它指向的对象                    |
+| p->mem           | 得到 p 的 mem 成员                              |
+| p.get()          | 返回 p 中保存的指针                             |
+| swap(p, q)       | 交换 p 和 q 中的指针                            |
+| p.swap(q)        | 交换 p 和 q 中的指针                            |
+
+=shared_ptr= 独有的操作如下表：
+| 操作                  | 说明                                                         |
+|-----------------------+--------------------------------------------------------------|
+| make_shared<T> (args) | 返回一个指向 T 类型的 shared_ptr，并使用 args 来初始化该对象 |
+| shared_ptr<T> p(q)    | 使用 q 来初始化 p，也就是说 p 和 q 指向了同一个对象          |
+| p = q                 | p 指向 q 指向的对象，p 原来指向对象的引用计数会递减          |
+| p.unique()            | 当仅有一个指针指向对象时，返回 true                          |
+| p.use_count()         | 返回有几个指针指向对象                                       |
+*** 默认指向空指针
+与创建普通指针不一样， =shared_ptr= 默认创建的时候指向空，也就是说该变量的值为 0，但变量本身还是要占内存的。
+- 默认指向空就避免了使用未初始化的野指针而导致内存被践踏。
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <memory>
+  #include <string>
+
+  using std::cin;
+  using std::cout;
+  using std::endl;
+  using std::string;
+  using std::shared_ptr;
+
+  int main(void)
+  {
+    shared_ptr<string> p;
+
+    cout << "The value of p is " << p << endl;
+    cout << "The address of p is " << &p << endl;
+
+    return 0;
+  }
+#+END_SRC
+*** make_shared 函数
+=make_shared= 函数在动态内存中分配一个对象并会将其初始化，然后返回指向此对象的 =shared_ptr= 。
+所以在使用 =make_shared= 时，就需要为其指定类型和对应的初始值。
+- 一般来讲创建一个 =shared_ptr= 都建议使用此函数
+#+BEGIN_SRC c
+  #include <iostream>
+  #include <memory>
+ 
+  using std::cout;
+  using std::endl;
+  using std::make_shared;
+ 
+  int main(void)
+  {
+    //使用 auto 更加简便
+    auto p = make_shared<int>(42);
+ 
+    cout << "The value of p is " << p << endl;
+    cout << "The value of *p is " << *p << endl;
+ 
+    return 0;
+  }
+
+#+END_SRC
+*** 拷贝与赋值
+=shared_ptr= 都有一个与它指向内存关联的计数器，称为 *引用计数（reference count）* 。
+- 当一个 =shared_ptr= 被拷贝，它的计数值就会递增
+  + 将一个 =shared_ptr= 赋值给另一个 =shared_ptr=
+  + 将一个 =shared_ptr= 作为参数传递给函数
+  + 将一个 =shared_ptr= 作为函数的返回值（如果函数返回值并没有赋值给 =shared_ptr= 那么会在函数返回后计数值又会递减）
+- 当给 =shared_ptr= 赋予一个新值或是被销毁，计数器就会递减
+  + 当计数器的值递减为 0 时，它就会释放自己所管理对象的内存（这是通过调用对象类型的析构函数来完成的）
+    
+*需要注意的是：* 如果将 =shared_ptr= 存放于一个容器中，而后不再需要全部元素，而只使用其中一部分，要记得使用 =erase= 删除不再需要的那些元素
+- 否则这些元素的内存是不会被自动释放的
