@@ -1,0 +1,69 @@
+#+TITLE: [What] 模板方法
+#+DATE:<2020-10-10 六> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <template_method.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML 
+* 问题
+在软件开发过程中，一般是会先开发软件的整体框架。这个框架是由最开始的需求所决定的，一般来讲框架具有稳定的操作结构。
+- 如果到了软件开发后期仍然在改软件框架，说明最开始的需求分析和解决方案的制定步骤出了大问题
+  
+但与框架所交互的组件确实会有很多改变的需求，那么就需要一些方法来应对保证架构稳定的前期下，满足组件的灵活变化。
+* 解决思路
+#+BEGIN_EXAMPLE
+  定义一个操作中的算法的骨架（稳定），将一些步骤延迟（变化）到子类中。
+  Template Method 使得子类可以不改变（复用）一个算法的结构即可重定义（override 重定义）该算法的某些特定步骤。
+#+END_EXAMPLE
+
+以 c++ 的角度来理解就是：
+1. 框架完成了方法的调用流程，这个流程是相对稳定的。
+2. 流程中调用了部分虚函数，这些虚函数是易变化的。
+3. 子类来重定义这些虚函数，以达到不同功能。
+   
+按照 UML 类图的简易逻辑如下：
+[[./templateMethod.jpg]]
+* 示例
+** 应用调用框架
+** 延迟绑定
