@@ -66,4 +66,178 @@
 [[./templateMethod.jpg]]
 * 示例
 ** 应用调用框架
+按照面向过程的思想，是由应用来调用框架的方法：
+#+BEGIN_SRC cpp
+  //Framework.h
+  #ifndef __FRAMEWORK_H__
+  #define __FRAMEWORK_H__
+
+  class Framework
+  {
+  public:
+    void step1(void);
+    void step3(void);
+    void step4(void);
+  };
+  #endif
+  //Framework.cpp
+  #include <iostream>
+
+  #include "Framework.h"
+
+  void Framework::step1(void)
+  {
+    std::cout << "func step1" << std::endl;
+  }
+  void Framework::step3(void)
+  {
+    std::cout << "func step3" << std::endl;
+  }
+  void Framework::step4(void)
+  {
+    std::cout << "func step4" << std::endl;
+  }
+  //Application.h
+  #ifndef __APPLICATION_H__
+  #define __APPLICATION_H__
+  class Application
+  {
+  public:
+    bool step2(void);
+  };
+  #endif
+  //Application.cpp
+  #include <iostream>
+
+  #include "Application.h"
+
+  bool Application::step2(void)
+  {
+    std::cout << "func step2" << std::endl;
+
+    return true;
+  }
+  //main.cpp
+  #include "Framework.h"
+  #include "Application.h"
+
+  int main(void)
+  {
+    Framework frame;
+    Application app;
+
+    frame.step1();
+
+    if(app.step2())
+      {
+        frame.step3();
+      }
+
+    frame.step4();
+  }
+#+END_SRC
+
+这种方式将稳定的框架执行流程和易变的用户代码混杂在一起，不利于后期维护。
 ** 延迟绑定
+应用仅需要填充易变的部分，稳定的框架执行流程应该对用户不可见：
+
+#+BEGIN_SRC cpp
+  //Framework.h
+  #ifndef __FRAMEWORK_H__
+  #define __FRAMEWORK_H__
+
+  class Framework
+  {
+  public:
+    void templateMethod(void);
+  protected:
+    virtual bool step2(void);
+    virtual void step4(void);
+  private:
+    void step1(void);
+    void step3(void);
+  };
+  #endif
+  //Framework.cpp
+  #include <iostream>
+
+  #include "Framework.h"
+
+  void Framework::templateMethod(void)
+  {
+    step1();
+
+    if(step2())
+      {
+        step3();
+      }
+
+    step4();
+  }
+
+  void Framework::step1(void)
+  {
+    std::cout << "func step1" << std::endl;
+  }
+  void Framework::step3(void)
+  {
+    std::cout << "func step3" << std::endl;
+  }
+
+  bool Framework::step2(void)
+  {
+    std::cout << "framework func step2" << std::endl;
+
+    return false;
+  }
+  void Framework::step4(void)
+  {
+    std::cout << "framework func step4" << std::endl;
+  }
+
+  //Application.h
+  #ifndef __APPLICATION_H__
+  #define __APPLICATION_H__
+
+  #include "Framework.h"
+
+  class Application : public Framework
+  {
+  protected:
+    bool step2(void) override;
+    void step4(void) override;
+  };
+  #endif
+
+  //Application.cpp
+  #include <iostream>
+
+  #include "Application.h"
+
+  bool Application::step2(void)
+  {
+    std::cout << "app func step2" << std::endl;
+
+    return true;
+  }
+
+  void Application::step4(void)
+  {
+    std::cout << "app func step4" << std::endl;
+  }
+
+  //main.cpp
+  #include "Framework.h"
+  #include "Application.h"
+
+  int main(void)
+  {
+    Framework *frame = new Application();
+
+    frame->templateMethod();
+
+    delete frame;
+  }
+#+END_SRC
+
+很明显，上面这种方式既易于维护，也很优雅。
