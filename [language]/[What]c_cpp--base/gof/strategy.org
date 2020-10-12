@@ -1,0 +1,78 @@
+#+TITLE: [What] 策略模式
+#+DATE:<2020-10-12 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <strategy.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+在软件构建过程中，某些对象使用的算法可能多种多样，经常改变，如果将这些算法都编码到对象中，将会使对象变得异常复杂。
+而且有时候支持不使用的算法也是一个性能负担。
+
+如何在运行时根据需要透明的更改对象的算法？将算法与对象本身解耦，从而避免上述问题？
+* 解决
+#+BEGIN_EXAMPLE
+  定义一系列算法，把它们一个个封装起来，并且使它们可互相替换（变化）。
+  该模式使得算法可独立于使用它的客户程序（稳定）而变化（扩展，子类化）。
+#+END_EXAMPLE
+
+以 c++ 的角度来理解就是：
+1. 为各种算法定义一个通用算法类，该类具有 =protected= 访问权限的虚函数
+2. 各个具体的算法继承自通用算法类，并重写通用算法类的虚函数
+3. 框架类以委托（指针）的形式包含该通用算法类
+4. 框架类具有运行该通用算法的方法，可以根据方法参数来生产不同的算法并运行
+
+按照 UML 类图的简易逻辑如下：
+
+[[./pic/strategy.jpg]]
+* 示例
+* 特别注意
+策略模式之所以叫策略，就是指实现一个解决方案会有多种不同的算法，这是站在比 =模板方法= 更高的一个层面上来讲。
+- Strategy 及其子类为组件提供了一系列可重用的方法，从而可以使得类型在运行时方便地根据需要在各个算法之间进行切换
+- Strategy 模式提供了用条件判断语句以外的另一种选择，消除条件判断语句，就是在解耦合。
+  + *含有许多条件判断语句的代码通常都需要 Strategy 模式*
+- 如果 Stragegy 对象没有实例变量，那么各个上下文可以共享一个 Strategy 对象，从而节省对象开销
+
+一般在实际工程中，会需要在上层使用 =策略模式= 来复用不同算法，而对应具体的算法微调，再对该算法使用 =模板方法= 。
+

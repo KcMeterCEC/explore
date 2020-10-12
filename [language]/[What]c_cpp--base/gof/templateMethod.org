@@ -63,7 +63,8 @@
 3. 子类来重定义这些虚函数，以达到不同功能。
    
 按照 UML 类图的简易逻辑如下：
-[[./templateMethod.jpg]]
+
+[[./pic/templateMethod.jpg]]
 * 示例
 ** 应用调用框架
 按照面向过程的思想，是由应用来调用框架的方法：
@@ -149,6 +150,7 @@
   class Framework
   {
   public:
+    virtual ~Framework();
     void templateMethod(void);
   protected:
     virtual bool step2(void);
@@ -162,6 +164,11 @@
   #include <iostream>
 
   #include "Framework.h"
+
+  Framework::~Framework()
+  {
+
+  }
 
   void Framework::templateMethod(void)
   {
@@ -241,3 +248,8 @@
 #+END_SRC
 
 很明显，上面这种方式既易于维护，也很优雅。
+
+* 特别注意
+模板方法是为了提高 *一个算法* 的复用性，也就是说该算法的具体步骤是确定的，仅仅是会改变一个算法中的几个小点。
+
+如果站在更高的层面上来讲，解决一个问题需要多个不同的算法，那就应该使用 *策略模式* 。
