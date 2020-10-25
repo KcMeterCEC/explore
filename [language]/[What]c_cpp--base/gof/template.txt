@@ -1,0 +1,62 @@
+#+TITLE: [What] 观察者模式
+#+DATE:<2020-10-12 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <observer.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+
+* 解决
+#+BEGIN_EXAMPLE
+
+#+END_EXAMPLE
+
+以 c++ 的角度来理解就是：
+
+按照 UML 类图的简易逻辑如下：
+
+* 示例
+* 特别注意
+
