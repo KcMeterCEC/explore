@@ -71,4 +71,149 @@
 [[./pic/observer.jpg]]
 
 * 示例
+#+BEGIN_SRC cpp
+  //file: observer.h
+  #ifndef OBSERVER_H
+  #define OBSERVER_H
+
+
+  class Observer
+  {
+  public:
+    virtual ~Observer();
+
+    virtual void update(int i);
+  };
+
+  #endif // OBSERVER_H
+  //file: observer.cpp
+  #include "observer.h"
+
+  #include <iostream>
+  Observer::~Observer()
+  {
+
+  }
+
+  void Observer::update(int i)
+  {
+    std::cout << "observer received value: " << i << std::endl;
+  }
+  //file: concreteobservera.h
+  #ifndef CONCRETEOBSERVERA_H
+  #define CONCRETEOBSERVERA_H
+
+  #include "observer.h"
+
+  class ConcreteObserverA : public Observer
+  {
+  public:
+    ConcreteObserverA();
+
+    void update(int i) override;
+  };
+
+  #endif // CONCRETEOBSERVERA_H
+  //file: concreteobservera.cpp
+  #include "concreteobservera.h"
+
+  #include <iostream>
+  ConcreteObserverA::ConcreteObserverA()
+  {
+
+  }
+  void ConcreteObserverA::update(int i)
+  {
+    std::cout << "ConcreteObserverA received value " << i << std::endl;
+  }
+  //file: concreteobserverb.h
+  #ifndef CONCRETEOBSERVERB_H
+  #define CONCRETEOBSERVERB_H
+
+  #include "observer.h"
+
+  class ConcreteObserverB : public Observer
+  {
+  public:
+    ConcreteObserverB();
+
+    void update(int i) override;
+  };
+
+  #endif // CONCRETEOBSERVERB_H
+  //file: concreteobserverb.cpp
+  #include "concreteobserverb.h"
+
+  #include <iostream>
+  ConcreteObserverB::ConcreteObserverB()
+  {
+
+  }
+  void ConcreteObserverB::update(int i)
+  {
+    std::cout << "ConcreteObserverB received value " << i << std::endl;
+  }
+  //file subject.h
+  #ifndef SUBJECT_H
+  #define SUBJECT_H
+
+  #include "observer.h"
+
+  #include <list>
+  class Subject
+  {
+  public:
+    Subject();
+    void attach(Observer *observer);
+    void detach(Observer *observer);
+    void notify(void);
+  private:
+    std::list<Observer *> observer_list_;
+  };
+  //file subject.cpp
+  #include "subject.h"
+
+  Subject::Subject()
+  {
+
+  }
+  void Subject::attach(Observer *observer)
+  {
+    observer_list_.push_back(observer);
+  }
+  void Subject::detach(Observer *observer)
+  {
+    observer_list_.remove(observer);
+  }
+  void Subject::notify(void)
+  {
+    for(auto v : observer_list_)
+      {
+        v->update(5);
+      }
+  }
+  //file main.cpp
+  #include "subject.h"
+  #include "concreteobservera.h"
+  #include "concreteobserverb.h"
+
+  #include <iostream>
+
+  using namespace std;
+
+  int main()
+  {
+    Subject sub;
+    ConcreteObserverA observer_a;
+    ConcreteObserverB observer_b;
+
+    sub.attach(&observer_a);
+    sub.notify();
+
+    sub.attach(&observer_b);
+    sub.notify();
+
+    return 0;
+  }
+#+END_SRC
 

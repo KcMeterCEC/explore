@@ -1,0 +1,34 @@
+#+TITLE: [What]API 简介
+#+DATE: <2020-10-29 四> 
+#+TAGS: CS
+#+LAYOUT: post
+#+CATEGORIES: book,c++API设计
+#+NAME: <book_cppapi_chapter1.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+对 API 有个系统性的认识。
+
+#+BEGIN_EXPORT html
+<!--more-->
+#+END_EXPORT
+#+BEGIN_EXAMPLE
+  API(Application Programming Interface)提供了对某个问题的抽象，以及客户与解决该问题的软件组件之间进行交互的方式。
+#+END_EXAMPLE
+
+标准的 C++ API 通常回包含如下元素：
+- 头文件： =.h= 文件描述接口供用户使用
+- 类库： 一个或多个静态或动态库，提供了 API 的具体实现。
+- 文档： 描述如何使用该 API，很多文档是自动生成的。
+  
+设计一个良好的 API 并不容易，需要考虑到向后兼容、文档、回归测试等等方面。
+
+为了多个组织的并行工作，各个组织在确定依赖关系后，便可以确定 API，这样便不会相互等待。
+
+在以下情况下，便要慎用第三方 API：
+- 许可证：比如商业代码就不能使用带 GPL 协议的第三方包
+- 功能不匹配
+- 缺少源代码：不能访问 API 的源代码就丧失了通过修改源代码修复错误的能力
+- 缺乏文档：由缺乏文档而研究 API 的成本可能会很高
+
+

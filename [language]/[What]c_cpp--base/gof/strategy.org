@@ -58,7 +58,7 @@
 #+END_EXAMPLE
 
 以 c++ 的角度来理解就是：
-1. 为各种算法定义一个通用算法类，该类具有 =protected= 访问权限的虚函数
+1. 为各种算法定义一个通用算法类，该类具有 =public= 访问权限的虚函数
 2. 各个具体的算法继承自通用算法类，并重写通用算法类的虚函数
 3. 框架类以委托（指针）的形式包含该通用算法类
 4. 框架类具有运行该通用算法的方法，可以根据方法参数来生产不同的算法并运行
@@ -66,7 +66,151 @@
 按照 UML 类图的简易逻辑如下：
 
 [[./pic/strategy.jpg]]
+
 * 示例
+#+BEGIN_SRC cpp
+  //algoa.h
+  #ifndef ALGOA_H
+  #define ALGOA_H
+
+  #include "strategy.h"
+
+  class Algoa : public Strategy
+  {
+  public:
+    ~Algoa();
+    void algo() override;
+  };
+
+  #endif // ALGOA_H
+  //algoa.cpp
+  #include "algoa.h"
+
+  #include <iostream>
+  Algoa::~Algoa()
+  {
+    std::cout << "Algoa destructure" << std::endl;
+  }
+
+  void Algoa::algo(void)
+  {
+    std::cout << "Algoa algo" << std::endl;
+  }
+  //algob.h
+  #ifndef ALGOB_H
+  #define ALGOB_H
+
+  #include "strategy.h"
+
+  class Algob : public Strategy
+  {
+  public:
+    ~Algob();
+    void algo() override;
+  };
+
+  #endif // ALGOB_H
+  //algob.cpp
+  #include "algob.h"
+
+  #include <iostream>
+  Algob::~Algob()
+  {
+    std::cout << "Algob destructure" << std::endl;
+  }
+
+  void Algob::algo(void)
+  {
+    std::cout << "Algob algo" << std::endl;
+  }
+  //strategy.h
+  #ifndef STRATEGY_H
+  #define STRATEGY_H
+
+
+  class Strategy
+  {
+  public:
+    virtual ~Strategy();
+    virtual void algo(void);
+  };
+
+  #endif // STRATEGY_H
+  //strategy.cpp
+  #include "strategy.h"
+
+  #include <iostream>
+
+  Strategy::~Strategy()
+  {
+    std::cout << "stragegy destructure" << std::endl;
+  }
+
+  void Strategy::algo(void)
+  {
+    std::cout << "stragegy algo" << std::endl;
+  }
+  //contex.h
+  #ifndef CONTEX_H
+  #define CONTEX_H
+
+  #include "strategy.h"
+
+  class Contex
+  {
+  public:
+    Contex(Strategy *strategy);
+    void run(void);
+    void set_strategy(Strategy *strategy);
+  private:
+    Strategy    *strategy_ = nullptr;
+  };
+
+  #endif // CONTEX_H
+  //contex.cpp
+  #include "contex.h"
+
+  Contex::Contex(Strategy *strategy):
+    strategy_(strategy)
+  {
+
+  }
+  void Contex::run(void)
+  {
+    if(strategy_)
+      {
+        strategy_->algo();
+      }
+  }
+  void Contex::set_strategy(Strategy *strategy)
+  {
+    strategy_ = strategy;
+  }
+  //main.cpp
+  #include <iostream>
+
+  #include "algoa.h"
+  #include "algob.h"
+  #include "contex.h"
+
+  using namespace std;
+
+  int main()
+  {
+    Algoa algoa;
+    Algob algob;
+
+    Contex contex(&algoa);
+
+    contex.run();
+
+    contex.set_strategy(&algob);
+
+    contex.run();
+
+    return 0;
+  }
+#+END_SRC
 * 特别注意
 策略模式之所以叫策略，就是指实现一个解决方案会有多种不同的算法，这是站在比 =模板方法= 更高的一个层面上来讲。
 - Strategy 及其子类为组件提供了一系列可重用的方法，从而可以使得类型在运行时方便地根据需要在各个算法之间进行切换
