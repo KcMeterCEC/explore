@@ -1,0 +1,289 @@
+#+TITLE: [What] 装饰模式
+#+DATE:<2020-10-29 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <decorator.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：《c++ 设计模式》
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责：明确组件的责任
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+在某些情况下，我们可能会 *过度地使用继承来扩展对象的功能* ，由于继承为类型引入的静态特质，使得这种扩展方式缺乏灵活性。
+并且随着子类的增多（扩展功能的增多），各种子类的组合（扩展功能的组合）会导致更多子类的膨胀。
+
+如何使 *对象功能的扩展* 能够根据需要来动态地实现？同时避免 *扩展功能的增多* 带来的子类膨胀问题？
+从而使得任何 *功能扩展变化* 所导致的影响降为最低？
+* 解决
+#+BEGIN_EXAMPLE
+  动态（组合）地给一个对象增加一些额外的职责。
+  就增加功能而言，Decorator 模式比生成子类（继承）更为灵活（消除重复代码 & 减少子类个数）。
+#+END_EXAMPLE
+
+通过采用组合而非继承的手法，Decorator 模式实现了在运行时动态扩展对象功能的能力，
+而且可以根据需要扩展多个功能。避免了使用继承带来的“灵活性差”和“多子类衍生问题”。
+
+Decorator 类在接口上表现为 is-a Component 的继承关系，即 Decorator 类继承了 Component 类所具有的接口。
+但在实现上又表现为 has-a Component 的组合关系，即 Decorator 类又使用了另外一个 Component 类。
+
+Decorator 模式的目的并非解决“多子类衍生的多继承问题”，Decorator 模式应用的要点在于解决“主体类在多个方向上的扩展功能”—— 是为“装饰”的含义。
+
+这里主要就是要区分组合/委托与继承的关系：
+- 一般在子类要对父类的方法进行重新实现时，使用继承比较合适。
+  + 这常常伴有虚函数
+- 在一个类对另一个类的方法进行扩展或限制时，使用复合或委托比较合适
+  + 扩展就是在一个类基础之上增加其处理步骤或功能
+  + 限制就是一个类只暴露另一个类的一小部分接口提供给用户使用
+
+以 c++ 的角度来理解就是，对于有多个类都继承自一个类，并且仅仅是对其进行扩展时：
+- 基类提供虚函数，抽象子类的通用操作
+- 子类继承基类完成属于自己的操作
+- 扩展操作单独定义各自的类，这些类可以通过复合的方式间接的操作前面的子类
+- 基类复合可以定义一个 =Decorator= 来包含它，扩展类通过继承 =Decorator= 来达到更加优雅的目的
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/decorator.jpg]]
+
+* 示例
+=Stream= 类，相当于 =Component= ，抽象操作。
+#+BEGIN_SRC cpp
+  //Stream.h
+  #ifndef STREAM_H
+  #define STREAM_H
+
+
+  class Stream
+  {
+  public:
+    Stream();
+    virtual ~Stream();
+
+    virtual char Read(int number);
+    virtual void Write(char val);
+  };
+
+  #endif // STREAM_H
+  //Stream.cpp
+  #include "stream.h"
+
+  Stream::Stream()
+  {
+
+  }
+  Stream::~Stream()
+  {
+
+  }
+  char Stream::Read(int number)
+  {
+
+  }
+  void Stream::Write(char val)
+  {
+
+  }
+#+END_SRC
+=FileStream,MemStream= 类是 =Stream= 类的重新实现。
+#+BEGIN_SRC cpp
+  //filestream.h
+  #ifndef FILESTREAM_H
+  #define FILESTREAM_H
+
+  #include "stream.h"
+
+  class FileStream : public Stream
+  {
+  public:
+    FileStream();
+
+    char Read(int number) override;
+    void Write(char val) override;
+  };
+
+  #endif // FILESTREAM_H
+  //filestream.cpp
+  #include "filestream.h"
+
+  #include <iostream>
+
+  FileStream::FileStream()
+  {
+
+  }
+  char FileStream::Read(int number)
+  {
+    std::cout << "FileStream "<< __func__ << std::endl;
+
+    return 0;
+  }
+  void FileStream::Write(char val)
+  {
+    std::cout << "FileStream "<< __func__ << std::endl;
+  }
+  //memstream.h
+  #ifndef MEMSTREAM_H
+  #define MEMSTREAM_H
+
+  #include "stream.h"
+
+  class MemStream : public Stream
+  {
+  public:
+    MemStream();
+
+    char Read(int number) override;
+    void Write(char val) override;
+  };
+
+  #endif // MEMSTREAM_H
+  //memstream.cpp
+  #include "memstream.h"
+
+  #include <iostream>
+  MemStream::MemStream()
+  {
+
+  }
+  char MemStream::Read(int number)
+  {
+    std::cout << "MemStream " << __func__ << std::endl;
+
+    return 0;
+  }
+  void MemStream::Write(char val)
+  {
+    std::cout << "MemStream " << __func__ << std::endl;
+  }
+#+END_SRC
+=DecoratorStream= 类用于将成员变量整合，便于代码更加优雅：
+#+BEGIN_SRC cpp
+  //decoratorstream.h
+  #ifndef DECORATORSTREAM_H
+  #define DECORATORSTREAM_H
+
+  #include "stream.h"
+
+  class DecoratorStream : public Stream
+  {
+  public:
+    DecoratorStream(Stream *stream);
+  protected:
+    Stream *stream_;
+  };
+  //decoratorstream.cpp
+  #include "decoratorstream.h"
+
+  DecoratorStream::DecoratorStream(Stream *stream) : stream_(stream)
+  {
+
+  }
+#+END_SRC 
+=DecoratorEncryptor= 类则是对 =Stream= 类的扩展操作：
+#+BEGIN_SRC cpp
+  //decoratorencryptor.h
+  #ifndef DECORATORENCRYPTOR_H
+  #define DECORATORENCRYPTOR_H
+
+  #include "decoratorstream.h"
+
+  class DecoratorEncryptor : public DecoratorStream
+  {
+  public:
+    DecoratorEncryptor(Stream *stream);
+
+    char Read(int number) override;
+    void Write(char val) override;
+
+  };
+
+  #endif // DECORATORENCRYPTOR_H
+  //decoratorencryptor.cpp
+  #include "decoratorencryptor.h"
+
+  #include <iostream>
+  DecoratorEncryptor::DecoratorEncryptor(Stream *stream) :
+    DecoratorStream(stream)
+  {
+
+  }
+  char DecoratorEncryptor::Read(int number)
+  {
+    std::cout << "DecoratorEncryptor " << __func__ << std::endl;
+
+    stream_->Read(number);
+
+    return 0;
+  }
+  void DecoratorEncryptor::Write(char val)
+  {
+    std::cout << "DecoratorEncryptor " << __func__ << std::endl;
+
+    stream_->Write(val);
+  }
+#+END_SRC
+main.cpp 可以看到 =DecoratorEncryptor= 对 =FileStream= 和 =MemStream= 的扩展操作，相互组合，提高了代码的灵活性：
+#+BEGIN_SRC cpp
+  //main.cpp
+  #include <iostream>
+
+  using namespace std;
+
+  #include "decoratorencryptor.h"
+  #include "filestream.h"
+  #include "memstream.h"
+
+  int main()
+  {
+    FileStream file_stream;
+    DecoratorEncryptor decorator_encrytor(&file_stream);
+
+    decorator_encrytor.Read(1);
+    decorator_encrytor.Write(2);
+
+    MemStream mem_stream;
+    DecoratorEncryptor decorator_encrytor2(&mem_stream);
+    decorator_encrytor2.Read(1);
+    decorator_encrytor2.Write(2);
+
+    return 0;
+  }
+#+END_SRC
+
