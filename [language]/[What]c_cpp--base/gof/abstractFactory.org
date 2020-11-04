@@ -1,0 +1,83 @@
+#+TITLE: [What] 抽象工厂
+#+DATE:<2020-11-04 三> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <abstractFactory.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建：避免 new 对象过程中所导致的紧耦合，从而支持对象创建的稳定
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中，经常面临着“一系列相互依赖的对象”的创建工作。同时由于需求的变化，往往存在更多系列对象的创建工作。
+
+  如何应对这种变化？如何绕过常规的对象创建方法（new），提供一种“封装机制”来避免客户程序和这种“多系列具体对象创建工作”的紧耦合？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  提供一个接口，让该接口负责创建一系列“相关或者相互依赖的对象”，无需指定它们具体的类。
+#+END_EXAMPLE
+
+以 c++ 的角度来理解就是：
+- 在前面工厂方法的基础上，工厂类将几个有关联性的工厂类合并成一个类
+  + 也就是说这个工厂有多个方法来创建多个有关联性的对象
+
+如此这般，那使用者原来需要包含多个工厂类的情况下，紧需要包含一个工程类囊括了创建多个关联对象的方法。
+这种改变就是优雅的。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/abstractFactory.jpg]]
+
+如上图所示：
+- 有两个不同的接口类  =AbstractProductA,AbstractProductB= ，同时它们有各自两个子类，两个子类各自的实现各有不同。
+- 但是抽象接口类 =AbstractProductA,AbstractProductB= 是有关联的，它们通常在一起使用
+- 所以抽象工厂就将创建两种接口的方法合并在了一起
+- 接下来便是抽象工厂的子类分别实现对 ProductA1/B1,ProductA2/B2 的打包创建方式
+
+如此一来，工厂类就是高内聚且优雅的。
+* 注意
+如果没有应对 *多系列对象创建* 的需求变化，则没有必要使用 Abstract Factory 模式，这时候使用简单的工厂完全可以。
+
+*系列对象* 指的是在某一特定系列下的对象之间有相互依赖、或作用的关系。不同系列的对象之间不能相互依赖。
+
+Abstract Factory 模式主要在于应对 *新系列* 的需求变动。其缺点在于难以应对 *新对象* 的需求变动。
+- 如果要增加一个新对象，那么继承工厂的子类都需要对应的做修改。
