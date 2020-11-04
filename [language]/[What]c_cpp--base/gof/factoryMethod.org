@@ -1,0 +1,260 @@
+#+TITLE: [What] 工厂方法
+#+DATE:<2020-11-03 二> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <factoryMethod.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建：避免 new 对象过程中所导致的紧耦合，从而支持对象创建的稳定
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中，经常面临着创建对象的工作。由于需求的变化，需要创建的对象的具体类型经常变化。
+
+  如何应对这种变化？如何绕过常规的对象创建方法（new），提供一种“封装机制”来避免客户程序和这种“具体对象创建工作”的紧耦合？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  定义一个用于创建对象的接口，让子类决定实例化哪一个类。
+
+  Factory Method 使得一个类的实例化延迟（目的：解耦，手段：虚函数）到子类。
+#+END_EXAMPLE
+
+Factory Method 模式用于隔离类对象的使用者和具体类型之间的耦合关系。面对一个经常变化的具体类型，紧耦合（new）会导致软件的脆弱。
+
+Factory Method 模式通过面向对象的手法，将所要创建的具体对象工作延迟到子类，从而实现一种扩展（而非更改）的策略，较好的解决了这种紧耦合关系。
+
+Factory Method 模式解决“单个对象”的需求变化。缺点在于要求创建方法/参数相同。
+
+以 c++ 的角度来理解就是：
+- 使用者以委托的方式使用抽象接口和工厂接口
+- 具体的对象由外部继承工厂接口的子类来提供
+
+使用这种方式能够最大限度的降低该使用者的耦合度，提高其灵活性。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/factoryMethod.jpg]]
+
+* 示例
+抽象类及其子类：
+#+BEGIN_SRC cpp
+  //file:product.h
+  #ifndef PRODUCT_H
+  #define PRODUCT_H
+
+
+  class Product
+  {
+  public:
+    Product();
+    virtual ~Product();
+    virtual void method(void) = 0;
+
+  };
+
+  #endif // PRODUCT_H
+  //file:product.cpp
+  #include "product.h"
+  #include <iostream>
+  Product::Product()
+  {
+
+  }
+  Product::~Product()
+  {
+    std::cout << "Product destructor" << std::endl;
+  }
+  //file:concreteproduct.h
+  #ifndef CONCRETEPRODUCT_H
+  #define CONCRETEPRODUCT_H
+
+  #include "product.h"
+
+  class ConcreteProduct : public Product
+  {
+  public:
+    ConcreteProduct();
+    ~ConcreteProduct();
+
+    void method() override;
+  };
+
+  #endif // CONCRETEPRODUCT_H
+  //file:concreteproduct.cpp
+  #include "concreteproduct.h"
+
+  #include <iostream>
+  ConcreteProduct::ConcreteProduct()
+  {
+
+  }
+  void ConcreteProduct::method()
+  {
+    std::cout << "ConcreteProduct::method" << std::endl;
+  }
+  ConcreteProduct::~ConcreteProduct()
+  {
+    std::cout << "ConcreteProduct destrutor" << std::endl;
+  }
+#+END_SRC
+工厂类及其子类：
+#+BEGIN_SRC cpp
+  //file:creator.h
+  #ifndef CREATOR_H
+  #define CREATOR_H
+
+  #include "product.h"
+
+  class Creator
+  {
+  public:
+    Creator();
+    virtual ~Creator();
+
+    virtual Product *FactoryMethod(void) = 0;
+  };
+
+  #endif // CREATOR_H
+  //file:creator.cpp
+  #include "creator.h"
+
+  Creator::Creator()
+  {
+
+  }
+  Creator::~Creator()
+  {
+
+  }
+  //file:concretecreator.h
+  #ifndef CONCRETECREATOR_H
+  #define CONCRETECREATOR_H
+
+  #include "creator.h"
+  #include "concreteproduct.h"
+
+  class ConcreteCreator : public Creator
+  {
+  public:
+    ConcreteCreator();
+
+    Product * FactoryMethod() override;
+  };
+
+  #endif // CONCRETECREATOR_H
+  //file:concretecreator.cpp
+  #include "concretecreator.h"
+
+  ConcreteCreator::ConcreteCreator()
+  {
+
+  }
+  Product * ConcreteCreator::FactoryMethod()
+  {
+    return new ConcreteProduct();
+  }
+
+#+END_SRC
+使用者类，可以看到使用者类中包含的都是抽象接口，这就实现了很低的耦合度：
+#+BEGIN_SRC cpp
+  //file user.h
+  #ifndef USER_H
+  #define USER_H
+
+  #include "creator.h"
+  #include "product.h"
+
+  class User
+  {
+  public:
+    User(Creator *creator);
+    ~User();
+
+    void handle(void);
+  private:
+    Creator *creator_ = nullptr;
+    Product *product_ = nullptr;
+  };
+
+  #endif // USER_H
+
+  //file user.cpp
+  #include "user.h"
+
+  User::User(Creator *creator) : creator_(creator)
+  {
+
+  }
+  User::~User()
+  {
+    delete product_;
+  }
+  void User::handle(void)
+  {
+    product_ = creator_->FactoryMethod();
+
+    product_ ->method();
+  }
+#+END_SRC
+
+最后是使用：
+#+BEGIN_SRC cpp
+  //file:main.cpp
+  #include <iostream>
+  #include "concretecreator.h"
+  #include "user.h"
+
+  using namespace std;
+
+  int main()
+  {
+    ConcreteCreator creatorA;
+
+    User user(&creatorA);
+
+    user.handle();
+
+    return 0;
+  }
+
+#+END_SRC
+

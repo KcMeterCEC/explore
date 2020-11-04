@@ -1,0 +1,76 @@
+#+TITLE: [What] 桥模式
+#+DATE:<2020-10-31 六> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <bridge.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：《c++ 设计模式》
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责：明确组件的责任
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  由于某些类型的固有的实现逻辑，使得它们据偶两个变化的维度，乃至多个维度的变化。
+
+  如何应对这种“多维度的变化”？如何利用面向对象技术来使得类型可以轻松地沿着两个乃至多个方向变化，而不引入额外的复杂度？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  将抽象部分（业务逻辑）与实现部分（平台实现）分离，使它们都可以独立地变化。
+#+END_EXAMPLE
+
+Bridge 模式使用“对象间的组合关系”解耦了抽象和实现之间固有的绑定关系，使得抽象和实现可以沿着各自的维度来变化。
+所谓抽象和实现沿着各自维度的变化，即“子类化”它们。
+
+Bridge 模式有时候类似于多继承方案，但是多继承方案往往违反单一职责原则（即一个类只有一个变化的原因），复用性比较差。
+Bridge 模式是比多继承方案更好的解决方法。
+
+Bridge 模式的应用一般在“两个非常强的变化维度”，有时一个类也有多于两个的变化维度，这时可以使用 Bridge 的扩展模式。
+
+以 c++ 的角度来理解就是：
+- 当一个类设计不合理，有多个职责时，就应该将它们抽象为不同的类
+- 然后其子类来具体实现
+
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/bridge.jpg]]
+
+可以看到，稳定区域的两个抽象类就如同一个桥梁一样，将具体的业务逻辑和具体实现部分连接了起来。
