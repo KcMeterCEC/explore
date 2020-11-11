@@ -1,0 +1,119 @@
+#+TITLE: [What] 单例模式
+#+DATE:<2020-11-11 三> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <singleton.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中，经常有这样一些特殊的类，必须保证它们在系统中只存在一个实例，才能确保它们的逻辑正确性、以及良好的效率。
+
+  如何绕过常规的构造器，提供一种机制来保证一个类只有一个实例？
+
+  这应该是类设计者的责任，而不是使用者的责任。
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  保证一个类仅有一个实例，并提供一个该实例的全局访问点。
+#+END_EXAMPLE
+
+以 c++ 的角度来理解就是：
+- 将该类的构造函数放置于私有访问权限中
+- 在 =get_instance()= 方法中返回局部静态变量
+  + c11 保证了静态局部变量创建的原子性
+* 示例
+#+BEGIN_SRC cpp
+  //singletone.h
+  #ifndef SINGLETONE_H
+  #define SINGLETONE_H
+
+  #include <iostream>
+
+  class Singletone
+  {
+  public:
+    static Singletone *get_instance(void){
+      static Singletone obj;
+
+      return &obj;
+    }
+
+    void show(void){
+      std::cout << __func__ << std::endl;
+    }
+  private:
+    Singletone();
+    Singletone(Singletone &obj){
+
+    }
+  };
+
+  #endif // SINGLETONE_H
+  //singletone.cpp
+  #include "singletone.h"
+
+  Singletone::Singletone()
+  {
+
+  }
+  //main.cpp
+  #include "singletone.h"
+
+  #include <iostream>
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    Singletone *obj = Singletone::get_instance();
+
+    obj->show();
+
+    return 0;
+  }
+#+END_SRC
+

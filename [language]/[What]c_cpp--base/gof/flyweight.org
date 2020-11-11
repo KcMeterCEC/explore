@@ -1,0 +1,162 @@
+#+TITLE: [What] 享元模式
+#+DATE:<2020-11-11 三> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <flyweight.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中采用纯粹对象方案的问题在于大量细粒度的对象会很快充斥在系统中，从而带来很高的运行时代价（主要指内存需求方面的代价）。
+
+  如何在避免大量细粒度对象问题的同时，让外部客户程序仍然能够透明地使用面向对象的方式来进行操作？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  运用共享技术有效地支持大量细粒度的对象。
+#+END_EXAMPLE
+
+面向对象很好地解决了抽象性的问题，但是作为一个运行在机器中的程序实体，我们需要考虑对象的代价问题。
+Flyweight 主要解决面向对象的代价问题，一般不触及面向对象的抽象性问题。
+
+Flyweight 采用对象共享的做法来降低系统中对象的个数，从而降低细粒度对象给系统带来的内存压力。
+在具体实现方面，要注意对象状态的处理。
+- 对象通常需要是只读的
+
+对象的数量太大从而导致对象内存开销加大，什么样的数量才算大？
+这需要我们仔细的根据具体应用情况进行评估，而不能凭空臆断。
+
+以 c++ 的角度来理解就是：
+- 将对象放在对象池中，根据用户的键来寻找对应的对象
+- 如果找不到该对象则创建一个新的对象，然后返回该新对象
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/flyweight.jpg]]
+
+* 示例
+#+BEGIN_SRC cpp
+  //font.h
+  #ifndef FONT_H
+  #define FONT_H
+
+  #include <string>
+
+  class Font
+  {
+  public:
+    Font(const std::string &str);
+  };
+
+  #endif // FONT_H
+  //font.cpp
+  #include "font.h"
+
+  Font::Font(const std::string &str)
+  {
+
+  }
+  //fontfactory.h
+  #ifndef FONTFACTORY_H
+  #define FONTFACTORY_H
+
+  #include "font.h"
+
+  #include <map>
+  #include <memory>
+
+  class FontFactory
+  {
+  public:
+    FontFactory();
+
+    std::shared_ptr<Font>  get_font(const std::string &key);
+  private:
+    std::map<std::string , std::shared_ptr<Font>> map_;
+  };
+
+  #endif // FONTFACTORY_H
+  //fontfactory.cpp
+  #include "fontfactory.h"
+
+  #include <iostream>
+
+  FontFactory::FontFactory()
+  {
+
+  }
+  std::shared_ptr<Font> FontFactory::get_font(const std::string &key)
+  {
+    if(map_.find(key) == map_.end()){
+      std::cout << "Didn't find font " << key << std::endl;
+      std::cout << "Create a new font!\n";
+      map_[key] = std::make_shared<Font>(key);
+    }
+    else{
+      std::cout << "Font " << key << " is existed.\n";
+    }
+
+    return map_[key];
+  }
+  //main.cpp
+  #include "font.h"
+  #include "fontfactory.h"
+
+  #include <iostream>
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    FontFactory factory;
+
+    std::shared_ptr<Font> fp = factory.get_font("test");
+
+    fp = factory.get_font("test");
+
+    return 0;
+  }
+#+END_SRC
+

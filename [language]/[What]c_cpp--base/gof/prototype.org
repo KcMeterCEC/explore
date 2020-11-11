@@ -1,0 +1,206 @@
+#+TITLE: [What] 原型模式
+#+DATE:<2020-11-04 三> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <prototype.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建：避免 new 对象过程中所导致的紧耦合，从而支持对象创建的稳定
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中，经常面临着“某些结构复杂的对象”的创建工作。
+  由于需求的变化，这些对象经常面临着剧烈的变化，但是它们却拥有比较稳定一致的接口。
+
+  如何应对这种变化？如何向“客户程序（使用这些对象的程序）”隔离出“这些易变对象”，从而使得“依赖这些易变对象的客户程序”不随着需求改变而改变？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  使用原型实例指定创建对象的种类，然后通过拷贝这些原型来创建新的对象。
+#+END_EXAMPLE
+
+Prototype 模式同样用于隔离类对象的使用者和具体类型（易变类）之间的耦合关系，它同样要求这些“易变类”拥有“稳定的接口”。
+
+Prototype 模式对于“如何创建易变类的实体对象”采用“原型克隆”的方法来做，它使得我们可以非常灵活地动态创建“拥有某些稳定接口”的新对象，
+所需要的工作仅仅是注册一个新类的对象（即原型），然后在任何需要的地方 Clone.
+
+Prototype 模式中的 Clone 方法可以利用某些框架中的序列化来实现深拷贝。
+
+以 c++ 的角度来理解就是：
+- 将创建对象的工作直接放在抽象接口中
+- 此创建方法创建自身
+  + 也就是使用拷贝构造的方式创建自己（必须要使用深拷贝，否则当原型中有指针成员时便会出问题）
+    
+可以看出来：原型模式是工厂方法的特例化。
+- 当对象比较复杂时，首先配置原型的状态，然后再创建其副本。这种场景下，使用原型模式就比较合理。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/prototype.jpg]]
+
+* 示例
+将工厂方法的示例稍加改动即可：
+
+抽象接口及其子类：
+#+BEGIN_SRC cpp
+  //file:product.h
+  #ifndef PRODUCT_H
+  #define PRODUCT_H
+
+
+  class Product
+  {
+  public:
+    Product();
+    virtual ~Product();
+    virtual void method(void) = 0;
+    virtual Product * clone(void) = 0;
+  };
+
+  #endif // PRODUCT_H
+  //file:product.cpp
+  #include "product.h"
+  #include <iostream>
+  Product::Product()
+  {
+
+  }
+  Product::~Product()
+  {
+    std::cout << "Product destructor" << std::endl;
+  }
+  //file:concreteproduct.h
+  #ifndef CONCRETEPRODUCT_H
+  #define CONCRETEPRODUCT_H
+
+  #include "product.h"
+
+  class ConcreteProduct : public Product
+  {
+  public:
+    ConcreteProduct();
+    ~ConcreteProduct();
+
+    void method() override;
+    Product * clone() override;
+  };
+
+  #endif // CONCRETEPRODUCT_H
+  //file:concreteproduct.cpp
+  #include "concreteproduct.h"
+
+  #include <iostream>
+  ConcreteProduct::ConcreteProduct()
+  {
+
+  }
+  void ConcreteProduct::method()
+  {
+    std::cout << "ConcreteProduct::method" << std::endl;
+  }
+  Product * ConcreteProduct::clone()
+  {
+    return new ConcreteProduct(*this);
+  }
+  ConcreteProduct::~ConcreteProduct()
+  {
+    std::cout << "ConcreteProduct destrutor" << std::endl;
+  }
+#+END_SRC
+
+使用者：
+#+BEGIN_SRC cpp
+  //file: user.h
+  #ifndef USER_H
+  #define USER_H
+
+  #include "product.h"
+
+  class User
+  {
+  public:
+    User(Product *product);
+    ~User();
+
+    void handle(void);
+  private:
+    Product *product_ = nullptr;
+  };
+  //file: user.cpp
+  #include "user.h"
+
+  User::User(Product *product) : product_(product)
+  {
+
+  }
+  User::~User()
+  {
+  }
+  void User::handle(void)
+  {
+    Product *product = product_->clone();
+
+    product ->method();
+
+    delete product;
+  }
+#+END_SRC
+
+调用者：
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include "concreteproduct.h"
+  #include "user.h"
+
+  using namespace std;
+
+  int main()
+  {
+    ConcreteProduct productA;
+
+    User user(&productA);
+
+    user.handle();
+
+    return 0;
+  }
+
+#+END_SRC
