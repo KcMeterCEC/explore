@@ -1,0 +1,74 @@
+#+TITLE: [What] 适配器
+#+DATE:<2020-11-16 一> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <adapter.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件系统中，由于应用环境的变化，常常需要将“一些现存的对象”放在新的环境中应用，但是新环境要求的接口是这些现存对象所不满足的。
+
+  如何应对这种“迁移的变化”？如何既能利用现有对象的良好实现，同时又能满足新的应用环境所要求的接口？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  将一个类的接口转换成客户希望的另一个接口。
+  Adapter 模式使得原本由于接口不兼容而不能一起工作的那些类可以一起工作。
+#+END_EXAMPLE
+
+Adapter 模式主要应用于“希望复用一些现存的类，但是接口与复用环境要求不一致的情况”，
+在遗留代码复用、类库迁移等方面非常有用。
+
+GoF23 定义了两种 Adapter 模式的实现结构：对象适配器和类适配器。但类适配器采用“多继承”的实现方式，一般不推荐使用。
+对象适配器采用“对象组合”的方式，更符合松耦合精神。
+
+Adapter 模式可以实现得非常灵活，不必拘泥于 GoF23 中定义的两种结构。
+例如，完全可以将 Adapter 模式中的“现存对象”作为新的接口方法参数，来达到适配的目的。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/adapter.jpg]]
+
+可以看到其设计思想与前面的代理模式很是相近，通过增加一个中间层便可以隔离这些变化。
+
