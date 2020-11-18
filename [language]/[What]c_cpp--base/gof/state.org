@@ -1,0 +1,313 @@
+#+TITLE: [What] 状态模式
+#+DATE:<2020-11-18 三> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <state.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化：对变化进行有效的管理的同时又维持高层模块的稳定
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件构建过程中，某些对象的状态如果改变，其行为也会随之而发生变化。
+  比如文档处于只读状态，其支持的行为和读写状态支持的行为就可能完全不同。
+
+  如何在运行时根据对象的状态来透明的更改对象的行为？而不会为对象操作和状态转化之间引入紧耦合？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  允许一个对象在其内部状态改变时，改变它的行为。从而使对象看起来似乎修改了其行为。
+#+END_EXAMPLE
+
+State 模式将所有与一个特定状态相关的行为都放入一个 State 的子类对象中，在对象状态切换时，切换相应的对象。
+但同时维持 State 的接口，这样实现了具体操作与状态转换之间的解耦。
+
+为不同的状态引入不同的对象使得状态转换变得更加明确，而且可以保证不会出现状态不一致的情况，因为转换是原子性的。
+
+如果 State 对象没有实例变量，那么各个上下文可以共享同一个 State 对象，从而节省对象开销。
+
+以 c++ 的角度来理解就是：
+- 将本来由用户来实现的状态切换，改变为由对象自己完成的切换。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/state.jpg]]
+
+* 示例
+首先定义一个抽象接口，以表示有多少种状态：
+#+BEGIN_SRC cpp
+  //file:state.h
+  #ifndef STATE_H
+  #define STATE_H
+
+
+  class State
+  {
+  public:
+    State();
+
+    virtual void Step1(void) = 0;
+    virtual void Step2(void) = 0;
+    virtual void Step3(void) = 0;
+    State * get_next(void);
+
+    virtual ~State();
+  protected:
+    State *next_;
+  };
+
+  #endif // STATE_H
+
+  //file:state.cpp
+  #include "state.h"
+
+  State::State()
+  {
+
+  }
+  State::~State()
+  {
+
+  }
+  State * State::get_next(void)
+  {
+    return next_;
+  }
+
+#+END_SRC
+然后有两个对象继承自基类的状态，各自状态的执行内容是不一样的：
+- 一般这种状态执行对象只需要单例即可
+#+BEGIN_SRC cpp
+  //file: openstate.h
+  #ifndef OPENSTATE_H
+  #define OPENSTATE_H
+
+  #include "state.h"
+
+  class OpenState : public State
+  {
+  public:
+    static State *get_instance(void)
+    {
+      static OpenState open_state_;
+
+      return &open_state_;
+    }
+
+    void Step1() override;
+    void Step2() override;
+    void Step3() override;
+  private:
+    OpenState();
+    OpenState(OpenState &open_state);
+  };
+
+  #endif // OPENSTATE_H
+
+  //file: openstate.cpp
+  #include "openstate.h"
+
+  #include <iostream>
+
+  #include "closestate.h"
+  OpenState::OpenState()
+  {
+
+  }
+  OpenState::OpenState(OpenState &open_state)
+  {
+
+  }
+  void OpenState::Step1()
+  {
+    std::cout << "open state step1\n";
+
+    next_ = CloseState::get_instance();
+  }
+  void OpenState::Step2()
+  {
+    std::cout << "open state step2\n";
+
+    next_ = CloseState::get_instance();
+  }
+  void OpenState::Step3()
+  {
+    std::cout << "open state step3\n";
+
+    next_ = CloseState::get_instance();
+  }
+
+  //file: closestate.h
+  #ifndef CLOSESTATE_H
+  #define CLOSESTATE_H
+
+  #include "state.h"
+
+  class CloseState : public State
+  {
+  public:
+    static State *get_instance(void)
+    {
+      static CloseState close_state_;
+
+      return &close_state_;
+    }
+
+    void Step1() override;
+    void Step2() override;
+    void Step3() override;
+  private:
+    CloseState();
+    CloseState(CloseState & close_state);
+  };
+
+  #endif // CLOSESTATE_H
+
+
+  //file: closestate.cpp
+  #include "closestate.h"
+
+  #include <iostream>
+
+  #include "openstate.h"
+
+  CloseState::CloseState()
+  {
+
+  }
+  CloseState::CloseState(CloseState & close_state)
+  {
+
+  }
+  void CloseState::Step1()
+  {
+    std::cout << "close state step1\n";
+
+    next_ = OpenState::get_instance();
+  }
+  void CloseState::Step2()
+  {
+    std::cout << "close state step2\n";
+
+    next_ = OpenState::get_instance();
+  }
+  void CloseState::Step3()
+  {
+    std::cout << "close state step3\n";
+
+    next_ = OpenState::get_instance();
+  }
+#+END_SRC 
+
+用户只需要在执行每个状态后，获取下一个状态的对象地址即可。用指针代替了 if/switch 式的状态机：
+#+BEGIN_SRC cpp
+  //file:client.h
+  #ifndef CLIENT_H
+  #define CLIENT_H
+
+  #include "state.h"
+
+  class Client
+  {
+  public:
+    Client(State *first_state);
+
+    void process1(void);
+    void process2(void);
+    void process3(void);
+  private:
+    State *state_;
+  };
+
+  #endif // CLIENT_H
+
+
+  //file:client.cpp
+  #include "client.h"
+
+  Client::Client(State *first_state) : state_(first_state)
+  {
+
+  }
+  void Client::process1(void)
+  {
+    state_->Step1();
+    state_ = state_->get_next();
+  }
+  void Client::process2(void)
+  {
+    state_->Step2();
+    state_ = state_->get_next();
+  }
+  void Client::process3(void)
+  {
+    state_->Step3();
+    state_ = state_->get_next();
+  }
+#+END_SRC
+
+最后的使用
+#+BEGIN_SRC cpp
+  #include <iostream>
+
+  #include "client.h"
+  #include "closestate.h"
+  #include "openstate.h"
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    Client client(OpenState::get_instance());
+
+    client.process1();
+    client.process2();
+    client.process3();
+
+    client.process1();
+    client.process2();
+    client.process3();
+
+    return 0;
+  }
+#+END_SRC
