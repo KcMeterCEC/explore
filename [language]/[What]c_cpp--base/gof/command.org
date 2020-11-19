@@ -1,0 +1,214 @@
+#+TITLE: [What] 命令模式
+#+DATE:<2020-11-19 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <command.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化：将组件的行为和组件本身进行解耦，从而支持组件行为的变化，实现两者之间的松耦合
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件构建过程中，“行为请求者”与“行为实现者”通常呈现一种“紧耦合”。
+  但在某些场合，比如需要对行为进行“记录、撤销/重做、事务”等处理，这种无法抵御变化的紧耦合是不合适的。
+
+  在这种情况下，如何将“行为请求者”与“行为实现者”解耦？将一组行为抽象为对象，可以实现二者之间的松耦合。
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  将一个请求（行为）封装为一个对象，从而使你可用不同的请求对客户进行参数化。
+  对请求排队或记录请求日志，以及支持可撤销的操作。
+#+END_EXAMPLE
+Command 模式的根本目的在于将“行为请求者”与“行为实现者”解耦，在面向对象语言中，常见的实现手段是“将行为抽象为对象”
+
+实现 Command 接口的具体命令对象 ConcreteCommand 有时候根据需要可能会保存一些额外的状态信息。
+通过使用 Composite 模式，可以将多个“命令”封装为一个“复合命令” MacroCommand
+
+Command 模式与 c++ 中的函数对象有些类似。但两者定义行为接口的规范有所区别：
+- Command 以面向对象中的“接口-实现”来定义行为接口规范，更严格，但有性能损失。
+- c++ 函数对象以函数签名来定义行为接口规范，更灵活，性能更高。
+按照 UML 类图的简易逻辑如下：
+[[./pic/command.jpg]]
+
+* 示例
+命令接口就是一个执行函数：
+#+BEGIN_SRC cpp
+  //file:command.h
+  #ifndef COMMAND_H
+  #define COMMAND_H
+
+
+  class Command
+  {
+  public:
+    Command();
+
+    virtual void exec(void) = 0;
+    virtual ~Command();
+  };
+
+  #endif // COMMAND_H
+
+
+  //file:command.cpp
+  #include "command.h"
+
+  Command::Command()
+  {
+
+  }
+  Command::~Command()
+  {
+
+  }
+#+END_SRC
+
+可以创建普通命令对象，也可以创建宏命令对象
+#+BEGIN_SRC cpp
+  //file: concretecommand1.h
+  #ifndef CONCRETECOMMAND1_H
+  #define CONCRETECOMMAND1_H
+
+  #include "command.h"
+
+  #include <string>
+
+  class ConcreteCommand1 : public Command
+  {
+  public:
+    ConcreteCommand1(const std::string &str);
+
+    void exec() override;
+  private:
+    std::string str_;
+  };
+
+  #endif // CONCRETECOMMAND1_H
+
+  //file: concretecommand1.cpp
+  #include "concretecommand1.h"
+
+  #include <iostream>
+
+  ConcreteCommand1::ConcreteCommand1(const std::string &str)
+    :str_(str)
+  {
+
+  }
+  void ConcreteCommand1::exec()
+  {
+    std::cout << "ConcreteCommand1 : " << str_ << std::endl;
+  }
+
+  //file: macrocommand.h
+  #ifndef MACROCOMMAND_H
+  #define MACROCOMMAND_H
+
+  #include "command.h"
+
+  #include <list>
+
+  class MacroCommand : public Command
+  {
+  public:
+    MacroCommand();
+
+    void AddCmd(Command *cmd);
+    void exec() override;
+  private:
+    std::list<Command *> cmd_list_;
+  };
+
+  #endif // MACROCOMMAND_H
+
+  //file: macrocommand.cpp
+  #include "macrocommand.h"
+
+  MacroCommand::MacroCommand()
+  {
+
+  }
+  void MacroCommand::AddCmd(Command *cmd)
+  {
+    cmd_list_.push_back(cmd);
+  }
+  void MacroCommand::exec()
+  {
+    for(auto v : cmd_list_)
+      {
+        v->exec();
+      }
+  }
+#+END_SRC
+
+使用者将命令加入宏执行即可
+#+BEGIN_SRC cpp
+  #include "command.h"
+  #include "concretecommand1.h"
+  #include "macrocommand.h"
+
+  #include <iostream>
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    ConcreteCommand1 cmd1("CMD1 ACTION...");
+    ConcreteCommand1 cmd2("CMD2 ACTION...");
+    ConcreteCommand1 cmd3("CMD3 ACTION...");
+
+    MacroCommand macro;
+
+    macro.AddCmd(&cmd1);
+    macro.AddCmd(&cmd2);
+    macro.AddCmd(&cmd3);
+
+    macro.exec();
+
+
+    return 0;
+  }
+
+#+END_SRC
+
