@@ -1,0 +1,222 @@
+#+TITLE: [What] 组合模式
+#+DATE:<2020-11-19 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <composite.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构：将特定的数据结构封装在内部，在外部提供统一的接口，来实现与特定数据结构无关的访问
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件在某些情况下，客户代码过多的依赖于对象容器复杂的内部实现结构，对象容器内部实现结构（而非抽象接口）
+  的变化将引起客户代码的频繁变化，带来了代码的维护性、扩展性等弊端。
+
+  如何将“客户代码与复杂的对象容器结构”解耦？让对象容器自己来实现自身的复杂结构，从而使得客户代码就像处理简单对象
+  一样来处理复杂的对象容器？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  将对象组合成树形结构以表示“部分--整体”的层次结构。
+  Composite 使得用户对单个对象和组合对象的使用具有一致性（稳定）。
+#+END_EXAMPLE
+Composite 模式采用树形结构来实现普遍存在的对象容器，从而将“一对多”的关系转化为“一对一”的关系，
+使得客户代码可以一致地（复用）处理对象和对象容器，无需关心处理的是单个的对象，还是组合的对象容器。
+
+将“客户代码与复杂的对象容器结构”解耦是 Composite 的核心思想，解耦之后，客户代码将与纯粹的抽象接口，
+而非对象容器的内部实现结构发生依赖，从而更能“应对变化”。
+
+Composite 模式在具体实现中，可以让父对象中的子对象反向追溯。
+如果父对象有频繁的遍历要求，可使用缓存技巧来改善效率。
+
+按照 UML 类图的简易逻辑如下：
+[[./composite.jpg]]
+
+* 示例
+先定义基类操作：
+#+BEGIN_SRC cpp
+  //file:component.h
+  #ifndef COMPONENT_H
+  #define COMPONENT_H
+
+
+  class Component
+  {
+  public:
+    Component();
+    virtual ~Component();
+    virtual void process(void) = 0;
+  };
+
+  #endif // COMPONENT_H
+
+  //file:component.cpp
+  #include "component.h"
+
+  Component::Component()
+  {
+
+  }
+  Component::~Component()
+  {
+
+  }
+#+END_SRC
+
+在使用 composite 继承基类：
+#+BEGIN_SRC cpp
+  //file: composite.h
+  #ifndef COMPOSITE_H
+  #define COMPOSITE_H
+
+  #include "component.h"
+
+  #include <list>
+
+  class Composite : public Component
+  {
+  public:
+    Composite();
+
+    void process() override;
+
+    void Add(Component *component);
+    void Remove(Component *component);
+  private:
+    std::list<Component *> component_;
+  };
+
+  #endif // COMPOSITE_H
+
+  //file: composite.cpp
+  #include "composite.h"
+
+  #include <iostream>
+
+  Composite::Composite()
+  {
+
+  }
+  void Composite::process()
+  {
+
+    std::cout << "composite porcess\n";
+    for(auto v : component_){
+      v->process();
+    }
+  }
+  void Composite::Add(Component *component)
+  {
+    component_.push_back(component);
+  }
+  void Composite::Remove(Component *component)
+  {
+    component_.remove(component);
+  }
+#+END_SRC
+叶子节点类用于填充基本的执行
+#+BEGIN_SRC cpp
+  //file:leaf.h
+  #ifndef LEAF_H
+  #define LEAF_H
+
+  #include "component.h"
+
+  class Leaf : public Component
+  {
+  public:
+    Leaf();
+
+    void process() override;
+  };
+
+  #endif // LEAF_H
+
+
+  //file:leaf.cpp
+  #include "leaf.h"
+
+  #include <iostream>
+
+  Leaf::Leaf()
+  {
+
+  }
+  void Leaf::process()
+  {
+    std::cout << "Leaf process\n";
+  }
+#+END_SRC
+
+对使用者来说，接口就统一了，而且不需要区分是叶子节点还是根节点
+#+BEGIN_SRC cpp
+  #include <iostream>
+
+  #include "component.h"
+  #include "composite.h"
+  #include "leaf.h"
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    Composite composite_a;
+    Composite composite_b;
+    Leaf leaf_a;
+    Leaf leaf_b;
+    Leaf leaf_c;
+
+    composite_a.Add(&leaf_a);
+    composite_a.Add(&composite_b);
+    composite_b.Add(&leaf_b);
+    composite_b.Add(&leaf_c);
+
+    composite_a.process();
+    leaf_a.process();
+
+    return 0;
+  }
+
+#+END_SRC 
+

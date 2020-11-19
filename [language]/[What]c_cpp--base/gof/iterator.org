@@ -1,0 +1,70 @@
+#+TITLE: [What] 迭代器
+#+DATE:<2020-11-19 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <iterator.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件构过程中，集合对象内部结构常常变化各异。但对于这些集合对象，我们希望在不暴露其内部结构的同时，
+  可以让外部客户代码透明地访问其中包含的元素，同时这种“透明遍历”也为“同一种算法在多种集合对象上进行操作”提供了可能。
+
+  使用面向对象技术将这种遍历机制抽象为“迭代器对象”为“应对变化中的集合对象”提供了一种优雅的方式。
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+提供一种方法顺序访问一个聚合对象中的各个元素，而不暴露（稳定）该对象的内部表示。
+#+END_EXAMPLE
+
+迭代抽象：访问一个聚合对象的内容而无需暴露它的内部表示
+
+迭代多态：为遍历不同的集合结构提供一个统一的接口，从而支持同样的算法在不同的集合结构上进行操作
+
+迭代器的健壮性考虑：遍历的同时更改迭代器所在的集合结构，会导致问题
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/iterator.jpg]]
+
+

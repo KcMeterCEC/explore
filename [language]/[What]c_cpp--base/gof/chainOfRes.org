@@ -1,0 +1,289 @@
+#+TITLE: [What] 职责链
+#+DATE:<2020-11-19 四> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <chain_of_res.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件构建过程中，一个请求可能被多个对象处理，但是每个请求在运行时只能有一个接受者。
+  如果显式指定，将必不可少地带来请求发送者与接受者的紧耦合。
+
+  如何使请求的发送者不需要指定具体的接受者？让请求的接受者自己在运行时决定来处理请求，从而使两者解耦。
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  使多个对象都有机会处理请求，从而避免请求的发送者和接收者之间的耦合关系。
+  将这些对象连成一条链，并沿着这条链传递请求，直到有一个对象处理它为止。
+#+END_EXAMPLE
+
+Chain of Responsibility 模式的应用场合在于“一个请求可能有多个接收者，但是最后真正的接收者只有一个”，
+这时候请求发送者与接收者的耦合有可能出现“变化脆弱”的症状，职责链的目的就是将二者解耦，从而更好地应对变化。
+
+应用了 Chain of Responsibility 模式后，对象的职责分派将更具灵活性。我们可以在运行时动态添加/修改请求的处理职责。
+
+如果请求传递到职责链的末尾仍然得不到处理，应该有一个合理的缺省机制。
+这也是每个接受对象的责任，而不是发出请求的对象的责任。
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/chainOfRes.jpg]]
+
+* 示例
+先定义请求类
+#+BEGIN_SRC cpp
+  //file: request.h
+  #ifndef REQUEST_H
+  #define REQUEST_H
+
+  #include <string>
+
+  class Request
+  {
+  public:
+    typedef enum{
+                 kHandle1,
+                 kHandle2,
+                 kHandle3,
+    }ReqType;
+
+    Request() = default;
+    Request(std::string &description, ReqType type = kHandle1);
+
+    const std::string &get_description(void);
+    ReqType get_type(void);
+  private:
+    std::string description_;
+    ReqType type_;
+  };
+
+  #endif // REQUEST_H
+
+
+
+  //file: request.cpp
+  #include "request.h"
+
+  Request::Request(std::string &description, ReqType type)
+    : description_(description), type_(type)
+  {
+
+  }
+  const std::string & Request::get_description(void)
+  {
+    return description_;
+  }
+  Request::ReqType Request::get_type(void)
+  {
+    return type_;
+  }
+#+END_SRC
+
+再定义处理基类：
+#+BEGIN_SRC cpp
+  //file: handle.h
+  #ifndef HANDLER_H
+  #define HANDLER_H
+
+  #include "request.h"
+
+  class Handler
+  {
+  public:
+    Handler(Handler *next = nullptr);
+
+    void process(Request &request);
+  protected:
+    virtual bool IsMyType(Request &request) = 0;
+    virtual void HandleType(Request &request) = 0;
+  private:
+    Handler *next_ = nullptr;
+  };
+
+  #endif // HANDLER_H
+
+
+  //file: handle.cpp
+  #include "handler.h"
+
+  #include <iostream>
+
+  Handler::Handler(Handler *next)
+    : next_(next)
+  {
+
+  }
+  void  Handler::process(Request &request)
+  {
+    if(IsMyType(request)){
+      HandleType(request);
+    }
+    else{
+      if(next_){
+        std::cout << "switch to next node\n";
+        next_->process(request);
+      }
+      else{
+
+      }
+    }
+  }
+#+END_SRC 
+
+然后是具体的处理类：
+#+BEGIN_SRC cpp
+  //file: concretehandlera.h
+  #ifndef CONCRETEHANDLERA_H
+  #define CONCRETEHANDLERA_H
+
+  #include "handler.h"
+
+  class ConcreteHandlerA : public Handler
+  {
+  public:
+    ConcreteHandlerA(Handler *next = nullptr);
+  protected:
+    bool IsMyType(Request &request) override;
+    void HandleType(Request &request) override;
+  };
+
+  #endif // CONCRETEHANDLERA_H
+
+  //file: concretehandlera.cpp
+  #include "concretehandlera.h"
+
+  #include <iostream>
+
+  ConcreteHandlerA::ConcreteHandlerA(Handler *next)
+    : Handler(next)
+  {
+
+  }
+  bool ConcreteHandlerA::IsMyType(Request &request)
+  {
+    std::cout << "ConcreteHandlerA type Check\n";
+    if(request.get_type() == Request::kHandle1)
+      {
+        return true;
+      }
+    return false;
+  }
+  void ConcreteHandlerA::HandleType(Request &request)
+  {
+    std::cout << "ConcreteHandlerA handle " << request.get_description() << std::endl;
+  }
+
+  //file: concretehandlerb.h
+  #ifndef CONRETEHANDLERB_H
+  #define CONRETEHANDLERB_H
+
+  #include "handler.h"
+
+  class ConcreteHandlerB : public Handler
+  {
+  public:
+    ConcreteHandlerB(Handler *next = nullptr);
+  protected:
+    bool IsMyType(Request &request) override;
+    void HandleType(Request &request) override;
+  };
+
+  #endif // CONRETEHANDLERB_H
+
+  //file: concretehandlerb.cpp
+  #include "conretehandlerb.h"
+
+  #include <iostream>
+
+  ConcreteHandlerB::ConcreteHandlerB(Handler *next)
+    : Handler(next)
+  {
+
+  }
+  bool ConcreteHandlerB::IsMyType(Request &request)
+  {
+    std::cout << "ConcreteHandlerB type Check\n";
+    if(request.get_type() == Request::kHandle2)
+      {
+        return true;
+      }
+    return false;
+  }
+  void ConcreteHandlerB::HandleType(Request &request)
+  {
+    std::cout << "ConcreteHandlerB handle " << request.get_description() << std::endl;
+  }
+#+END_SRC
+
+最后，使用者只需要发送消息即可
+#+BEGIN_SRC cpp
+  #include "concretehandlera.h"
+  #include "conretehandlerb.h"
+  #include "handler.h"
+  #include "request.h"
+
+  #include <iostream>
+  #include <string>
+
+  using namespace std;
+
+  int main()
+  {
+    cout << "Hello World!" << endl;
+
+    std::string str("test");
+    Request requst(str, Request::kHandle2);
+
+    ConcreteHandlerB handler_b;
+    ConcreteHandlerA handler_a(&handler_b);
+
+    Handler *handler = &handler_a;
+    handler->process(requst);
+
+
+
+    return 0;
+  }
+
+#+END_SRC
