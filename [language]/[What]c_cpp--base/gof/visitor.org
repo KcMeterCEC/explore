@@ -1,0 +1,74 @@
+#+TITLE: [What] 访问器
+#+DATE:<2020-11-20 五> 
+#+TAGS: c++
+#+LAYOUT: post 
+#+CATEGORIES: language, c/c++, GoF
+#+NAME: <visitor.org>
+#+OPTIONS: ^:nil
+#+OPTIONS: ^:{}
+
+学习视频：<<c++ 设计模式>>
+
+从封装变化角度对模式分类：
+- 组件协作：通过 *晚期绑定* ，来实现框架和应用之间的松耦合
+  + Template Method
+  + Strategy
+  + Observer / Event
+- 单一职责
+  + Decorator
+  + Bridge
+- 对象创建
+  + Factory Method
+  + Abstract Factory
+  + Prototype
+  + Builder
+- 对象性能
+  + Singleton
+  + Flyweight
+- 接口隔离
+  + Facade
+  + Proxy
+  + Mediator
+  + Adapter
+- 状态变化
+  + Memento
+  + State
+- 数据结构
+  + Composite
+  + Iterator
+  + Chain of Resposibility
+- 行为变化
+  + Command
+  + Visitor
+- 领域问题
+  + Interpreter
+
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 问题
+#+BEGIN_EXAMPLE
+  在软件构建过程中，由于需求的改变，某些类层次结构中常常需要增加新的行为（方法）。
+  如果直接在基类中做这样的更改，将会给子类带来很繁重的变更负担，甚至破坏原有设计。
+
+  如何在不更改类层次结构的前提下，在运行时根据需要透明地为类层次结构上的各个类动态添加新的操作，从而避免上述问题？
+#+END_EXAMPLE
+* 解决
+#+BEGIN_EXAMPLE
+  表示一个作用于某对象结构中的各元素的操作。
+  使得可以在不改变（稳定）各元素的类前提下定义（扩展）作用于这些元素的新操作（变化）。
+#+END_EXAMPLE
+
+Visitor 模式通过所谓的双重分发（double dispatch）来实现在不更改（不添加新的操作-》编译时）Element 类层次结构
+的前提下，在运行时透明地为类层次结构上的各个类动态添加新的操作（支持变化）。
+
+所谓双重分发即 Visitor 模式中间包括了两个多态分发（注意其中的多态机制）：
+- 第一个为 accept 方法的多态辨析
+- 第二个为 visitElementX 方法的多态辨析
+
+Visitor 模式的最大缺点在于扩展类层次结构（添加新的 Element 子类），会导致 Visitor 类的改变。
+因此 Visitor 模式适用于“Element 类层次结构稳定，而其中的操作却经常面临频繁改动”。
+- 这个要求太苛刻了
+
+按照 UML 类图的简易逻辑如下：
+[[./pic/visitor.jpg]]
