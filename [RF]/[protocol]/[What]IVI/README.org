@@ -1,0 +1,96 @@
+#+TITLE: [What]使用 IVI 驱动 34450
+#+DATE: <2020-12-19 六> 
+#+TAGS: protocol_rf
+#+LAYOUT: post
+#+CATEGORIES: RF, protocol, IVI
+#+NAME: <qt_with_ivi.org>
+#+OPTIONS: ^:nil 
+#+OPTIONS: ^:{}
+
+- 学习手册：《Your Guide to Getting Started with IVI Drivers》
+
+[[https://www.ivifoundation.org/][IVI]] 组织致力于将各种射频仪器的编程接口进行抽象，使得程序员不用再去阅读各个设备的编程手册。
+而是使用统一的编程接口进行设备的操作，大大的提高了开发进度。
+#+BEGIN_HTML
+<!--more-->
+#+END_HTML
+* 下载驱动
+
+[[./pic/ivi_struct.jpg]]
+
+从上图可以看出，IVI 驱动与 I/O Library 进行通信，然后才是控制设备。
+那么就要下载以下两种驱动：
+1. I/O Library，也就是设备的直接编程库，对于 Keysight 而言，就是标准的 [[https://www.keysight.com/main/software.jspx?cc=CN&lc=chi&nid=-33330.977662&id=2175637&pageMode=CV][IO libraries suite]]
+2. 设备厂商所实现的 IVI 驱动库
+
+除此之外，还有一个 [[https://www.ivifoundation.org/shared_components/Default.aspx][IVI Shared Components]]，用于不同厂商驱动的兼容。
+- 这个软件需要最先下载
+
+那么安装顺序就是：
+- IVI Shared Components
+- IO libraries suite
+- 34450 IVI 驱动库
+* 关联库头文件及库
+安装目录一般位于 =C:\Program Files\IVI Foundation= ，这里就包含了 IVI 和 VISA 库。
+
+对应的头文件路径：
+#+BEGIN_EXAMPLE
+C:\Program Files\IVI Foundation\IVI\Include
+C:\Program Files\IVI Foundation\VISA\Win64\Include
+#+END_EXAMPLE
+
+对应的库路径：
+#+BEGIN_EXAMPLE
+C:\Program Files\IVI Foundation\IVI\Lib_x64\msc
+C:\Program Files\IVI Foundation\VISA\Win64\Lib_x64\msc
+#+END_EXAMPLE
+
+对应 Qt 使用 qmake 的配置如下：
+#+BEGIN_EXAMPLE
+INCLUDEPATH += \
+    "C:/Program Files/IVI Foundation/IVI/Include" \
+    "C:/Program Files/IVI Foundation/VISA/Win64/Include"
+
+LIBS += "-LC:/Program Files/IVI Foundation/IVI/Lib_x64/msc" -lAg34450
+#+END_EXAMPLE
+* Hello world
+下面运行一个放置示例：
+#+BEGIN_SRC cpp
+    ViSession session;
+    ViStatus error = VI_SUCCESS;
+    ViReal64 reading;
+    char addrn[] = "GPIB::23::INSTR";
+
+    error = Ag34450_InitWithOptions(addrn, VI_FALSE, VI_TRUE,
+                            "Simulate = 1",
+                            &session);
+    if(error != VI_SUCCESS){
+        qDebug() << "Ag34450_InitWithOptions error !";
+
+        return false;
+    }
+
+    error = Ag34450_ConfigureMeasurement(session, AG34450_VAL_DC_VOLTS, 1.5, 0.001);
+    if(error != VI_SUCCESS){
+        qDebug() << "Ag34450_ConfigureMeasurement error !";
+
+        return false;
+    }
+    error = Ag34450_ConfigureTrigger(session, AG34450_VAL_IMMEDIATE, 0.01);
+    if(error != VI_SUCCESS){
+        qDebug() << "Ag34450_ConfigureTrigger error !";
+
+        return false;
+    }
+    error = Ag34450_Read(session, 1000, &reading);
+    if(error != VI_SUCCESS){
+        qDebug() << "Ag34450_Read error !";
+
+        return false;
+    }
+    qDebug() << "Ag34450_Read result = " << reading;
+
+    if(session){
+        Ag34450_close(session);
+    }
+#+END_SRC
