@@ -101,3 +101,86 @@ c11 提供了几种智能指针（smart pointer）负责自动释放所指向的
     
 *需要注意的是：* 如果将 =shared_ptr= 存放于一个容器中，而后不再需要全部元素，而只使用其中一部分，要记得使用 =erase= 删除不再需要的那些元素
 - 否则这些元素的内存是不会被自动释放的
+
+* 直接管理内存
+使用 =new= 和 =delete= 来申请和释放内存，通常会比较容易犯错，所以一般情况下尽量使用智能指针来完成动态内存的操作。
+** 使用 new 动态分配和初始化对象
+#+BEGIN_EXAMPLE
+  默认情况下，动态分配的对象是默认初始化的，这意味着内置类型或组合类型的对象的值将是未定义的，
+  而类类型将用默认构造函数进行初始化。
+#+END_EXAMPLE
+
+基于上述原因，无论是类类型，还是内置类型，使用 *值初始化* 都是一个很好的习惯。
+#+BEGIN_SRC cpp
+  //ps 默认指向的 string 对象为空
+  string *ps = new string();
+
+  //pi 默认指向的 pi 值为 0
+  //如果不使用值初始化（后面跟空括号），那么 pi 指向对象的内容就是未知的
+  int *pi = new int();
+#+END_SRC
+** 内存耗尽
+当 new 申请内存失败后，默认会抛出 =std::bad_alloc= 异常，也可以改变使用 new 的方式来阻止它抛出异常：
+#+BEGIN_SRC cpp
+  //如果分配失败，new 抛出 std::bad_alloc
+  int *p1 = new int;
+
+  //如果分配失败，new 返回一个空指针
+  int *p2 = new (nothrow) int;
+#+END_SRC
+
+* shared_ptr 和 new 结合使用
+可以使用 new 返回的指针来初始化智能指针，但只能是使用直接初始化的方式。
+- 因为接受指针参数的只能指针构造函数是 explicit 的。
+#+BEGIN_SRC cpp
+  //错误，无法进行隐式转换
+  shared_ptr<int> p1 = new int(1024);
+
+  //正确
+  shared_ptr<int> p2(new int(1024));
+#+END_SRC
+
+为了正确使用智能指针，我们必须坚持一些基础规范：
+- 不使用相同的内置指针值初始化（或 reset）多个智能指针
+- 不 delete get() 返回的指针
+- 不使用 get() 初始化或 reset 另一个智能指针
+- 如果使用 get() 返回的指针，记住当最后一个对应的智能指针销毁后，你的指针就变为无效了
+- 如果你使用智能指针管理的资源不是 new 分配的内存， *记住传递给它一个删除器*
+
+定义一个删除器的示例如下，这在断开 socket 这类操作时很有用：
+
+#+BEGIN_SRC cpp
+  #include <iostream>
+  #include <memory>
+
+  int *connect(void){
+    std::cout << "connect to server\n";
+
+    return new int;
+  }
+  void disconnect(int *p){
+    std::cout << "disconnect from server\n";
+
+    delete p;
+  }
+
+  void end_connect(int *p){
+    std::cout << "exec end connect\n";
+
+    disconnect(p);
+  }
+
+  void f(void){
+    int * con_p = connect();
+
+    std::shared_ptr<int> p(con_p, end_connect);
+
+    std::cout << "do something\n";
+  }
+
+  int main(void){
+    f();
+
+    return 0;
+  }
+#+END_SRC

@@ -399,4 +399,31 @@ CMake 中包含这个文件:
   )
 #+END_EXAMPLE
 ** 其它编译器配置
+*** PIC 标记
+默认情况下 =-fPIC= 标记会被自动使能，如果要显示的指定的话，可以：
+#+BEGIN_EXAMPLE
+  # 全局设置
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+  # 仅对指定的 target 进行设置
+  set_target_properties(lib1 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+#+END_EXAMPLE
+*** 连接其他的库
+有些库是 cmake 本身就自带了的，比如 =${CMAKE_DL_LIBS}= 就指定了 dl 库的路径。
+
+而有些库是需要编写对应的 Find*.cmake 文件，使用 =find_library= 来查找库：
+#+BEGIN_EXAMPLE
+  find_library(MATH_LIBRARY m)
+  if(MATH_LIBRARY)
+      target_link_libraries(MyTarget PUBLIC ${MATH_LIBRARY})
+  endif()
+#+END_EXAMPLE
+*** 过程优化
+#+BEGIN_EXAMPLE
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT result)
+  # 如果编译器支持过程优化，则打开该功能
+  if(result)
+    set_target_properties(foo PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+  endif()
+#+END_EXAMPLE
