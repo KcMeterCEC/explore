@@ -1,5 +1,5 @@
 ---
-title: [What] Effective Modern C++ ：理解 decltype
+title: '[What] Effective Modern C++ ：理解 decltype'
 tags: 
 - c++
 categories: 
@@ -9,17 +9,21 @@ categories:
 layout: true
 ---
 
-# decltype 规则
+《Effective Modern C++》第一章的 Item3 学习，理解 `decltype` 推导。
 
-- decltype 对于变量和表达式的推导，总是忠实的反应其类型
+<!--more-->
+
+# `decltype` 规则
+
+- `decltype` 对于变量和表达式的推导，总是忠实的反应其类型
 - 对于左值表达式，由于其可被赋值，所以推导的类型总是 T&
-- c++14 支持 decltype(auto)，使得 auto 以 decltype 的规则进行推导
+- c++14 支持 `decltype(auto)`，使得 `auto` 以 `decltype` 的规则进行推导
 
-# 使用 decltype 的场合
+# 使用 `decltype` 的场合
 
 ## c++ 11
 
-在 c++11 中，decltype 经常使用的场景是用于模板函数：当输入的参数类型不一样，得到的函数返回类型也不一样。
+在 c++11 中，`decltype` 经常使用的场景是用于模板函数：当输入的参数类型不一样，得到的函数返回类型也不一样。
 
 ``` cpp
 template<typename Container, typename Index>
@@ -43,7 +47,7 @@ std::deque<int> d;
 AuthAndAccess(d, 5) = 10;
 ```
 
-为了能够在 c++14 中返回引用，也需要使用 decltype：
+为了能够在 c++14 中返回引用，也需要使用 `decltype`：
 
 ```cpp
 template<typename Container, typename Index>
@@ -53,7 +57,7 @@ decltype(auto) AuthAndAccess(Container& c, Index i){
 }
 ```
 
-decltype 与 auto 合用，可以使得以 decltype 的形式进行推导：
+`decltype` 与 `auto` 合用，可以使得以 `decltype` 的形式进行推导：
 
 ```cpp
 Widget w;
@@ -64,7 +68,7 @@ auto my_widget = cw;
 decltype(auto) my_widget2 = cw;
 ```
 
-# 使用 decltype 的注意事项
+# 使用 `decltype` 的注意事项
 
 - 当直接推导变量名时，得到的是变量名对应的类型
 - 当变量名由括号所包含时，得到的是变量名对应类型的引用

@@ -6,7 +6,7 @@ categories:
 - language
 - c/c++
 - Effective
-layout: true
+layout: false
 ---
 
 
