@@ -1,5 +1,5 @@
 ---
-title: [What] Effective Modern C++ ：查看推导的类型
+title: '[What] Effective Modern C++ ：查看推导的类型'
 tags: 
 - c++
 categories: 
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
 
 i 代表 `int` 类型，但是第二种情况实际上应该是 `int &`。
 
-在运行时的环境中，只有 boost 库提供的方法能够准确的显示被推导的类型。
+在运行时的环境中，只有 `boost` 库提供的方法能够准确的显示被推导的类型。
 
 ```cpp
 #include <boost/type_index.hpp>
