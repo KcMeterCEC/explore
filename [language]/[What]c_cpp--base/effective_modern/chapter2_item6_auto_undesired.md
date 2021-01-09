@@ -1,5 +1,5 @@
 ---
-title: [What] Effective Modern C++ ：auto 初始化可能会遇到的坑
+title: '[What] Effective Modern C++ ：auto 初始化可能会遇到的坑'
 tags: 
 - c++
 categories: 
@@ -8,8 +8,6 @@ categories:
 - Effective
 layout: true
 ---
-
-
 
 理解了 `auto`的推导原则后，和`auto`的便利性后，也需要注意`auto`推导可能会遇到的问题。
 
@@ -105,3 +103,28 @@ int main()
 4. `ret`得到的就是第 3 位的地址（在上面正确的结果中，如果进行了隐式转换，是将第 3 位的值拷贝了一次，而此处并未拷贝）
 5. `tmp`临时对象内存被释放，最终`std::cout`语句所获取的就是个野指针！
 
+# 解决方案
+
+解决办法就是明确的限定需要进行一次转换，使用`static_cast`：
+
+```cpp
+#include <iostream>
+#include <vector>
+
+std::vector<bool> GetResult(void){
+    std::vector<bool> ret = {0, 0, 1, 1, 1};
+
+    return ret;
+}
+
+int main()
+{
+    auto ret = static_cast<bool>(GetResult()[2]);
+
+    std::cout << "ret value is " << ret << "\n";
+
+    return 0;
+}
+```
+
+其实在很多有隐式类型转换的位置，显示的使用 cast 是一个很好的习惯。

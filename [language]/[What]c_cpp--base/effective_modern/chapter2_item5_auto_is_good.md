@@ -1,15 +1,13 @@
 ---
-title: [What] Effective Modern C++ ：认识到使用 auto 的好处
+title: '[What] Effective Modern C++ ：认识到使用 auto 的好处'
 tags: 
 - c++
 categories: 
 - language
 - c/c++
 - Effective
-layout: false
+layout: true
 ---
-
-
 
 理解了 `auto`的推导原则后，就需要认识到使用 `auto`所带来的便利性，才能优雅的使用它。
 
