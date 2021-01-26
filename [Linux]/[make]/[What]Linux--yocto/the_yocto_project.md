@@ -38,7 +38,9 @@ layout: true
 - 需要网络连接：工具链会下载源码
   - 或者也可以提前下载自己需要的源码，离线编译
   - 如果要下载源码，建议使用[代理](https://wiki.yoctoproject.org/wiki/Working_Behind_a_Network_Proxy)
+
 ### 依赖库安装
+
 需要安装的依赖包有：
 - git1.8.3.1 或更高等级
 - tar1.28 或更高
