@@ -109,7 +109,7 @@ INHERIT += "rm_work"
 ## 开始仿真
 使用`Ctrl -C`退出仿真环境.
 ```shell
-runqemu qemux86
+runqemu qemux86-64
 ```
 ## 注意事项
 ### 从别处拷贝整个工程
