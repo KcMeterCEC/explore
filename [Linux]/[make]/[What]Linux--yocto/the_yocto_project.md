@@ -38,7 +38,9 @@ layout: true
 - 需要网络连接：工具链会下载源码
   - 或者也可以提前下载自己需要的源码，离线编译
   - 如果要下载源码，建议使用[代理](https://wiki.yoctoproject.org/wiki/Working_Behind_a_Network_Proxy)
+
 ### 依赖库安装
+
 需要安装的依赖包有：
 - git1.8.3.1 或更高等级
 - tar1.28 或更高
@@ -50,7 +52,9 @@ build-essential chrpath socat cpio python python3 python3-pip python3-pexpect py
 xz-utils debianutils iputils-ping libsdl1.2-dev xterm subversion texi2html texinfo \
 make xsltproc docbook-utils fop dblatex xmlto 
 ```
+
 ### yocto 源码获取
+
 yocto 项目更新分为次要版本和主要版本更新，其中主要版本更新每隔半年发布一次，次要版本则在半年之间发布更新。
 - 次要版本每次更新代表修复了上一主要版本的一些 bug，但并不会加入新的功能
 - 主要版本每次更新都会带有新功能、新配置文件等加入
@@ -90,7 +94,9 @@ yocto 提供了脚本`oe-init-build-env`用于设置环境变量并在当前目�
 ```shell
 INHERIT += "rm_work"
 ```
+
 ### 开始编译
+
 首次编译需要一定的时间, 因为需要首次下载文件。
 - 至于时间要根据网速而定，一般几个小时吧……
 
@@ -165,7 +171,9 @@ yocto 与 OpenEmbedded 是两个相互合作的项目，两个项目的元数据
 
 - OpenEmbedded 专注于技术难点、recipes、还有板级支持（bsp），将这些部分进行分层开发
 - yocto 专注于构建框架，致力于以简便的方式帮助用户构建嵌入式和后期的测试
-# yocto中的一些专业术语
+
+## yocto中的一些专业术语
+
 | 术语                        | 说明                                      |
 |-|-|
 | Append file                 | Append 文件使用`.bbappend`作为后缀，用于对 `recipe`文件的扩展或修改                                                                             |
