@@ -2,8 +2,8 @@
 title: '[What] Effective Modern C++ ：理解 std::move 和 std::forward'
 tags: 
 - c++
-categories: 
 date:  2021/1/26
+categories: 
 - language
 - c/c++
 - Effective

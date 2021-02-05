@@ -2,8 +2,8 @@
 title: '[What] Effective Modern C++ ：正确的使用 Pimpl'
 tags: 
 - c++
-categories: 
 date:  2021/1/26
+categories: 
 - language
 - c/c++
 - Effective

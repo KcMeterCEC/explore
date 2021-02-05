@@ -2,8 +2,8 @@
 title: '[What] Effective Modern C++ ：make_shared 和 make_unique 优于使用 new'
 tags: 
 - c++
-categories: 
 date:  2021/1/25
+categories: 
 - language
 - c/c++
 - Effective

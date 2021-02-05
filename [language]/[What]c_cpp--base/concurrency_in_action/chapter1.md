@@ -2,8 +2,8 @@
 title: '[What] C++ Concurrency in Action 2nd ：c++ 与并发'
 tags: 
 - c++
-categories: 
 date:  2021/2/2
+categories: 
 - language
 - c/c++
 - Concurrency

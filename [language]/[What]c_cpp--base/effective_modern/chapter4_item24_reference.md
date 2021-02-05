@@ -2,8 +2,8 @@
 title: '[What] Effective Modern C++ ：区分通用引用和右值引用'
 tags: 
 - c++
-categories: 
 date:  2021/1/27
+categories: 
 - language
 - c/c++
 - Effective

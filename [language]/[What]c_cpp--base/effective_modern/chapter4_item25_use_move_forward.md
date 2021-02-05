@@ -2,8 +2,8 @@
 title: '[What] Effective Modern C++ ：对右值引用使用 std::move，对通用引用使用 std::forward'
 tags: 
 - c++
-categories: 
 date:  2021/1/28
+categories: 
 - language
 - c/c++
 - Effective
