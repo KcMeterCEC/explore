@@ -380,5 +380,3 @@ void thread_b()
 
 hierarchical_mutex 既然可以被`std::lock_guard`所使用，是因为它提供了`lock`,`unlock`,`try_lock`标准处理函数。
 
-## `std::unique_lock`
-
