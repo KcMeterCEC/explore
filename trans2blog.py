@@ -41,16 +41,17 @@ def get_real_name(file_path, pwd_path):
                     pic_str = re.search('\[\[\.\/(.+)\]\]',lines[i]).group(1)
                     redir_pic = 1
                 if '.jpg)' in lines[i]:
-                    pic_str = re.search('\(\.\/(.+)\)',lines[i]).group(1)
-                    redir_pic = 2
-                    
+                    if '![]' in lines[i]:
+                        pic_str = re.search('\(\.\/(.+)\)',lines[i]).group(1)
+                        redir_pic = 2
+
                 if redir_pic:
                     temp_str = html_str + pwd_path.lstrip('.') + "/"
                     temp_str += pic_str
                     temp_str += "?raw=true"
                     new_str = "#+HTML:<img src=\"%s\" alt=\"%s\">" %(temp_str,pic_str)
                     if redir_pic == 2:
-                        new_str = "![](\"%s\")" %(temp_str)
+                        new_str = "![](%s)" %(temp_str)
                     lines[i] = new_str
                 if '#+BEGIN_HTML' in lines[i]:
                     lines[i] = "\n#+BEGIN_EXPORT html\n"
