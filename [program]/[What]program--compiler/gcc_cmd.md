@@ -20,17 +20,14 @@ layout: true
   + 注意此处是大写的`-S`，也可以直接从源文件`-S`到汇编文件。
 - `gcc -c hello.s -o hello.o` / `g++ -c hello.s -o hello.o`
   + 也可以直接从源文件一步到位到目标文件
-
 - `gcc -c -fleading-underscore hello.c` ：默认符号不带下划线，使用此选项后会加上下划线
-
-标文件                                    |
-|         |                            |
-| gcc -c -fno-common hello.c                 | 把所有未初始化的全局变量不以COMMON块的形式处理                         |
-| gcc -c -ffunction-sections -fdata-sections | 将数据和代码都单独分段，以在链接时将未使用的代码移除目标文件，减小大小 |
-| gcc -c -fno-builtin hello.c                | 关闭内置函数优化选项                                                   |
-| ld -T <link_script>                        | 指定链接脚本                                                           |
-| gcc -fPIC -shared -o hello.so hello.c      | 以位置无关码的形式生成动态链接库                                       |
-| gcc -c hello.c -la -o hello.o              | 链接动态库 liba.so , 加上参数 -static 表示链接静态库                   |
+- `gcc -c -fno-common hello.c`：把所有未初始化的全局变量不以COMMON块（若符号）的形式处理
+- `gcc -c -ffunction-sections -fdata-sections `：将数据和代码都单独分段，以在链接时将未使用的代码移除目标文件，减小大小
+- `gcc -c -fno-builtin hello.c `：关闭内置函数优化选项    
+- `ld -T <link_script>`：指定链接脚本  
+- `gcc -fPIC -shared -o hello.so hello.c`：以位置无关码的形式生成动态链接库 
+- `gcc -c hello.c -la -o hello.o `：链接动态库 liba.so , 加上参数 -static 表示链接静态库
+- `gcc -fno-omit-frame-pointer`：使用寄存器来保存栈帧，以更好的能够回溯函数调用栈
 
 # 查看
 - `file <file_name>` ： 查看文件是哪些类型 
@@ -41,17 +38,56 @@ layout: true
 - `readelf -h <file_name>` ：读取ELF文件头
 - `readelf -S <file_name>`：显示elf文件的完整段表 （注意是大写的 S）
 - `nm <filename>`/`readelf -s <file_name>`：显示 elf 文件的符号表
+- `objdump -r <file_name> `：查看目标文件的重定位表
+- `readelf -l <file_name>`：查看 elf 文件的 segment，了解映射到虚拟地址空间的结构
+- `readelf -d <file_name>.so`：查看动态链接文件头(.dynamic 段) 
+- `readelf -sD <file_name>.so`：查看动态链接文件符号哈希表
+- `readelf --dyn-syms <file_name>.so`：查看动态链接文件的动态符号表
+- `ar -t <lib_name>.a `：查看静态库所包含哪些目标文件
+- `ar -x <lib_name>.a`：解压静态库中的目标文件
+- `ld -verbose`：查看链接器的默认链接脚本
+- `ldd <file_name>`：查看程序主模块或共享库依赖于哪些共享库 
 
-| objdump -r <file_name>                                               | 查看目标文件的重定位表      
-| readelf -l <file_name>                                               | 查看elf文件的segment，了解映射到虚拟地址空间的结构 |
-| readelf -d <file_name>.so                                            | 查看动态链接文件头(.dynamic 段)                    |
-| readelf -sD <file_name>.so                                           | 查看动态链接文件符号哈希表                         |
-| readelf --dyn-syms <file_name>.so                                    | 查看动态链接文件的动态符号表                       |
-| ar -t <lib_name>.a                                                   | 查看静态库所包含哪些目标文件                       |
-| ar -x <lib_name>.a                                                   | 解压静态库中的目标文件                             |
-| ld -verbose                                                          | 查看链接器的默认链接脚本                           |
-| ldd <file_name>                                                      | 查看程序主模块或共享库依赖于哪些共享库             |
+- `readelf -d <filename>.so | grep TEXTREL` : 若无任何输出，代表此动态链接库是位置无关码的形式
+- `readelf -l <filename> | grep interpreter` : 查看可执行文件动态连接器路径
 
-- =readelf -d <filename>.so | grep TEXTREL= : 若无任何输出，代表此动态链接库是位置无关码的形式
-- =readelf -l <filename> | grep interpreter= : 查看可执行文件动态连接器路径
+# 属性
+
+## 在 main 函数运行前执行函数
+
+对于 gcc 来讲，在 main 函数运行前，会先执行`.ctor`段中的函数指针初始化列表（和 Linux kernel 的初始化列表逻辑一致）。那么我们可以使用属性`constructor`来显示指定将某个函数地址放入`.ctor`段，以先于`main`函数执行：
+
+> c++ 的全局对象构造函数地址也是被放到这个段中来初始化的。
+
+```cpp
+#include <stdio.h>
+void my_init(void) __attribute__((constructor));
+void my_init(void) {
+    printf("Hello ");
+}
+
+int main(void){
+    printf("World!\n");
+
+    return 0;
+}
+```
+
+## 在 main 函数返回后执行函数
+
+和前面的逻辑类似，只需要将函数地址使用`destructor`修饰即可：
+
+```cpp
+#include <stdio.h>
+void my_init(void) __attribute__((destructor));
+void my_init(void) {
+    printf("Hello ");
+}
+
+int main(void){
+    printf("World!\n");
+
+    return 0;
+}
+```
 
