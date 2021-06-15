@@ -1,6 +1,6 @@
 ---
-title: [What] 现代 cmake 速览
-tags: 
+title: '[What] 现代 cmake 速览'
+tags:
 - cmake
 date:  2021/6/10
 categories: 
