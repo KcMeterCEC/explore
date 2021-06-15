@@ -1,5 +1,5 @@
 ---
-title: '[What]interger representations'
+title: '[What]integer representations'
 tags: 
 - CS
 date:  2021/6/1
