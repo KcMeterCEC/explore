@@ -265,11 +265,15 @@ QML 与 JavaScript 是可以无缝衔接的（可以说是 QML 是 JavaScript �
 
 矩形元素除了继承自 `Item` 外，还具有以下扩展属性:
 - `color` : 设置矩形的颜色
-  + 颜色的值可以是 16进制 RGB（比如 “#FF4444”），也可以在[svg-color](https://www.w3.org/TR/css-color-3/#svg-color)表中填入对应的名称。
+  + 颜色的值可以是 16进制 ARGB（比如 “#00FF4444”），也可以在[svg-color](https://www.w3.org/TR/css-color-3/#svg-color)表中填入对应的名称。
+  + 还可以使用`Qt.rgba(0, 0.5, 0, 1)`这种方式来指定
 - `border.color` , `border.width` ：设置矩形轮廓的颜色和宽度
 - `radius` : 设置圆角
 - `gradient` ： 设置矩形填充的渐变色
   + 填充适合简单的应用场景，要是想要复杂的填充效果那还是自己贴图来得又快又好
+
+
+
 ``` js
   //填充渐变色是使用一系列 GradientStop 来完成的
   //每个 GradientStop 由对应的 position 和 color 来完成
@@ -354,7 +358,6 @@ QML 与 JavaScript 是可以无缝衔接的（可以说是 QML 是 JavaScript �
 - `verticalAlignment` : 垂直对齐方式
 - `style`：设置字体的凸起和凹陷样式
 - `styleColor`：设置字体样式边框的颜色
-  
 
 示例如下：
 ``` js
@@ -423,6 +426,7 @@ Rectangle{
   + 地址可以是左斜杠的本地地址，也可以是网络地址
 - `fillMode` : 控制调整大小的行为
   + 使用此属性后，需要设置属性 `clip: true` ，以约束图片的大小
+
 示例如下：
 ``` js
   import QtQuick 2.12
@@ -457,6 +461,8 @@ Rectangle{
 ```
 效果如下：
 ![](./pic/image.jpg)
+
+
 
 ## MouseArea
 `MouseArea` 元素是非可视化的元素，它是一个矩形区域用户捕捉鼠标事件。
@@ -518,6 +524,9 @@ Rectangle{
 - 由于元素名称是 `Button` ，那么文件名就肯定要是 `Button.qml` 
 - 由于外形是一个矩形并且可以设置字符串，那么它至少需要 `Rectangle` 和 `Text` 元素来组成
 - 既然可以捕获按钮，那么就得需要 `MouseArea` 来完成捕获，并且得要让调用它的 QML 可以接收到该鼠标事件
+
+
+
 ``` js
   //Button.qml
   import QtQuick 2.12
