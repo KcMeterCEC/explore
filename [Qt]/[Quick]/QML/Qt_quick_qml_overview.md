@@ -152,12 +152,19 @@ QML 将复杂的界面分成了多个 QML 来完成，每个 QML 由多个元素
 - 当有属性的值被改变了，引用它的属性的值也会跟着改变，在 QML 中这叫做绑定（binding）
 > 这如同 c/c++ 中变量的值改变了，那么对应使用它的其它部分的运算结果也跟着改变了。
 
-- 定义一个属性的格式为 `property <type> <name> : <value>` ，如果没有设置 <value> 则该属性使用默认值
+- 定义一个属性的格式为 `[readonly] property <type> <name> [: <value>]` ，如果没有设置 <value> 则该属性使用默认值
+
+  > `readonly`代表该属性为只读的
+
 - 可以通过 `property alias <name>: <reference>` 为属性设定一个别名
   + 这种方式主要是为了把当前对象的属性转发到外部可以使用
+  + 如果通过新建属性名的方式，会由于绑定的问题而不会得到预期的结果，详询[kdab](https://www.youtube.com/watch?v=qzSNju-h1pk&list=PL6CJYn40gN6hdNC1IGQZfVI707dh9DPRc&index=17)的视频。
+  
 - 有些属性具有子属性，所以一般将这种属性集中设置
   + 对于上面的 `font` 属性还可以这样设置： `font { family: "Ubuntu"; pixelSize: 24 }`
+  
 - QtQuick 还内建了很多已创建的对象，可以直接引用对象的名称来完成一些关联设置： `<Element>.<property>: <value>`
+
 - 对于任何属性，我们都可以为他绑定对应的信号处理机制
   + 比如对于 `Height` 属性，当它被改变时，就输出其值 `onHeightChanged: console.log('height:', height)`
 
@@ -508,7 +515,11 @@ Rectangle{
 用户可以在内建元素的基础之上构建自己的元素，这个被组合构建的元素就是组件。
 
 比如用户可以创建一个`Button.qml`文件，在此文件中基于其它元素来构建一个组件。
+
+> 文件名的首字母必须大写！
+
 然后其它的 qml 文件可以将 `Button.qml` 作为一个元素来使用了：
+
 ``` js
   Button{
       id: ...
