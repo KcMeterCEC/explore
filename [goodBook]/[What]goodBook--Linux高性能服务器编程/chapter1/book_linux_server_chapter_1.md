@@ -1,21 +1,24 @@
-#+TITLE: [What]tcp/ip 协议族 --> arp 与 dns
-#+DATE: <2019-10-15 二> 
-#+TAGS: CS
-#+LAYOUT: post
-#+CATEGORIES: book,Linux高性能服务器编程
-#+NAME: <book_linux_server_chapter_1.org>
-#+OPTIONS: ^:nil
-#+OPTIONS: ^:{}
+---
+title: '[What]tcp/ip 协议族 --> arp 与 dns'
+tags: 
+- CS
+date:  2019/10/15
+categories: 
+- book
+- Linux高性能服务器编程
+layout: true
+---
 
-在阅读 [[http://kcmetercec.top/categories/book/%25E5%259B%25BE%25E8%25A7%25A3TCPIP-%25E5%2585%25A5%25E9%2597%25A8/][<<图解TCPIP>>]] 时，只简单提了一下 arp 与 dns，现在将它们加深一下理解。
-#+BEGIN_EXPORT html
+在阅读 <<图解TCPIP>> 时，只简单提了一下 arp 与 dns，现在将它们加深一下理解。
+
 <!--more-->
-#+END_EXPORT
-* ARP
+
+# ARP
 ARP 处于网络层，实现网络地址到物理地址的转换，其原理是：主机向目标机器发送 ARP 请求，目标机收到请求后回应包含自己物理地址的 ARP 应答包。
 - 实际上整个局域网络都会接收到 ARP 请求包，只是其他机器由于目标地址不匹配而不响应罢了。
-** 报文格式
-[[./arp_format.jpg]]
+## 报文格式
+![](./arp_format.jpg)
+
 - 硬件类型（2 字节）：定义物理地址的类型，1 表示 MAC 地址
 - 协议类型（2 字节）：要映射的协议地址类型， 0x800 表示 IP 地址
 - 硬件和协议地址长度（均 1 字节）：分别表示后面发送的物理地址和 IP 地址长度
@@ -27,35 +30,34 @@ ARP 处于网络层，实现网络地址到物理地址的转换，其原理是�
   + RARP 应答：4
 - 发送端及接收端的物理地址和 IP 地址：对于最开始 ARP 请求来说，主机并不知道目标机的物理地址
   + 目标机在匹配 IP 地址与自己相符后，会将自己的物理地址填充到 ARP 应答包后返回
-    
+
 ARP 包的长度为 28 字节，这对于数据链路层来说是属于数据部分。
-- 有时候会要求该部分最小为 46 字节，所以会增加填充字节。
-** ARP 的缓存
-ARP 维护了一个缓存来保存最近访问的机器 IP 地址和物理地址的映射关系。
-- cache 真是个提高效率的好东西
+- 有时候会要求该部分最小为 46 字节，所以会增加填充字节（填充内容为 0）。
+## ARP 的缓存
+ARP 维护了一个缓存来保存最近访问的机器 IP 地址和物理地址的映射关系（cache 真是个提高效率的好东西）。
 
 ARP 常用命令如下：
-- =arp= : 查看缓存的映射关系
-- =arp -d <ip>= : 删除对应 ip 的缓存项
-- =arp -s <ip> <mac>= : 添加 ip 和物理地址映射关系
-** 查看 ARP 通信过程
+- `arp` : 查看缓存的映射关系
+- `arp -d <ip>` : 删除对应 ip 的缓存项
+- `arp -s <ip> <mac>` : 添加 ip 和物理地址映射关系
+## 查看 ARP 通信过程
 通过观察虚拟机（192.168.11.9）访问树莓派（192.168.11.191）来查看 ARP 通信过程。
 
 首先要删除其 ARP 缓存，不然无法抓取到 ARP 请求报文：
-#+BEGIN_EXAMPLE
+``` shell
   sudo arp -d 192.168.11.191
-#+END_EXAMPLE
+```
 然后启用 tcpdump 抓取两边的通信:
-#+BEGIN_EXAMPLE
+``` shell
   sudo tcpdump -i enp0s3 -ent '(dst 192.168.11.191 and src 192.168.11.9)or(dst 192.168.11.9 and src 192.168.11.191)'
-#+END_EXAMPLE
+```
 另一个终端启动 telnet 访问树莓派的 echo 服务：
-#+BEGIN_EXAMPLE
+``` shell
   telnet 192.168.11.191 echo
-#+END_EXAMPLE
+```
 
 最后抓取到的 ARP 请求和返回如下：
-#+BEGIN_EXAMPLE
+``` shell
   08:00:27:a3:4b:28 > ff:ff:ff:ff:ff:ff, ethertype ARP (0x0806), length 42: Request who-has 192.168.11.191 tell 192.168.11.9, length 28
   b8:27:eb:e0:d8:a2 > 08:00:27:a3:4b:28, ethertype ARP (0x0806), length 60: Reply 192.168.11.191 is-at b8:27:eb:e0:d8:a2, length 46
   # 省略 ipv4 报文
@@ -66,17 +68,17 @@ ARP 常用命令如下：
 
   # 省略 ipv4 报文
   ...
-#+END_EXAMPLE
+```
 可以看到：
 1. 虚拟机首先以广播的形式发送 ARP 请求，树莓派在匹配到 IP 地址与自己一致时便将自己的 MAC 通过 ARP 返回。
    - 并且树莓派在随后也发送了一次 ARP 请求，但这次的目的物理地址就是明确的，主要是为了确认缓存 ARP
 2. 虚拟机的 ARP 包就是标准的 28 字节，而树莓派的 ARP 包则填充到了 46 字节。
    - 由于总长度没有计算数据链路帧的最后 4 字节校验，所以总长度就分别是 42,60 字节。
 
-* DNS
+# DNS
 DNS 服务器是多个分布式按层级分布的服务器系统，每个服务器负责对应的域名到 IP 地址的映射关系。
-** 报文格式
-[[./dns_format.jpg]]
+## 报文格式
+![](./dns_format.jpg)
 
 - 16 位标识：标记一对 DNS 查询和应答，以区分 DNS 应答所对应的是哪个 DNS 查询
 - 16 位标志：协商具体的通信方式和反馈通信状态，16 位依次是
@@ -85,14 +87,14 @@ DNS 服务器是多个分布式按层级分布的服务器系统，每个服务�
   + AA（1 位）：授权应答，仅用于应答报文，1 表示域名服务器是授权服务器
   + TC（1 位）：截断标志，仅用于 DNS 报文使用 UDP 服务时使用，1 表示 DNS 报文超过 512 字节并被截断
   + RD（1 位）：递归查询标志，1 表示递归查询，DNS 服务器向其它 DNS 服务器查询，直到找到结果并返回给客户端。
-0 表示迭代查询，目标 DNS 无法解析某个主机名，则将它自己知道的其他 DNS 服务器的 IP 地址返回给客户端
+  0 表示迭代查询，目标 DNS 无法解析某个主机名，则将它自己知道的其他 DNS 服务器的 IP 地址返回给客户端
   + RA（1 位）：允许递归标志，仅用于应答报文，1 表示 DNS 服务器支持递归查询
   + zero（3 位）：保留，设置为 0
   + rcode（4 位）：应答状态，0 表示无错误，3 表示域名不存在
 - 接下来的 4 个字段分别表示最后 4 个字段的长度，这些长度很据查询报文和应答报文都不一样
 
 查询报文包含 1 个查询问题，而应答、授权、额外信息为 0。
-[[./dns_request.jpg]]
+![](./dns_request.jpg)
 
 - 查询名是以一定格式封装的要查询的主机域名
 - 查询类型表示如何执行查询操作：
@@ -100,35 +102,35 @@ DNS 服务器是多个分布式按层级分布的服务器系统，每个服务�
   + 类型 CNAME：值为 5，表示获取目标主机的别名
   + 类型 PTR：值为 12，表示反向查询
 - 查询类值为 1，表示获取 IP 地址
-  
+
 应答报文资源个数至少为 1,而授权、额外资源个数可以为 0，应答、授权字段和额外信息字段都使用资源记录（Resource Record，RR）格式。
 
 资源记录格式如下：
-[[./dns_rr.jpg]]
+![](./dns_rr.jpg)
 
 - 32 位域名：资源的名字，和查询报文中的名字一样
 - 16 位类型和类：与查询报文中的字段一样
 - 32 位生存时间：该查询记录结果可被本地客户端缓存多长时间，单位为秒
 - 16 为资源数据长度和资源数据：内容与字段有关，对于类型 A，资源数据就是 IPv4 地址，长度就为 4（以字节为单位）
-** linux 中的 DNS 配置
-linux 使用 =/etc/resolv.conf= 文件存放 DNS 服务器 IP 地址，可以使用 =systemd-resolve --status= 命令查看当前正在使用的 DNS 服务器地址。
-#+BEGIN_EXAMPLE
+## linux 中的 DNS 配置
+linux 使用 `/etc/resolv.conf` 文件存放 DNS 服务器 IP 地址，可以使用 `systemd-resolve --status` 命令查看当前正在使用的 DNS 服务器地址。
+``` shell
   #使用以下命令查询域名对应的 IP 地址
   host -t A <url>
-#+END_EXAMPLE
+```
 
-** 查看 DNS 报文
-依然使用 =tcpdump= 来抓取域名包：
-#+BEGIN_EXAMPLE
+## 查看 DNS 报文
+依然使用 `tcpdump` 来抓取域名包：
+``` shell
   sudo tcpdump -i enp0s3 -nt -s 500 port domain
 
   cec@virtual:~$ host -t A www.baidu.com
   www.baidu.com is an alias for www.a.shifen.com.
   www.a.shifen.com has address 14.215.177.38
   www.a.shifen.com has address 14.215.177.39
-#+END_EXAMPLE
+```
 可以看出内容：
-#+BEGIN_EXAMPLE
+``` shell
   IP 192.168.11.9.44818 > 192.168.11.1.53: 29153+ A? www.baidu.com. (31)
   IP 192.168.11.1.53 > 192.168.11.9.44818: 29153 3/0/0 CNAME www.a.shifen.com., A 14.215.177.38, A 14.215.177.39 (90)
-#+END_EXAMPLE
+```
