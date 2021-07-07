@@ -1,50 +1,52 @@
-#+TITLE: [What]TCP/IP 练习：访问 Internet 上的 Web 服务器
-#+DATE: <2019-10-14 一> 
-#+TAGS: CS
-#+LAYOUT: post
-#+CATEGORIES: book,Linux高性能服务器编程
-#+NAME: <book_linux_server_chapter_4.org>
-#+OPTIONS: ^:nil
-#+OPTIONS: ^:{}
+---
+title: '[What]TCP/IP 练习：访问 Internet 上的 Web 服务器'
+tags: 
+- CS
+date:  2019/11/1
+categories: 
+- book
+- Linux高性能服务器编程
+layout: true
+---
 
 前面算是理解了一下 TCP/IP 的工作原理，现在要来实践消化一下了。
-#+BEGIN_EXPORT html
-<!--more-->
-#+END_EXPORT
-* 总体思路
-[[./http_exercise.jpg]]
 
-如上图所示，访问端运行 =wget= 程序，通过代理上的 =squid= 程序中转，访问 =www.baidu.com= 的首页 =index.html= 文档。
-* 部署
-** 客户端到代理
+<!--more-->
+
+* 总体思路
+![](./http_exercise.jpg)
+
+如上图所示，访问端运行 `wget` 程序，通过代理上的 `squid` 程序中转，访问 `www.baidu.com` 的首页 `index.html` 文档。
+# 部署
+## 客户端到代理
 客户端需要先设置代理服务器：
-#+BEGIN_EXAMPLE
-  # 3128 为 squid 服务器的默认端口号
-  export http_proxy="192.168.11.188:3128"
-#+END_EXAMPLE
-** squid 代理服务器
-在使用 apt 安装好 squid 后，在 =/etc/squid/squid.conf= 中加入以下两行：
-#+BEGIN_EXAMPLE
+``` shell
+# 3128 为 squid 服务器的默认端口号
+export http_proxy="192.168.11.188:3128"
+```
+## squid 代理服务器
+在使用 apt 安装好 squid 后，在 `/etc/squid/squid.conf` 中加入以下两行：
+``` shell
   acl localnet src 192.168.11.0/24
   http_access allow localnet
-#+END_EXAMPLE
+```
 然后再启动服务：
-#+BEGIN_EXAMPLE
+``` shell
   sudo service squid restart
-#+END_EXAMPLE
-* 抓取
+```
+# 抓取
 首先删除代理端对路由器的 arp 缓存，然后使用 tcpdump 抓取整个通信过程：
-#+BEGIN_EXAMPLE
+``` shell
   sudo arp -d 192.168.11.1
   sudo tcpdump -s 2000 -i eth0 -ntX '(src 192.168.11.188) or (dst 192.168.11.188) or (arp)'
   wget --header="Connection: close" http://www.baidu.com/index.html
-#+END_EXAMPLE
+```
 
 可以看到简略输出如下：
-#+BEGIN_EXAMPLE  
-  # 握手请求
+``` shell 
+  # 向代理的握手请求
   IP 192.168.11.9.51750 > 192.168.11.188.3128: Flags [S], seq 2395726701, win 29200, options [mss 1460,sackOK,TS val 4158096288 ecr 0,nop,wscale 10], length 0
-  # 代理通过 ARP 得到代理地址后返回
+  # 代理通过 ARP 得到客户端地址后返回
   ARP, Request who-has 192.168.11.9 tell 192.168.11.188, length 28
   ARP, Reply 192.168.11.9 is-at 08:00:27:a3:4b:28, length 46
   # 代理返回应答
@@ -108,5 +110,4 @@
   IP 192.168.11.9.51750 > 192.168.11.188.3128: Flags [.], ack 2887, win 35, options [nop,nop,TS val 4158102152 ecr 1725241924], length 0
   IP 192.168.11.9.51750 > 192.168.11.188.3128: Flags [F.], seq 196, ack 2888, win 35, options [nop,nop,TS val 4158102152 ecr 1725241925], length 0
   IP 192.168.11.188.3128 > 192.168.11.9.51750: Flags [.], ack 197, win 235, options [nop,nop,TS val 1725241925 ecr 4158102152], length 0
-#+END_EXAMPLE
-
+```

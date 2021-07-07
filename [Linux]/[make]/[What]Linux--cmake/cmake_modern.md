@@ -13,7 +13,7 @@ layout: true
 - 学习书籍：
   + [《Modern CMake》](https://cliutils.gitlab.io/modern-cmake/)
   + [Effective Modern CMake](https://gist.github.com/mbinna/c61dbb39bca0e4fb7d1f73b0d66a4fd1)
-- CMake 版本：3.18.2 
+- CMake 版本：3.20.5
 
 在看了 GNU Radio 3.8 系列的 cmake 文件后，发现现在的 cmake 已经变化了挺多。
 而我还停留在 cmake 2.8 的时代，有必要来了解一下现代 cmake 构建方式，以提高构建工程的搭建速度。
@@ -40,6 +40,8 @@ cmake -S ./ -B build
 cmake --build build
 # 如果想要多核并行编译，那么可以加上 -j N 参数指定核心数
 cmake --build build -j 4
+# 如果想查看构建细节，可以加上 -v 选项
+# 如果想指定构建某个目标，可以加上 -t 选项
 ```
 
 
@@ -84,7 +86,10 @@ CC=clang CXX=clang++ CMAKE_GENERATOR=Ninja cmake -S ./ -B build
 
 ### 调试
 
-调试 CMake 时，可以在生成构建时使用 `--trace` 选项以输出详细信息
+调试 CMake 时：
+
+- 可以在生成构建时使用 `--trace` 选项以输出更为详细信息
+- 可以使用`--trace-source="filename"`来指定调试某个文件的详细构建过程
 
 
 
@@ -92,31 +97,41 @@ CC=clang CXX=clang++ CMAKE_GENERATOR=Ninja cmake -S ./ -B build
 
 养成下面这些 CMake 的使用习惯，可以高效稳定的完成构建。
 - 不要使用全局函数：比如 `link_directories,include_libraries` 这类函数
+
+  > 因为大的构建工程一次性都会构建多个目标，使用全局函数就会影响这些目标的构建
+
 - 不要对使用该 cmake 的用户设定一些不必要的规则：比如必须用户输入一些不必要的选项才能够正常工作
   + 这些东西应该尽量在 cmake 中尽量私有化的设定好
+  
 - 不要在 cmake 构建系统外添加全局文件：一般都是在添加一个文件到工程中后，重新执行一次 cmake 构建即可
-- 直接链接到构建的文件：如果有多个依赖，直接链接到构建文件，可以在构建文件更新后，使用依赖方也实时生效
+
+- 应该将文件链接到 target 而不是全局链接
+
 - 在链接的时候，不要跳过 `PUBILC/PRIVATE` 
+
 - 将 CMake 文件当作编码一样对待，也需要尽量保证简洁和可读性
+
 - 将 targets 作为 INTERFACE 以保证及高内聚低耦合的特性
+
 - 保证能正常的构建和安装
-- 编写 `Config.cmake` 文件以正常的配置
+
+- 编写 `Config.cmake` 文件以正常的可以搜寻到库，而不是使用硬指定的方式
+
 - 使用 ALIAS targets 以保证使用的一致性：使用 `add_subdirectory` 和 `find_package` 需要提供相同的 targets 和名称空间
-- 将频繁使用的函数组合用函数或宏来包裹
+
+- 将频繁使用的函数组合用函数或宏来包裹，以达到最大的复用
+
 - 函数名和宏名都使用小写形式，只有变量名才使用大写
-- 使用 `cmake_policy`
+
+- 使用 `cmake_policy`以限定 cmake 兼容性
 
 
 
 # 基础速览
 
-
-
 ## 基础结构
 
 以下是绝大部分顶层 `CMakeLists.txt` 所含有的部分。
-
-
 
 ### 最小版本需求
 
@@ -182,8 +197,10 @@ ${STATIC_LIBRARIES}
 
 
 
-
 ### 增加配置
+
+使用 target_xxx 来包含对应的源文件和头文件，这就像使用命名空间将多个 target 隔离一样，以避免混淆。
+
 ``` cmake
 # 将 include 文件夹加入头文件路径
 target_include_directories(one PUBLIC include)
@@ -305,9 +322,9 @@ function(COMPLEX)
 endfunction()
 
 complex(SINGLE ONE_VALUE value MULTI_VALUES some other values)
-​``` cmake
+```
 最终在函数中得到的变量列表就是：
-​``` cmake
+``` cmake
   COMPLEX_PREFIX_SINGLE = TRUE
   COMPLEX_PREFIX_ANOTHER = FALSE
   COMPLEX_PREFIX_ONE_VALUE = "value"
@@ -478,6 +495,11 @@ configure_file (
 # 增加特定的配置
 
 ## 设置构建类型
+
+设定一个默认类型，如果用户指定了，便使用用户指定的类型。
+
+> 比如 -DCMAKE_BUILD_TYPE=Debug 这样用户就指定使用 Debug 构建
+
 ``` cmake
   set(default_build_type "Release")
   if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -547,3 +569,14 @@ configure_file (
     set_target_properties(foo PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
   endif()
 ```
+
+# 增加外部项目
+
+参考这个[教程](https://github.com/BrightXiaoHan/CMakeTutorial/blob/master/ImportExternalProject/README.md)使用`FetchContent_Declare`是最简单粗暴的方式。
+
+# 增加测试
+
+对于中小型项目，使用[catch](https://github.com/catchorg/Catch2)是简单易行的办法，而添加的方式与添加外部项目是一样的方式。
+
+> 对于 catch 的使用，可以参考[这篇博客](https://renyili.org/post/use_catch2/)。
+
