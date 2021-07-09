@@ -86,11 +86,20 @@ CC=clang CXX=clang++ CMAKE_GENERATOR=Ninja cmake -S ./ -B build
 
 ### 调试
 
-调试 CMake 时：
+调试 CMake 的 CMakeLists.txt 执行细节时：
 
 - 可以在生成构建时使用 `--trace` 选项以输出更为详细信息
 - 可以使用`--trace-source="filename"`来指定调试某个文件的详细构建过程
 
+```shell
+cmake -S . -B build --trace
+```
+
+在编译时，如果想看编译的执行细节，使用`--verbose`选项：
+
+```shell
+cmake --build ./build --verbose
+```
 
 
 ## CMake 的一些使用习惯
