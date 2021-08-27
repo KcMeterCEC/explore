@@ -163,5 +163,5 @@ class PriorityCustomer: public Customer{
     }
     private:
     int priority;
-}
+};
 ```
