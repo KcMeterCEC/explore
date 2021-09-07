@@ -479,6 +479,8 @@ image=Image
 fdt_addr=0x43000000
 fdt_file=myb-imx8mm-lcd-hontron-7.dtb
 boot_fdt=try
+console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200
+mmcroot=/dev/mmcblk1p2 rootwait rw
 
 mmcargs=setenv bootargs ${jh_clk} console=${console} root=${mmcroot}
 loadfdt=fatload mmc ${mmcdev}:${mmcpart} ${fdt_addr} ${fdt_file}
@@ -511,3 +513,4 @@ else booti ${loadaddr} - ${fdt_addr};\
 fi\
 ```
 
+`bootcmd`将会是 U-boot 启动以后自动执行的命令。

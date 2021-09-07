@@ -183,6 +183,50 @@ INSTALL_MOD_PATH=$HOME/rootfs modules_install
 - `mrproper`：删除所有的中间文件，包含`.config`文件
 - `distclean`：在`mrproper`的基础上，删除基本的备份文件、补丁文件等
 
+## 编译 imx8mm 内核
+
+为了简化编译，这里使用[米尔科技的内核分支](https://github.com/MYiR-Dev/myir-imx-linux)。
+
+先安装基础包：
+
+```shell
+$ sudo apt install -y libssl-dev libelf-dev
+```
+
+首先需要将交叉编译工具链，加入当前 SHELL 的环境变量中：
+
+```shell
+$ export PATH=/home/cec/x-tools/aarch64-unknown-linux-gnu/bin:${PATH}
+```
+
+然后按照惯例，先清理一下中间文件：
+
+```shell
+$ make distclean
+```
+
+配置常使用的全局变量：
+
+```shell
+$ export CROSS_COMPILE=aarch64-unknown-linux-gnu-
+$ export ARCH=arm64
+```
+
+接下来为内核指定要编译的构架，及其使用的默认配置：
+
+```shell
+$ make myd_imx8mm_defconfig
+```
+
+最后就是编译内核文件、模块、设备树：
+
+```shell
+$ make -j8 dtbs Image modules
+```
+
+- `Image`文件编译后位于`arch/arm64/boot/Image`
+- 设备树位于`arch/arm64/boot/dts/myir/`
+
 # 启动内核
 
 ## 当没有文件系统时
@@ -245,3 +289,22 @@ root=/dev/<disk name>p<partition number>
 - `rootwait`：一直等到设备初始化完毕以后，才挂载根文件系统
 
 - `rw`：以读写的方式挂载根文件系统
+
+## imx8mm 内核启动
+
+## 制作启动 SD 卡
+
+从 Uboot 中的启动命令可知：它将在 mmc 的 1 分区中寻找`Image`文件和对应的设备树。
+
+并且，前面我们将由[imx-mkimage](https://source.codeaurora.org/external/imx/imx-mkimage)打包的 bootloader 拷贝到了 SD 卡的 33K 偏移处，也就是说需要保留这部分裸数据，前面制作好的`flash.bin`有 1M 多的大小，需要考虑好这个偏移。
+
+1. 由于 SD 卡是 512 字节的扇区，先用 fdisk 简单粗暴的将第一个分区的起始扇区设为 20480，这样就预留了有 10MB 的空间给 bootloader。
+
+2. 使用`sudo mkfs.vfat /dev/sdd1`将分区格式化为 FAT32 格式
+
+3. 将编译得到的`Image`和`myb-imx8mm-base.dtb`拷贝到 SD 卡分区
+
+   > 这里选择 `myb-imx8mm-base.dtb`，是因为前面打包 bootloader 也是这个设备树
+
+4. 修改 U-boot 默认环境变量`fdt_file`的值为`myb-imx8mm-base.dtb`，这样才能一一对应
+
