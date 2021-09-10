@@ -44,7 +44,7 @@ libtool-bin make patch python3-dev rsync texinfo unzip wget xz-utils
 
   > 这在分析目标文件，对目标文件进行瘦身等非常有用
 
-- [GCC]([GCC, the GNU Compiler Collection - GNU Project](http://gcc.gnu.org/))：主要用于 c/c++ 的编译器集合
+- [GCC](http://gcc.gnu.org/)：主要用于 c/c++ 的编译器集合
 
 - c/c++ 库：包含支持 c/c++ 标准，且具有自己的扩展
 
@@ -107,10 +107,10 @@ x86_64-linux-gnu
 
 c 库有以下几个选择：
 
-- [glibc]([The GNU C Library](https://www.gnu.org/software/libc/))：GNU 标准 C 库，对 POSIX 支持也是最为完善的，只是体积占用比较大。
-- [musl libc]([musl libc](https://musl.libc.org/))：兼容性与 glibc 比较接近，但是占用体积比较小
-- [uClibc-ng]([Welcome to uClibc-ng! - Embedded C library](https://uclibc-ng.org/))：专用于嵌入式场景的 c 库，主要还是 uClinux 用得多
-- [eglibc]([EGLIBC: EGLIBC](http://www.eglibc.org/home))：也是专用于嵌入式场景的 c 库，但已经好几年没有更新了
+- [glibc](https://www.gnu.org/software/libc/)：GNU 标准 C 库，对 POSIX 支持也是最为完善的，只是体积占用比较大。
+- [musl libc](https://musl.libc.org/)：兼容性与 glibc 比较接近，但是占用体积比较小
+- [uClibc-ng](https://uclibc-ng.org/)：专用于嵌入式场景的 c 库，主要还是 uClinux 用得多
+- [eglibc](http://www.eglibc.org/home)：也是专用于嵌入式场景的 c 库，但已经好几年没有更新了
 
 所以，如果 RAM 很小，那就选 musl libc，否则还是选 glibc 是最简单粗暴的方式。
 
@@ -120,7 +120,7 @@ c 库有以下几个选择：
 
 1. 选择已经编译好的第三方工具链
    - SOC 厂商或开发板厂商会提供他们的工具链
-   - 一些开源组织（比如[linaro]([Accelerating deployment of Arm-based solutions - Linaro](https://www.linaro.org/))）会提供他们的工具链
+   - 一些开源组织（比如[linaro](https://www.linaro.org/)）会提供他们的工具链
    - 发行版也会维护交叉编译工具链
 2. 选择构建工具（buildroot,yocto）提供的工具链
 3. 使用源码自己构建工具链
@@ -131,11 +131,11 @@ c 库有以下几个选择：
 
 首选在 SOC 厂商网站上获取他们所提供的工具链，其次才是在`linaro`网站上获取。
 
-其工具链位于[arm 工具链主页]([GNU Toolchain – Arm Developer](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain))中，但由于网络原因，推荐使用[清华大学开源镜像站]([Index of /armbian-releases/_toolchain/ | 清华大学开源软件镜像站 | Tsinghua Open Source Mirror](https://mirrors.tuna.tsinghua.edu.cn/armbian-releases/_toolchain/))。
+其工具链位于[arm 工具链主页](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain)中，但由于网络原因，推荐使用[清华大学开源镜像站](https://mirrors.tuna.tsinghua.edu.cn/armbian-releases/_toolchain/)。
 
 ## 自己构建工具链
 
-构建工具链最简单的办法是通过[crosstool-NG]([GitHub - crosstool-ng/crosstool-ng: A versatile (cross-)toolchain generator.](https://github.com/crosstool-ng/crosstool-ng)) 来完成自动化构建。
+构建工具链最简单的办法是通过[crosstool-NG](https://github.com/crosstool-ng/crosstool-ng) 来完成自动化构建。
 
 ### 安装 crosstool-NG
 
