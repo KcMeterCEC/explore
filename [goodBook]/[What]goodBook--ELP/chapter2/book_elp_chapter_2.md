@@ -187,6 +187,19 @@ $ ct-ng menuconfig
 
   > 为了在后面可以在工具链库路径中加入其他库，这样在交叉编译时不会因为找不到库而编译错误
 
+- 在`Operating System -> Version of linux`选择 5.3.18
+
+  > 目前 MYB-C8MMX V1.3 使用 5.4.3 内核，所以工具链必须低于该版本。
+  >
+  > 否则在加载文件系统时，就会出现错误：
+  >
+  > > FATAL: kernel too old
+  > > Kernel panic - not syncing: Attempted to kill init! exitcode=0x00007f00
+  >
+  > 因为编译出的动态库 libc.so.6 所需要的内核版本高于当前内核版本
+  >
+  > - 可以使用`file libc.so.6`来查看其期望的版本
+
 - ~~选择`Target options->Floating point`为`hardware(FPU)`~~（32 位 arm 中有此选项）
 
   > 如果有硬件浮点的话，那么选择此项才能产生使用硬件浮点单元的汇编，以提高运行效率

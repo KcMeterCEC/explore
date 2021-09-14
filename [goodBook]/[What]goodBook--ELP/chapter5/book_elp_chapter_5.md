@@ -72,6 +72,8 @@ $ cd ~/rootfs
 $ mkdir bin dev etc home lib proc sbin sys tmp usr var
 $ mkdir usr/bin usr/lib usr/sbin
 $ mkdir -p var/log
+# 对于 ARM64 lib 引用的是 lib64，其实只需要为 lib 创建软链接即可
+$ ln -s lib lib64
 ```
 
 接下来就是要考虑一些文件的权限问题了，对于一些重要文件应该限制为`root `用户才能操作。而其他程序应该运行在普通用户模式。
@@ -83,6 +85,10 @@ $ mkdir -p var/log
 ### `init`程序
 
 `init`程序是进入根文件系统后运行的第一个程序。
+
+> 对于 busybox 而言，就是`/sbin/init`，最终还是指向 busybox 这个独立可执行程序。
+
+`init`程序首先会读取`/etc/inittab`中的配置，然后依次启动对应的程序。
 
 ### Shell
 
@@ -150,7 +156,7 @@ $ make distclean
 $ make defconfig
 ```
 
-然后使用`make menuconfig` 进入`Busybox Settings -> Installation Options`来设置安装路径到前面的 staging 目录。
+然后使用`make menuconfig` 进入`Settings -> Destination path for make install`来设置安装路径到前面的 staging 目录。
 
 接下来便是编译及安装：
 
@@ -251,6 +257,11 @@ Load Address: 00000000
 Entry Point:  00000000
 ```
 
+需要注意的是：**initramfs 包体积不能太大，因为压缩包和解压后的文件都会全部存在于内存中！** 
+
+> [这篇文章](https://www.lightofdawn.org/blog/?viewDetailed=00128)有讲到，`initramfs`包最好小于内存的 25%
+
+
 ## 启动独立包
 
 ### 拷贝进 SD 卡
@@ -290,8 +301,229 @@ $ env save
 ```shell
 $ booti ${loadaddr} ${initrd_addr} ${fdt_addr}
 ```
+这个时候会发现没有工作控制流而退出 shell：
+```shell
+/bin/sh: can't access tty; job control turned off
+```
+
+## 将 initramfs 嵌入内核
+
+将`initramfs`嵌入内核非常简单：在`General setup -> Initramfs source file(s)`中指定**未压缩的 cpio 文件**，然后再次运行 make 即可。
+
+这样设置以后，便可以在 bootloader 中指定内核和设备树地址就行了。
+
+> 这里需要注意内核 + initramfs 所占用的空间，设备树需要预留足够多的空间以避免相互覆盖。
+>
+> 比如当前内核 + initramfs 就有 55MB，那么设备树的载入位置需要再往后放一点。
+>
+> 当前开发板具有 2GB 内存，那 DDR 寻址范围是 0x40000000 ~ 0xC0000000。
+>
+> 所以设备树的位置预留足够位置即可，比如放置在 0x4C800000 处，就预留了 200MB 的空间。
+
+## 以设备列表的形式构建 initramfs
+
+设备列表就是一个配置文件，用以列出文件、文件夹、设备节点、链接等等。
+
+在构建内核的时候，也就会生成按照设备列表配置的 cpio 文件。
+
+和上面的方式一样，在内核的`Initramfs source file(s)`处指向该配置文件。
+
+下面是一个简单的示例：
+
+```shell
+# dir <name> <mode> <uid> <gid>
+dir /bin 775 0 0
+dir /sys 775 0 0
+dir /tmp 775 0 0
+dir /dev 775 0 0
+# nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>
+nod /dev/null 666 0 0 c 1 3
+nod /dev/console 600 0 0 c 5 1
+dir /home 775 0 0
+dir /proc 775 0 0
+dir /lib 775 0 0
+# slink <name> <target> <mode> <uid> <gid>
+slink /lib/libm.so.6 libm-2.22.so 777 0 0
+slink /lib/libc.so.6 libc-2.22.so 777 0 0
+slink /lib/ld-linux-armhf.so.3 ld-2.22.so 777 0 0
+# file <name> <location> <mode> <uid> <gid>
+file /lib/libm-2.22.so /home/chris/rootfs/lib/libm-2.22.so 755 
+0 0
+file /lib/libc-2.22.so /home/chris/rootfs/lib/libc-2.22.so 755 
+0 0
+file /lib/ld-2.22.so /home/chris/rootfs/lib/ld-2.22.so 755 0 0
+```
+
+# 完整启动 initramfs
+
+前面的启动过程，会由于 initramfs 缺少文件而退出 shell，而正确的启动流程是：
+
+1. 内核启动`/sbin/init`程序
+2. `/sbin/init`读取`/etc/inittab`确定启动级别及运行 shell
+3. 根据`/etc/inittab`中的内容找到`/etc/init.d/rcS`然后依次运行对应脚本进行环境初始化
+
+而`busybox`在其源码`examples/bootfloppy/etc/`中就提供了通用的示例，将其拷贝到我们创建的`rootfs`中是比较简单的方法：
+
+```shell
+cec@imx8:~/myb/rootfs$ cp -aR ../busybox/examples/bootfloppy/etc/** etc/
+```
+
+## inittab 修改
+
+作为测试目的，对其进行简单修改：
+
+```shell
+# 启动初始化脚本为 /etc/init.d/rcS
+::sysinit:/etc/init.d/rcS
+# 虚拟终端作为 shell
+::askfirst:-/bin/sh
+```
+
+## rcS 修改
+
+在 `rcS`脚本中，需要至少挂载`proc,sys`两个虚拟文件系统：
+
+```shell
+#!/bin/sh
+mount -t proc proc /proc 
+mount -t sysfs sysfs /sys
+```
+
+## 增加用户配置
+
+`busybox`默认会支持 shadow 特性，这需要添加用户配置文件。
+
+用户名及相关信息被配置于`/etc/passwd`文件中，每个用户一行，中间以冒号分开，依次是：
+
+- 用户名
+
+- `x`代表密码存储于`/etc/shadow`
+
+  > `/etc/passwd`是所有人可读的，而`/etc/shadow`则只能是 root 用户和组可以读，以此来保证安全性。
+
+- 用户 ID
+
+- 组 ID
+
+- 注释
+
+- 用户的`home`目录
+
+- 用户所使用的 shell
+
+```shell
+root:x:0:0:root:/root:/bin/sh
+daemon:x:1:1:daemon:/usr/sbin:/bin/false
+```
+
+组名称则存储于`/etc/group`中，也是每个组一行，中间以冒号分开：
+
+- 组名
+- 组密码，`x`代表该组没有密码
+- 组 ID
+- 那些用于属于该组
+
+```shell
+root:x:0:
+daemon:x:1:
+```
 
 
+## 启动
 
+最后还需要在`console`中修改启动程序`rdinit=/sbin/init`。
 
+# 创建设备节点更好的方法
 
+`mknod`创建设备节点比较繁琐，还有其他更好的办法：
+
+- `devtmpfs`：这是在启动时被挂载到`/dev`的伪文件系统。内核通过它来动态的增加和删除设备节点。
+- `mdev`：由 busybox 提供的工具，通过读取`/etc/mdev.conf`来达到自动挂载节点的目的
+- `udev`：功能和`udev`类似，现在属于`systemd`的一部分
+
+在实际使用中，一般是通过`devtmpfs`来自动创建节点，而`mdev/udev`来设置节点的属性。
+
+## `devtmpfs`
+
+在使用`devtmpfs`之前，需要确保内核已经使能了`CONFIG_DEVTMPFS`。
+
+> 如果使能了 CONFIG_DEVTMPFS_MOUNT 内核会自动挂载该文件系统，只是不适用于 initramfs
+
+然后在启动脚本中挂载`devtmpfs`：
+
+```shell
+mount -t devtmpfs devtmpfs /dev
+```
+
+## `mdev`
+
+在使用`mdev`之前，需要在启动脚本中将其设置为接收内核发送的`hotplug`事件，然后再启动`mdev`：
+
+```shell
+echo /sbin/mdev > /proc/sys/kernel/hotplug
+mdev -s
+```
+
+`mdev`会根据`/etc/mdev.conf`文件来配置节点的属性：
+
+```shell
+# file /etc/mdev.conf
+null root:root 666
+random root:root 444
+urandom root:root 444
+```
+
+关于 `mdev`更多说明，参考 busybox 源码中的 `docs/mdev.txt`文件。
+
+# 网络配置
+
+## 基本配置
+
+与网络配置相关的文件有：
+
+```shell
+etc/network
+etc/network/if-pre-up.d
+etc/network/if-up.d
+etc/network/interfaces
+var/run
+```
+
+其中`interfaces`中是对网络的配置：
+
+```shell
+auto lo
+iface lo inet loopback
+
+# 配置 eth0 为静态 IP
+auto eth0
+iface eth0 inet static
+    address 192.168.1.101
+    netmask 255.255.255.0
+    network 192.168.1.0
+
+# 也可以这样配置，使用动态 IP
+# auto eth0
+# iface eth0 inet dhcp
+# iface eth1 inet dhcp    
+```
+
+对于动态 IP，busybox 使用 `udchpcd`运行`/usr/share/udhcpc/default.script`来完成配置。
+
+## 字符串映射
+
+glibc 使用 `name service switch（NSS）`来实现从名称到特定数值的转换。
+
+比如从用户名转换到 UID，从服务器名称转换到端口号，从主机名称转换到 IP 地址等。
+
+这些配置被存储于`/etc/nssswitch.conf`文件中：
+
+```shell
+passwd:    files # 查询 UID ，就在 /etc/passwd
+group:     files
+shadow:    files
+hosts:     files dns # 查询主机就在 /etc/hosts，如果查询不到就从 DNS 查询
+networks:  files
+protocols: files
+services:  files # 查询端口号，就在 /etc/services
+```
