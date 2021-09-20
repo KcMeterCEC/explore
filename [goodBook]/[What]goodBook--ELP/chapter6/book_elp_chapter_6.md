@@ -35,48 +35,9 @@ layout: true
 5. [PTXdist](https://www.ptxdist.org/)：简单的构建工具
 6. [Yocto](https://www.yoctoproject.org/)基于 OpenEmbedded 扩展的元数据、工具、文档集，更为强大的构建工具
 
-其中就属 Buildroot 和 Yocto 用户最多，所以对它们进行比较。
+其中就属 Yocto 最完善，所以这里只关注 Yocto。
 
 <!--more-->
-# Buildroot
-
-[Buildroot](https://buildroot.org/)主要使用`GNU Make`作为主要的构建工具，用于构建工具链、bootloader、内核、根文件系统。
-
-## 获取
-
-```shell
-$ git clone git://git.buildroot.net/buildroot -b 2021.02.4
-```
-
-## 配置
-
-配置也是通过`Kconfig`的方式，所以它也有一个默认配置，使用` make list-defconfigs`可以列出所有的默认设置。
-
-## 编译
-
-Buildroot 也需要从网络下载代码，所以最终会有这些输出目录：
-
-- `dl`：包含所下载的源码包
-- `output`：包含中间及最终的输出文件
-  + `build`：编译输出
-  + `host`：包含构建过程中用到的工具
-  + `images`：这里面就包含了 bootloader、内核、根文件系统
-  + `staging`：指向工具链`sysroot`的软连接，这个名字有点迷惑人
-  + `target`：`staging`根文件系统
-
-## 运行
-
-和之前手撸的方式一样，以正确的方式引导内核及根文件系统即可
-
-## 创建新的 BSP
-
-创建新的 BSP 按照以下路径来放置组件：
-
-- `board/<organization>/<device>`：这里包含对 Linux，U-Boot 等的补丁、二进制对象、构建步骤、配置文件
-- `configs/<device>_defconfig`：这里包含对目标板的默认配置
-- `package/<organization>/<package_name>`：这里放置其他附加包
-
-# Yocto
 
 
 
