@@ -1,5 +1,5 @@
 ---
-title: '[What] C++ Concurrency in Action 2nd ：c++ 与并发'
+title: '[What] C++ Concurrency in Action 2nd ：c++ 中的并发'
 tags: 
 - c++
 date:  2021/2/2
@@ -36,11 +36,11 @@ c++14 进而又增加了互斥类型，c++17 增加了并行算法。
 #include <iostream>
 #include <chrono>
 #include <cstring>
+
 #include <pthread.h>
  
 std::mutex iomutex;
-void f(int num)
-{
+void f(int num) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
  
     sched_param sch;
@@ -51,12 +51,12 @@ void f(int num)
               << sch.sched_priority << '\n';
 }
  
-int main()
-{
+int main() {
     std::thread t1(f, 1), t2(f, 2);
  
     sched_param sch;
-    int policy; 
+    int policy;
+    
     pthread_getschedparam(t1.native_handle(), &policy, &sch);
     sch.sched_priority = 20;
     if (pthread_setschedparam(t1.native_handle(), SCHED_FIFO, &sch)) {
@@ -74,11 +74,11 @@ int main()
 //多线程管理的头文件
 #include <thread>
 
-void hello(void){
+void hello(void) {
     std::cout << "Hello world!\n";
 }
 
-int main(void){
+int main(void) {
 
     std::thread t1(hello);
 

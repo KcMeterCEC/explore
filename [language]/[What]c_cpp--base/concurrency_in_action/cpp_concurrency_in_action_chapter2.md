@@ -18,6 +18,10 @@ layout: true
 
 在 c++ 中，线程也是一个对象，该对象与对应的执行函数、对象相关联而执行对应的操作。
 
+当创建该对象后，与其相关联的可执行对象就会被并发执行。
+
+> 这就和使用 pthread_create 一样，创建一个 pthread 与之关联的函数便会并发执行。
+
 ### 与普通函数关联
 
 最简单的创建线程的方式便是将一个普通函数与线程对象关联，线程启动后便会执行该函数。
@@ -51,14 +55,14 @@ int main(void){
 //多线程管理的头文件
 #include <thread>
 
-class BackGroundTask{
+class BackGroundTask {
   public:
-    void operator()() const{
+    void operator()() const {
         std::cout << "Hello world!\n";
     }
 };
 
-int main(void){
+int main(void) {
 
     /**
       @brief : 方法1，创建实例，将实例传给对象
@@ -83,6 +87,8 @@ int main(void){
 }
 ```
 
+特别要注意括号初始化，如果是以`std::thread t1(BackGroundTask());`形式，则是代表声明了一个函数。其参数是函数指针，返回类型是`std::thread`。关于初始化的坑，在[这篇文章](http://kcmetercec.top/2021/01/20/chapter3_item7_create_obj/)有详细说明。
+
 ### 与 Lambda 表达式关联
 
 ```cpp
@@ -90,9 +96,9 @@ int main(void){
 //多线程管理的头文件
 #include <thread>
 
-int main(void){
+int main(void) {
 
-    auto task = [](){
+    auto task = []() {
         std::cout << "Hello world!\n";
     };
 
@@ -112,9 +118,9 @@ int main(void){
 //多线程管理的头文件
 #include <thread>
 
-class TaskObj{
+class TaskObj {
 public:
-    TaskObj(int i):i_(i){
+    TaskObj(int i):i_(i) {
 
     }
     static void Task(TaskObj *obj);
@@ -122,11 +128,11 @@ private:
     int i_ = 0;
 };
 
-void TaskObj::Task(TaskObj *obj){
+void TaskObj::Task(TaskObj *obj) {
     std::cout << "The value of obj is " << obj->i_ << "\n";
 }
 
-int main(void){
+int main(void) {
 
     TaskObj obj(10);
 
@@ -147,19 +153,19 @@ int main(void){
 #include <string>
 #include <functional>
 
-class Obj{
+class Obj {
 public:
-    Obj(int val):val_(val){
+    Obj(int val):val_(val) {
 
     }
-    void Exec(void){
+    void Exec(void) {
         std::cout << "Value is " << val_ << "\n";
     }
 private:
     int val_{0};
 };
 
-int main(void){
+int main(void) {
 
     Obj obj(89);
 
@@ -193,17 +199,13 @@ int main(void){
 
 ```cpp
 struct func;         
-void f()
-{
-    int some_local_state=0;
+void f() {
+    int some_local_state = 0;
     func my_func(some_local_state);
     std::thread t(my_func);
-    try
-    {
+    try {
         do_something_in_current_thread();
-    }
-    catch(...)
-    {
+    } catch(...) {
         t.join();
         throw;
     }
@@ -224,14 +226,14 @@ void f()
 //多线程管理的头文件
 #include <thread>
 
-class TaskGuard{
+class TaskGuard {
 public:
-    TaskGuard(std::thread &t):t_(t){
+    TaskGuard(std::thread &t):t_(t) {
 
     }
-    ~TaskGuard(){
+    ~TaskGuard() {
         //保证一个线程是可以 join 的，并且目前没有其它代码使用该 join
-        if(t_.joinable()){
+        if(t_.joinable()) {
             std::cout << "Waiting for thread completely\n";
             t_.join();
         }
@@ -244,12 +246,12 @@ private:
     std::thread &t_;
 };
 
-void Task(void){
+void Task(void) {
     std::cout << "Hello world!\n";
 }
 
 
-int main(void){
+int main(void) {
 
     std::thread t1(Task);
 
@@ -271,7 +273,7 @@ int main(void){
 
 参数的传递是直接在线程对象的构造函数中依次传入参数即可，比如`std::thread t1(TaskObj::Task, &obj);`。
 
-但是需要特别注意的是：**`std::thread`会根据传入的参数进行一次拷贝，然后在线程函数执行时，再将此参数转换为右值引用类型传递给函数**。
+但是需要特别注意的是：**`std::thread`会根据传入的参数进行一次拷贝，然后在线程函数执行时，默认会将此参数转换为右值引用类型传递给函数**。
 
 > 传递右值引用是为了充分利用移动语义以提高参数传递的效率。
 
@@ -285,11 +287,11 @@ int main(void){
 #include <chrono>
 #include <string>
 
-void PrintStr(const std::string &str){
+void PrintStr(const std::string &str) {
     std::cout << "The str is : " << str << "\n";
 }
 
-void Oops(void){
+void Oops(void) {
     char str[100] = "Hello world!";
 
     std::thread t1(PrintStr, str);
@@ -298,7 +300,7 @@ void Oops(void){
 }
 
 
-int main(void){
+int main(void) {
 
     Oops();
 
@@ -321,20 +323,21 @@ int main(void){
 #include <chrono>
 #include <string>
 
-void PrintStr(const std::string &str){
+void PrintStr(const std::string &str) {
     std::cout << "The str is : " << str << "\n";
 }
 
-void Oops(void){
+void Oops(void) {
     char str[100] = "Hello world!";
 
+    // 创建一个 std::string 类型的临时对象，str 作为构造参数参数 
     std::thread t1(PrintStr, std::string(str));
 
     t1.detach();
 }
 
 
-int main(void){
+int main(void) {
 
     Oops();
 
@@ -355,11 +358,11 @@ int main(void){
 #include <string>
 #include <functional>
 
-void PrintStr(int& i){
+void PrintStr(int& i) {
     std::cout << "The value is : " << i << "\n";
 }
 
-int main(void){
+int main(void) {
 
     int val = 10;
 
@@ -381,11 +384,11 @@ int main(void){
 #include <string>
 #include <functional>
 
-void PrintStr(int& i){
+void PrintStr(int& i) {
     std::cout << "The value is : " << i << "\n";
 }
 
-int main(void){
+int main(void) {
 
     int val = 10;
 
@@ -408,11 +411,11 @@ int main(void){
 #include <functional>
 #include <memory>
 
-static void Thread(std::unique_ptr<int> par){
+static void Thread(std::unique_ptr<int> par) {
     std::cout << "The value of par is " << *par << "\n";
 }
 
-int main(void){
+int main(void) {
 
     std::unique_ptr<int> val = std::make_unique<int>(10);
 
@@ -445,11 +448,11 @@ int main(void){
 #include <functional>
 #include <memory>
 
-static void Thread(int par){
+static void Thread(int par) {
     std::cout << "The value of par is " << par << "\n";
 }
 
-int main(void){
+int main(void) {
     std::thread t1(Thread, 1);
     //由于 t1 不是一个匿名的临时对象，所以需要显示的使用 std::move
     //t1 目前没有关联任何线程函数
@@ -471,20 +474,17 @@ int main(void){
 当然也可以在函数返回或形参中使用`std::thread`，并且由于返回的是匿名临时对象，可以不用显示使用`std::move`：
 
 ```cpp
-std::thread f()
-{
+std::thread f() {
     void some_function();
     return std::thread(some_function);
 }
-std::thread g()
-{
+std::thread g() {
     void some_other_function(int);
     std::thread t(some_other_function,42);
     return t;
 }
 void f(std::thread t);
-void g()
-{
+void g() {
     void some_function();
     f(std::thread(some_function));
     std::thread t(some_function);
@@ -506,12 +506,12 @@ void g()
 
 class TaskGuard{
 public:
-    TaskGuard(std::thread t):t_(std::move(t)){
+    TaskGuard(std::thread t):t_(std::move(t)) {
         //由于可以保证当前只有 t_ 与线程关联，所以可以来判定是否有线程
         if(!t_.joinable())
             throw std::logic_error("No thread");
     }
-    ~TaskGuard(){
+    ~TaskGuard() {
         t_.join();
     }
 
@@ -527,7 +527,7 @@ void Task(void){
 }
 
 
-int main(void){
+int main(void) {
 
     std::thread t1(Task);
 
@@ -551,16 +551,16 @@ int main(void){
 #include <memory>
 #include <vector>
 
-static void Thread(int par){
+static void Thread(int par) {
     std::cout << "The value of par is " << par << "\n";
 }
 
 int main(void){
     std::vector<std::thread> vt;
-    for(int i = 0; i < 20; ++i){
+    for(int i = 0; i < 20; ++i) {
         vt.emplace_back(Thread, i);
     }
-    for(auto& v : vt){
+    for(auto& v : vt) {
         v.join();
     }
 
@@ -593,22 +593,22 @@ c++ 提供了函数`std::thread::hardware_concurrency()`来返回硬件所支持
 #include <memory>
 #include <vector>
 
-static void Thread(int par){
+static void Thread(int par) {
     std::cout << "The value of par is " << par << "\n";
     std::cout << "The id of mine is " << std::this_thread::get_id() << "\n\n";
 }
 
-int main(void){
+int main(void) {
 
     auto number = std::thread::hardware_concurrency();
 
     std::cout << "hardware concurrency " << number << "\n";
 
     std::vector<std::thread> vt;
-    for(int i = 0; i < 20; ++i){
+    for (int i = 0; i < 20; ++i) {
         vt.emplace_back(Thread, i);
     }
-    for(auto& v : vt){
+    for (auto& v : vt) {
         std::cout << "join thread: " << v.get_id() << "\n";
         v.join();
     }
@@ -635,10 +635,8 @@ int main(void){
 
 ```cpp
 std::thread::id master_thread;
-void some_core_part_of_algorithm()
-{
-    if(std::this_thread::get_id()==master_thread)
-    {
+void some_core_part_of_algorithm() {
+    if (std::this_thread::get_id() == master_thread) {
         do_master_thread_work();
     }
     do_common_work();
