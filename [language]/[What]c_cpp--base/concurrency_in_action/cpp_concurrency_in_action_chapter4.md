@@ -31,10 +31,8 @@ std::condition_variable data_cond;
 std::queue<data_chunk> data_queue;      
 
 //生产者
-void data_preparation_thread()
-{
-    while(more_data_to_prepare())
-    {
+void data_preparation_thread() {
+    while (more_data_to_prepare()) {
         const data_chunk data = prepare_data();
         {
 			//将数据写入队列
@@ -48,16 +46,15 @@ void data_preparation_thread()
         data_cond.notify_one();
     }
 }
-void data_processing_thread()
-{
-    while(true)
-    {
+// 消费者
+void data_processing_thread() {
+    while(true) {
         std::unique_lock<std::mutex> lk(mut);
         //等待数据，当 lambda 中的返回为真时，则会继续处理后面的数据，否则会释放互斥量然后继续睡眠    
         data_cond.wait(
             lk,[]{return !data_queue.empty();});
         //拷贝一个数据的副本，这样可以让临界区的执行时间尽量的短     
-        data_chunk data=data_queue.front();
+        data_chunk data = data_queue.front();
         data_queue.pop();
         //操作完数据需要释放互斥量
         lk.unlock();
@@ -73,9 +70,12 @@ void data_processing_thread()
 
 ```cpp
 template<typename Predicate>
-void minimal_wait(std::unique_lock<std::mutex>& lk,Predicate pred){
+void minimal_wait(std::unique_lock<std::mutex>& lk,Predicate pred) {
     while(!pred()){
         lk.unlock();
+        
+        // 等待唤醒
+        
         lk.lock();
     }
 }
@@ -91,45 +91,40 @@ void minimal_wait(std::unique_lock<std::mutex>& lk,Predicate pred){
 #include <mutex>
 #include <condition_variable>
 template<typename T>
-class threadsafe_queue
-{
+class threadsafe_queue {
 private:
 	//在多线程环境下，互斥量是易变的，需要加上 mutable 修饰
     mutable std::mutex mut;    
     std::queue<T> data_queue;
     std::condition_variable data_cond;
 public:
-    threadsafe_queue()
-    {}
-    threadsafe_queue(threadsafe_queue const& other)
-    {
+    threadsafe_queue() {
+        
+    }
+    threadsafe_queue(threadsafe_queue const& other) {
 		//使用拷贝构造函数也需要做到互斥
         std::lock_guard<std::mutex> lk(other.mut);
-        data_queue=other.data_queue;
+        data_queue = other.data_queue;
     }
-    void push(T new_value)
-    {
+    void push(T new_value) {
         std::lock_guard<std::mutex> lk(mut);
         data_queue.push(new_value);
         data_cond.notify_one();
     }
-    void wait_and_pop(T& value)
-    {
+    void wait_and_pop(T& value) {
         std::unique_lock<std::mutex> lk(mut);
         data_cond.wait(lk,[this]{return !data_queue.empty();});
         value=data_queue.front();
         data_queue.pop();
     }
-    std::shared_ptr<T> wait_and_pop()
-    {
+    std::shared_ptr<T> wait_and_pop() {
         std::unique_lock<std::mutex> lk(mut);
         data_cond.wait(lk,[this]{return !data_queue.empty();});
         std::shared_ptr<T> res(std::make_shared<T>(data_queue.front()));
         data_queue.pop();
         return res;
     }
-    bool try_pop(T& value)
-    {
+    bool try_pop(T& value) {
 		//既然是试探性的获取数据，就不需要用到条件变量了
         std::lock_guard<std::mutex> lk(mut);
         if(data_queue.empty())
@@ -138,8 +133,7 @@ public:
         data_queue.pop();
         return true;
     }
-    std::shared_ptr<T> try_pop()
-    {
+    std::shared_ptr<T> try_pop() {
         std::lock_guard<std::mutex> lk(mut);
         if(data_queue.empty())
             return std::shared_ptr<T>();
@@ -147,8 +141,7 @@ public:
         data_queue.pop();
         return res;
     }
-    bool empty() const
-    {
+    bool empty() const {
         std::lock_guard<std::mutex> lk(mut);
         return data_queue.empty();
     }
@@ -159,18 +152,14 @@ public:
 
 ```cpp
 threadsafe_queue<data_chunk> data_queue;    
-void data_preparation_thread()
-{
-    while(more_data_to_prepare())
-    {
+void data_preparation_thread() {
+    while(more_data_to_prepare()) {
         const data_chunk data=prepare_data();
         data_queue.push(data);        
     }
 }
-void data_processing_thread()
-{
-    while(true)
-    {
+void data_processing_thread() {
+    while(true) {
         data_chunk data;
         data_queue.wait_and_pop(data);    
         process(data);
@@ -198,11 +187,11 @@ future 用于标识等待一个一次性事件的发生，一旦该事件发生�
 #include <iostream>
 #include <future>
 
-static int find_the_answer_to_ltuae(){
+static int find_the_answer_to_ltuae() {
 	return 1 + 1;
 }
 
-int main(){
+int main() {
 	std::future<int> the_answer = std::async(find_the_answer_to_ltuae);
 
 	//如果在使用 get() 时线程还没有运行完成，那么在此处则会阻塞等待线程运行完毕
@@ -217,30 +206,27 @@ int main(){
 ```cpp
 #include <string>
 #include <future>
-struct X
-{
+struct X {
     void foo(int,std::string const&);
     std::string bar(std::string const&);
 };
 X x;
 //这里拷贝的是对象 x 的地址，所以其调用方式是： (&x)->foo(42, "hello")
-auto f1=std::async(&X::foo,&x,42,"hello");
+auto f1 = std::async(&X::foo,&x,42,"hello");
 //这里拷贝的是对象 x，所以其调用方式是：x.bar("goodbye")      
-auto f2=std::async(&X::bar,x,"goodbye");    
-struct Y
-{
+auto f2 = std::async(&X::bar,x,"goodbye");    
+struct Y {
     double operator()(double);
 };
 Y y;
 //这里通过类 Y 创建了一个临时对象，然后在内部以右值引用的方式传递给其 operator()
-auto f3=std::async(Y(),3.141);
+auto f3 = std::async(Y(),3.141);
 //这里拷贝的是引用，所以其调用方式是y(2.718)       
-auto f4=std::async(std::ref(y),2.718);     
+auto f4 = std::async(std::ref(y),2.718);     
 X baz(X&);
 //由于 baz 这个函数需求的是左值引用，所以传递参数必须要使用 std::ref 
 std::async(baz,std::ref(x));     
-class move_only
-{
+class move_only {
 public:
     move_only();
     move_only(move_only&&)
@@ -250,21 +236,21 @@ public:
     void operator()();
 };
 //创建临时对象，内部以右值引用的方式移动给 operator()
-auto f5=std::async(move_only());
+auto f5 = std::async(move_only());
 ```
 
 可以对`std::async`配置策略，以显示的指定其执行策略是同步还是异步：
 
 ```cpp
 //以异步的方式执行，也就是会在另外一个线程中执行
-auto f6=std::async(std::launch::async,Y(),1.2);
+auto f6 = std::async(std::launch::async,Y(),1.2);
 //推迟执行，在使用 wait() 或 get() 时才执行，相当于同步执行     
-auto f7=std::async(std::launch::deferred,baz,std::ref(x));
+auto f7 = std::async(std::launch::deferred,baz,std::ref(x));
 //下面这两种方式会根据代码的具体实现方式来选择是同步还是异步执行    
-auto f8=std::async(                           
+auto f8 = std::async(                           
    std::launch::deferred | std::launch::async,
    baz,std::ref(x));                          
-auto f9=std::async(baz,std::ref(x));
+auto f9 = std::async(baz,std::ref(x));
 
 //比如 f7 使用 wait() 的时候， baz(x) 才执行          
 f7.wait();
@@ -272,9 +258,11 @@ f7.wait();
 
 ## 将 future 与一个任务关联
 
-`std::packaged_task`提供了更为灵活的方式，它可以将一个可执行函数、对象等内部与一个`std::future`绑定在一起，然后这个可执行函数、对象可以被同步或异步的被执行。执行的时候其返回值便会自动存储，而后可以通过关联的`std::future`来获取。
+`std::packaged_task`提供了更为灵活的方式，它可以将一个可执行函数、对象等内部与一个`std::future`绑定在一起，形成一个可执行对象。
 
-这个与前面单独的使用`std::future`不同，`std::future`是主动控制可执行函数、对象的执行，而`std::package_task`是函数被其它代码执行，而后返回值主动关联到`std::future`:
+然后这个可执行对象可以被同步或异步的被执行。执行的时候其返回值便会自动存储，而后可以通过关联的`std::future`来获取。
+
+对于处理批量任务，使用这个打包的方式，可以将这种多个对象都放入容器中便于管理:
 
 ```cpp
 #include <iostream>
@@ -284,43 +272,44 @@ f7.wait();
 #include <functional>
  
 // unique function to avoid disambiguating the std::pow overload set
-int f(int x, int y) { return std::pow(x,y); }
+int f(int x, int y) { 
+    return std::pow(x,y); 
+}
  
-void task_lambda()
-{
+void task_lambda() {
     std::packaged_task<int(int,int)> task([](int a, int b) {
         return std::pow(a, b); 
     });
     std::future<int> result = task.get_future();
  
+    // 这个是同步执行，调用该函数的时候才执行，返回值会保存在 future 中
     task(2, 9);
  
     std::cout << "task_lambda:\t" << result.get() << '\n';
 }
  
-void task_bind()
-{
+void task_bind() {
     std::packaged_task<int()> task(std::bind(f, 2, 11));
     std::future<int> result = task.get_future();
  
+    // 这个是同步执行，调用该函数的时候才执行，返回值会保存在 future 中
     task();
  
     std::cout << "task_bind:\t" << result.get() << '\n';
 }
  
-void task_thread()
-{
+void task_thread() {
     std::packaged_task<int(int,int)> task(f);
     std::future<int> result = task.get_future();
  
+    // 这个是异步执行，调用该函数的时候才执行，返回值会保存在 future 中
     std::thread task_td(std::move(task), 2, 10);
     task_td.join();
  
     std::cout << "task_thread:\t" << result.get() << '\n';
 }
  
-int main()
-{
+int main() {
     task_lambda();
     task_bind();
     task_thread();
@@ -342,19 +331,17 @@ std::mutex m;
 std::deque<std::packaged_task<void()> > tasks;
 bool gui_shutdown_message_received();
 void get_and_process_gui_message();
-void gui_thread()                   
-{
+void gui_thread() {
 	//事件循环，获取消息
-    while(!gui_shutdown_message_received())   
-    {
+    while (!gui_shutdown_message_received()) {
         get_and_process_gui_message();    
         std::packaged_task<void()> task;
         {
             std::lock_guard<std::mutex> lk(m);
-            if(tasks.empty())                 
+            if (tasks.empty())                 
                 continue;
             //从消息队列中取出一个消息
-            task=std::move(tasks.front());   
+            task = std::move(tasks.front());   
             tasks.pop_front();
         }
         //执行该消息，同时与之关联的 std::future 也 reday 了
@@ -363,11 +350,10 @@ void gui_thread()
 }
 std::thread gui_bg_thread(gui_thread);
 template<typename Func>
-std::future<void> post_task_for_gui_thread(Func f)
-{
+std::future<void> post_task_for_gui_thread(Func f) {
 	//将一个消息任务与 future 绑定
     std::packaged_task<void()> task(f);       
-    std::future<void> res=task.get_future();
+    std::future<void> res = task.get_future();
     //消息存入消息队列     
     std::lock_guard<std::mutex> lk(m);
     tasks.push_back(std::move(task));
@@ -394,20 +380,19 @@ std::future<void> post_task_for_gui_thread(Func f)
  
 void accumulate(std::vector<int>::iterator first,
                 std::vector<int>::iterator last,
-                std::promise<int> accumulate_promise)
-{
+                std::promise<int> accumulate_promise) {
     int sum = std::accumulate(first, last, 0);
+    // 执行这一步操作后，与 promise 绑定的 future 状态就会是 reday 状态
     accumulate_promise.set_value(sum);  // Notify future
 }
  
-void do_work(std::promise<void> barrier)
-{
+void do_work(std::promise<void> barrier) {
     std::this_thread::sleep_for(std::chrono::seconds(3));
+    // 等待 3 秒后，等待它的 future 就会被唤醒
     barrier.set_value();
 }
  
-int main()
-{
+int main() {
     // Demonstrate using promise<int> to transmit a result between threads.
     std::vector<int> numbers = { 1, 2, 3, 4, 5, 6 };
     std::promise<int> accumulate_promise;
@@ -429,6 +414,8 @@ int main()
     barrier_future.wait();
     std::cout << "wait result done\n";
     new_work_thread.join();
+    
+    return 0;
 }
 ```
 
@@ -441,7 +428,7 @@ int main()
 #include <stdexcept>
 #include <future>
 
-int func_div(int a, int b){
+int func_div(int a, int b) {
     std::cout << "a = " << a << " b " << b << "\n";
     if(b == 0){
         throw std::out_of_range("input out of range!\n");
@@ -450,7 +437,7 @@ int func_div(int a, int b){
     return a / b;
 }
 
-int main(void){
+int main(void) {
 
     std::future<int> f = std::async(func_div, 10, 0);
 
@@ -520,7 +507,7 @@ c++ 标准库提供了头文件` <chrono>`以支持时钟相关的操作：
 
 ### ratio
 
-`ratio`头文件提供了模板类`std::ratio<num, den>`，其值代表 N 内有 D 次数，也就是频率。
+`ratio`头文件提供了模板类`std::ratio<num, den>`，其值代表 N 秒内有 D 次数，也就是频率。
 
 比如 1毫秒，就是 1 秒内有 1000 次，那么就表示为：`std::ratio<1,1000>`。
 
@@ -536,7 +523,7 @@ c++ 标准库提供了头文件` <chrono>`以支持时钟相关的操作：
 #include <iostream>
 #include <ratio>
 
-int main(void){
+int main(void) {
     std::cout << std::ratio<1, 1000>::num << "\n";
     std::cout << std::ratio<1, 1000>::den << "\n";
     std::cout << std::micro::num << "\n";
@@ -573,7 +560,7 @@ int main(void){
 #include <ratio>
 #include <chrono>
 
-int main(void){
+int main(void) {
     //得到一个代表两秒的值
     auto t = std::chrono::seconds(2);
 
@@ -592,9 +579,9 @@ int main(void){
 
 ```cpp
 using namespace std::chrono_literals;
-auto one_day=24h;
-auto half_an_hour=30min;
-auto max_time_between_messages=30ms;
+auto one_day = 24h;
+auto half_an_hour= 30min;
+auto max_time_between_messages= 30ms;
 ```
 
  这样`15ns` 就等同于 `std::chrono::nanoseconds(15)`:
@@ -604,7 +591,7 @@ auto max_time_between_messages=30ms;
 #include <ratio>
 #include <chrono>
 
-int main(void){
+int main(void) {
     using namespace std::chrono_literals;
     //得到一个代表两秒的值
     auto t = 2s;
@@ -627,7 +614,7 @@ int main(void){
 #include <ratio>
 #include <chrono>
 
-int main(void){
+int main(void) {
     std::chrono::milliseconds ms(54802);
     //最终转换为 54 秒
     std::chrono::seconds s = std::chrono::duration_cast<std::chrono::seconds>(ms);
@@ -652,11 +639,11 @@ int main(void){
 #include <ratio>
 #include <iomanip>
 
-int main(){
+int main() {
     using namespace std::literals; // enables the usage of 24h, 1ms, 1s instead of
                                    // e.g. std::chrono::hours(24), accordingly
 
-    //以系统时钟作为参考，周期是 100 微秒
+    //以系统时钟作为参考，周期是 100 纳秒
     const std::chrono::time_point<std::chrono::system_clock,
             std::chrono::duration<long long, std::ratio<1, 10000000>>> now =
         std::chrono::system_clock::now();
@@ -682,7 +669,7 @@ int main(){
 #include <ratio>
 #include <iomanip>
 
-int main(){
+int main() {
     auto start=std::chrono::high_resolution_clock::now();
     for(int i = 0; i < 0xffffff; ++i){
 
@@ -706,12 +693,12 @@ int main(){
 #include <ratio>
 #include <thread>
 
-int main(){
+int main() {
     auto start=std::chrono::high_resolution_clock::now();
     //使用相对延迟，延迟两秒
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    auto stop=std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
     std::cout<<"relative delay took "
              << std::chrono::duration_cast<std::chrono::microseconds> (stop-start).count()
              << " microseconds" <<std::endl;
@@ -743,3 +730,320 @@ int main(){
 - `std::shared_lock<Mutex>::try_lock_for` / `std::shared_lock<Mutex>::try_lock_for`
 - `std::future<T>::wait_for` / `std::future<T>::wait_until`
 - `std::shared_future<T>::wait_for` / `std::shared_future<T>::wait_until`
+
+# 线程间同步的应用
+
+比起简单的将数据暴露出来给多个线程共享，使用函数式编程是可以简化代码的一个好方法。
+
+## 函数式编程与`std::future`
+
+下面以快速排序为例，来展示函数式编程是如何做到多线程安全的。
+
+### c 代码实现快速排序
+
+快速排序思路如下：
+
+1. 选择数据的一个点作为 pivot 与其他数做比较
+2. 小于 pivot 的数放一边，大于或等于 pivot 的数放另外一半
+3. 递归的进行步骤 2，递归的终止条件便是当前需要判断的数组值只有 1 个时，排序便完成了
+
+下面是一个简易的 c 代码示例：
+
+```c
+#include <stdio.h>
+#include <stdint.h>
+
+static void swap(int *a, int *b) {
+    int tmp = *a;
+    *a = *b;
+    *b = tmp;
+}
+
+static int partition(int *buf, int p, int r) {
+    int i = p;
+
+    // 这里选取 r 作为 pivot
+    for (int j = p; j <= r - 1; j++) {
+        if (buf[j] < buf[r]) {
+            if (i != j) {
+                swap(&buf[j], &buf[i]);
+            }
+            i++;
+        }
+    }
+
+    swap(&buf[i], &buf[r]);
+
+    return i;
+}
+
+static void quick_sort_frame(int *buf, int p, int r) {
+    if (p >= r) {
+            return ;
+    }
+    int q = partition(buf, p, r);
+
+    printf("quick_sort p = %d, r = %d, q = %d\n", p, r, q);
+    for (int i = p; i <= r; i++) {
+        printf("%d,", buf[i]);
+    }
+    printf("\n");
+    quick_sort_frame(buf, p, q - 1);
+    quick_sort_frame(buf, q + 1, r);
+}
+static void quick_sort(int *buf, int size) {
+    quick_sort_frame(buf, 0, size - 1);
+}
+
+#define BUF_SIZE 10
+static int buf[BUF_SIZE];
+int main(int argc, char *argv[]) {
+
+    printf("before sort, buffer contents are:\n");
+
+    for (int8_t i = 0; i < BUF_SIZE; i++) {
+            buf[i] = BUF_SIZE - i;
+            printf("%d,", buf[i]);
+    }
+    printf("\n");
+
+    quick_sort(buf, BUF_SIZE);
+
+    printf("after sort, buffer contents are:\n");
+    for (int8_t i = 0; i < BUF_SIZE; i++) {
+            printf("%d,", buf[i]);
+    }
+    printf("\n");
+    return 0;
+}
+```
+
+其输出为：
+
+```shell
+before sort, buffer contents are:
+10,9,8,7,6,5,4,3,2,1,
+quick_sort p = 0, r = 9, q = 0
+1,9,8,7,6,5,4,3,2,10,
+quick_sort p = 1, r = 9, q = 9
+9,8,7,6,5,4,3,2,10,
+quick_sort p = 1, r = 8, q = 1
+2,8,7,6,5,4,3,9,
+quick_sort p = 2, r = 8, q = 8
+8,7,6,5,4,3,9,
+quick_sort p = 2, r = 7, q = 2
+3,7,6,5,4,8,
+quick_sort p = 3, r = 7, q = 7
+7,6,5,4,8,
+quick_sort p = 3, r = 6, q = 3
+4,6,5,7,
+quick_sort p = 4, r = 6, q = 6
+6,5,7,
+quick_sort p = 4, r = 5, q = 4
+5,6,
+after sort, buffer contents are:
+1,2,3,4,5,6,7,8,9,10,
+```
+
+### c++ 代码实现快速排序
+
+```cpp
+#include <iostream>
+#include <list>
+#include <algorithm>
+
+template<typename T>
+std::list<T> sequential_quick_sort(std::list<T> input) {
+    if (input.empty()) {
+        return input;
+    }
+    std::list<T> result;
+    // 取 list 头的元素作为 pivot
+    result.splice(result.begin(), input, input.begin());
+    T const& pivot = *result.begin();
+
+    // 将 list 中剩余的元素和 pivot 做比较
+    auto divide_point = std::partition(input.begin(), input.end(),
+            [&](T const& t){return t < pivot;});
+    // 将分类好的小于 pivot 的元素放入 lower_part
+    // 那么 input 中的剩余元素便是大于或等于 pivot 的元素
+    std::list<T> lower_part;
+    lower_part.splice(lower_part.end(), input, input.begin(),
+        divide_point);
+    // 将两个区间的元素递归
+    auto new_lower(
+        sequential_quick_sort(std::move(lower_part)));
+    auto new_higher(
+        sequential_quick_sort(std::move(input)));
+    // 大于或等于 pivot 的元素依次放在 pivot 的右边
+    result.splice(result.end(),new_higher);
+    // 小于 pivot 的元素依次放在 pivot 的左边
+    result.splice(result.begin(),new_lower);
+
+    return result;
+}
+
+int main() {
+    std::list<int> vals = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+
+    std::cout << "contents of vals before sort:\n";
+    for (auto v : vals) {
+        std::cout << v << ",";
+    }
+    std::cout << "\n";
+
+    vals = sequential_quick_sort(vals);
+
+    std::cout << "contents of vals after sort:\n";
+    for (auto v : vals) {
+        std::cout << v << ",";
+    }
+    std::cout << "\n";
+
+    return 0;
+}
+```
+
+可以看到，与上面 c 版本的实现思路是完全一样的，知识有标准库的加持，使得代码看起来更为简洁。
+
+### 并行实现快速排序
+
+以上的 c++ 代码是由一个线程来完成了，如果可以由多个线程来完成并行排序便可以更加快速的得出结果。
+
+这里就需要考虑到 data race 的问题了，使用`std::future`是一个比较优雅的解决方案。
+
+由于每次分为两个部分后，又需要对这两个部分递归，所以将其中一个部分分离为一个单独的线程是可以提供并发度的：
+
+```cpp
+#include <iostream>
+#include <list>
+#include <algorithm>
+#include <future>
+
+template<typename T>
+std::list<T> sequential_quick_sort(std::list<T> input) {
+    if (input.empty()) {
+        return input;
+    }
+    std::list<T> result;
+    // 取 list 头的元素作为 pivot
+    result.splice(result.begin(), input, input.begin());
+    T const& pivot = *result.begin();
+
+    // 将 list 中剩余的元素和 pivot 做比较
+    auto divide_point = std::partition(input.begin(), input.end(),
+            [&](T const& t){return t < pivot;});
+    // 将分类好的小于 pivot 的元素放入 lower_part
+    // 那么 input 中的剩余元素便是大于或等于 pivot 的元素
+    std::list<T> lower_part;
+    lower_part.splice(lower_part.end(), input, input.begin(),
+        divide_point);
+    // 将小于区间的元素放在另一个线程访问
+    std::future<std::list<T>> new_lower(
+        	// 最后会使用 new_lower.get() 来获取结果，所以这里可以使用移动语义
+            // 因为栈上的变量可以确保有效性
+            std::async(&sequential_quick_sort<T>, std::move(lower_part))
+            );
+
+    auto new_higher(
+        sequential_quick_sort(std::move(input)));
+    // 大于或等于 pivot 的元素依次放在 pivot 的右边
+    result.splice(result.end(),new_higher);
+    // 小于 pivot 的元素依次放在 pivot 的左边
+    result.splice(result.begin(),new_lower.get());
+
+    return result;
+}
+
+int main() {
+    std::list<int> vals = {10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
+
+    std::cout << "contents of vals before sort:\n";
+    for (auto v : vals) {
+        std::cout << v << ",";
+    }
+    std::cout << "\n";
+
+    vals = sequential_quick_sort(vals);
+
+    std::cout << "contents of vals after sort:\n";
+    for (auto v : vals) {
+        std::cout << v << ",";
+    }
+    std::cout << "\n";
+
+    return 0;
+}
+```
+
+由于两个线程分别是处理两边的数据，也不会有 data race 的情况出现。
+
+这里需要注意的是线程的并发数量，是递归的 2^n 次方。
+
+> 比如递归 10 次，线程的数量就是 1024 个。
+
+所以，要根据当前硬件所支持的并发数来决定是使用`std::launch::deferrred`还是`std::launch::async`。
+
+> 默认情况下不填这项，那就依赖编译器的实现来完成不同的策略。
+
+如果要使用纯 c 来实现这个并行方式，则需要更多的代码且不易维护。
+
+## 通过消息传递来完成同步
+
+CSP（Communicating Sequential Process）编程方式就是指：以消息传递的方式在各个线程间共享数据。
+
+每个线程当前的状态根据接收到的消息而定，在处理消息时各个线程都是完全独立的而不会有 data race 的情况出现。
+
+这种方式使得并发编程变得简单而易于维护。
+
+> 这个过程中的临界资源便是消息队列，可以使用类将其封装起来而易于使用。
+
+一个比较简单的示例如下：
+
+```cpp
+struct card_inserted {
+    std::string account;
+};
+class atm {
+    messaging::receiver incoming;
+    messaging::sender bank;
+    messaging::sender interface_hardware;
+    // 这个函数指针指向当前正在执行的状态
+    void (atm::*state)();
+    std::string account;
+    std::string pin;
+    void waiting_for_card() {
+        interface_hardware.send(display_enter_card());   
+        incoming.wait()                             
+            .handle<card_inserted>(
+                [&](card_inserted const& msg) {
+                    account = msg.account;
+                    pin = "";
+                    interface_hardware.send(display_enter_pin());
+                    // 当满足条件后，便切换状态
+                    state = &atm::getting_pin;
+                }
+                );
+    }
+    void getting_pin();
+public:
+    void run() {
+		// 默认的初始状态
+        state = &atm::waiting_for_card;     
+        try {
+            for(;;) {
+				// 执行当前状态
+                (this->*state)();    
+            }
+        }
+        catch(messaging::close_queue const&) {
+        }
+    }
+};
+```
+
+可以看到：
+
+1. 一个线程只执行当前的状态，状态的切换并不会引起临界区的问题
+2. 多个线程都维护自己的状态，这使得并发逻辑变得非常简单
+3. 唯一需要注意的便是消息队列的互斥问题
