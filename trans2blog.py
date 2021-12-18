@@ -11,7 +11,7 @@ import os
 import shutil
 import filecmp
 
-blog_source = "/home/cec/github/kcmetercec.github.io/hexo/source/_posts/";
+blog_source = "/home/cec/github/new_blog/blog/source/_posts/";
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 
 def get_real_name(file_path, pwd_path):
@@ -24,8 +24,8 @@ def get_real_name(file_path, pwd_path):
             check_file = 0
             if '#+NAME:' in lines[i]: #this is org mod file
                 name_file = re.search('<(.+)>',lines[i]).group(1)
-                check_file = 1
-            if 'layout: true' in lines[i]: #this is markdown file
+                # check_file = 1
+            if 'comments: true' in lines[i]: #this is markdown file
                 name_file = os.path.basename(file_path)
                 check_file = 1
             if check_file == 1:
