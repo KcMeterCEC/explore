@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
 
 Makefile 比较简单，如下：
 
-```shell
+```makefile
 INCLUDE = /usr/local/include/erpc
 LIBRARY = /usr/local/lib
 
