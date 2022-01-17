@@ -6,7 +6,7 @@ categories:
 - framework
 - ERPC
 date: 2021/12/18
-updated: 2021/12/18
+updated: 2022/1/17
 layout: true
 comments: true
 ---
@@ -193,8 +193,18 @@ int main(int argc, char *argv[]) {
 
     auto message = "Hello, this is client!\n";
     binary_t cmd{(uint8_t*)message, (uint32_t)(std::strlen(message))};
+    
+    binary_t *ret = DemoHello(&cmd);
 
-    std::cout << "Get message of server: " << DemoHello(&cmd)->data << "\n";
+    std::cout << "Get message of server: " << ret->data << "\n";
+
+    if (ret->data) {
+        erpc_free(ret->data);
+    }
+
+    if (ret) {
+        erpc_free(ret);
+    }
     // 关闭连接
     erpc_transport_tcp_close();
 
