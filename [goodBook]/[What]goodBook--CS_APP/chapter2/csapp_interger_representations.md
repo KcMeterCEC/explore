@@ -1,11 +1,12 @@
 ---
-title: '[What]integer representations'
+title: 'integer representations'
 tags: 
 - CS
-date:  2021/6/1
 categories: 
 - book
 - CS:APP
+date:  2021/6/1
+updated: 2021/12/28
 layout: true
 ---
 

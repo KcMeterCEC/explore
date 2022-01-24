@@ -151,4 +151,4 @@ CPU 要先将硬盘的代码载入内存中执行，而后 CPU 要通过内部�
 ### single-instruction,Multiple-Data(SIMD) Parallelism
 处理器提供硬件支持单个指令可以同时处理多个数据，这样也可以提高处理速度。
 ## The importance of acstractions in computer systems
-在计算机学科中，需要学会以抽象的方式提现系统的一部分或整体架构，这既能理解其中的概念，还能隐藏其中复杂的细节。
+在计算机学科中，需要学会以抽象的方式体现系统的一部分或整体架构，这既能理解其中的概念，还能隐藏其中复杂的细节。
