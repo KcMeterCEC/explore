@@ -6,7 +6,7 @@ categories:
 - framework
 - ERPC
 date: 2021/12/20
-updated: 2021/12/20
+updated: 2022/2/21
 layout: true
 comments: true
 ---
@@ -249,6 +249,15 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 ```
+
+## NESTED_CALLS_DETECTION
+
+`NESTED_CALLS_DETECTION` 宏是用于检测在服务端的函数被调用期间，是否又进行了其他接口函数的调用。这个宏默认是使能的。
+> 服务端生成的自动代码中，会先后设置变量 `nestingDetection` 的值为 `true` 和 `false`，以检测这期间是否有嵌套调用。
+
+而如果我们修改当前代码到客户端和服务端同时使用时，便会给这个宏带来误导，导致客户端的调用函数可能会返回失败 `kErpcStatus_NestedCallFailure`。
+
+所以这里要在文件 `erpc_config.h` 中关闭该宏。
 
 ## 修改 Makefile
 
