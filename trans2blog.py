@@ -40,7 +40,7 @@ def get_real_name(file_path, pwd_path):
                 if '.jpg]]' in lines[i]:
                     pic_str = re.search('\[\[\.\/(.+)\]\]',lines[i]).group(1)
                     redir_pic = 1
-                if '.jpg)' in lines[i]:
+                if '.jpg)' in lines[i] or '.gif)' in lines[i]:
                     if '![]' in lines[i]:
                         pic_str = re.search('\(\.\/(.+)\)',lines[i]).group(1)
                         redir_pic = 2
