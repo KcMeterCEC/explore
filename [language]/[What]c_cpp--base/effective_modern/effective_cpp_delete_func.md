@@ -1,13 +1,16 @@
 ---
-title: '[What] Effective Modern C++ ：delete 优于私有未定义行为'
+title: Effective C++ ：delete 优于私有未定义行为
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/4/14
+updated: 2022/4/14
 layout: true
+comments: true
 ---
+
 如果不想让用户使用某个函数，那么有以下 3 种做法：
 1. 使用`delete`限定
 2. 将该函数设定为私有
@@ -29,6 +32,7 @@ layout: true
 ## 将该函数设定为私有
 
 私有成员不能被用户调用，但是可以被`friend`或其它成员函数无意调用，这会造成逻辑漏洞。
+> 当然可以只在类中声明它们，而不定义。这样在其被调用到时，编译器就会报错。但这报错并不能直接体现出类设计者的意图。
 
 ## 使用`delete`限定
 
@@ -59,14 +63,14 @@ bool isLucky(double) = delete;       // reject doubles and
 ```cpp
 template<typename T>
 void processPointer(T* ptr);
-//限制 void* 
+//限制 void* 偏特化
 template<>
 void processPointer<void>(void*) = delete;
 template<>
 void processPointer<const void>(const void*) = delete;
 template<>
 void processPointer<const void>(const volatile void*) = delete;
-//限制 char*
+//限制 char* 偏特化
 template<>
 void processPointer<char>(char*) = delete;
 template<>
@@ -75,7 +79,7 @@ template<>
 void processPointer<const char>(const volatile char*) = delete;
 ```
 
-在类种的函数模板，也可以如此使用：
+在类中的函数模板，也可以如此使用：
 
 ```cpp
 class Widget {
