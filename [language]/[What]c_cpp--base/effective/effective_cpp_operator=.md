@@ -1,35 +1,41 @@
 ---
-title: '[What] Effective  C++ ：赋值重载的注意点'
+title: Effective  C++ ：赋值重载的注意点
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/4/15
+updated: 2022/4/15
 layout: true
+comments: true
 ---
 
+复制重载涉及到拷贝赋值和移动赋值两种情况，有些点需要注意一下。
+
 <!--more-->
+
 # 让 `operator=`类重载返回 `*this` 引用
-为了满足连锁赋值的需求，赋值重载方法需要返回对象。
+
+为了满足连续赋值的需求，赋值重载方法需要返回对象。
 
 而为了能够提高效率，返回它的引用是个好习惯。
 
 ```cpp
-class Widget{
+class Widget {
 	public:
     // ...
     // +=, -=, *= 这类函数重载都要满足连续赋值要求
-    Widget& operator+=(const Widget& rhs){
+    Widget& operator+=(const Widget& rhs) {
         // ...
         return *this;
     }
-    Widget& operator=(const Widget& rhs){
+    Widget& operator=(const Widget& rhs) {
         // ...
         return *this;
     }
     // 即使参数类型不同，也需要满足连续赋值
-    Widget& operator=(int rhs){
+    Widget& operator=(int rhs) {
         // ...
         return *this;
     }
@@ -50,10 +56,10 @@ class Widget{
 #include <string>
 #include <cstring>
 
-class MyString{
+class MyString {
     public:
         // ...
-        MyString& operator=(const MyString& str){
+        MyString& operator=(const MyString& str) {
             if(this == &str){
                 return *this;
             }
@@ -84,23 +90,23 @@ class MyString{
 #include <string>
 #include <cstring>
 
-class MyString{
+class MyString {
     public:
         // ...
-    	MyString(const char* str){
+    	MyString(const char* str) {
             int str_len = std::strlen(str);
-            if(str_len == 0){
+            if(str_len == 0) {
                 len_ = 1;
                 str_ = new char[len_];
                 str_[0] = '\0';
-            }else{
+            }else {
                 len_ = str_len + 1;
                 str_ = new char[len_];
                 std::memcpy(str_, str, len_);
             }
         }
     	// ...
-        MyString& operator=(const MyString& str){
+        MyString& operator=(const MyString& str) {
             // 先使用一个副本指向当前指针指向的内存
             char* str_tmp = str_;
 
@@ -121,6 +127,7 @@ class MyString{
 ```
 
 如上代码所示，即避免了自我赋值的问题，也避免了抛出异常的问题。
+> 对于移动赋值，也需要考虑自我赋值的问题，但一般不会遇到抛出异常问题。因为移动赋值通常要声明为 noexcept 形式，已让 vector 这种容器使用。
 
 # 注意要复制对象的每个成分
 
@@ -130,13 +137,13 @@ class MyString{
 对于第一点的示例如下：
 
 ```cpp
-class Customer{
+class Customer {
     public:
     // ...
-    Customer(const Customer& rhs): name(rhs.name){
+    Customer(const Customer& rhs): name(rhs.name) {
         
     }
-    Customer& operator=(const Customer& rhs){
+    Customer& operator=(const Customer& rhs) {
         name = rhs.name;
         
         return *this;
@@ -146,16 +153,16 @@ class Customer{
     std::string name;
 };
 
-class PriorityCustomer: public Customer{
+class PriorityCustomer: public Customer {
     public:
     // ...
     PriorityCustomer(const PriorityCustomer& rhs)
     : Customer(rhs), // 调用基类的拷贝构造函数
-    priority(rhs.priority){
+    priority(rhs.priority) {
         
     }
     
-    PriorityCustomer& PriorityCustomer(const PriorityCustomer& rhs){
+    PriorityCustomer& PriorityCustomer(const PriorityCustomer& rhs) {
         Customer::operator=(rhs); //调用基类的拷贝赋值函数
         priority = rhs.priority;
         
