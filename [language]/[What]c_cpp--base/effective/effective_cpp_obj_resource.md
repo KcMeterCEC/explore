@@ -1,23 +1,29 @@
 ---
-title: '[What] Effective  C++ ：管理资源'
+title: Effective  C++ ：管理资源
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/4/17
+updated: 2022/4/17
 layout: true
+comments: true
 ---
-这里的资源主要是：内存、文件描述符、互斥锁、数据库连接、socket 等。
+
+这里的资源主要是：内存、文件描述符、互斥锁、数据库连接、socket 等，一旦不使用它们，都要归还给系统。
+
 <!--more-->
+
 # 以对象管理资源
+
 首先在编写一个类的时候，就需要在它的析构函数中仔细整理它需要释放的资源。
 
 而在使用对象时，需要使用 RAII 类来管理这些资源，比如智能指针。
 
-编写 RAII 类时，除了管理原始资源外，还需要提供接口`get()`和`类型重载`来获取原始资源。
+编写 RAII 类时，除了管理原始资源外，还需要提供接口`get()`来获取原始资源。
 
-因为一些 c API 是需要操作原始资源的。
+因为一些 C API 是需要操作原始资源的。
 
 # 小心资源管理类中的拷贝行为
 
@@ -29,12 +35,12 @@ layout: true
 那么就这样定义：
 
 ```cpp
-class Lock{
+class Lock {
   public:
-    explicit Lock(Mutex* pm):mutex_(pm){
+    explicit Lock(Mutex* pm) : mutex_(pm) {
         lock(mutex_);
     }
-    ~Lock(){
+    ~Lock() {
         unlock(mutex_);
     }
   private:
@@ -82,13 +88,13 @@ Mutex m;
 > 这种情况下，就需要为`shared_ptr`指定删除器。
 
 ```cpp
-class Lock{
+class Lock {
   public:
     // 指定 shared_ptr 的删除器是 unlock 操作
-    explicit Lock(Mutex* pm):mutex_(pm, unlock){
+    explicit Lock(Mutex* pm) : mutex_(pm, unlock) {
         lock(mutex_.get());
     }
-    ~Lock(){
+    ~Lock() {
 		// 有了智能指针，析构函数就不需要主动释放了
     }
   private:
@@ -137,6 +143,7 @@ ProcessWidget(std::shared_ptr<Widget>(new Widget), win);
 那么假设，在创建临时对象`win`是发生了异常而导致中断操作，那么第一步所申请的内存就没有被智能指针所接管。造成了**很难排查的内存泄漏**！
 
 所以应该养成好的习惯：先创建智能指针，再进行调用：
+> 或者使用 `std::make_unique` 和 `std::make_shared 来替代` `new`。
 
 ```cpp
 std::shared_ptr<Widget> pw(new Widget);
