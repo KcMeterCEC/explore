@@ -1,14 +1,18 @@
 ---
-title: '[What] Effective Modern C++ ：nullptr 优于 0 和 NULL'
+title: Effective C++ ：nullptr 优于 0 和 NULL
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/2
+updated: 2022/5/2
 layout: true
+comments: true
 ---
+
 在 c 中，通常使用`NULL`表示一个空指针，但是在 cpp 中有更优的`nullptr`可供选择。
+
 <!--more-->
 
 首先需要明白：
@@ -24,14 +28,14 @@ layout: true
 #include <vector>
 #include <iostream>
 
-void f(int i){
+void f(int i) {
     std::cout << "int parameter " << i << "\n";
 }
-void f(int *i){
+void f(int *i) {
     std::cout << "pointer paramter " << i << "\n";
 }
 
-int main(void){
+int main(void) {
     f(0);
     f(NULL);
     f(nullptr);
@@ -68,7 +72,7 @@ int main(void){
 
 ```cpp
 auto result = Record();
-if(result == 0){
+if(result == 0) {
     
 }
 ```
@@ -79,7 +83,7 @@ if(result == 0){
 
 ```cpp
 auto result = Record();
-if(result == nullptr){
+if(result == nullptr) {
     
 }
 ```
@@ -89,5 +93,3 @@ if(result == nullptr){
 由于`0`和`NULL`并不能转换为任意指针类型，所以在调用有些需要特定指针类型的函数时，编译器就会报错。
 
 而`nullptr`却可以转为该类型，保证编译的正确执行。
-
- 
