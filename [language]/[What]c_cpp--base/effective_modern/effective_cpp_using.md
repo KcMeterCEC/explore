@@ -1,27 +1,33 @@
 ---
-title: '[What] Effective Modern C++ ：using 优于 typedef'
+title: Effective C++ ：using 优于 typedef
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/3
+updated: 2022/5/3
 layout: true
+comments: true
 ---
+
 在 c 中，`typedef`是我经常使用的别名语法。但在 cpp 中，`using`才是更好的选择。
+
 <!--more-->
 
 # 可读性比较
 
 在 cpp 中为了避免命名污染，通常会在使用一个对象、方法时都要输入其完整的命名空间：
 
-> std::vector<int> val;
->
-> std::unique_ptr<std::unordered_map<std::string, std::string>> val;
+```cpp
+std::vector<int> val;
+
+std::unique_ptr<std::unordered_map<std::string, std::string>> val;
+```
 
 上面第二种写法实在是累，就算使用复制粘贴的方式，以后如果要修改，改起来也非常麻烦。
 
-这种情况下可以使用`typedef`或`using`：
+这种情况下可以使用 `typedef` 或`using`：
 
 ```cpp
 typedef

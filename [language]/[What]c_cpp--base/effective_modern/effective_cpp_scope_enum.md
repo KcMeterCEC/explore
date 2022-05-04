@@ -1,14 +1,18 @@
 ---
-title: '[What] Effective Modern C++ ：作用域枚举优于非作用域枚举'
+title: Effective C++ ：作用域枚举优于非作用域枚举
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/3
+updated: 2022/5/4
 layout: true
+comments: true
 ---
+
 简单来讲就是对于枚举类型，也需要将其存放于命名空间中，以避免枚举中元素对外部标识符的污染。
+
 <!--more-->
 
 # 非作用域枚举对标识符的污染
@@ -17,7 +21,7 @@ layout: true
 #include <vector>
 #include <iostream>
 
-enum Color{
+enum Color {
   kWhite,
   kBlack,
   kRed,
@@ -25,7 +29,7 @@ enum Color{
 
 int kBlack = 1;
 
-int main(void){
+int main(void) {
 
     return 0;
 }
@@ -39,7 +43,7 @@ int main(void){
 #include <vector>
 #include <iostream>
 
-enum class Color{
+enum class Color {
   kWhite,
   kBlack,
   kRed,
@@ -47,7 +51,7 @@ enum class Color{
 
 int kBlack = 1;
 
-int main(void){
+int main(void) {
 
     auto kRed = Color::kRed;
     auto kWhite = Color::kWhite;
@@ -66,7 +70,7 @@ int main(void){
 #include <vector>
 #include <iostream>
 
-enum class Color{
+enum class Color {
   kWhite,
   kBlack,
   kRed,
@@ -74,13 +78,13 @@ enum class Color{
 
 int kBlack = 1;
 
-int main(void){
+int main(void) {
 
     auto kRed = Color::kRed;
     auto kWhite = Color::kWhite;
 
     //直接使用 kWhite 与 5 进行比较是编译不过的，除非显示的进行转换
-    if(static_cast<int>(kWhite) < 5){
+    if (static_cast<int>(kWhite) < 5) {
 
     }
 
@@ -98,13 +102,13 @@ int main(void){
 
 enum Color;
 
-enum Color{
+enum Color {
   kWhite,
   kBlack,
   kRed,
 };
 
-int main(void){
+int main(void) {
 
     auto Red = kRed;
     auto White = kWhite;
@@ -120,6 +124,11 @@ int main(void){
 ```cpp
 enum class Status;                   // forward declaration
 void continueProcessing(Status s);   // use of fwd-declared enum
+```
+
+默认的类型是`int`，用户也可以显示指定其存储类型：
+```cpp
+enum class Status: std::uint32_t;
 ```
 
 # 在需要使用索引的地方使用非作用域枚举
@@ -143,7 +152,7 @@ namespace TupleIndex {
     };
 }
 
-int main(void){
+int main(void) {
 
     using UserInfo = std::tuple<
                     std::string, // name
@@ -168,13 +177,13 @@ int main(void){
 #include <iostream>
 #include <tuple>
 
-enum class Element{
+enum class Element {
   NAME,
   ADDR,
   AGE
 };
 
-int main(void){
+int main(void) {
 
     using UserInfo = std::tuple<
                     std::string, // name
