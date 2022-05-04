@@ -1,15 +1,20 @@
 ---
-title: '[What] Effective Modern C++ ：尽可能的使用 constexpr'
+title: Effective C++ ：尽可能的使用 constexpr
 tags: 
-- c++
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/4
+updated: 2022/5/4
 layout: true
+comments: true
 ---
+
 使用`constexpr`以让编译器来检查该值是否是常量表达式，降低程序员负担。
+
 <!--more-->
+
 # `const` 与 `constexpr`
 
 `constexpr`修饰的表达式，需要在**编译时**就确定其值，且该值以后不可被改变。而`const`修饰的表达式，是在运行时才能够确定其值：
@@ -21,8 +26,7 @@ layout: true
 #include <iostream>
 #include <array>
 
-
-int main(void){
+int main(void) {
 
     int sz; //非常量表达式
     constexpr auto array_size = sz; //由于 sz 不是常量表达式，所以 array_size 无法编译通过
@@ -63,20 +67,20 @@ int main(void){
 #include <iostream>
 #include <array>
 
-constexpr int pow(int base, int exp) noexcept{
+constexpr int pow(int base, int exp) noexcept {
     //c++ 11 仅允许一条 return 语句
     return (exp == 0 ? 1 : base * pow(base, exp - 1));
 
     //c++ 14 允许多条语句
 //    int result = 1;
-//    for(int i = 0; i < exp; ++i){
+//    for (int i = 0; i < exp; ++i) {
 //        result *= base;
 //    }
 
 //    return result;
 }
 
-int main(void){
+int main(void) {
 
     constexpr int exp = 5;
     //当传入的值是 constexpr 时，可以用在编译时确定值
@@ -114,8 +118,7 @@ private:
 
 ```cpp
 constexpr    
-Point midpoint(const Point& p1, const Point& p2) noexcept
-{
+Point midpoint(const Point& p1, const Point& p2) noexcept {
   return { (p1.xValue() + p2.xValue()) / 2,    // call constexpr
            (p1.yValue() + p2.yValue()) / 2 };  // member funcs
 }
