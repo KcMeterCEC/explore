@@ -1,32 +1,36 @@
 ---
-title: '[What] Effective Modern C++ ：理解 std::move 和 std::forward'
+title: Effective C++ ：理解 std::move 和 std::forward
 tags: 
-- c++
-date:  2021/1/26
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/5
+updated: 2022/5/5
 layout: true
+comments: true
 ---
-- 移动语义：使用移动内存的方式替代拷贝方式，以提高效率
-- 完美转发：将接受任意参数的函数模板参数转发给其它函数，其它函数获得与自己需求参数同样的实参
-- 右值引用：用于粘合以上两个特性
-  - 区别左值与右值的一个方法是：如果一个对象可以取地址，那么它是左值，否则它是右值。
-  <!--more-->
+
+需要时刻牢记的是：函数的形参都是左值，即使它的类型是右值引用，它也是左值，因为它可以被取地址。
+
+主要是区分什么是右值，满足以下二者之一即可：
+1. 临时对象
+2. 无法位于赋值符号右边的对象
+
+<!--more-->
 
 # `std::move`和`std::forward`
 
 `std::move`相当于无条件的将其参数转换为右值，而`std::forward`则是判定条件否则满足来进行转换。
+> 这就是说，这两个函数都是做的`cast`动作，并没有做其他的操作。
 
 `std::move`的简易实现如下：
 
 ```cpp
 //c++11 版本
-template<typename T>                       // in namespace std
+template<typename T>                         // in namespace std
 typename remove_reference<T>::type&&
-    move(T&& param)
-{
+    move(T&& param) {
     using ReturnType =                       // alias declaration;
         typename remove_reference<T>::type&&;  
     return static_cast<ReturnType>(param);
@@ -34,8 +38,7 @@ typename remove_reference<T>::type&&
 
 //c++14 版本
 template<typename T>                          
-decltype(auto) move(T&& param)                
-{
+decltype(auto) move(T&& param) {
     using ReturnType = remove_reference_t<T>&&;
     return static_cast<ReturnType>(param);
 }
@@ -43,9 +46,41 @@ decltype(auto) move(T&& param)
 
 可以看到，`move`函数将参数`param`使用`static_cast`强制转换为了`remove_reference<T>::type&&`，也就是参数的右值引用。
 
-也就是说标准的`std::move`也仅仅是做转换作用，它并没有像它的名字那样实现移动的操作。
+也就是说标准的`std::move`也仅仅是做转换作用，它并没有像它的名字那样实现移动的操作，而是向编译器指明，该对象是可以被移动的。
 
-而是向编译器指明，该对象是可以被移动的。
+有了这个基础，就可以理解下面的代码：
+```cpp
+#include <iostream>
+
+class Hello {
+public:
+    Hello() {
+        std::cout << "default constructor!\n";
+    }
+    Hello(const Hello& rhs) {
+        std::cout << "copy constructor!\n";
+    }
+
+    Hello(Hello&& rhs) {
+        std::cout << "move constructor!\n";
+    }
+};
+
+int main(void) {
+
+    // 使用默认构造函数
+    Hello obj_a;
+
+    // 使用拷贝构造函数
+    Hello obj_b(obj_a);
+
+    // 使用移动构造函数
+    Hello obj_c(std::move(obj_a));
+
+
+    return 0;
+}
+```
 
 # 理解`std::move`
 
@@ -67,9 +102,9 @@ public:                   // typedef for std::basic_string<char>
 
 ```cpp
 class Annotation {
-    public:
+public:
     explicit Annotation(const std::string text)
-        private:
+private:
     std::string value;
 };
 ```
@@ -109,19 +144,19 @@ class Annotation {
 #include <array>
 #include <memory>
 
-void process(const int& lvalArg){
+void process(const int& lvalArg) {
     std::cout << "This is process function with const int&\n";
 }
-void process(int&& rvalArg){
+void process(int&& rvalArg) {
     std::cout << "This is process function with int&&\n";
 }
 
 template<typename T>
-void func(T&& param){
+void func(T&& param) {
     process(std::forward<T>(param));
 }
 
-int main(void){
+int main(void) {
     int a = 10;
 
     func(a);
