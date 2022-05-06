@@ -1,14 +1,16 @@
 ---
-title: '[What] Effective Modern C++ ：对右值引用使用 std::move，对通用引用使用 std::forward'
+title: Effective C++ ：对右值引用使用 std::move，对通用引用使用 std::forward
 tags: 
-- c++
-date:  2021/1/28
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/6
+updated: 2022/5/6
 layout: true
+comments: true
 ---
+
 当形参被声明为右值引用时，意味着传入的实参需要是右值引用，并且该参数是可移动的。既然目的如此明确，那么使用`std::move`是正确的选择：
 ```cpp
 class Widget {
@@ -56,7 +58,7 @@ private:
   std::string name;
 };
 
-int main(void){
+int main(void) {
 
     std::string str = {"hello,world\n"};
 
@@ -80,13 +82,13 @@ int main(void){
 
 作为`widget`的使用者，其本意是将`str`的内容拷贝一份给`widget`，但是由于使用了`std::move`进行无条件转换。最终`str`指向的内容被移动到了`widget`的私有成员`name`中。
 
-但作为使用这还以为`str`中依然是原来的内容，如果继续操作`str`便会遇到未定义的错误！
+但作为使用者还以为`str`中依然是原来的内容，如果继续操作`str`便会遇到未定义的错误！
 
 # 对返回值使用`std::move`或`std::forward`
 
 ## 好心办坏事
 
-当满同时满足以下两个条件时，c++ 会应用返回值优化策略（return value optimization，RVO）：
+当**同时**满足以下两个条件时，c++ 会应用返回值优化策略（return value optimization，RVO）：
 
 1. 局部变量的类型和函数的返回类型一致
 2. 当前局部变量就是被返回的变量
