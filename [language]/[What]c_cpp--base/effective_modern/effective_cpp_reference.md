@@ -1,14 +1,16 @@
 ---
-title: '[What] Effective Modern C++ ：区分通用引用和右值引用'
+title: Effective C++ ：区分通用引用和右值引用
 tags: 
-- c++
-date:  2021/1/27
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/6
+updated: 2022/5/6
 layout: true
+comments: true
 ---
+
 声明一个右值引用，使用`T&&`这种格式，但是这玩意并不是表面上看到的那么简单。
 ```cpp
 void f(Widget&& param);             // 右值引用
@@ -56,6 +58,7 @@ f(std::move(w));       // rvalue passed to f; param's type is
 ```
 
 需要注意的是：**通用引用必须要严格遵从`T&&`的格式**。
+> `auto`也是同理，遵从`auto&&`格式，也是通用引用。
 
 比如以下两种都是右值引用：
 
@@ -88,8 +91,3 @@ public:                                            // Standards
   …
 };
 ```
-
-
-
-
-
