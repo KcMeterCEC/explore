@@ -1,15 +1,18 @@
 ---
-title: '[What] Effective Modern C++ ：不用创建通用引用的重载函数'
+title: Effective C++ ：不要创建通用引用的重载函数
 tags: 
-- c++
-date:  2021/1/28
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/9
+updated: 2022/5/9
 layout: true
+comments: true
 ---
-如果创建通用引用的重载函数，但很多时候还是会调用到通用引用函数，这会让人很迷惑。
+
+创建通用引用的重载函数，但很多时候还是会调用到通用引用函数，这会让人很迷惑。
+
 <!--more-->
 
 # 普通版本
@@ -18,8 +21,7 @@ layout: true
 
 ```cpp
 std::multiset<std::string> names;     // global data structure
-void logAndAdd(const std::string& name)
-{
+void logAndAdd(const std::string& name) {
   auto now =                          // get current time
     std::chrono::system_clock::now();
   log(now, "logAndAdd");              // make log entry
@@ -50,8 +52,7 @@ logAndAdd("Patty Dog");               // pass string literal
 
 ```cpp
 template<typename T>
-void logAndAdd(T&& name)
-{
+void logAndAdd(T&& name) {
   auto now = std::chrono::system_clock::now();
   log(now, "logAndAdd");
   names.emplace(std::forward<T>(name));
@@ -65,10 +66,9 @@ void logAndAdd(T&& name)
 下面假设，用户可以查询索引的方式传入字符串，那么`logAndAdd`就需要一个重载版本：
 
 ```cpp
-std::string nameFromIdx(int idx);      // return name
-                                       // corresponding to idx
-void logAndAdd(int idx)                // new overload
-{
+std::string nameFromIdx(int idx);      // return name corresponding to idx new overload
+                                       
+void logAndAdd(int idx) {
   auto now = std::chrono::system_clock::now();
   log(now, "logAndAdd");
   names.emplace(nameFromIdx(idx));
