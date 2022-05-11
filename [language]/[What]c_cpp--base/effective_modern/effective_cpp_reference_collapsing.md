@@ -1,13 +1,14 @@
 ---
-title: '[What] Effective Modern C++ ：理解引用折叠'
+title: Effective C++ ：理解引用折叠
 tags: 
-- c++
-date:  2021/9/22
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/11
+updated: 2022/5/11
 layout: true
+comments: true
 ---
 
 如果一个模板函数的形参是通用引用，那么：
@@ -47,9 +48,7 @@ void Func(T&& param) {
     SomeFunc(std::forward<T>(param));
 }
 
-int main(void){
-
-
+int main(void) {
     std::vector<int> v1{1};
 
     Func(v1);
@@ -58,8 +57,6 @@ int main(void){
     return 0;
 }
 ```
-
-
 
 上面的推导逻辑，在编译器内部就叫做引用折叠（`reference collapsing`）,也就是两个引用化简为一个引用。
 
@@ -108,7 +105,7 @@ std::vector<int> && forward(typename
 }
 ```
 
-那么就直接返回一个右值引用即可。
+这种情况下，不会发生引用折叠，那么就直接返回一个右值引用即可。
 
 # 引用折叠发生的场景
 
