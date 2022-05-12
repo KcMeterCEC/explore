@@ -1,19 +1,22 @@
 ---
-title: '[What] Effective Modern C++ ：熟悉完美转发的错误情况'
+title: Effective C++ ：熟悉完美转发的错误情况
 tags: 
-- c++
-date:  2021/9/29
-categories: 
-- language
-- c/c++
-- Effective
+- cpp
+categories:
+- cpp
+- effective
+date: 2022/5/12
+updated: 2022/5/12
 layout: true
+comments: true
 ---
 
 要认识到完美转发的一些错误用例，才能够很好的使用它。
 
 <!--more-->
+
 # 基本使用
+
 再来看看完美转发的基本使用：根据输入参数的类型，调用对应的函数。
 
 ```cpp
@@ -53,9 +56,8 @@ int main(int argc, char *argv[]) {
 
 ```cpp
 template<typename... Ts>
-void fwd(Ts&&... params)             // accept any arguments
-{
-  f(std::forward<Ts>(params)...);    // forward them to f
+void fwd(Ts&&... params) {             // accept any arguments
+  f(std::forward<Ts>(params)...);      // forward them to f
 }
 ```
 
@@ -156,7 +158,7 @@ int main(int argc, char *argv[]) {
 
 ## 仅声明`static const`数据成员
 
-在[这里](http://kcmetercec.top/2021/08/20/chapter1_item2_define/)已经说明了可以直接在类内声明`static const`数据成员，只要不取其地址，那么可以正常使用。
+可以直接在类内声明`static const`数据成员，只要不取其地址，那么可以正常使用。
 
 但在通用引用函数中，由于引用在编译器内部也是一个指针，所以在这种情况下就需要提供其定义：
 
@@ -203,3 +205,4 @@ int main(int argc, char *argv[]) {
 ## 位字段
 
 如果通用引用函数的输入是位字段，则无法完成推导，因为引用在编译器内部是指针，而无法获取位字段的地址。
+> 函数形参是拷贝形式或`const`引用形式，就可以传入位字段。因为编译器会为这些位字段生成拷贝。
