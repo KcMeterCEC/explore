@@ -1,15 +1,18 @@
 ---
-title: '[What] C++ Concurrency in Action 2nd ：c++ 中的并发'
+title: C++ concurrency：初识并发
 tags: 
-- c++
-date:  2021/2/2
-categories: 
-- language
-- c/c++
-- Concurrency
+- cpp
+categories:
+- cpp
+- concurrency
+date: 2022/5/15
+updated: 2022/5/15
 layout: true
+comments: true
 ---
-c++ 对于多线程的支持是在 c++11 及以后才出现的。
+
+c++ 对于多线程的支持是在 c++11 出现的，这表示可以编写跨平台的多线程代码了。
+
 <!--more-->
 
 # c++ 多线程的历史
@@ -51,7 +54,7 @@ void f(int num) {
               << sch.sched_priority << '\n';
 }
  
-int main() {
+int main(void) {
     std::thread t1(f, 1), t2(f, 2);
  
     sched_param sch;
