@@ -1,15 +1,23 @@
 ---
-title: '[What] C++ Concurrency in Action 2nd ：线程间共享数据'
+title: C++ concurrency：线程间共享数据
 tags: 
-- c++
-date:  2021/2/6
-categories: 
-- language
-- c/c++
-- Concurrency
+- cpp
+categories:
+- cpp
+- concurrency
+date: 2022/5/17
+updated: 2022/5/19
 layout: true
+comments: true
 ---
-这一章主要熟悉用 c++ 来编写可以跨平台的数据共享操作。
+
+避免`data race`的底层方法有 3 种：
+1. 使用互斥机制，保证访问共享数据的原子性
+2. 使用无锁编程
+3. 使用事务机制（如同数据库一样，将多个操作做成日志形式，一旦日志被打断则重新开始）
+
+而互斥机制是相对简单易用的方式。
+
 <!--more-->
 
 # 使用互斥量保护临界区
@@ -59,7 +67,10 @@ int main(void) {
 
 ## 结构化共享数据
 
-结构化共享数据需要注意的是要**避免将共享数据的指针或引用传递出去，因为这样会绕过互斥量而造成未定义行为**：
+结构化共享数据需要注意的是要**避免将共享数据的指针或引用传递出去，因为这样会绕过互斥量而造成未定义行为**，这就包括以下几种情况：
+1. 将共享数据的指针或引用通过函数返回
+2. 将共享数据的指针或引用赋值给全局指针
+3. 将共享数据的指针或引用传递给其他用户可调用函数，而该函数参数是以指针或引用的方式获取该共享数据
 
 ```cpp
 class some_data {
@@ -84,7 +95,7 @@ public:
 some_data* unprotected;
 //将被保护数据的地址赋值给了 unprotected
 void malicious_function(some_data& protected_data) {
-    unprotected=&protected_data;
+    unprotected = &protected_data;
 }
 data_wrapper x;
 void foo() {
@@ -96,7 +107,7 @@ void foo() {
 
 ## 注意接口调用所造成的内部竞态
 
-以`std::stack`为例，虽然它的每个接口都保证是多线程的安全的。但是对其接口的应用却需要特别注意：
+以`std::stack`为例，假设它的每个接口都保证是多线程的安全的。但是对其接口的应用却需要特别注意：
 
 ```cpp
 std::stack<int> s;
@@ -104,7 +115,7 @@ if (!s.empty()) {
 	//假设目前 s 中只有一个元素了
 	//如果在这之间，有另外一个线程抢占并执行了 s.pop()
 	//那么下面这两行代码的访问行为便是未知的
-    int const value=s.top();
+    int const value = s.top();
     //同样的，假设是在下面这行之间发生了抢占并执行了 s.pop()，下面这段代码也会出问题
     s.pop();               
     do_something(value);
@@ -113,9 +124,22 @@ if (!s.empty()) {
 
 要解决这个问题，最简单粗暴的方式就是使用互斥量将这整个步骤原子化。但如果 stack 元素所占内存太大时，进行元素拷贝的时间过长占用内存过大，有些类型将会抛出`std::bad_alloc`异常。那么这种解决方案在元素占用内存大的情况下就不适用了。
 
-### 元素使用引用
+> 比如在`stack`中的元素是`vector`，而`vector`的内存是从堆中申请的。
+> 在执行`top()`操作时，会进行整个`vector`拷贝，这意味着需要申请堆内存。
+> 如果`vector`很大，则可能由于内存不够或被限制而抛出异常。
+> 所以标准库将`top()`和`pop()`拆分成两个动作，如果`top()`失败，则`stack`内的内容仍然没有被改变。
+> 现在使用互斥量将它们捆绑在一起，如果由于内存过大而失败，又继续执行后面的`pop()`，则会导致`stack`内容被删除了一个元素，而用户又没有获取到该元素的内容。
 
-既然进行大内存拷贝会抛出异常，那么就将栈中的元素使用引用来代替就可以了。但这就需要在创建引用的同时就要提前创建对应绑定的对象，这在很多场合就会比较麻烦。
+为了避免大内存抛异常的情况，有以下几个解决方案：
+
+### 形参传递使用引用
+在调用函数前，首先用户申请内存。如果申请失败，也不会导致`pop`的问题：
+```cpp
+std::vector<int> result;
+some_stack.pop(result);
+```
+
+但是这有一定的局限性：有些用户数据是不太容易构建对象的或者是构建成本比较高
 
 ### 使用不会抛出异常的元素
 
@@ -153,7 +177,7 @@ public:
         std::lock_guard<std::mutex> lock(other.m);
         data = other.data;
     }
-    threadsafe_stack& operator=(const threadsafe_stack&) = delete;
+    threadsafe_stack& operator= (const threadsafe_stack&) = delete;
 
     void push(T new_value) {
         std::lock_guard<std::mutex> lock(m);
@@ -167,10 +191,11 @@ public:
         data.pop();
         return res;
     }
+    // 让用户先申请内存，然后通过赋值的方式传递
     void pop(T& value) {
         std::lock_guard<std::mutex> lock(m);
         if(data.empty()) throw empty_stack();
-        value=data.top();
+        value = data.top();
         data.pop();
     }
     bool empty() const {
@@ -195,7 +220,7 @@ int main() {
 可以看到：
 
 1. 使用互斥量将原始的`top()`和`pop()`进行原子化以避免竞态
-2. 返回元素使用引用或地址，以避免大量的拷贝
+2. 返回元素使用引用或地址，以避免拷贝出现异常
 3. 当元素为空时，抛出异常以提醒用户代码
 
 ## 死锁问题及其解决
@@ -242,7 +267,8 @@ public:
 
 当一个线程已经获取了一个锁并且还未释放的时候，就不要再获取其它的锁了。
 
-如果每个线程都遵守这个规则，那么就不会那么容易造成死锁。因为每个线程都管理自己所获取的那个锁而不会获取到其它线程的锁。
+如果每个线程都遵守这个规则，那么就不会那么容易造成死锁，因为每个线程都获取单独的锁。
+> 即使别的线程已经获取了该锁，那么该线程所做的就是等待。但别的线程不会等待该线程，所以也不会造成死锁。
 
 如果确实需要同时获取到多个锁，那么使用`std::lock`和`std::lock_guard`来管理这些锁以避免死锁。
 
@@ -258,7 +284,7 @@ public:
 
 ### 使用一个获取锁的层级
 
-简单的说就是：为各个锁分一个高低层级，并且获取锁的顺序必须是由高向低层级的方向获取。
+简单的说就是：为各个锁分一个高低层级，并且获取锁的顺序必须是由高向低层级的方向获取，然后由低到高的方向释放。
 
 那么这里的重点就是要设计一个可以识别出层级高低的锁，核心就在于使用`thread_local`变量以共享同一个线程中的层级：
 
@@ -279,9 +305,9 @@ class hierarchical_mutex {
     }
     void update_hierarchy_value() {
         //将当前层级进行存储，类似于压栈的操作
-        previous_hierarchy_value=this_thread_hierarchy_value;
+        previous_hierarchy_value = this_thread_hierarchy_value;
         //更新当前线程所处于的层级
-        this_thread_hierarchy_value=hierarchy_value;
+        this_thread_hierarchy_value = hierarchy_value;
     }
 public:
     explicit hierarchical_mutex(unsigned long value):
@@ -298,10 +324,10 @@ public:
     }
     void unlock() {
 		//保证释放的时候也必须是由低到高释放
-        if (this_thread_hierarchy_value!=hierarchy_value)
+        if (this_thread_hierarchy_value != hierarchy_value)
             throw std::logic_error(“mutex hierarchy violated”);  
         //将存储的上一级的值取出来，相当于出栈
-        this_thread_hierarchy_value=previous_hierarchy_value;    
+        this_thread_hierarchy_value = previous_hierarchy_value;    
         internal_mutex.unlock();
     }
     bool try_lock() {
@@ -348,14 +374,14 @@ void thread_b() {
 }
 ```
 
-hierarchical_mutex 可以被`std::lock_guard`所使用，是因为它提供了`lock`,`unlock`,`try_lock`标准处理函数。
+hierarchical_mutex 可以被`std::lock_guard`所使用，是因为它提供 `lock`,`unlock`,`try_lock`标准处理函数。
 
 ## 使用`std::unique_lock`来灵活的使用锁
 
-`std::unique_lock`相比`std::lock_guard`更加智能。
+`std::defer_lock`使得`std::unique_lock`只是刚开始获得锁的关联，但并不会`lock()`这个锁。
 
-- `std::lock_guard`在构造函数中传入锁便会获取该锁的所有权
-- `std::unique_lock`则是可以根据情况，推迟使用锁
+`std::unique_lock`可以在后面主动使用`lock()`、`unlock()`这些方法来主动获取和释放锁。
+> 由于可以主动的释放锁，所以在操作完以后立即释放锁，可以提高整个系统的并发性能
 
 这里的应用场景主要是在于灵活的使用锁，前面的 swap 函数还有更好的实现方式：
 
@@ -380,9 +406,11 @@ public:
 };
 ```
 
+如果`std::lock`成功获取了锁，则在析构时，`std::unique_lock`会释放该锁。反之则不会。
+
 ## 传递互斥量的所有权
 
-当一个函数获取了一个锁，然后需要该函数的使用者来释放该锁，这种情况下就需要传递锁的所有权了。
+当一个函数获取了一个锁，然后需要该函数的使用者来释放该锁，这种情况下就需要传递锁的所有权了。而`std::unique_lock`内部私有成员保存了该锁，所以使用它来移动所有权是最合适的。
 
 当传递的锁本就是一个右值，那么这种传递会自动完成（比如返回一个临时的锁）。
 
@@ -402,6 +430,10 @@ void process_data() {
 }
 ```
 
+如果多个线程在获取锁之后都需要一个共同的处理过程，那么可以将这个处理过程和`std::unique_lock`封装为一个函数：
+- 在函数内部先获取锁，然后在处理共有过程
+- 将锁的所有权传递出去，以继续各个线程独有的处理流程
+
 ## 锁的粒度
 
 基本原则是：尽量保证临界区的执行时间最短，以保证系统的运行效率。
@@ -409,20 +441,18 @@ void process_data() {
 `std::unique_lock`在这种情况下可以比较灵活的使用，因为它既可以主动的获取和释放锁，也可以在其本身被释放时，自动的释放锁。
 
 ```cpp
-void get_and_process_data(){
+void get_and_process_data() {
     std::unique_lock<std::mutex> my_lock(the_mutex);
     some_class data_to_process = get_next_data_chunk();
     my_lock.unlock();
     //这段区域不是临界区，所以可以先释放锁
-    result_type result=process(data_to_process);
+    result_type result = process(data_to_process);
     my_lock.lock();                              
     write_result(data_to_process,result);
 }
 ```
 
 有的时候，为了降低锁保持的时间，可以先将共享的数据在栈上做一次拷贝，然后再进行接下来的操作，这样锁的粒度就只有对共享数据进行拷贝的那一小段。
-
-
 
 但有些情况下需要格外注意：
 
@@ -453,6 +483,8 @@ public:
 如果两个对象的值再两个`get_detail()`方法之间被改变了，则它们是不等的。
 
 这种情况下需要再将两个操作打包为一个临界区。
+> 但很多情况下，即使出现了这种情况也不会有什么影响。这是根据业务逻辑而定的。
+> 比如有些业务逻辑已经完全考虑了这种情况，只要保证获取`some_detail`对象是原子性的就行了。
 
 # 保护临界区的其它方法
 
@@ -465,6 +497,7 @@ public:
 ```cpp
 std::shared_ptr<some_resource> resource_ptr;
 void foo() {
+    // 延迟初始化，在使用的时候才初始化
     if (!resource_ptr) {
         resource_ptr.reset(new some_resource);    
     }
@@ -532,7 +565,7 @@ private:
     connection_handle connection;
     std::once_flag connection_init_flag;
     void open_connection() {
-        connection=connection_manager.open(connection_details);
+        connection = connection_manager.open(connection_details);
     }
 public:
     X(connection_info const& connection_details_):
@@ -549,9 +582,9 @@ public:
 };
 ```
 
-## 保护很少更新的数据结构
+## 保护非频繁更新的数据结构
 
-当一个数据结构很少更新，大部分时候都是读操作时。使用读写锁是最为合适的，因为这可以保证读的并发性，从而相比互斥锁有更高的吞吐量。
+当一个数据结构更新频率很低，大部分时候都是读操作时。使用读写锁是最为合适的，因为这可以保证读的并发性，从而相比互斥锁有更高的吞吐量。
 
 c++11 并没有提供读写锁，c++14 提供了`std::shared_timed_mutex`，c++17 在 14 的基础上还增加了` std::shared_mutex`。
 
@@ -566,8 +599,7 @@ c++11 并没有提供读写锁，c++14 提供了`std::shared_timed_mutex`，c++1
 #include <shared_mutex>
 //这个类代表 dns 的一个地址
 class dns_entry;
-class dns_cache
-{
+class dns_cache {
 	//将 url 与地址使用 map 来进行存储
     std::map<std::string,dns_entry> entries;
     mutable std::shared_mutex entry_mutex;
@@ -575,15 +607,15 @@ public:
     dns_entry find_entry(std::string const& domain) const {
 		//查找 dns 列表时，使用 std::shared_lock 以保证可以多线程并发访问
         std::shared_lock<std::shared_mutex> lk(entry_mutex);      
-        std::map<std::string,dns_entry>::const_iterator const it=
+        std::map<std::string,dns_entry>::const_iterator const it =
             entries.find(domain);
-        return (it==entries.end())?dns_entry():it->second;
+        return (it == entries.end()) ? dns_entry() : it->second;
     }
     void update_or_add_entry(std::string const& domain,
                              dns_entry const& dns_details) {
 		//修改 dns 列表时，需要使用 std::lock_guard 以保证独占的访问
         std::lock_guard<std::shared_mutex> lk(entry_mutex);  
-        entries[domain]=dns_details;
+        entries[domain] = dns_details;
     }
 };
 ```
@@ -595,4 +627,3 @@ public:
 需要注意的时，递归获取`std::recursive_mutex`的次数和释放的次数需要等同，所以使用`std::lock_guard<std::recursive_mutex>` 和`std::unique_lock<std::recursive_mutex>` 是明智的做法。
 
 > 但一般情况下都不建议这么做，如果代码中出现了递归锁，建议还是要重新思考代码逻辑是否可以优化。
-
