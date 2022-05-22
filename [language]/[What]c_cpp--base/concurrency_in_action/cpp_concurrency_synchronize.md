@@ -1,22 +1,25 @@
 ---
-title: '[What] C++ Concurrency in Action 2nd ：线程间同步操作'
+title: C++ concurrency：线程间同步
 tags: 
-- c++
-date:  2021/3/8
-categories: 
-- language
-- c/c++
-- Concurrency
+- cpp
+categories:
+- cpp
+- concurrency
+date: 2022/5/19
+updated: 2022/5/22
 layout: true
+comments: true
 ---
-这一章主要熟悉用 c++ 来编写可以跨平台的数据同步操作。
+
+熟悉用 c++ 来编写可以跨平台的数据同步操作。
+
 <!--more-->
 
 # 等待事件或条件
 
 ## 使用条件变量
 
-之前在看[ostep](http://kcmetercec.top/2020/05/26/book_ostep_concurrency_condition_variables/)的时候熟悉过条件变量，但只是 Linux 平台下的。现在看看 c++ 标准库是如何使用的。
+之前在看 [ostep](https://pages.cs.wisc.edu/~remzi/OSTEP/) 的时候熟悉过条件变量，但只是 Linux 平台下的。现在看看 c++ 标准库是如何使用的。
 
 c++ 标准库在` <condition_variable>`头文件中提供了` std::condition_variable`和`std::condition_variable_any`两种条件变量。
 
@@ -48,7 +51,7 @@ void data_preparation_thread() {
 }
 // 消费者
 void data_processing_thread() {
-    while(true) {
+    while (true) {
         std::unique_lock<std::mutex> lk(mut);
         //等待数据，当 lambda 中的返回为真时，则会继续处理后面的数据，否则会释放互斥量然后继续睡眠    
         data_cond.wait(
@@ -60,7 +63,7 @@ void data_processing_thread() {
         lk.unlock();
         //到这里才是处理刚刚收到的数据          
         process(data);
-        if(is_last_chunk(data))
+        if (is_last_chunk(data))
             break;
     }
 }
@@ -71,7 +74,7 @@ void data_processing_thread() {
 ```cpp
 template<typename Predicate>
 void minimal_wait(std::unique_lock<std::mutex>& lk,Predicate pred) {
-    while(!pred()){
+    while (!pred()) {
         lk.unlock();
         
         // 等待唤醒
@@ -93,7 +96,7 @@ void minimal_wait(std::unique_lock<std::mutex>& lk,Predicate pred) {
 template<typename T>
 class threadsafe_queue {
 private:
-	//在多线程环境下，互斥量是易变的，需要加上 mutable 修饰
+	//在多线程环境下，互斥量会在 const 成员函数中被使用，需要加上 mutable 修饰
     mutable std::mutex mut;    
     std::queue<T> data_queue;
     std::condition_variable data_cond;
@@ -114,7 +117,7 @@ public:
     void wait_and_pop(T& value) {
         std::unique_lock<std::mutex> lk(mut);
         data_cond.wait(lk,[this]{return !data_queue.empty();});
-        value=data_queue.front();
+        value = data_queue.front();
         data_queue.pop();
     }
     std::shared_ptr<T> wait_and_pop() {
@@ -127,9 +130,9 @@ public:
     bool try_pop(T& value) {
 		//既然是试探性的获取数据，就不需要用到条件变量了
         std::lock_guard<std::mutex> lk(mut);
-        if(data_queue.empty())
+        if (data_queue.empty())
             return false;
-        value=data_queue.front();
+        value = data_queue.front();
         data_queue.pop();
         return true;
     }
@@ -154,7 +157,7 @@ public:
 threadsafe_queue<data_chunk> data_queue;    
 void data_preparation_thread() {
     while(more_data_to_prepare()) {
-        const data_chunk data=prepare_data();
+        const data_chunk data = prepare_data();
         data_queue.push(data);        
     }
 }
@@ -163,11 +166,17 @@ void data_processing_thread() {
         data_chunk data;
         data_queue.wait_and_pop(data);    
         process(data);
-        if(is_last_chunk(data))
+        if (is_last_chunk(data))
             break;
     }
 }
 ```
+
+如果想要同时唤醒多个线程，那就应该使用`notify_all()`方法。
+
+信号量是 [c++ 20](https://en.cppreference.com/w/cpp/thread/counting_semaphore) 才提供的，如果在之前的版本要使用信号量，那就使用条件变量和互斥锁来实现信号量。被互斥的变量其实就是计数值：
+- 释放信号量时计数值加 1
+- 获取信号量时计数值减一
 
 # 使用`future`等待一次性事件
 
@@ -258,9 +267,23 @@ f7.wait();
 
 ## 将 future 与一个任务关联
 
-`std::packaged_task`提供了更为灵活的方式，它可以将一个可执行函数、对象等内部与一个`std::future`绑定在一起，形成一个可执行对象。
+`std::packaged_task`提供了更为灵活的方式，它可以将一个可执行函数、可执行对象等与一个`std::future`绑定在一起，形成一个可执行对象。
 
 然后这个可执行对象可以被同步或异步的被执行。执行的时候其返回值便会自动存储，而后可以通过关联的`std::future`来获取。
+
+比如  `std::packaged_task<std::string(std::vector<char>*,int)>`打包后实例化的类就如同下面这样：
+```cpp
+template<>
+class packaged_task<std::string(std::vector<char>*,int)> {
+public:
+    template<typename Callable>
+    explicit packaged_task(Callable&& f);
+    // std::future 类型和模板里面传入的返回值一致
+    std::future<std::string> get_future();
+    // 函数参数和模板里面传入的参数一致
+    void operator()(std::vector<char>*,int);
+};
+```
 
 对于处理批量任务，使用这个打包的方式，可以将这种多个对象都放入容器中便于管理:
 
@@ -316,8 +339,6 @@ int main() {
 }
 ```
 
-
-
 比如，GUI 有个独立的线程执行刷新任务，其它的任务要刷新线程必须要给这个 GUI 任务发送消息，这些线程或许还需要得到 GUI 线程执行该消息后的返回值。那么使用`std::package_task`就是合理的：
 
 ```cpp
@@ -357,7 +378,8 @@ std::future<void> post_task_for_gui_thread(Func f) {
     //消息存入消息队列     
     std::lock_guard<std::mutex> lk(m);
     tasks.push_back(std::move(task));
-    //返回与该消息绑定的 future，用户可以在需要的时候获取这个消息的执行返回结果     
+    // 返回与该消息绑定的 future，用户可以在需要的时候获取这个消息的执行返回结果
+    // 如果对结果不感兴趣，也可以丢弃这个返回
     return res;                      
 }
 ```
@@ -421,31 +443,42 @@ int main() {
 
 ## 将异常存入 future
 
-正常情况下，当一个函数抛出异常时，会层层向上传递，如果没有用户代码 catch 它，那么将会由标准库处理并退出用户进程。但是当使用了`std::future`，`std::promises`，`std::packaged_task`时，如果其关联函数抛出了异常，这个异常的值会被存储在 future 中：
+正常情况下，当一个函数抛出异常时，会层层向上传递，如果没有用户代码 catch 它，那么将会由标准库处理并退出用户进程。但是当使用了`std::future`，`std::promises`，`std::packaged_task`时，如果其关联函数抛出了异常，这个异常的值会被存储在 future 中。
+
+使用`std::promises`来存储异常，然后在获取线程中获取异常才是一个优雅的做法：
 
 ```cpp
 #include <iostream>
 #include <stdexcept>
 #include <future>
+#include <thread>
+#include <chrono>
 
-int func_div(int a, int b) {
+static std::promise<int> result;
+
+void func_div(int a, int b) {
     std::cout << "a = " << a << " b " << b << "\n";
     if(b == 0){
-        throw std::out_of_range("input out of range!\n");
+        result.set_exception(
+                    std::make_exception_ptr(std::out_of_range("input out of range!\n"))
+                    );
+    } else {
+        result.set_value(a / b);
     }
-
-    return a / b;
 }
 
 int main(void) {
 
-    std::future<int> f = std::async(func_div, 10, 0);
+    std::thread t(func_div, 10, 0);
 
-	//如果使用了 while(1) ，那么虽然 func_div 抛出了异常，这个应用代码并不会被杀死
-    while(1);
-    //当使用 get 时，才会重新抛出异常
-    int ret = f.get();
+    std::cout << "sleep 3 seconds\n";
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+    std::cout << "get result\n";
+    //在获取结果的时候，才抛出异常
+    int ret = result.get_future().get();
     std::cout << "get result: " << ret << "\n";
+
+    t.join();
 
     return 0;
 }
@@ -482,12 +515,12 @@ std::shared_future<std::string> sf(p.get_future());
 std::promise< std::map< SomeIndexType, SomeDataType, SomeComparator,
     SomeAllocator>::iterator> p;
 //sf 推导为  std::shared_future< std::map< SomeIndexType, SomeDataType, SomeComparator, //SomeAllocator>::iterator>
-auto sf=p.get_future().share();
+auto sf = p.get_future().share();
 ```
 
 # 超时等待
 
-对于时间的设定，可以设置相对时间（比如等待 100 毫秒）和绝对时间（比如等待至 2022年……）。
+对于时间的设定，可以设置相对时间（比如等待 100 毫秒）和绝对时间（比如等待至 2023年……）。
 
 c++ 标准库提供了这两种时间的设定，对于相对时间，其操作方法以`_for`作为后缀，对于绝对时间，其操作方法以`_until`作为后缀。
 
@@ -503,13 +536,15 @@ c++ 标准库提供了头文件` <chrono>`以支持时钟相关的操作：
 
 以上 3 个时钟都具有静态函数`now()`以获取一个绝对的时间点`time_point`。
 
-## 周期
+## 时间段
 
 ### ratio
 
-`ratio`头文件提供了模板类`std::ratio<num, den>`，其值代表 N 秒内有 D 次数，也就是频率。
+`ratio`头文件提供了模板类`std::ratio<num, den>`，其值代表分数，`num`就是分子（Numerator）的简写，`den`就是分母（denominator）的简写。
 
-比如 1毫秒，就是 1 秒内有 1000 次，那么就表示为：`std::ratio<1,1000>`。
+而在时间的角度来看的话，可以理解为`num`秒内有`den`次发生，也就是频率的表示。
+
+> 比如 1毫秒，就是 1 秒内有 1000 次，那么就表示为：`std::ratio<1,1000>`。
 
 该头文件还提供了很多实现定义的类型，便于用户直接使用：（详见[cppreference](https://en.cppreference.com/w/cpp/numeric/ratio/ratio)）
 
@@ -544,16 +579,16 @@ int main(void) {
 
 头文件`<chrono>`提供了`std::chrono::duration<Rep,Period>`模板。
 
-它与`std::ratio`联合使用，以表示在多少个周期内有多少个计数值。
+它与`std::ratio`联合使用，以表示在时间段内有多少个计数值。
 
-第一个参数指定存储周期的类型值，第二个参数指定`std::ratio`。
+第一个参数指定存储时间段的类型值，第二个参数指定`std::ratio`。
 
 比如：
 
 - 使用`short`存储一分钟的计数值：`std::chrono::duration<short,std::ratio<60,1>>`
 - 使用`double`存储毫秒： `std::chrono::duration<double,std::ratio<1,1000>>`
 
-为了方便，标准库还提供了`std::nanoseconds,  std::microseconds,  std::milliseconds,  std::seconds, std::minutes, std::hours`等这些定义好的周期值。
+为了方便，标准库还提供了`std::nanoseconds,  std::microseconds,  std::milliseconds,  std::seconds, std::minutes, std::hours`等这些定义好的时间段值。
 
 ```cpp
 #include <iostream>
@@ -575,7 +610,7 @@ int main(void) {
 }
 ```
 
-在 c++14 及以后，还提供了`std::chrono_literals`以使用字面值来表示周期：
+在 c++14 及以后，还提供了`std::chrono_literals`以使用字面值来表示时间段：
 
 ```cpp
 using namespace std::chrono_literals;
@@ -630,7 +665,7 @@ int main(void) {
 
 ## 时间点
 
-`std::chrono::time_point<>`用于表示一个绝对的时间点，它有两个参数。第一个参数用于表示这个时间点的参考时钟，第二个参数用于表示周期：
+`std::chrono::time_point<>`用于表示一个绝对的时间点，它有两个参数。第一个参数用于表示这个时间点的参考时钟，第二个参数用于表示时间段：
 
 ```cpp
 #include <iostream>
@@ -670,14 +705,14 @@ int main() {
 #include <iomanip>
 
 int main() {
-    auto start=std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     for(int i = 0; i < 0xffffff; ++i){
 
     }
-    auto stop=std::chrono::high_resolution_clock::now();
+    auto stop = std::chrono::high_resolution_clock::now();
     std::cout<<"for loop took "
              << std::chrono::duration_cast<std::chrono::microseconds> (stop-start).count()
-             << " microseconds" <<std::endl;
+             << " microseconds" << std::endl;
 
     return 0;
 }
@@ -694,7 +729,7 @@ int main() {
 #include <thread>
 
 int main() {
-    auto start=std::chrono::high_resolution_clock::now();
+    auto start = std::chrono::high_resolution_clock::now();
     //使用相对延迟，延迟两秒
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
@@ -703,11 +738,11 @@ int main() {
              << std::chrono::duration_cast<std::chrono::microseconds> (stop-start).count()
              << " microseconds" <<std::endl;
 
-    start=std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
     //使用绝对延迟，延迟 800 毫秒
     std::this_thread::sleep_until(std::chrono::system_clock::now() + std::chrono::milliseconds(800));
 
-    stop=std::chrono::high_resolution_clock::now();
+    stop = std::chrono::high_resolution_clock::now();
     std::cout<<"absolute delay took "
              << std::chrono::duration_cast<std::chrono::microseconds> (stop-start).count()
              << " microseconds" <<std::endl;
@@ -721,7 +756,6 @@ int main() {
 - `std::this_thread::sleep_for` / `std::this_thread::sleep_until`
 - `std::condition_variable::wait_for` / `std::condition_variable::wait_until`
 - `std::condition_variable_any::wait_for` / `std::condition_variable_any::wait_until`
-
 - `std::timed_mutex::try_lock_for` / `std::timed_mutex::try_lock_until`
 - `std::recursive_timed_mutex::try_lock_for` / `std::recursive_timed_mutex::try_lock_until`
 - `std::shared_timed_mutex::try_lock_for` / `std::shared_timed_mutex::try_lock_until`
@@ -876,9 +910,9 @@ std::list<T> sequential_quick_sort(std::list<T> input) {
     auto new_higher(
         sequential_quick_sort(std::move(input)));
     // 大于或等于 pivot 的元素依次放在 pivot 的右边
-    result.splice(result.end(),new_higher);
+    result.splice(result.end(), new_higher);
     // 小于 pivot 的元素依次放在 pivot 的左边
-    result.splice(result.begin(),new_lower);
+    result.splice(result.begin(), new_lower);
 
     return result;
 }
@@ -904,7 +938,7 @@ int main() {
 }
 ```
 
-可以看到，与上面 c 版本的实现思路是完全一样的，知识有标准库的加持，使得代码看起来更为简洁。
+可以看到，与上面 c 版本的实现思路是完全一样的，只是有标准库的加持，使得代码看起来更为简洁。
 
 ### 并行实现快速排序
 
