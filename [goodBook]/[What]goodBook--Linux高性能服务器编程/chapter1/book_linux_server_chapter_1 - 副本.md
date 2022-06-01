@@ -1,12 +1,14 @@
 ---
-title: '[What]tcp/ip 协议族 --> arp 与 dns'
+title: 使用 Wireshark 观察 ARP 协议
 tags: 
-- CS
-date:  2019/10/15
-categories: 
-- book
-- Linux高性能服务器编程
+- network
+categories:
+- network
+- basic
+date: 2022/6/1
+updated: 2022/6/1
 layout: true
+comments: true
 ---
 
 在阅读 <<图解TCPIP>> 时，只简单提了一下 arp 与 dns，现在将它们加深一下理解。
