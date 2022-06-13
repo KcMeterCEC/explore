@@ -25,7 +25,7 @@ Linux 提供了 3 种定时方法：
 SO_RECVTIMEO 和 SO_SNDTIMEO 分别对应设置接收和发送超时。
 
 | 系统调用 | 有效选项    | 系统调用超时后的行为                        |
-|----------+-------------+---------------------------------------------|
+|----------|-----------|---------------------------------------------|
 | send     | SO_SNDTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
 | sendmsg  | SO_SNDTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
 | recv     | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
