@@ -32,6 +32,7 @@ SO_RECVTIMEO 和 SO_SNDTIMEO 分别对应设置接收和发送超时。
 | recvmsg  | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
 | accept   | SO_RCVTIMEO | 返回 -1，errno 的值为 EAGAIN 或 EWOULDBLOCK |
 | connect  | SO_SNDTIMEO | 返回 -1，errno 的值为 EINPROGRESS           |
+
 如下所示为 socket 使用`connect` 超时的设置：
 
 ``` c
