@@ -6,7 +6,7 @@ categories:
 - cpp
 - CoreGuidelines
 date: 2022/7/26
-updated: 2022/7/26
+updated: 2022/9/9
 layout: true
 comments: true
 ---
@@ -41,7 +41,11 @@ int round(bool round_up, double d) {
 
 `non-const`全局变量就可能：
 1. 导致该变量被多处使用，造成依赖关系
-2. 并发`data race`
+2. `data race`
+
+#  形参的检查
+
+
 
 
 
