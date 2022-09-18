@@ -333,7 +333,6 @@ static void count2(int n) {
 | n-3  | n-2  | 1       |
 |      |      |         |
 
-
 当`i`的值为 0 时，`j`的值将从 1~(n-1)，其执行次数是：
 
 > 1 + 2 + … + (n-3) + (n-2)
@@ -376,3 +375,125 @@ static void count2(int n) {
 > 比如 1，2，3 的重复组合就是：
 > 123,  132,  213,   231, 312, 321
 
+### 与 O(n^3) 
+
+前面推导的公式进行展开就是：
+
+![](./pic/3level_for_formula_expand.jpg)
+这个结果虽然很精准，但是在表示代码执行复杂度的时候会有点麻烦。如果遇到了更为复杂的代码，那其精确的公式会更加复杂。
+
+这种复杂的表达方式会干扰我们对代码执行效率的分析，所以我们要抓住主要矛盾，忽略次要矛盾。
+
+从公式的展开结果可以推测，3 阶的`n`应该是最为主要的，其次的 2 阶、1 阶、系数都是次要的。
+
+为了能够验证这个推测，可以通过`octave`来绘制：
+
+```matlab
+clear all;
+clc;
+
+set(0, "defaulttextfontsize", 36);  % title
+set(0, "defaultaxesfontsize", 24);  % axes labels
+
+point = [1: 2000];
+formula_1 = (point.^3 / 6)
+formula_2 = (point.^3 / 6 - point.^2 / 2)
+formula_3 = (point.^3 / 6 - point.^2 / 2 + point./3)
+
+grid on;
+hold on;
+
+title("compare formulas");
+xlabel("points");
+ylabel("result");
+
+plot(point, formula_1);
+plot(point, formula_2);
+plot(point, formula_3);
+legend("n^3/6", "n^3/6 - n^2/2", "n^3/6 - n^2/2 + n/3");
+
+hold off;
+```
+
+
+![](./pic/3level_for_formula_tilde.jpg)
+
+
+从绘制结果可以看出来，果然是高阶的影响最大，次阶几乎没有影响。
+
+虽然说高阶下还有个除以 6 的运算，但是其增长趋势和`n^3`是一模一样的，所以除以 6 也是可以省略的，最终计算其代码运行复杂度就是以 O(n^3) 来表示了。
+
+所以，对于精确公式的估计方式如下表：
+
+| 精确的公式               | 近似的公式 | 增长趋势 |
+|---------------------|-------|------|
+| N^3/6 - N^2/2 + N/3 | N^3/6 | N^3  |
+| N^2/2 - N/2         | N^2/2 | N^2  |
+| lgN+1               | lgN   | lgN  |
+|                     |       |      |
+
+下面便是代码中常会遇到的时间复杂度：
+
+![](./pic/algorithm_complex.jpg)
+
+从这个趋势和左侧的数值可以看出来各种时间复杂度的执行时间差异是多么的大。
+
+octave 测试代码如下：
+
+```matlab
+clear all;
+clc;
+close all;
+
+set(0, "defaulttextfontsize", 36);  % title
+set(0, "defaultaxesfontsize", 24);  % axes labels
+
+points = [1:1:15];
+
+ratio = 1e-6;
+
+algo_1 = ones(1, length(points));# O(1)
+algo_2 = log10(points); # O(log(N))
+algo_3 = points; # O(N)
+algo_4 = points .* log10(points); # O(N * log(N))
+
+algo_5 = points .^ 2; # O(N^2)
+algo_6 = points .^ 3; # O(N^3)
+algo_7 = 2 .^ points; # O(2^N)
+algo_8 = factorial(points); # O(N!)
+
+grid on;
+hold on;
+
+title("compare formulas");
+xlabel("points");
+ylabel("result");
+
+plot(points, algo_1);
+plot(points, algo_2);
+plot(points, algo_3);
+plot(points, algo_4);
+legend("O(1)", "O(log(N))", "O(N)", "O(Nlog(N))");
+
+hold off;
+
+figure;
+grid on;
+hold on;
+
+plot(points, algo_5);
+plot(points, algo_6);
+plot(points, algo_7);
+legend("O(N^2)","O(N^3)","O(2^N)");
+
+hold off;
+
+figure;
+grid on;
+hold on;
+
+plot(points, algo_8);
+legend("O(N!)");
+
+hold off;
+```
