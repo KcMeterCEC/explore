@@ -17,7 +17,7 @@ Smith chart 对于射频领域的重要性不言而喻，但我们应该如何�
 
 # 绘制的理论
 
-在[这篇文章](https://www.maximintegrated.com/en/design/technical-documents/tutorials/7/742.html)中已经说明了，对于史密斯圆图，其核心公式是：
+在 [这篇文章](https://www.maximintegrated.com/en/design/technical-documents/tutorials/7/742.html) 中已经说明了，对于史密斯圆图，其核心公式是：
 
 ![](./pic/simple_expression.jpg)
 
