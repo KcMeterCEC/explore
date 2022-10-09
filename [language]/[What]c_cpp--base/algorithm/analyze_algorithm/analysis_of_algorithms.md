@@ -6,7 +6,7 @@ categories:
 - cpp
 - Algorithms
 date: 2022/9/9
-updated: 2022/9/17
+updated: 2022/10/9
 layout: true
 comments: true
 ---
@@ -19,6 +19,9 @@ comments: true
 2. 这段代码会占用多少内存，是否会触发 Stack overflow 或 Out of memory？
 
 如果仅仅是凭感觉来估算，真实解决往往是大相径庭，我们需要科学方法来量化代码的时间及空间复杂度。
+
+> 实际上，代码的准确执行时间是无法计算的，这根据运行的软硬件环境都有关系。
+> 但是不管环境如何，其趋势是可预测的。
 
 <!--more-->
 
@@ -169,7 +172,7 @@ int main(void) {
 | 32Kints.txt | 32000   | 1128.04     | 4584.773     |
 | 1Mints.txt  | 1000000 |             |              |
 
-可以看出来：c++ 的运行效率大约是 java 的 4 倍，c++ 还是香啊……
+可以看出来：c++ 的运行效率（未开优化）大约是 java 的 4 倍，c++ 还是香啊……
 
 接下来，使用 excel 进行绘图，结果如下：
 
@@ -285,7 +288,7 @@ static int count(const std::vector<int>& a) {
 }
 ```
 
-最开始的创建两个局部变量，它们的频率都是 1，这个是没有疑问的，重点是在于下面的 `for`循环语句的执行次数。
+最开始的创建两个局部变量，它们的频率都是 1，这个是没有疑问的，重点是在于下面的 `for`循环语句（或者说是里面的`if`语句）的执行次数。
 
 由于上面是 3 层循环，对于我这种数学渣理解起来有点困难，那么我们先将 3 层循环简化为 2 层循环：
 
@@ -306,13 +309,14 @@ static void count2(int n) {
 下面先列举出规律：
 
 | i 的值  | 内层执行次数 |
-|-------|--------|
+| ----- | ------ |
 | 0     | n - 1  |
 | 1     | n - 2  |
 | 2     | n - 3  |
 | ...   | ...    |
 | n - 2 | 2      |
 |       |        |
+
 那么总的执行次数就是内层执行次数之和（外层相对于内层每次执行次数就是 1）：
 
 > 1 + 2 + .…+(n-2) + (n-1)
@@ -325,7 +329,7 @@ static void count2(int n) {
 下面再来看有三层`for`循环的情况，为了便于分析，同样也是以第二层和第三层`for`循环作为分析对象：
 
 | i 的值 | j 的值 | 第三层执行次数 |
-|------|------|---------|
+| ---- | ---- | ------- |
 | 0    | 1    | n - 2   |
 | 1    | 2    | n - 3   |
 | ...  | ...  | ...     |
@@ -342,10 +346,8 @@ static void count2(int n) {
 ![](./pic/3level_for.jpg)
 那么依次计算当`i`的值增加时，第三层的执行次数为：
 
-
 ![](./pic/3level_for_list.jpg)
 那么将这些执行次数求和：
-
 
 ![](./pic/3level_for_sum.jpg)
 
@@ -368,14 +370,10 @@ static void count2(int n) {
 > So, the number of triples that can be chosen from N items is equal to:
 > N(N - 1)(N - 2) / 6
 
-他的解释是，元素的顺序是无序的，得出一个 3 的阶层。
+他的这个算法则是简单易懂：如果 3 层`for`循环的`i,j,k`可以随意组合，那么其执行次数就应该是`N(N-1)(N-2)`，
+但是由于其顺序是必然的`i>j>k`，那么这 3 个组合只会有 6 种中的一种，所以需要总次数除以 6.
 
-这是因为他是以排列组合的思路来看待这个问题的，因为最终的代码是需要在最内层的循环执行的，而元素`i,j,k`的取值是可以随意组合的，所以去掉重复的部分就是要除以 6。
-
-> 比如 1，2，3 的重复组合就是：
-> 123,  132,  213,   231, 312, 321
-
-### 与 O(n^3) 
+### 与 O(n^3)
 
 前面推导的公式进行展开就是：
 
@@ -418,9 +416,7 @@ legend("n^3/6", "n^3/6 - n^2/2", "n^3/6 - n^2/2 + n/3");
 hold off;
 ```
 
-
 ![](./pic/3level_for_formula_tilde.jpg)
-
 
 从绘制结果可以看出来，果然是高阶的影响最大，次阶几乎没有影响。
 
@@ -429,11 +425,13 @@ hold off;
 所以，对于精确公式的估计方式如下表：
 
 | 精确的公式               | 近似的公式 | 增长趋势 |
-|---------------------|-------|------|
+| ------------------- | ----- | ---- |
 | N^3/6 - N^2/2 + N/3 | N^3/6 | N^3  |
 | N^2/2 - N/2         | N^2/2 | N^2  |
 | lgN+1               | lgN   | lgN  |
-|                     |       |      |
+| 3                   | ~3    | 1    |
+
+## 常用的时间复杂度
 
 下面便是代码中常会遇到的时间复杂度：
 
@@ -500,3 +498,318 @@ legend("O(N!)");
 
 hold off;
 ```
+
+### 常量时间复杂度 O(1)
+
+常量时间复杂度是指代码运行固定的语句数量，与输入参数的个数没有任何关系，所以其运行时间是固定的。
+
+> 当然这并不意味着 O(1) 就是运行时间短的代码，要看具体做什么工作。
+> 
+> 比如之前我就看到过一万行的`main`函数……
+
+```cpp
+a = b + c;
+```
+
+### 对数时间复杂度 O(log(N))
+
+代码的运行时间与输入参数的个数呈对数关系，一般情况下其比 O(1) 会慢一点。
+
+```cpp
+int i = 1;
+while (i < n) {
+  i = i * 2;
+}
+```
+
+### 线性时间复杂度 O(N)
+
+代码的运行时间随着输入参数个数的增加而线性的增加，就是一个一次函数，一般情况下比 O(log(N) 慢。
+
+```cpp
+double max = a[0];
+for (int i = 1; i < N; ++i) {
+    if (a[i] > max) {
+        max = a[i];
+    }
+}
+```
+
+### 线性对数时间复杂度 O(Nlog(N))
+
+代码的运行时间随着输入参数个数的增加以 N \* log(N) 的时间增加，显然它会比 O(N) 和O(log(N)) 都慢。
+
+```cpp
+int i = 1;
+
+for(int j = 1; j < n; ++j) {
+    while (i < n) {
+        i = i * 2;
+      }
+}
+```
+
+### 平方时间复杂度 O(N^2)
+
+代码的运行时间随着输入参数个数的增加以 N^2 的时间增加。
+
+```cpp
+static void count2(int n) {
+    uint32_t run_cnt = 0;
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            run_cnt += 1;
+        }
+    }
+
+    std::cout << __func__ << ": " << run_cnt << " times\n";
+}
+```
+
+### 立方时间复杂度 O(N^3)
+
+代码的运行时间随着输入参数个数的增加以 N^3 的时间增加。
+
+```cpp
+static int count(const std::vector<int>& a) {
+    int n = a.size();
+    int cnt = 0;
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            for (int k = j + 1; k < n; ++k) {
+                if (a[i] + a[j] + a[k] == 0) {
+                    cnt += 1;
+                }
+            }
+        }
+    }
+
+    return cnt;
+}
+```
+
+### 指数时间复杂度 O(2^N)
+
+代码的运行时间随着输入参数个数的增加以 2^N 的时间增加，运行时间是极长的。
+
+### 阶层时间复杂度 O(N!)
+
+这个是最恐怖的时间复杂度了，随着输入参数的增加，运行时间可以到天荒地老……
+
+# 优化测试代码
+
+目前已经知道了测试代码的时间复杂度是 O(N^3)，并且有了对前面常用的时间复杂度的认识。
+
+那么要优化测试代码，就是尽量选择时间复杂度低于 O(N^3) 的算法就可以了。
+
+## 两层 for 循环优化
+
+现在先简化一下模型，对两层`for`循环的代码（代码时间复杂度为 O(N^2)）进行分析：
+
+```cpp
+static int count(const std::vector<int>& a) {
+    int n = a.size();
+    int cnt = 0;
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (a[i] + a[j] == 0) {
+                cnt += 1;
+            }
+        }
+    }
+
+    return cnt;
+}
+```
+
+可以看到，既然`a[i] + a[j]`等于 0，那就意味着`a[i]`是`a[j]`的负数。
+
+那么就可以对内层的`for`循环进行优化：
+
+> 查找`a[i]`的负数`a[j]`如果存在满足条件的`a[j]`则`cnt += 1`
+
+对于查找方法，需要细化如下：
+
+1. 在整个循环之外，先对输入的数据源进行排序
+
+2. 在内层`for`循环对下标为**i+1 至 n-1**的数据进行二分查找，寻找符合条件的值（i 及 i 以前的数据是不需要查找的）
+
+### 参考
+
+现在先以前面`O(N^2)`复杂度的代码运行，查看运行时间：
+
+```shell
+Input file name: 32Kints.txt
+I have read 32000 integers
+result: 273
+function `count` took 0.069 seconds
+```
+
+### c++ 优化
+
+下面是以 c++ 的方式来实现上面的优化代码：
+
+```cpp
+static int count(std::vector<int>& a) {
+    int cnt = 0;
+
+    std::stable_sort(a.begin(), a.end());
+
+    for (auto it = a.cbegin(); it != a.cend() - 1; ++it) {
+        int current_val = *it;
+        if (std::binary_search(it + 1, a.cend(), -current_val)) {
+            cnt += 1;
+        }
+    }
+
+    return cnt;
+}
+```
+
+书籍中使用的是归并排序，所以这里 c++ 也使用`std::stable_sort`来一一对应。
+
+运行时间如下：
+
+```shell
+Input file name: 1Mints.txt
+I have read 1000000 integers
+result: 249838
+function `count` took 0.1 seconds
+```
+
+### java 优化
+
+这我就直接搬书上的代码来测试了：
+
+```java
+import edu.princeton.cs.algs4.In;
+import edu.princeton.cs.algs4.Stopwatch;
+import edu.princeton.cs.algs4.BinarySearch;
+import java.util.Arrays;
+
+public class Main {
+    public static int count(int[] a) {
+        int n = a.length;
+        int count = 0;
+
+        Arrays.sort(a);
+
+        for (int i = 0; i < n; ++i) {
+            if (BinarySearch.indexOf(a, -a[i]) > i) {
+                count += 1;
+            }
+        }
+
+        return count;
+    }
+
+    public static void main(String[] args) {
+        System.out.println("working directory: " + System.getProperty("user.dir"));
+        if (args.length == 0) {
+            return;
+        }
+
+        System.out.println("analyze file: " + args[0]);
+
+        In in = new In(args[0]);
+        int[] a = in.readAllInts();
+
+        Stopwatch timer = new Stopwatch();
+        int count = count(a);
+        System.out.println("elapsed time = " + timer.elapsedTime());
+        System.out.println("count = " + count);
+    }
+}
+```
+
+运行时间如下：
+
+```shell
+working directory: D:\lab\java\ij_hello
+analyze file: 1Mints.txt
+elapsed time = 0.229
+count = 249838
+```
+
+归并排序的代码时间复杂度是`O(Nlog(N))`，二分查找的代码时间复杂度是`O(log(N))`，所以两层 for 循环的代码时间复杂度就是`O(Nlog(N))`。
+
+## 三层 for 循环优化
+
+三层 for 循环优化的思路和两层 for 循环优化一致，相当于`a[k] = -(a[i] + a[j])`，那么代码就呼之欲出了。
+
+### c++ 优化
+
+```cpp
+static int count(std::vector<int>& a) {
+    int n = a.size();
+    int cnt = 0;
+
+    std::stable_sort(a.begin(), a.end());
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (std::binary_search(a.cbegin() + j + 1, a.cend(), -(a[i] + a[j]))) {
+                cnt += 1;
+            }
+        }
+    }
+
+    return cnt;
+}
+```
+
+运行时间如下：
+
+```shell
+Input file name: 32Kints.txt
+I have read 32000 integers
+result: 2052358
+function `count` took 8.445 seconds
+```
+
+### java 优化
+
+```java
+public static int count(int[] a) {
+	int n = a.length;
+	int count = 0;
+
+	Arrays.sort(a);
+
+	for (int i = 0; i < n; ++i) {
+		for (int j = i + 1; j < n; ++j) {
+			if (BinarySearch.indexOf(a, -(a[i] + a[j])) > j) {
+				count += 1;
+			}
+		}
+	}
+
+	return count;
+}
+```
+
+运行时间如下：
+
+```shell
+working directory: D:\lab\java\ij_hello
+analyze file: 32Kints.txt
+elapsed time = 19.039
+count = 2052358
+```
+
+对于上面的代码：
+
+- 归并排序的时间复杂度是`O(Nlog(N))`
+
+- 两层`for`循环的次数是`N(N-1)/2`
+
+- 最内层的二分查找时间复杂度是`O(log(N))`
+
+结合来就是`Nlog(N) + N(N-1)/2 * log(N)`那么就可以简化为`O(N^2log(N))`。
+
+
+
+可以看到，经过优化后的代码执行速度比原来快了 100 多倍！
