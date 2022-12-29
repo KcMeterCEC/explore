@@ -774,20 +774,20 @@ function `count` took 8.445 seconds
 
 ```java
 public static int count(int[] a) {
-	int n = a.length;
-	int count = 0;
+    int n = a.length;
+    int count = 0;
 
-	Arrays.sort(a);
+    Arrays.sort(a);
 
-	for (int i = 0; i < n; ++i) {
-		for (int j = i + 1; j < n; ++j) {
-			if (BinarySearch.indexOf(a, -(a[i] + a[j])) > j) {
-				count += 1;
-			}
-		}
-	}
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (BinarySearch.indexOf(a, -(a[i] + a[j])) > j) {
+                count += 1;
+            }
+        }
+    }
 
-	return count;
+    return count;
 }
 ```
 
@@ -809,7 +809,5 @@ count = 2052358
 - 最内层的二分查找时间复杂度是`O(log(N))`
 
 结合来就是`Nlog(N) + N(N-1)/2 * log(N)`那么就可以简化为`O(N^2log(N))`。
-
-
 
 可以看到，经过优化后的代码执行速度比原来快了 100 多倍！
