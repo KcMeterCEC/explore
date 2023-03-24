@@ -3,6 +3,7 @@ title: 如何编写一个旋转编码器的驱动？
 tags: 
 - linux
 categories:
+- linux
 - driver
 - chip
 date: 2022/10/2
