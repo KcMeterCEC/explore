@@ -7,8 +7,8 @@ categories:
 - highway
 date: 2023/3/21
 updated: 2023/3/21
-layout: false
-comments: true
+layout: true
+comments: false
 ---
 
 [highway](https://github.com/google/highway) 是谷歌开源的 SIMD 代码库，它封装了各个不同平台的底层接口，大大简化了编程难度。
