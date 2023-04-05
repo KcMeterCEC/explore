@@ -855,3 +855,128 @@ int main(int argc, char* argv[]) {
 #define list_safe_reset_next(pos, n, member)                \
     n = list_next_entry(pos, member)         
 ```
+
+
+
+# 链表的演化
+
+以上是双向环形链表的实现，它还可以很方便的演化为以下几种数据结构：
+
+- 去掉前驱指针，就是单向循环链表
+
+- 对接口进行进一步封装，只允许头的取出和尾的插入操作，就是 FIFO
+
+- 对接口进行进一步封装，只允许头的取出和插入操作，就是栈
+
+由于上面的链表实现方式可以被插入到任意一种数据结构中，还有一种妙用：一个数据结构根据用途插入多个链表节点！
+
+> 相当于是以不同的角度来看这个数据结构
+
+
+
+# 示例
+
+下面编写一个简单的内核模块，来简单的使用一下链表，模块代码如下：
+
+
+
+```c
+#define pr_fmt(fmt) "[list]: " fmt
+
+#include <linux/init.h>
+#include <linux/module.h>
+#include <linux/list.h>
+#include <linux/slab.h>
+
+#define ITEM_COUNT  (10)
+
+struct item {
+    int val;
+    struct list_head node;
+};
+
+LIST_HEAD(item_head);
+
+static void show_list(void)
+{
+    pr_info("I have these items:\n");
+
+    struct item* get_item;
+    list_for_each_entry(get_item, &item_head, node) {
+        pr_info("val: %d\n", get_item->val);
+    }
+    pr_info("\n");
+}
+
+static int __init list_init(void)
+{
+    pr_info("%s -> %d\n", __func__, __LINE__);
+
+    for (int i = 0; i < ITEM_COUNT; ++i) {
+        struct item* new_item = (struct item* )kmalloc(sizeof(struct item), GFP_KERNEL);
+        if (!new_item) {
+            pr_err("Can't malloc memory!\n");
+        }
+        new_item->val = i;
+
+        list_add(&(new_item->node), &item_head);
+    }
+
+    show_list();
+
+    return 0;
+}
+module_init(list_init);
+
+static void __exit list_exit(void)
+{
+    pr_info("%s -> %d\n", __func__, __LINE__);
+
+    struct item* get_item;
+    struct item* tmp_item;
+    list_for_each_entry_safe(get_item, tmp_item, &item_head, node) {
+        pr_info("delete item : %d\n", get_item->val);
+
+        list_del(&(get_item->node));
+        show_list();
+
+        kfree(get_item);
+    }
+}
+module_exit(list_exit);
+
+
+MODULE_AUTHOR("kcmetercec <kcmeter.ece@gmail.com>");
+MODULE_LICENSE("GPL v2");
+MODULE_DESCRIPTION("A simple demo which uses list");
+MODULE_ALIAS("list demo");
+MODULE_VERSION("ver1.0");
+
+```
+
+
+
+对应的 Makefile 如下：
+
+
+
+```c
+KVERS = $(shell uname -r)
+
+obj-m += list.o
+
+EXTRA_CFLAGS = -std=gnu99
+
+build: kernel_modules
+
+kernel_modules:
+        make -C /lib/modules/$(KVERS)/build M=$(CURDIR) modules
+
+clean:
+        make -C /lib/modules/$(KVERS)/build M=$(CURDIR) clean
+
+```
+
+
+
+需要注意的是：上面使用了 gnu99 编译选项。
