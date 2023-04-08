@@ -7,7 +7,7 @@ categories:
 - mm
 - hardware
 date: 2023/4/6
-updated: 2023/4/6
+updated: 2023/4/7
 layout: true
 comments: true
 ---
@@ -189,3 +189,13 @@ MMU通过读取页描述符中的对应位来确定当前的访问是否具有�
 ```shell
 使用TLB需要保证TLB与主存的一致性，在启动MMU之前需要使无效整个TLB，启动后再打开此功能。
 ```
+
+# Linux 中的页表
+
+Linux 默认使用 3 级页表，以更好的节省页表对内存的消耗（尤其是 64 位处理器），其 3 级页表称作：
+
+- 页总目录PGD（Page Global Directory）
+
+- 页中间目录PMD（Page Middle Derectory）
+
+- 页表PT（Page Table）
