@@ -1,5 +1,5 @@
 ---
-title: 理解 MMU 最基本原理？
+title: 理解 MMU 最基本原理
 tags: 
 - linux
 categories:
