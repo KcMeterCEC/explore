@@ -7,8 +7,9 @@ categories:
 - Modulation
 - FM/PM
 date: 2023/7/20
-updated: 2023/7/20
+updated: 2023/7/23
 layout: true
+mathjax: true
 comments: true
 ---
 
