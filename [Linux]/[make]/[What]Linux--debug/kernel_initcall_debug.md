@@ -24,6 +24,8 @@ comments: true
 
 一般现在都是使用设备树中的参数，所以需要将该环境变量从 u-boot 中删除，避免造成误导。
 
+> u-boot 中的默认环境变量配置位于路径 `include/configs/`中
+
 关于 u-boot 修改的代码路径如下：
 
 ```shell
