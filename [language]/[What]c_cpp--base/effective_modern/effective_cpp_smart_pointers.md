@@ -12,6 +12,7 @@ comments: true
 ---
 
 传统指针具有以下缺陷：
+
 1. 单从一个指针的声明，无法判定它是指向一个对象还是指向一个包含该对象的数组
 2. 单从一个指针的声明，无法判定当不使用该指针时，是否需要释放它所指向对象所占用的资源
 3. 当需要释放指针所指向对象的资源时，并不能明确的知道是该使用`delete`，还是使用其它专有的释放函数
@@ -86,6 +87,7 @@ auto makeInvestment(Ts&&... params) {              // C++14
 使用`lambda`来定义删除函数的好处是：使用该种方式不会使得`unique_ptr`的体积增加，而使用普通函数的定义方式则会使得`unique_ptr`的体积增加。
 
 工厂函数之所以返回的是`unique_ptr`，是因为这种返回方式可以不用关心调用者使用的是`shared_ptr`还是`unique_ptr`，这样更能适用于更加广泛的场合。
+
 > 返回的`unique_ptr`是临时对象，则编译器会尝试使用移动语义将该对象移动到被赋值变量中。
 
 ### 对数组使用
@@ -97,8 +99,10 @@ auto makeInvestment(Ts&&... params) {              // C++14
 # 使用 shared_ptr 来管理共享的堆资源
 
 `shared_ptr`使用对资源的引用计数来决定是否释放资源：
+
 - 构造函数会使得对资源的引用计数加 1
 - 而析构函数和赋值构造函数都会将**对当前指向资源的引用计数减 1**
+  
   > 赋值构造引用计数减 1，指的是：当前`shared_ptr`已经指向了一个对象，当它被另一个`shared_ptr`赋值时，那指向原来对象的`shared_ptr`关联计数就会减一，指向新对象的`shared_ptr`关联计数就会加一。
 - 当对资源的引用计数为 0 时，就会释放该资源
 
@@ -139,7 +143,7 @@ std::shared_ptr<Widget>                 // deleter type is not part of ptr type
 ```cpp
 auto customDeleter1 = [](Widget *pw) { … };    // custom deleters,each with a different type
 auto customDeleter2 = [](Widget *pw) { … };     
-                                                
+
 std::shared_ptr<Widget> pw1(new Widget, customDeleter1);
 std::shared_ptr<Widget> pw2(new Widget, customDeleter2);
 std::vector<std::shared_ptr<Widget>> vpw{ pw1, pw2 };
@@ -166,9 +170,9 @@ std::vector<std::shared_ptr<Widget>> vpw{ pw1, pw2 };
 尤其是第三点需要特别注意，也就是说：
 
 > 当将一个原始指针用于创建多个`shared_ptr`时，就会有多个 Control Block。
->
+> 
 > 那就意味着有多个 Reference Count，那么就会导致同一个指针会被释放多次的问题。
->
+> 
 > 所以最稳妥的方式是使用`make_shared`。
 
 比如像下面这样，`pw`就会被释放两次：
@@ -191,6 +195,7 @@ std::shared_ptr<Widget> spw2(spw1);     // spw2 uses same control block as spw1
 ## `shared_ptr`不能用于数组
 
 `shared_ptr`并没有像`unique_ptr`一样提供了`std::shared_ptr<T[]>`这样的功能函数，所以它不能作用于数组。
+
 > 使用 `std::array`,`std::vector`,`std::string`这类类才是正确的方式
 
 # 使用 weak_ptr 来检查 shared_ptr 资源是否已经释放
@@ -250,7 +255,7 @@ int main(void) {
     std::weak_ptr<int> wpi(spi);
 
     std::cout << "The value of spi is " << *spi << "\n";
-    
+
     // 通过 lock() 方法返回 shared_ptr，如果资源已经被释放了，则返回 nullptr
     auto spi2 = wpi.lock();
     if(spi2 != nullptr) {
@@ -275,17 +280,20 @@ int main(void) {
 ## 应用场景
 
 一个应用场景便是在观察者模式中，发送者会含有许多观察者的基类指针。如果这些观察者都是在堆上申请，且有可能被其他代码所释放掉，那么使用`weak_ptr`是一个比较优雅的办法。
+
 > 一旦 `lock()`方法返回为`nullptr`，则代表该观察者已经被销毁，则就不应该再向它发送消息了。
 
 # make_shared 和 make_unique 优于使用 new
 
 `std::make_shared` 是 c++11 的一部分，但是`std::make_unique`是在 c++14 才被加入标准的。如果要在 c++ 11 中使用，可以自己定义一个简易版本：
+
 ```cpp
 template<typename T, typename... Ts>
 std::unique_ptr<T> make_unique(Ts&&... params) {
   return std::unique_ptr<T>(new T(std::forward<Ts>(params)...));
 }
 ```
+
 > 这个版本无法指向原始数组，也无法定制删除函数
 
 ## 为什么要使用`make`函数
@@ -521,13 +529,13 @@ class Widget {                            //"widget.h"
 public:
   Widget();
   ~Widget();
-    
+
   Widget(Widget&& rhs);                   // declarations only
   Widget& operator=(Widget&& rhs);        
-    
+
   Widget(const Widget& rhs);              // declarations only
   Widget& operator=(const Widget& rhs);    
-    
+
 private:                                  
   struct Impl;
   std::unique_ptr<Impl> pImpl;
@@ -537,9 +545,9 @@ private:
 #include "gadget.h"
 #include <string>
 #include <vector>
-…                                    	// in "widget.cpp"
+…                                        // in "widget.cpp"
 struct Widget::Impl {     
-  std::string name;                  	// Widget::Impl
+  std::string name;                      // Widget::Impl
   std::vector<double> data;
   Gadget g1, g2, g3;
 };
