@@ -346,7 +346,7 @@ fatload mmc 0:1 0x80f00000 am335x-boneblack.dtb
 设置终端设备：
 
 ```shell
-setenv bootargs console=ttyO0
+setenv bootargs console=ttyO0,115200
 ```
 
 使用 `bootz` 启动：
