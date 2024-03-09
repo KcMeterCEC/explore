@@ -1,17 +1,15 @@
 ---
 title: 认识 bootloader
 tags: 
-
 - yocto
-  categories: 
+categories: 
 - linux
 - make
 - yocto
-  date: 2024/2/4
-  updated: 2024/2/19
-  layout: true
-  comments: true
-
+date: 2024/2/4
+updated: 2024/2/19
+layout: true
+comments: true
 ---
 
 重新整理引导的构建相关知识。
@@ -477,8 +475,6 @@ setenv serverip 192.168.159.99
 # tftp 读取 uImage 到 0x82000000
 tftp 82000000 uImage
 ```
-
-
 
 ## 启动内核
 

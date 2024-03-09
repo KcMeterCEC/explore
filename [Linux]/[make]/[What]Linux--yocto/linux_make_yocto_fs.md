@@ -1,20 +1,16 @@
 ---
-title: '[What]Building a Root Filesystem'
+title: 构建根文件系统
 tags: 
-- CS
+- yocto
 categories: 
-- book
-- Embedded Linux Programming
+- linux
+- make
+- yocto
+date: 2024/2/27
+updated: 2024/2/27
 layout: true
+comments: true
 ---
-
-学习书籍：[Mastering Embedded Linux Programming: Create fast and reliable embedded solutions with Linux 5.4 and the Yocto Project 3.1 (Dunfell), 3rd Edition](https://www.amazon.com/Mastering-Embedded-Linux-Programming-potential/dp/1789530385)
-> 通过阅读这部书，将整个嵌入式 Linux 的开发知识串联起来，以整理这些年来所学的杂乱知识。
-
-- 开发主机：ubuntu 20.04 LTS
-- 开发板：[myc-c8mmx-c](http://www.myir-tech.com/product/myc-c8mmx.htm) imx8mm（4核 A53 + M4）
-- 系统：Linux 5.4
-- yocto：3.1
 
 重新来梳理一下根文件系统编译。
 
@@ -60,13 +56,11 @@ $ mount [-t vfstype] [-o options] device directory
 # mount -t sysfs sysfs /sys
 ```
 
-
-
 ## 创建`staging`文件夹
 
 所谓的`staging`文件夹，就是一个根文件系统的基础框架，在最开始可以创建它：
 
-``` shell
+```shell
 $ mkdir ~/rootfs
 $ cd ~/rootfs
 $ mkdir bin dev etc home lib proc sbin sys tmp usr var
@@ -77,8 +71,6 @@ $ ln -s lib lib64
 ```
 
 接下来就是要考虑一些文件的权限问题了，对于一些重要文件应该限制为`root `用户才能操作。而其他程序应该运行在普通用户模式。
-
-
 
 ## 目录中具有的程序
 
@@ -156,13 +148,13 @@ $ make distclean
 $ make defconfig
 ```
 
-然后使用`make menuconfig` 进入`Settings -> Destination path for make install`来设置安装路径到前面的 staging 目录。
+然后使用`make menuconfig` 进入`Settings -> Cross compiler prefix`来设置安装路径到前面的 staging 目录。
 
 接下来便是编译及安装：
 
 ```shell
-$ export CROSS_COMPILE=aarch64-unknown-linux-gnu-
-$ export ARCH=arm64
+$ export CROSS_COMPILE=arm-cortex_a8-linux-gnueabihf-
+$ export ARCH=arm
 $ make
 $ make install
 ```
@@ -175,14 +167,14 @@ $ make install
 
 ```shell
 # 以 SYSROOT 存储路径，比较方便
-$ export SYSROOT=$(aarch64-unknown-linux-gnu-gcc -print-sysroot)
+$ export SYSROOT=$(arm-cortex_a8-linux-gnueabihf-gcc -print-sysroot)
 ```
 
 其中`lib`文件夹存储得是共享链接库，将它们复制进去即可：
 
 ```shell
 # 使用 -a ，不破坏其软连接
-cec@imx8:~/myb/rootfs$ cp -aR ${SYSROOT}/lib/** ./lib/
+cec@box:~/lab/rootfs$ cp -aR ${SYSROOT}/lib/** ./lib/
 ```
 
 ## 设备节点
@@ -211,7 +203,7 @@ $ sudo mknod -m 600 dev/console c 5 1
 
 ```shell
 # 由于前面已经设置了 ARCH 和 CROSS_COMPILE 所以这里就不用设置了
-$ make INSTALL_MOD_PATH=/home/cec/myb/rootfs modules_install
+$ make INSTALL_MOD_PATH=/home/cec/lab/rootfs modules_install
 ```
 
 可以看到模块都被安装到了根文件系统的`lib/modules/<kernel_version>`目录下了。
@@ -234,25 +226,23 @@ $ make INSTALL_MOD_PATH=/home/cec/myb/rootfs modules_install
 
 ```shell
 # 指定了 GID 和 UID 都是 root
-cec@imx8:~/myb/rootfs$ find . | cpio -H newc -ov --owner root:root >  ../initramfs.cpio
+cec@box:~/lab/rootfs$ find . | cpio -H newc -ov --owner root:root >  ../initramfs.cpio
 ```
 
 然后再进行一次压缩：
 
 ```shell
-cec@imx8:~/myb$ gzip initramfs.cpio
+cec@box:~/lab/rootfs$ gzip initramfs.cpio
 ```
 
 最后使用工具`mkimage`来为文件加入头：
 
 ```shell
-cec@imx8:~/myb$ ./bootloader/myir-imx-uboot/tools/mkimage -A arm64 -O linux -T ramdisk -d initramfs.cpio.gz uRamdisk
-
-disk
+cec@box:~/lab$ mkimage -A arm -O linux -T ramdisk -d initramfs.cpio.gz uRamdisk
 Image Name:   
-Created:      Fri Sep 10 13:53:24 2021
-Image Type:   AArch64 Linux RAMDisk Image (gzip compressed)
-Data Size:    193404777 Bytes = 188871.85 KiB = 184.45 MiB
+Created:      Fri Mar  1 09:18:49 2024
+Image Type:   ARM Linux RAMDisk Image (gzip compressed)
+Data Size:    27835346 Bytes = 27182.96 KiB = 26.55 MiB
 Load Address: 00000000
 Entry Point:  00000000
 ```
@@ -260,7 +250,6 @@ Entry Point:  00000000
 需要注意的是：**initramfs 包体积不能太大，因为压缩包和解压后的文件都会全部存在于内存中！** 
 
 > [这篇文章](https://www.lightofdawn.org/blog/?viewDetailed=00128)有讲到，`initramfs`包最好小于内存的 25%
-
 
 ## 启动独立包
 
@@ -272,17 +261,15 @@ Entry Point:  00000000
 
 然后需要将`initramfs`载入到 DDR 中，前面我们将：
 
-- Image 载入到 `0x40480000`
-- FDT 载入到 `0x43000000`
+- Image 载入到 `0x80200000`
+- FDT 载入到 `0x80f00000`
 
-而 FDT 目前大小只有 42KB，那么可以将`uRamdisk`载入到`0x43800000`
+而 FDT 目前大小只有 58KB，那么可以将`uRamdisk`载入到`0x81000000`
 
 ```shell
-$ env set initrd_addr 0x43800000
-$ env save
-$ fatload mmc ${mmcdev}:${mmcpart} ${initrd_addr} uRamdisk
-
-193404841 bytes read in 2230 ms (82.7 MiB/s)
+$ fatload mmc 0:1 0x80200000 zImage
+$ fatload mmc 0:1 0x80f00000 am335x-boneblack.dtb
+$ fatload mmc 0:1 0x81000000 uRamdisk
 ```
 
 3. 指定启动的`init`程序
@@ -290,8 +277,7 @@ $ fatload mmc ${mmcdev}:${mmcpart} ${initrd_addr} uRamdisk
 需要在`bootargs`中加入启动程序是 shell：`rdinit=/bin/sh`
 
 ```shell
-$ env set bootargs console=ttymxc1,115200 earlycon=ec_imx6q,0x30890000,115200 rdinit=/bin/sh
-$ env save
+$ setenv bootargs console=ttyO0,115200 rdinit=/bin/sh
 ```
 
 3. 使用 booti 启动
@@ -299,9 +285,12 @@ $ env save
 也就是说在原来的基础上，加上`initramfs`的地址即可：
 
 ```shell
-$ booti ${loadaddr} ${initrd_addr} ${fdt_addr}
+# $ bootz ${loadaddr} ${initrd_addr} ${fdt_addr}
+$ bootz 0x80200000 0x81000000 0x80f00000
 ```
-这个时候会发现没有工作控制流而退出 shell：
+
+这个时候会发现没有工作控制流而给出警告：
+
 ```shell
 /bin/sh: can't access tty; job control turned off
 ```
@@ -313,12 +302,21 @@ $ booti ${loadaddr} ${initrd_addr} ${fdt_addr}
 这样设置以后，便可以在 bootloader 中指定内核和设备树地址就行了。
 
 > 这里需要注意内核 + initramfs 所占用的空间，设备树需要预留足够多的空间以避免相互覆盖。
->
-> 比如当前内核 + initramfs 就有 55MB，那么设备树的载入位置需要再往后放一点。
->
-> 当前开发板具有 2GB 内存，那 DDR 寻址范围是 0x40000000 ~ 0xC0000000。
->
-> 所以设备树的位置预留足够位置即可，比如放置在 0x4C800000 处，就预留了 200MB 的空间。
+> 
+> 比如当前内核 + initramfs 就有 50MB，那么设备树的载入位置需要再往后放一点。
+> 
+> 当前开发板具有 512MB 内存，那 DDR 寻址范围是 0x80000000 ~ 0xA0000000。
+> 
+> 所以设备树的位置预留足够位置即可，比如放置在 0x8CA00000 处，就预留了 200MB 的空间。
+
+编译进内核以后，启动命令就简单了一点：
+
+```shell
+fatload mmc 0:1 0x80200000 zImage
+fatload mmc 0:1 0x8CA00000 am335x-boneblack.dtb
+setenv bootargs console=ttyO0,115200 rdinit=/bin/sh
+bootz 0x80200000 - 0x8CA00000
+```
 
 ## 以设备列表的形式构建 initramfs
 
@@ -327,6 +325,8 @@ $ booti ${loadaddr} ${initrd_addr} ${fdt_addr}
 在构建内核的时候，也就会生成按照设备列表配置的 cpio 文件。
 
 和上面的方式一样，在内核的`Initramfs source file(s)`处指向该配置文件。
+
+`cpio`文件就会在编译时创建。
 
 下面是一个简单的示例：
 
@@ -354,6 +354,12 @@ file /lib/libc-2.22.so /home/chris/rootfs/lib/libc-2.22.so 755
 file /lib/ld-2.22.so /home/chris/rootfs/lib/ld-2.22.so 755 0 0
 ```
 
+可以使用内核文件`/usr/gen_initramfs_list.sh`来根据前面的 rootfs 生成一个配置文文件：
+
+```shell
+$ ./usr/gen_initramfs_list.sh -u 1000 -g 1000 ~/lab/rootfs > initramfs-device-table
+```
+
 # 完整启动 initramfs
 
 前面的启动过程，会由于 initramfs 缺少文件而退出 shell，而正确的启动流程是：
@@ -365,7 +371,7 @@ file /lib/ld-2.22.so /home/chris/rootfs/lib/ld-2.22.so 755 0 0
 而`busybox`在其源码`examples/bootfloppy/etc/`中就提供了通用的示例，将其拷贝到我们创建的`rootfs`中是比较简单的方法：
 
 ```shell
-cec@imx8:~/myb/rootfs$ cp -aR ../busybox/examples/bootfloppy/etc/** etc/
+cec@box:~/lab/rootfs$ cp -aR ../busybox/examples/bootfloppy/etc/** etc/
 ```
 
 ## inittab 修改
@@ -389,6 +395,15 @@ mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 ```
 
+修改以后再次打包为 cpio 文件，对应的 bootargs 就可以修改：
+
+```shell
+fatload mmc 0:1 0x80200000 zImage
+fatload mmc 0:1 0x8CA00000 am335x-boneblack.dtb
+setenv bootargs console=ttyO0,115200 rdinit=/sbin/init
+bootz 0x80200000 - 0x8CA00000
+```
+
 ## 增加用户配置
 
 `busybox`默认会支持 shadow 特性，这需要添加用户配置文件。
@@ -398,7 +413,7 @@ mount -t sysfs sysfs /sys
 - 用户名
 
 - `x`代表密码存储于`/etc/shadow`
-
+  
   > `/etc/passwd`是所有人可读的，而`/etc/shadow`则只能是 root 用户和组可以读，以此来保证安全性。
 
 - 用户 ID
@@ -428,10 +443,22 @@ root:x:0:
 daemon:x:1:
 ```
 
+`/etc/shadow` 中的示例内容如下：
 
-## 启动
+```shell
+root::10933:0:99999:7:::
+daemon:*:10933:0:99999:7:::
+```
 
-最后还需要在`console`中修改启动程序`rdinit=/sbin/init`。
+在 rootfs 中加入这几个文件，其中 **/etc/shadow** 需要修改权限为 600，以便只有 root 可以打开此文件。
+
+然后再编辑 `etc/inittab` 让初始启动程序为 getty 获取用户名及密码验证：
+
+```shell
+::sysinit:/etc/init.d/rcS
+# respawn 代表当一个用户退出后，又重新启动 getty
+::respawn:/sbin/getty 115200 console
+```
 
 # 创建设备节点更好的方法
 
@@ -508,7 +535,7 @@ iface eth0 inet static
 # iface eth1 inet dhcp    
 ```
 
-对于动态 IP，busybox 使用 `udchpcd`运行`/usr/share/udhcpc/default.script`来完成配置。
+对于动态 IP，busybox 使用 `udchpcd`运行`/usr/share/udhcpc/default.script`来完成配置，可以拷贝`examples/udhcp/simple.script`来完成。
 
 ## 字符串映射
 
@@ -526,4 +553,14 @@ hosts:     files dns # 查询主机就在 /etc/hosts，如果查询不到就从 
 networks:  files
 protocols: files
 services:  files # 查询端口号，就在 /etc/services
+```
+
+这些文件完全可以在当前主机中拷贝，这些文件都是有统一格式的。
+
+最后还需要安装库以便于正确执行名称查找：
+
+```shell
+$ cd ~/rootfs
+$ cp -a $SYSROOT/lib/libnss* lib
+$ cp -a $SYSROOT/lib/libresolv* lib
 ```
