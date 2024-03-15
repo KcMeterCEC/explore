@@ -354,5 +354,3 @@ setenv bootargs console=ttyO0,115200
 ```shell
 bootz 0x80200000 - 0x80f00000
 ```
-
-
