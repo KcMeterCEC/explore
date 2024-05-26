@@ -99,6 +99,8 @@ cat ./arm-cortex_a8-linux-gnueabihf/sysroot/usr/include/linux/version.h
 
 那么就得到对应的版本是：5.03.18
 
+![](./pic/buildroot_custom_compiler.jpg)
+
 3. 以 initramfs 的方式构建：
    
    - **Filesystem images->cpio the root filesystem (for use as an initial RAM filesystem)**
@@ -191,8 +193,6 @@ cp ~/lab/cpp/hello/hello /home/cec/github/buildroot-2024.02/board/beaglebone/roo
 ```
 
 然后配置 buildroot 中的 **System configuration | Root filesystem overlay directories** 为此 overlay 路径，再次编译后该应用程序便被打包进去了。
-
-
 
 # 重新认识构建过程
 
