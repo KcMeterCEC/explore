@@ -46,9 +46,17 @@ BUSYBOX_OVERRIDE_SRCDIR = /home/bob/busybox/
 
 然后就可以使用：
 
-- make <pkg>-rebuild ： 重新编译
-- make <pkg>-reconfig ： 重新配置
-- make <pkg>-rebuild all : 重新配置并编译
+- `make <pkg>-rebuild` ： 重新编译
+- `make <pkg>-reconfig` ： 重新配置
+- `make <pkg>-rebuild all` : 重新配置并编译
+
+除此之外，对于像 UBOOT、Kernel 这种包，需要指定其配置文件，配置文件不能带有`_defconfig`。
+
+![](./pic/buildroot_custom_uboot_src.jpg)
+
+对于 Linux 而言，还需要注意配置其设备树：
+
+![](./pic/buildroot_custom_linux_src.jpg)
 
 # 常用的配置步骤
 

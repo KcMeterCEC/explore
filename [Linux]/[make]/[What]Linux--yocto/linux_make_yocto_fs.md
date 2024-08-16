@@ -84,7 +84,7 @@ $ ln -s lib lib64
 
 ### Shell
 
-`Shell`用户运行脚步，和用户交互等。在嵌入式系统中，有这么几个常用的`Shell`：
+`Shell`用户运行脚本，和用户交互等。在嵌入式系统中，有这么几个常用的`Shell`：
 
 - `bash`：功能强大，但是体积占用也大，一般运行于桌面系统中。
 - `ash`：和`bash`兼容性很好，且体积占用小，适合于嵌入式系统。
@@ -280,7 +280,7 @@ $ fatload mmc 0:1 0x81000000 uRamdisk
 $ setenv bootargs console=ttyO0,115200 rdinit=/bin/sh
 ```
 
-3. 使用 booti 启动
+3. 使用 bootz 启动
 
 也就是说在原来的基础上，加上`initramfs`的地址即可：
 
@@ -466,7 +466,7 @@ daemon:*:10933:0:99999:7:::
 
 - `devtmpfs`：这是在启动时被挂载到`/dev`的伪文件系统。内核通过它来动态的增加和删除设备节点。
 - `mdev`：由 busybox 提供的工具，通过读取`/etc/mdev.conf`来达到自动挂载节点的目的
-- `udev`：功能和`udev`类似，现在属于`systemd`的一部分
+- `udev`：功能和`mdev`类似，现在属于`systemd`的一部分
 
 在实际使用中，一般是通过`devtmpfs`来自动创建节点，而`mdev/udev`来设置节点的属性。
 
@@ -476,7 +476,7 @@ daemon:*:10933:0:99999:7:::
 
 > 如果使能了 CONFIG_DEVTMPFS_MOUNT 内核会自动挂载该文件系统，只是不适用于 initramfs
 
-然后在启动脚本中挂载`devtmpfs`：
+对于`initramfs`在启动脚本中挂载`devtmpfs`：
 
 ```shell
 mount -t devtmpfs devtmpfs /dev

@@ -180,6 +180,35 @@ setenv bootargs console=ttyO0,115200 rdinit=/sbin/init
 bootz 0x80200000 - 0x8CA00000
 ```
 
+## sdcard.img 内容查看
+
+查看 sdcard.img 可以通过 fdisk 和 mount 在本机上查看：
+
+先通过 `fdisk -l ./sdcard.img` 查看分区情况：
+
+```shell
+cec@box:$ fdisk -l ./sdcard.img 
+Disk ./sdcard.img: 38.58 MiB, 40458240 bytes, 79020 sectors
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0x00000000
+
+Device        Boot Start     End Sectors  Size Id Type
+./sdcard.img1 *        1   32768   32768   16M  c W95 FAT32 (LBA)
+./sdcard.img2      32769 1081344 1048576  512M 83 Linux
+```
+
+可以看到分区大小和类型，然后可以挂载在当前某个空目录下：
+
+```shell
+# offset 指定挂载的起始位置
+sudo mount -o loop,offset=$((1*512)) -t vfat ./sdcard.img ./mnt/
+```
+
+
+
 ## 将应用程序打包进 rootfs
 
 ### overlay 的方式
