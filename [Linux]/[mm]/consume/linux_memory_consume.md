@@ -37,7 +37,7 @@ comments: true
 
 在进程表示的结构体 `task_struct` 中包含了结构 `mm_struct` 的指针，以总体表示该进程占用的虚拟内存资源。
 
--  `pgd` 代表该进程的页表
+- `pgd` 代表该进程的页表
 - `struct vm_area_struct *mmap` 将进程整个VMA给链接起来了
 
 mmap是一个指向 =vm_area_struct= 结构的链表，每一个节点(称为VMA)都表示了该进程的**合法虚拟地址空间**,进程每申请一段虚拟内存都会有一个节点与之对应。
@@ -65,11 +65,12 @@ mmap是一个指向 =vm_area_struct= 结构的链表，每一个节点(称为VMA
 在查看进程的vma前，首先就是要知道其pid，可以通过 `ps -aux` 或 `pidof` 来找出 pid.
 
 有以下3种方式查看vma：
+
 1. 使用 `pmap <pid>` 
 2. 使用 `cat /proc/<pid>/maps` 
 3. 使用 `cat /proc/<pid>/smaps | more`
-  - 此种方式最为详细
-  
+   - 此种方式最为详细
+
 # 多个进程在内存条中的分配
 
 从上面的理解可以知道，每个进程的vma都表示了自己所独自占用的虚拟地址空间， **但实际上只有部分被加载到了物理内存** 。
@@ -79,12 +80,14 @@ mmap是一个指向 =vm_area_struct= 结构的链表，每一个节点(称为VMA
 ![](./multiprocess_mem.jpg)
 
 由上图可以看出：
+
 1. 每个进程的虚拟地址空间都认为自己独占整个系统内存资源
 2. 每个进程都具有一个页表，在进程切换的时候也会发生页表切换，页表的基地址会给MMU
 3. 页表将每个进程对应的物理地址进行映射，其中具有相同代码段的进程其物理地址是一样的，虽然虚拟地址可能不一样
    + 在多核架构上，每个核都有一个MMU可以实现一一映射，之间并不冲突
-     
+
 基于上图，就可以再次来看内存消耗表示的几个概念了:
+
 - VSS(Virtual set size) : 指的是一个进程所消耗的虚拟地址空间。
   + 对应进程1044，其 VSS = 1 + 2 + 3 
 - RSS(resident set size) : 指的是一个进程所真实消耗的物理内存空间
@@ -112,14 +115,15 @@ mmap是一个指向 =vm_area_struct= 结构的链表，每一个节点(称为VMA
 ```
 
 - 在使用 gcc 编译代码时，使能其 `addresssanitizer` 选项。这种方式会在源代码中插入内存监控代码，进程运行速度影响不大。
-如下代码：
-``` c
+  如下代码：
+  
+  ```c
   #include <stdio.h>
   #include <stdlib.h>
   #include <string.h>
   #include <sanitizer/lsan_interface.h>
   #include <unistd.h>
-
+  
   void main(void)
   {
     uint32_t *p1, i = 0;
@@ -135,7 +139,7 @@ mmap是一个指向 =vm_area_struct= 结构的链表，每一个节点(称为VMA
           }
       }
   }
-```
+  ```
 
 还需要加上编译选项:
 
