@@ -7,6 +7,20 @@
 #+OPTIONS: ^:nil 
 #+OPTIONS: ^:{}
 
+---
+title: Linux下进程和线程的调度
+tags: 
+- linux
+categories:
+- linux
+- process
+- overview
+date: 2024/9/2
+updated: 2024/9/2
+layout: true
+comments: true
+---
+
 课程：宋宝华老师的进程课程
 
 整理Linux下的进程和线程的调度。
