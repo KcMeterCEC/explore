@@ -69,6 +69,7 @@ struct files_struct {
 系统中可以创建的进程总数是有限的，同理单个用户可以创建的进程数也是有限的。
 
 - 用户可以使用 `ulimit -u` 查看限制的进程数，也可以使用 `getrlimit(),setrlimit()` 来得到或设置资源
+- 在`/proc/sys/kernel/pid_max`中表示了整个系统的进程限制
 
 ```c
 #include <stdio.h>
