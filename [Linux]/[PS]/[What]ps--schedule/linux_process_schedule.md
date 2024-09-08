@@ -397,7 +397,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 
 ## 实时补丁
 
-在 [][https://wiki.linuxfoundation.org/realtime/start] 给出了实时补丁（需要手动merge到代码中,然后在menuconfig 中配置）。
+在 [](https://wiki.linuxfoundation.org/realtime/start) 给出了实时补丁（需要手动merge到代码中,然后在menuconfig 中配置）。
 
 此补丁做了如下改动：
 
@@ -405,5 +405,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 - 将不可调度锁修改为可调度锁
 
 这样系统在任何时候都是可以调度的，以此来提高切换速度。
+
+> 但由于 Linux 存在内存申请的 Lazy 机制等等，所以仍然无法做到硬实时。
 
 替代方案： rt thread + linux
