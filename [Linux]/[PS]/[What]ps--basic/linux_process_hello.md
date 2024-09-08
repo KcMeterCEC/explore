@@ -227,31 +227,31 @@ int main(void) {
 如下面的示例代码所示：
 
 ```c
-	int ret;
-	struct globalfifo_dev *dev = container_of(filp->private_data,
-		struct globalfifo_dev, miscdev);
+    int ret;
+    struct globalfifo_dev *dev = container_of(filp->private_data,
+        struct globalfifo_dev, miscdev);
 
-	DECLARE_WAITQUEUE(wait, current);
+    DECLARE_WAITQUEUE(wait, current);
 
-	mutex_lock(&dev->mutex);
-	add_wait_queue(&dev->r_wait, &wait);
+    mutex_lock(&dev->mutex);
+    add_wait_queue(&dev->r_wait, &wait);
 
-	while (dev->current_len == 0) {
-		if (filp->f_flags & O_NONBLOCK) {
-			ret = -EAGAIN;
-			goto out;
-		}
-		__set_current_state(TASK_INTERRUPTIBLE);
-		mutex_unlock(&dev->mutex);
+    while (dev->current_len == 0) {
+        if (filp->f_flags & O_NONBLOCK) {
+            ret = -EAGAIN;
+            goto out;
+        }
+        __set_current_state(TASK_INTERRUPTIBLE);
+        mutex_unlock(&dev->mutex);
 
-		schedule();
-		if (signal_pending(current)) {
-			ret = -ERESTARTSYS;
-			goto out2;
-		}
+        schedule();
+        if (signal_pending(current)) {
+            ret = -ERESTARTSYS;
+            goto out2;
+        }
 
-		mutex_lock(&dev->mutex);
-	}
+        mutex_lock(&dev->mutex);
+    }
 ```
 
 ## fork()
