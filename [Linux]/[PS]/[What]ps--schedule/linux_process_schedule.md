@@ -18,20 +18,21 @@ comments: true
 
 <!--more-->
 
-
 # 调度的目标
 
 ## 吞吐和响应
 
 操作系统的主要目标是要在保持高的吞吐量的同时还要有高的响应速度。
+
 - 吞吐量：整个系统在单位时间内做的有用功越多，吞吐量就越大
   + 进程的切换，代码的局部搬移都属于无用功
 - 响应速度：当发生切换请求时，要以尽量快的完成切换，哪怕牺牲其他的任务为代价
-  + 这其中就包含了进程环境切换，以及代码局部性处理的搬移
+  + 这其中就包含了进程环境切换，以及代码局部性处理的搬移（cache miss 而导致的需要读内存）
 
 毫无疑问，这两个指标是互相矛盾的，只有选择一个侧重点。
 
 在内核配置的 `Kernel Features -> Preemption Model` 中可以选择调度策略：
+
 - No Forced Preemption(Server): 不能被抢占
 - Voluntary Kernel Preemption(Desktop): kernel自愿让出
 - Preemptible Kernle(Low-Latency Desktop):kernel可以被抢占(嵌入式系统一般都选择此项)
@@ -39,6 +40,7 @@ comments: true
 ## CPU与I/O平衡
 
 进程分为两种类型：
+
 - I/O消耗型：更多的是I/O操作，对CPU的占用率低
   + 在I/O操作时，一般进程会阻塞的等待，CPU会被让出去
 - CPU消耗型：更多的操作是在CPU的运算上
@@ -48,6 +50,7 @@ comments: true
 ![](./cpu_io.jpg)
 
 由此可以看出，在调度时，我们应该 **优先调度I/O消耗型** ，以让其尽快响应。
+
 - I/O型的进程消耗时间绝大部分是在I/O设备上，所以其对CPU的性能要求并不高
   + ARM通过big.LITTLE架构来组成4小核和4大核，让小核来做I/O任务，大核做运算任务
     + 虽然小核处理能力弱，但其功耗低。而且从宏观上看其性能依然是8核的性能
@@ -59,20 +62,27 @@ comments: true
 Linux的优先级从0~139，数值越低优先级越高。
 
 - 在内核中，设置的值便与优先级一一对应
-- 在用户空间中，设置的RT值通过公式 `99 - priority` 来计算真实的优先级
-  + 所以在用户空间中，设置的值越小优先级反而越低
+- 在用户空间中，设置的RT值通过公式 `99 - priority` 来计算真实的优先级(所以在用户空间中，设置的RT值越小优先级反而越低)，而设置的 NICE 值则又是`100+20+priority`而得到的（这种情况也是 NICE 值越低，优先级越高）。
 
 ## 策略
 
 其中0~99使用RT策略，100~139使用NICE策略。
 
-- 关于内核、用户空间、top命令中的优先级显示，参看[此文章][https://mp.weixin.qq.com/s/44Gamu17Vkl77OGV2KkRmQ]
+- 关于内核、用户空间、top命令中的优先级显示，参看[此文章](https://mp.weixin.qq.com/s/44Gamu17Vkl77OGV2KkRmQ)
 
-| 用户   |      内核 | Top         |
-|--------|-----------|-------------|
+| 用户     | 内核        | Top         |
+| ------ | --------- | ----------- |
 | RT 50  | 49(99-RT) | -51(-1-RT)  |
-| RT99   |         0 | rt          |
-| NICE 5 |       125 | 25(20+NICE) |
+| RT99   | 0         | rt          |
+| NICE 5 | 125       | 25(20+NICE) |
+
+通过上表也可以看出：
+
+1. 使用 Top 看到的优先级，数值越小优先级越高
+
+2. 使用 Top 看到的优先级如果小于0 或 rt 则是 RT 策略，否则就是 NICE 策略
+
+
 
 ### RT策略
 
@@ -84,7 +94,7 @@ RT策略分为 SCHED_FIFO 和 SCHED_RR:
 - SCHED_RR:高优先级的对象先运行，同等优先级轮转
   + 在不同优先级的情况下，高优先级的对象先运行， **并且要等待此对象主动释放CPU，其他对象才能依次运行**
     + 在同优先级下，对象轮转运行，所以才称为RR(round-robin)策略
-      
+
 可以看出，SCHED_FIFO和SCHED_RR在不同优先级的情况下策略是一样的，区别是在同等优先级的情况下。
 
 ### NICE策略
@@ -103,13 +113,15 @@ RT策略分为 SCHED_FIFO 和 SCHED_RR:
 为此，linux 在 2.6 以后设置了 RT 门限，以设置 RT 策略的进程只能在一个周期里运行确定的时间。
 
 在 `/proc/sys/kernel/` 下的 `sched_rt_period_us,sched_rt_runtime_us` 来设置 period和runtime。
+
 - 也就是是在period的时间里，RT进程只能最多运行runtime时间。
 - 可以通过命令 `chrt -f -a -p <prio> <pid>` 来改变进程的优先级
 
 ### CFS :完全公平调度(NICE策略优化)
 
 - NICE策略下的进程都具有一个权重
-``` c
+  
+  ```c
   /*
    ,* Nice levels are multiplicative, with a gentle 10% change for every
    ,* nice level changed. I.e. when a CPU-bound task goes from nice 0 to
@@ -132,14 +144,18 @@ RT策略分为 SCHED_FIFO 和 SCHED_RR:
    /*  10 */       110,        87,        70,        56,        45,
    /*  15 */        36,        29,        23,        18,        15,
   };
-```
+  ```
 
 - 虚拟运行时间通过公式计算： `vtime = ptime * 1024 / weight` (NICE值越大，权重越小，虚拟运行时间越高)
+  
   + ptime : 实际运行时间
   + weight : 权重
   + 1024: 对应NICE为0的权重
+
 - 将此虚拟运行时间挂在一颗红黑树上
+
 - linux首先运行红黑树上值最小的节点，当节点运行其ptime会继续增加
+  
   + 所有随着时间推移，该节点将不会是最小的节点
 
 基于以上这个逻辑， **I/O型的ptime就比较小，所有它就会被优先调度** ，这就满足了优先运行I/O型进程的初衷。
@@ -149,19 +165,19 @@ RT策略分为 SCHED_FIFO 和 SCHED_RR:
 
 ## 设置API
 
-| System Call              | Description          |
-|--------------------------|----------------------|
-| nice()                   | 设置进程的nice值     |
-| sched_setscheduler()     | 设置调度策略         |
-| sched_getscheduler()     | 获取调度策略         |
-| sched_setparam()         | 设置RT策略优先级     |
-| sched_getparam()         | 获取RT策略优先级     |
+| System Call              | Description |
+| ------------------------ | ----------- |
+| nice()                   | 设置进程的nice值  |
+| sched_setscheduler()     | 设置调度策略      |
+| sched_getscheduler()     | 获取调度策略      |
+| sched_setparam()         | 设置RT策略优先级   |
+| sched_getparam()         | 获取RT策略优先级   |
 | sched_get_priority_max() | 得到RT策略最高优先级 |
 | sched_get_priority_min() | 得到RT策略最低优先级 |
 | sched_rr_get_interval()  | 得到RR策略时间片参数 |
-| sched_setaffinity()      | 设置进程关系         |
-| sched_getaffinity()      | 获取进程关系         |
-| sched_yield()            | 主动让出CPU          |
+| sched_setaffinity()      | 设置进程关系      |
+| sched_getaffinity()      | 获取进程关系      |
+| sched_yield()            | 主动让出CPU     |
 
 在pthread库支持下，又封装了一次系统调用，通过 `pthread_attr_xxxx` 来实现设置。
 
@@ -179,19 +195,22 @@ RT策略分为 SCHED_FIFO 和 SCHED_RR:
 ## 关于运行时间
 
 一个代码运行时间包括：
+
 - real time: 用户所感受的运行时间
 - user time: 代码在user space 运行时间
 - kernel time: 代码陷入内核的运行时间，也就是计算通过系统调用所花费的时间
 
 可以使用命令 `time <exec>` 来统计一个程序的时间，这个时间的计算依据是根据 **资源为单位** 计算的：
+
 - 当一个程序 fork() 出一个进程，那么一共就有两个进程，对应两个 `task_struct` 的同时也对应两份资源，所以通过 time 来计算的real time 和 user time 是一致的
 - 当一个程序 create() 出一个线程，那么一共对应两个 `task_struct` 但只有一份资源，那么在多核上跑时，通过 time 计算的 user time 是 real time 的两倍
 - 在路径 `/proc/<pid>/task/` 下可以查看具体的 `task_struct` 信息
 
 通过以下实例可以验证:
+
 - 共享一份资源
 
-``` c
+```c
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -234,7 +253,7 @@ int main(void) {
 
 - 每个 `task_struct` 对应一份资源
 
-``` c
+```c
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -317,16 +336,16 @@ int main(void) {
 
 ### API
 
-``` c
+```c
 int pthread_attr_setaffinity_np(pthread_attr_t *attr,
-							  size_t cpusetsize, const cpu_set_t *cpuset);
+                              size_t cpusetsize, const cpu_set_t *cpuset);
 int pthread_attr_getaffinity_np(const pthread_attr_t *attr,
-							  size_t cpusetsize, cpu_set_t *cpuset);
+                              size_t cpusetsize, cpu_set_t *cpuset);
 int sched_setaffinity(pid_t pid, size_t cpusetsize,
-					const cpu_set_t *mask);
+                    const cpu_set_t *mask);
 
 int sched_getaffinity(pid_t pid, size_t cpusetsize,
-					cpu_set_t *mask);
+                    cpu_set_t *mask);
 ```
 
 ### shell
@@ -339,6 +358,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 ## 中断负载均衡
 
 除了 `task_struct` 任务会消耗CPU外，中断和软中断的执行也会消耗CPU，为了能够让多个核能够处理中断所以有时需要做负载均衡(比如将网卡多个fifo均衡到多个核上以提高吞吐量)。
+
 - 其优先级为 中断 > 软中断 > 调度
 - 通过命令 `cat /proc/interrupts` 可以查看硬中断全局概览
 - 通过命令 `cat /proc/softirqs` 查看软中断概览
@@ -347,6 +367,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 ### 软中断负载均衡
 
 当一个核中断发生后，其对应的软中断也必须由此核调用，但如果处理量太大则可以将此核的处理任务再次均分到其他核以快速处理提高吞吐量。
+
 - 在网络上通过 `echo <mask> > /sys/class/net/eth1/queues/rx-0/rps_cpus` 来打开此功能
 
 ## cgroup
@@ -379,6 +400,7 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 在 [][https://wiki.linuxfoundation.org/realtime/start] 给出了实时补丁（需要手动merge到代码中,然后在menuconfig 中配置）。
 
 此补丁做了如下改动：
+
 - 将中断和软中断都修改为线程
 - 将不可调度锁修改为可调度锁
 
