@@ -376,9 +376,9 @@ int sched_getaffinity(pid_t pid, size_t cpusetsize,
 
 ### 创建group操作流程
 
-- 进入路径 `/sys/fs/cgroup/cpu`
+- 进入路径 `/sys/fs/cgroup/`
 - 新建组名文件 `mkdir <group name>`
-  + 进入文件后发现有 `cgroup.procs` 用于存储组类成员的pid， `cpu.shares` 存储此组的权重
+  + 进入文件后发现有 `cgroup.procs` 用于存储组类成员的pid， `cpu.max` 存储此组的权重
     + 修改权重可以修改此组的CPU占用率,越大占用率越高
 - 使用 `echo <pid> > cgroup.procs` 加入成员到组
 
