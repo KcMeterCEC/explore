@@ -6,15 +6,15 @@ categories:
 - linux
 - userspace
 - fs
-date: 2023/8/23
-updated: 2023/9/5
-layout: false
+date: 2024/9/10
+updated: 2024/9/10
+layout: true
 comments: true
 ---
 
-- kernel version : v6.1.x (lts)
-
-整理文件系统基本操作。
+| kernel version | arch  |
+| -------------- | ----- |
+| v5.4.0         | arm32 |
 
 <!--more-->
 
@@ -35,7 +35,8 @@ comments: true
   /**
     * @brief 设置文件在创建时需要去掉的权限
     * @note : 此设置仅影响此进程的umask，不会影响 shell 默认的 umask
-    * 使用shell命令 umask 可以查看 shell 设置输出依次为: <special bits><user><group><other> 
+    * 使用shell命令 umask 
+    * 可以查看 shell 设置输出依次为: <special bits><user><group><other> 
     */
   int umask(int newmask);
   /**
