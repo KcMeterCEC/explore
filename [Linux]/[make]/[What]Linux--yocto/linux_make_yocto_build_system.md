@@ -207,8 +207,6 @@ Device        Boot Start     End Sectors  Size Id Type
 sudo mount -o loop,offset=$((1*512)) -t vfat ./sdcard.img ./mnt/
 ```
 
-
-
 ## 将应用程序打包进 rootfs
 
 ### overlay 的方式

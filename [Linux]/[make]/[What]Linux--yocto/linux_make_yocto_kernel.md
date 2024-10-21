@@ -6,10 +6,10 @@ categories:
 - linux
 - make
 - yocto
-  date: 2024/2/19
-  updated: 2024/2/19
-  layout: true
-  comments: true
+date: 2024/2/19
+updated: 2024/2/19
+layout: true
+comments: true
 ---
 
 重新来梳理一下内核编译。

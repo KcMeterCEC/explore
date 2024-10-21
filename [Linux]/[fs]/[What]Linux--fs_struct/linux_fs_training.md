@@ -1,49 +1,72 @@
-#+TITLE: [What]Linux文件系统基本脉络
-#+DATE:  <2018-04-29 Sun> 
-#+TAGS: filesystem
-#+LAYOUT: post 
-#+CATEGORIES: linux, fs, struct
-#+NAME: <linux_fs_struct_base.org>
-#+OPTIONS: ^:nil 
-#+OPTIONS: ^:{}
+---
+title: Linux文件系统基本脉络
+tags: 
+- linux
+categories:
+- linux
+- fs
+- overview
+date: 2024/9/17
+updated: 2024/9/17
+layout: true
+comments: true
+---
+
+
 
 记录从上层用户操作到底层文件系统之间的调用流程以及数据流。
-[[./vfs_fileoperations.jpg]]
-#+BEGIN_HTML
+![](./vfs_fileoperations.jpg)
+
 <!--more-->
-#+END_HTML
-* simplefs 实战
-[[https://github.com/psankar/simplefs][simplefs]] 用最少的代码实现了文件系统的基本操作。
-** 基本体验
-*** 创建一个硬盘
-目前使用 =dd= 命令创建一个块大小为 4096字节，共100个块的硬盘文件。
-#+begin_example
+
+# simplefs 实战
+
+[simplefs][https://github.com/psankar/simplefs] 用最少的代码实现了文件系统的基本操作。
+
+## 基本体验
+
+### 创建一个硬盘
+
+目前使用 `dd` 命令创建一个块大小为 4096字节，共100个块的硬盘文件。
+
+```shell
   #bs 指定一个块的大小
   #count 指定块数目
   #if 输入文件内容， /dev/zero 会不断输出0
   #of 输出文件名
   #此命令可以用来测试内存的操作速度
   dd bs=4096 count=100 if=/dev/zero of=image
-#+end_example
-*** 格式化并挂载
-#+begin_example
+```
+
+### 格式化并挂载
+
+```shell
 make 
 ./mkfs-simplefs image
 mkdir mount
-sudo insmod simplefs.ko ; mount -o loop -t simplefs image ./mount
-#+end_example
-*** 查看内容
-接下来就是以root的身份进入到 =mount= 文件夹，便可以查看其文件及文件内容。
-** 格式化代码分析(mkfs-simplefs.c)
+sudo insmod simplefs.ko 
+mount -o loop -t simplefs image ./mount
+```
+
+### 查看内容
+
+接下来就是以root的身份进入到 `mount` 文件夹，便可以查看其文件及文件内容。
+
+## 格式化代码分析(mkfs-simplefs.c)
+
 其格式化的步骤为：
+
 1. 写入superblock 的内容
 2. 写根目录inode
 3. 写文件inode
 4. 写根目录block
 5. 写文件block
-*** 写 superblock
+
+### 写 superblock
+
 此函数将一个block来保存superblock的信息。
-#+BEGIN_SRC c
+
+``` c
 #define SIMPLEFS_MAGIC 0x10032013
 #define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
 struct simplefs_super_block {
@@ -83,10 +106,13 @@ static int write_superblock(int fd)
         printf("Super block written succesfully\n");
         return 0;
 }
-#+END_SRC
-*** 写根文件inode
+```
+
+### 写根文件inode
+
 根文件的inode紧接着superblock 往后填充，也就是在第2个block中存储inode.
-#+BEGIN_SRC c
+
+``` c
 struct simplefs_inode {
         mode_t mode; //此inode表示的档案类型
         uint64_t inode_no;//inode的索引号
@@ -122,11 +148,14 @@ static int write_inode_store(int fd)
         printf("root directory inode written succesfully\n");
         return 0;
 }
-#+END_SRC
-*** 写文件inode
-通过此函数可以看出：所有的inode都存储在一个block中，而一个inode大小为 =28= 字节。
-也就是说，此文件系统最多支持文件和文件夹的总数为 4096 / 28 = 146 
-#+BEGIN_SRC c
+```
+
+### 写文件inode
+
+通过此函数可以看出：所有的inode都存储在一个block中，而一个inode大小为 `28` 字节。
+也就是说，此文件系统最多支持文件和文件夹的总数为 `4096 / 28 = 146 `
+
+``` c
 #define SIMPLEFS_DEFAULT_BLOCK_SIZE 4096
 const uint64_t WELCOMEFILE_INODE_NUMBER = 2;//文件inode为2号
 const uint64_t WELCOMEFILE_DATABLOCK_NUMBER = 3;//文件内容block
@@ -163,12 +192,15 @@ static int write_inode(int fd, const struct simplefs_inode *i)
                 ("inode store padding bytes (after the two inodes) written sucessfully\n");
         return 0;
 }
-#+END_SRC
-*** 写根目录block
-写根目录block就是写文件名以及其inode的索引,一个名称对的大小为 264 字节，
-也就是说一个目录最多可以存储的名称对为 4096 / 264 = 15 个，也就是说一个目录
+```
+
+### 写根目录block
+
+写根目录block就是写文件名以及其inode的索引,一个名称对的大小为 `264` 字节，
+也就是说一个目录最多可以存储的名称对为 `4096 / 264 = 15` 个，也就是说一个目录
 最多存储15个文件或目录名。
-#+BEGIN_SRC c
+
+``` c
 #define SIMPLEFS_FILENAME_MAXLEN 255 //文件名的最大长度
 struct simplefs_dir_record {
         char filename[SIMPLEFS_FILENAME_MAXLEN];
@@ -202,10 +234,13 @@ int write_dirent(int fd, const struct simplefs_dir_record *record)
                 ("padding after the rootdirectory children written succesfully\n");
         return 0;
 }
-#+END_SRC
-*** 写文件block 
+```
+
+### 写文件block 
+
 写文件block就是把文件内容写进去即可。
-#+BEGIN_SRC c
+
+``` c
 int write_block(int fd, char *block, size_t len)
 {
         ssize_t ret;
@@ -218,20 +253,26 @@ int write_block(int fd, char *block, size_t len)
         printf("block has been written succesfully\n");
         return 0;
 }
-#+END_SRC
-** 文件系统的结构
+```
+
+## 文件系统的结构
+
 根据上面的格式化代码，可以知道其结构如下图：
-[[./simplefs_struct.jpg]]
+
+！[](./simplefs_struct.jpg)
 
 可以看出此文件系统的确是足够的简单：
+
 1. superblock描述极为简单
 2. 并不具备block bitmap 和 inode bitmap
 3. 最多支持的文件和文件夹总数为146个(因为仅用了一个block来存储inode)
 4. 一个文件夹中可以存储的文件和文件夹总数为15个
 5. 一个文件的内容不能超过一个block
 
-*** 文件系统操作逻辑
+### 文件系统操作逻辑
+
 根据以上简单结构的分析，可以猜测出其基本的文件操作逻辑：
+
 1. 新建文件夹
   + 从inode table 中填充一个文件夹类型的inode并获取其索引
   + 为此索引的inode分配一个block并写入对应的inode
@@ -254,18 +295,22 @@ int write_block(int fd, char *block, size_t len)
 
 基于这些猜测，接下来分析其文件系统操作代码。
 
-** 操作代码分析(simple.c)
-*** 挂载
-在载入模块时，会首先使用函数 =kmem_cache_create= ，用于为文件系统的inode申请缓存以便达到快速访问的目的。
-#+BEGIN_SRC c
+## 操作代码分析(simple.c)
+
+### 挂载
+在载入模块时，会首先使用函数 ·kmem_cache_create· ，用于为文件系统的inode申请缓存以便达到快速访问的目的。
+
+``` c
 sfs_inode_cachep = kmem_cache_create("sfs_inode_cache",
                                      sizeof(struct simplefs_inode),
                                      0,
                                      (SLAB_RECLAIM_ACCOUNT| SLAB_MEM_SPREAD),
                                      NULL);
-#+END_SRC
-在挂载文件时，会调用函数 =simplefs_fill_super= 函数，此函数的主要目的就是填充 =super_block= 结构体
-#+BEGIN_SRC c
+```
+
+在挂载文件时，会调用函数 `simplefs_fill_super` 函数，此函数的主要目的就是填充 `super_block` 结构体
+
+``` c
 /* This function, as the name implies, Makes the super_block valid and
  ,* fills filesystem specific information in the super block */
 int simplefs_fill_super(struct super_block *sb, void *data, int silent)
@@ -349,13 +394,15 @@ release:
 
         return ret;
 }
-#+END_SRC
+```
 
 其数据填充结果如下图：
-[[./struct_super_block.jpg]]
 
-在 =super.h= 中有以下两个操作,对照上图就可以看出其意义：
-#+BEGIN_SRC c
+![](./struct_super_block.jpg)
+
+在 `super.h` 中有以下两个操作,对照上图就可以看出其意义：
+
+``` c
 //获取 simplefs_super_block 结构体地址
 static inline struct simplefs_super_block *SIMPLEFS_SB(struct super_block *sb)
 {
@@ -367,13 +414,16 @@ static inline struct simplefs_inode *SIMPLEFS_INODE(struct inode *inode)
 {
         return inode->i_private;
 }
-#+END_SRC
-*** 读取文件夹内容
+```
+
+### 读取文件夹内容
+
 为了获取文件夹的内容得先从目录inode找到其对应的block。
 
-当在 =mount= 文件夹下使用命令 =ls= 时，其执行路径依次为：
+当在 `mount` 文件夹下使用命令 `ls` 时，其执行路径依次为：
 - simplefs_iterate : 用于扫描目录中的文件或文件夹名称以及其对应的inode
-#+BEGIN_SRC c
+
+``` c
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
 static int simplefs_iterate(struct file *filp, struct dir_context *ctx)
 #else
@@ -439,9 +489,11 @@ static int simplefs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 
         return 0;
 }
-#+END_SRC
+```
+
 - simplefs_lookup : 得到文件或文件夹的inode内容并初始化系统的 inode结构体
-#+BEGIN_SRC c
+
+``` c
 struct dentry *simplefs_lookup(struct inode *parent_inode,
                                struct dentry *child_dentry, unsigned int flags)
 {
@@ -505,9 +557,11 @@ struct dentry *simplefs_lookup(struct inode *parent_inode,
 
         return NULL;
 }
-#+END_SRC
+```
+
 - simplefs_get_inode : 得到请求的inode号码的内容
-#+BEGIN_SRC c
+
+``` c
 /* This functions returns a simplefs_inode with the given inode_no
  ,* from the inode store, if it exists. */
 struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
@@ -553,7 +607,8 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
         brelse(bh);
         return inode_buffer;
 }
-#+END_SRC
+```
+
 - simplefs_iterate
 
 可以看出其基本思路是：
@@ -561,13 +616,15 @@ struct simplefs_inode *simplefs_get_inode(struct super_block *sb,
 2. 扫描block有哪些文件或文件夹
 3. 获取这些扫描到的文件或文件夹的inode内容，为其操作做好准备
 
-*** 读取文件内容
+### 读取文件内容
+
 可以猜测为了读取文件内容，首先要获取其inode才能找到其block.
 
-当执行 =cat vanakkam= 时，执行的函数依次是：
+当执行 `cat vanakkam` 时，执行的函数依次是：
 - simplefs_iterate : 重复执行了8次
 - simplefs_read
-#+BEGIN_SRC c
+
+``` c
 ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
                       loff_t * ppos)
 {
@@ -614,14 +671,17 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 
         return nbytes;
 }
-#+END_SRC
+```
+
 - simplefs_read
 
 可以看出其思路为：
 1. 从目录inode获取目录block，进而获取到文件的inode
   + 所以当你对一个目录都没有读权限时，是无法通过其inode来获取文件内容的
 2. 从文件inode找到其对应block再读取其内容
-*** 写文件内容
+
+### 写文件内容
+
 可以猜测其与读文件内容的思路是一样的：
 1. 从目录inode获取目录block，进而获取到文件的inode
 2. 从文件inode找到其对应block再写入对应的内容
@@ -630,7 +690,8 @@ ssize_t simplefs_read(struct file * filp, char __user * buf, size_t len,
 执行 echo "Hello world!" > vanakkam 其执行路径为：
 - simplefs_iterate : 重复执行了12次，没看懂为什么
 - simplefs_write : 写入数据并同步
-#+BEGIN_SRC c
+
+``` c
 ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
                        loff_t * ppos)
 {
@@ -702,9 +763,11 @@ ssize_t simplefs_write(struct file * filp, const char __user * buf, size_t len,
 
         return len;
 }
-#+END_SRC
+```
+
 - simplefs_inode_save : 更新inode
-#+BEGIN_SRC c
+
+``` c
 int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode)
 {
         struct simplefs_inode *inode_iterator;
@@ -745,11 +808,14 @@ int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode
 
         return 0;
 }
-#+END_SRC
+```
+
 - simplefs_inode_search : 从inode table 中找到对应序列的inode
 
-*** 新建文件夹
+### 新建文件夹
+
 先来猜测新建文件夹的步骤：
+
 1. 根据文件夹inode找到其block
 2. 为新建的文件夹在inode table 中获取一个inode
 3. 为新建的文件夹分配一个block
@@ -757,12 +823,14 @@ int simplefs_inode_save(struct super_block *sb, struct simplefs_inode *sfs_inode
 5. 更新父文件夹inode
 6. 与硬盘同步
 
-执行命令 =mkdir hello= 其调用函数依次为：
+执行命令 `mkdir hello` 其调用函数依次为：
+
 - simplefs_iterate : 浏览目录获取其档案及对应inode
 - simplefs_lookup : 查看当前目录是否已有此档案名
 - simplefs_mkdir : 新建文件夹
 - simplefs_create_fs_object : 新建档案
-#+BEGIN_SRC c
+
+``` c
 static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
                                      umode_t mode)
 {
@@ -892,10 +960,12 @@ static int simplefs_create_fs_object(struct inode *dir, struct dentry *dentry,
 
         return 0;
 }
-#+END_SRC
+```
+
 - simplefs_sb_get_object_count ： 获取当前super block 中记录的inode数量
 - simplefs_sb_get_a_freeblock : 获取空闲block
-#+BEGIN_SRC c
+
+``` c
 int simplefs_sb_get_a_freeblock(struct super_block *vsb, uint64_t * out)
 {
         //获取super block
@@ -938,10 +1008,12 @@ end:
         mutex_unlock(&simplefs_sb_lock);
         return ret;
 }
-#+END_SRC
+```
+
 - simplefs_sb_sync : 同步super block 与硬盘
 - simplefs_inode_add : 获取一个inode
-#+BEGIN_SRC c
+
+``` c
 void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 {
         struct simplefs_super_block *sb = SIMPLEFS_SB(vsb);
@@ -980,12 +1052,13 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
         mutex_unlock(&simplefs_sb_lock);
         mutex_unlock(&simplefs_inodes_mgmt_lock);
 }
-#+END_SRC
+```
 - simplefs_sb_sync 
 - simplefs_inode_save 
 - simplefs_inode_search 
 
-*** 新建文件
+### 新建文件
+
 还是先来猜测一下新建文件的步骤：
 1. 根据文件夹inode找到对应的block
 2. 从inode table 中为新建文件获取一个inode
@@ -994,7 +1067,8 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 5. 更新文件夹的inode,以及block
 6. 更新super block 的 inode
 
-下面执行 =echo "hello world!" > hello/hello.txt= 其条用函数依次为：
+下面执行 `echo "hello world!" > hello/hello.txt` 其条用函数依次为：
+
 - simplefs_iterate : 首先通过根目录扫描其所包含的条目
 - simplefs_iterate : 然后通过扫描 =hello= 目录扫描其所包含的条目
 - simplefs_lookup : 查找是否存在 =hello.txt= 的inode
@@ -1010,7 +1084,8 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 - simplefs_inode_save : 更新inode
 - simplefs_inode_search 
 
-** 功能实现
+## 功能实现
+
 通过查看其代码可以发现，此文件系统还有以下功能未能实现：
 - 删除文件
 - 删除文件夹
@@ -1018,8 +1093,9 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 - 建立硬链接
 
 下面来尝试一一实现：
-*** 删除文件
-前面已经新建了文件 =/hello/hello.txt= ，下面尝试将它删除。
+
+### 删除文件
+前面已经新建了文件 `/hello/hello.txt` ，下面尝试将它删除。
 
 根据已有的知识先来猜测一下如何以最简单的方式删除一个文件，
 为了能够使得操作步骤尽量的少，其实没有必要去擦除文件block的内容，而只需要对其inode操作即可。
@@ -1030,24 +1106,29 @@ void simplefs_inode_add(struct super_block *vsb, struct simplefs_inode *inode)
 3. inode table 修改
 4. super block 修改
    
-通过 =strace rm -f hello.txt= 观察到有这么一行输出：
-#+BEGIN_EXAMPLE
+通过 `strace rm -f hello.txt` 观察到有这么一行输出：
+
+```shell
 unlinkat(AT_FDCWD, "hello.txt", 0)      = -1 EPERM (Operation not permitted)
-#+END_EXAMPLE
-对应驱动的调用接口应该是 =struct inode_operations= 下的 =unlink=
-#+BEGIN_SRC c
+```
+
+对应驱动的调用接口应该是 `struct inode_operations` 下的 `unlink`
+``` c
   int (*unlink) (struct inode *,struct dentry *);
-#+END_SRC
+```
+
 - 在实现的过程中发现，其在增加inode 和 dir content 时是直接简单粗暴的在尾部增加，很明显在删除文件时会产生漏洞，所以此bug也需要修复。
 
-* FUSE
-[[./fuse.jpg]]
+# FUSE
+
+![](./fuse.jpg)
 
 如上图所示，FUSE仅仅在内核中实现了一个简单的模块，用于接口VFS和用户空间，文件系统的操作细节则存在于用户空间中。
 - 这种方式导致操作效率低但便于调试
 
-* 比较重要的数据结构
-#+BEGIN_SRC c
+# 比较重要的数据结构
+
+``` c
 /**
  ,* @brief 文件系统总览
  ,*/
@@ -1392,11 +1473,12 @@ struct file {
 #endif /* #ifdef CONFIG_EPOLL */
         struct address_space          *f_mapping;
 } __attribute__((aligned(4)));/* lest something weird decides that 2 is OK */
-#+END_SRC
+```
 
 inode Tab 存在于硬盘中，如果每次CPU从硬盘中读取那么效率会比较低下，
-所以内核会为inode Table 申请一段内存以作为缓存，称为 *对应文件系统的 inode cache*.
-#+BEGIN_SRC c
+所以内核会为inode Table 申请一段内存以作为缓存，称为 **对应文件系统的 inode cache**.
+
+``` c
 static int __init init_inodecache(void)
 {
         ext4_inode_cachep = kmem_cache_create("ext4_inode_cache",
@@ -1408,10 +1490,11 @@ static int __init init_inodecache(void)
                 return -ENOMEM;
         return 0;
 }
-#+END_SRC
+```
 
 同样在VFS层面上，也会对抽象出来的 inode 和 路径进行缓存(dentry), 分别称为 icache 和 dcache.
-#+BEGIN_SRC c
+
+``` c
 static void __init dcache_init(void)
 {
         unsigned int loop;
@@ -1472,6 +1555,7 @@ void __init inode_init(void)
         for (loop = 0; loop < (1U << i_hash_shift); loop++)
                 INIT_HLIST_HEAD(&inode_hashtable[loop]);
 }
-#+END_SRC
+```
+
 最终这些申请的缓存都是内核通过LRU算法进行回收的(内核通过 shrink方法来回收slab内存)
 - shrink 方法需要驱动编写者来主动实现
