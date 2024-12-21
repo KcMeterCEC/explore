@@ -64,6 +64,8 @@ cpio -i -d /etc/fstab < archive.cpio
 cpio -t < archive.cpio
 ```
 
+**需要注意的是：** cpio 打包后的文件大小不能超过 4GB.
+
 ## 编译
 
 在 `buildroot`中只需要搜`swupdate`就可以找到该包并使能，如果想要更细致的配置，可以通过以下命令配置：
@@ -102,8 +104,6 @@ make swupdate-menuconfig
 
 12. 如果具有`post update command`则执行这些命令
 
-
-
 使用`swupdate`执行升级命令为：
 
 ```shell
@@ -116,3 +116,66 @@ swupdate -i <filename>
 # 启动后就可以通过 http://<target_ip>:8080 来访问
 swupdate -w "--document-root ./www --port 8080"
 ```
+
+## 改变 U-BOOT
+
+`U-BOOT`可以保存两份环境变量，便于保证在更新环境变量时的安全性，要使能这个特性，需要配置`CONFIG_ENV_OFFSET_REDUND`或`CONFIG_ENV_ADDR_REDUND`。
+
+除此之外，还可以在`U-BOOT`中增加一个启动计数器，如果计数器没有正确的被应用程序清零则意味着这个版本升级的应用没有正常运行，然后可以切换到之前备份的应用。
+
+## 构建升级包
+
+升级包需要`sw-updescription`是第一个文件，其余的镜像可以依次往后放即可。使用类似下面的脚本就可以打包：
+
+```shell
+CONTAINER_VER="1.0"
+PRODUCT_NAME="my-software"
+FILES="sw-description image1.ubifs  \
+       image2.gz.u-boot uImage.bin myfile sdcard.img"
+for i in $FILES;do
+        echo $i;done | cpio -ov -H crc >  ${PRODUCT_NAME}_${CONTAINER_VER}.swu
+```
+
+也可以通过[GitHub - sbabic/swugenerator: A host tool to generate SWU update package for SWUpdate](https://github.com/sbabic/swugenerator/)来打包生成升级包。
+
+升级包的查看可以通过下面的命令完成：
+
+```shell
+swupdate -c -i my-software_1.0.swu
+```
+
+# 升级策略
+
+## single copy
+
+![](./pic/swupdate_single_copy.jpg)
+
+正常情况下，bootloader 直接启动用户的内核，进入文件系统运行应用程序。
+
+当需要升级时：
+
+1. 通知 bootloader 需要启动`swupdate`，然后重启系统
+   
+   - 通知的方式多种多样，比如通过环境变量、GPIO等
+
+2. bootloader 启动带 swupdate 的内核和 RAMFS
+
+3. 在 RAMFS 中启动`swupdate`分析升级包并升级
+
+如果升级过程失败，应用程序无法正确清空 bootloader 的启动计数器，则 bootloader 会主动进入升级系统。
+
+## double copy
+
+![](./pic/swupdate_double_copy.jpg)
+
+bootloader 交替的启动切换最新的软件，`swupdate`则升级那个未被启动的软件分区。
+
+当当前应用程序没有正确清空 bootloader 的启动计数器时，bootloader 会主动切换回上一个版本的应用程序。
+
+## double-copy with rescue system
+
+![](./pic/swupdate_double_copy_rescue.jpg)
+
+在`double-copy`的基础上，还可以增加一个救援系统，这样当两个版本都无法正确运行（或那个硬盘损坏）的情况下，仍然可以启动救援系统来重新格式化、更新系统。
+
+> 这个救援系统也是可以被更新的
