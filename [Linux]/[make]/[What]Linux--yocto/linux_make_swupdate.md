@@ -699,3 +699,106 @@ end
 ```
 
 上述的`image`则为传入的参数列表，该脚本设置了版本和安装属性然后返回。
+
+# 验证与签名
+
+## 基本逻辑
+
+`swupdate`的逻辑为：
+
+1. 对`sw-description`进行签名验证，确保该文件未被篡改
+
+2. 在`sw-description`中包含各个独立镜像文件的哈希校验，确认这些镜像文件的正确性
+
+`swupdate`可以通过`menuconfig`来配置签名验证使用的算法
+
+- RSA 公钥/私钥验证：私钥存放在构建主机中，公钥存放在目标设备上
+
+- CMS 用于证书
+
+- GPG 用于签名
+
+## 生成密钥和证书
+
+对于`RSA`和`CMS`算法，OpenSSL 用来生成密钥，对于`GPG`，gpg 用于生成密钥和对镜像文件签名。
+
+### 使用 RSA
+
+生成公钥和私钥：
+
+```shell
+# 先生成私钥
+openssl genrsa -aes256 -out priv.pem
+# 再生成公钥
+openssl rsa -in priv.pem -out public.pem -outform PEM -pubout
+```
+
+使用 RSA 生成签名：
+
+```shell
+# 对 sw-description 生成 rsa-pkcs#1.5 签名
+openssl dgst -sha256 -sign priv.pem sw-description > sw-description.sig
+
+
+# 也可以生成 rsa-pss 签名
+openssl dgst -sha256 -sign priv.pem -sigopt rsa_padding_mode:pss \
+    -sigopt rsa_pss_saltlen:-2 sw-description > sw-description.sig
+```
+
+### 证书生成
+
+```shell
+openssl req -x509 -newkey rsa:4096 -nodes -keyout mycert.key.pem \
+    -out mycert.cert.pem -subj "/O=SWUpdate /CN=target"
+```
+
+- `mycert.key.pem`用于保存在构建主机上
+
+- `mycert.cert.pe`用于保存在目标设备机上
+
+### 使用 CMS 进行签名
+
+```shell
+openssl cms -sign -in  sw-description -out sw-description.sig -signer mycert.cert.pem \
+        -inkey mycert.key.pem -outform DER -nosmimecap -binary
+```
+
+## 使用签名和验证
+
+对于签名而言，配置文件`sw-description`和`sw-description.sig`结合使用，签名文件跟在配置文件之后。
+
+在配置文件中的镜像都需要包含属性`sha256`，代表该镜像文件的校验和。
+
+下面的脚本演示了如何打包：
+
+```shell
+#!/bin/bash
+
+MODE="RSA-PKCS-1.5"
+PRODUCT_NAME="myproduct"
+CONTAINER_VER="1.0"
+IMAGES="rootfs kernel"
+FILES="sw-description sw-description.sig $IMAGES"
+
+#if you use RSA
+if [ x"$MODE" == "xRSA-PKCS-1.5" ]; then
+    openssl dgst -sha256 -sign priv.pem sw-description > sw-description.sig
+elif if [ x"$MODE" == "xRSA-PSS" ]; then
+    openssl dgst -sha256 -sign priv.pem -sigopt rsa_padding_mode:pss \
+        -sigopt rsa_pss_saltlen:-2 sw-description > sw-description.sig
+elif if [ x"$MODE" == "xGPG" ]; then
+    gpg --batch --homedir "${GPG_HOME_DIR}" --default-key "${GPG_KEY}" \
+        --output sw-description.sig --detach-sig sw-description
+else
+    openssl cms -sign -in  sw-description -out sw-description.sig -signer mycert.cert.pem \
+        -inkey mycert.key.pem -outform DER -nosmimecap -binary
+fi
+for i in $FILES;do
+        echo $i;done | cpio -ov -H crc >  ${PRODUCT_NAME}_${CONTAINER_VER}.swu
+```
+
+下面的配置文件演示了带有 sha256 校验的内容：
+
+```shell
+
+```
