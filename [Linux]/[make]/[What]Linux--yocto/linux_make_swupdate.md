@@ -800,5 +800,81 @@ for i in $FILES;do
 下面的配置文件演示了带有 sha256 校验的内容：
 
 ```shell
+software =
+{
+        version = "0.1.0";
 
+        hardware-compatibility: [ "revC"];
+
+        images: (
+                {
+                    filename = "core-image-full-cmdline-beaglebone.ext3";
+                    device = "/dev/mmcblk0p2";
+                    type = "raw";
+                    sha256 = "43cdedde429d1ee379a7d91e3e7c4b0b9ff952543a91a55bb2221e5c72cb342b";
+                }
+        );
+        scripts: (
+                {
+                    filename = "test.lua";
+                    type = "lua";
+                    sha256 = "f53e0b271af4c2896f56a6adffa79a1ffa3e373c9ac96e00c4cfc577b9bea5f1";
+                 }
+        );
+}
+```
+
+# 对称加密
+
+`swupdate`支持使用 AES 对镜像文件进行对称加密，在配置`swupdate`时需要使能`ENCRYPTED_IMAGES`.其使用步骤如下：
+
+## 生成密钥
+
+对于`aes-256-cbc`，需要生成 32 字节密钥和 16 字节初始化向量：
+
+```shell
+openssl rand -hex 32
+# key, for example 390ad54490a4a5f53722291023c19e08ffb5c4677a59e958c96ffa6e641df040
+openssl rand -hex 16
+# IV, for example d5d601bacfe13100b149177318ebc7a4
+```
+
+## 加密镜像
+
+```shell
+openssl enc -aes-256-cbc -in <INFILE> -out <OUTFILE> -K <KEY> -iv <IV>
+```
+
+- `<INFILE>`：输入的原始镜像文件
+
+- `<OUTFILE>`：加密后的镜像文件
+
+- `<KEY>`：上面生成的 32 字节的密钥
+
+- `<IV>`：上面生成的 16 字节初始化向量
+
+## 创建密钥文件
+
+创建密钥文件，将密钥和初始化向量以空格分隔，写入文件。并在启动 `swupdate`时，以`-K`选项传入该文件：
+
+```shell
+390ad54490a4a5f53722291023c19e08ffb5c4677a59e958c96ffa6e641df040 d5d601bacfe13100b149177318ebc7a4
+```
+
+## 配置示例
+
+最后是在配置文件中加入描述：
+
+```shell
+software =
+{
+        version = "0.0.1";
+        images: ( {
+                        filename = "core-image-full-cmdline-beaglebone.ext3.enc";
+                        device = "/dev/mmcblk0p3";
+                        encrypted = true;
+                        ivt = "65D793B87B6724BB27954C7664F15FF3";
+                }
+        );
+}
 ```
