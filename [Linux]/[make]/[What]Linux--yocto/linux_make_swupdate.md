@@ -878,3 +878,59 @@ software =
         );
 }
 ```
+
+# handler
+
+`handler`指的就是对各种镜像文件的安装处理程序，根据镜像文件的类型来匹配不同的`handler`。
+
+`swupdate`开放了接口，可以扩展增加各种`handler`，以适配用户定义的类型。
+
+## 创建新的 `handler`
+
+只需要按照`swupdate`的接口注册执行函数就可以了。
+
+```cpp
+int my_handler(struct img_type *img,
+        void __attribute__ ((__unused__)) *data)
+```
+
+`img_type`指向要安装的镜像文件的起始，处理函数通过此结构体获取文件的信息，然后读取文件内容并执行安装。
+
+`data`是用于描述安装过程的数据指针，对于脚本的 handler，其为`struct script_handler_data`
+
+`swupdate`还提供了通用函数，将流数据拷贝到目的地址：
+
+```cpp
+int copyfile(int fdin, int fdout, int nbytes, unsigned long *offs,
+        int skip_file, int compressed, uint32_t *checksum, unsigned char *hash);
+```
+
+- `fdin`：输入流，在处理函数中通过`img->fdin`获得
+
+- `hash`：镜像文件的签名
+
+用户通过下面的函数注册新的`handler`函数：
+
+```cpp
+__attribute__((constructor))
+void my_handler_init(void)
+{
+        register_handler("mytype", my_handler, my_mask, data);
+}
+```
+
+其函数原型为：
+
+```cpp
+register_handler(my_image_type, my_handler, my_mask, data);
+```
+
+- `my_image_type`：以字符串表示的匹配镜像文件类型
+
+- `my_handler`：处理函数的指针
+
+- `my_mask`：`HANDLER_MASK`枚举值，表示可以处理的类型
+
+- `data`：用于传递给处理函数的数据
+
+# API
