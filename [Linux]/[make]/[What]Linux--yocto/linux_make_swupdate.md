@@ -944,6 +944,8 @@ register_handler(my_image_type, my_handler, my_mask, data);
 
 4. `/tmp/sockinstctrl`
 
+> swupdate 也编译了一个 `swupdate-client`工具，用户演示客户端如何与服务端进行通信。
+
 ## 客户端与服务端的通信逻辑
 
 同时，`swupdate`提供了客户端库，便于以直接调用函数的方式来完成通信。
@@ -1056,3 +1058,84 @@ struct ipc_message {
 - `source`的值为`SWUPDATE_SUBPROCESS`
 
 - `cmd`的类型可以参考`network_ipc.h`
+
+### 在升级过程中获取信息
+
+除了可以获取升级的成功与失败外，还可以获取升级过程中的进度。客户端可以注册一个函数，来获取升级过程中的状态。
+
+> swupdate-progress 是一个工具用于获取升级过程中的状态
+
+客户端注册的方式是通过`connect`来连接`/tmp/swupdateprog`，然后使用`recv`来获取消息即可，消息的结构如下：
+
+```cpp
+struct progress_msg {
+        unsigned int    magic;          /* Magic Number */
+        unsigned int    status;         /* Update Status (Running, Failure) */
+        unsigned int    dwl_percent;    /* % downloaded data */
+        unsigned long long dwl_bytes;   /* total of bytes to be downloaded */
+        unsigned int    nsteps;         /* No. total of steps */
+        unsigned int    cur_step;       /* Current step index */
+        unsigned int    cur_percent;    /* % in current step */
+        char            cur_image[256]; /* Name of image to be installed */
+        char            hnd_name[64];   /* Name of running handler */
+        sourcetype      source;         /* Interface that triggered the update */
+        unsigned int    infolen;        /* Len of data valid in info */
+        char            info[2048];     /* additional information about install */
+};
+```
+
+- `status`：大的状态，包含`START, RUN, SUCCESS, FAILURE, DOWNLOAD, DONE`
+
+- `dwl_percent`：当状态为`DOWNLOAD`时，表示下载的状态
+
+- `dwl_bytes`：已经下载的总字节数
+
+- `nsteps`：总共运行的 handler 的数量
+
+- `cur_step`：当前运行的 handler 的序号
+
+- `cur_percent`：当前运行的 `handler`的进度
+
+- `cur_images`：当前正在安装的镜像名
+
+- `hnd_name`：当前正在运行的 handler 名
+
+- `infolen`：info 数组中包含的数据长度
+
+- `info`：安装过程的附加信息
+
+整个过程的示例代码位于：`tools/swupdate-progress.c`
+
+### bootloader 接口
+
+bootloader 接口主要是对其环境变量进行设定的接口，其位于`include/bootloader.h`文件中，包含的有：
+
+```cpp
+// 获取环境变量
+char *env_get(const char *name);
+// 设置环境变量
+int env_set(const char *name, const char *value);
+// 删除环境变量
+int env_unset(const char *name);
+// 从文件中读取并批量写入文件变量
+int apply_list(const char *filename);
+```
+
+这些函数需要一开始被注册：
+
+```cpp
+static bootloader trunk = {
+    .env_get = &do_env_get,
+    .env_set = &do_env_set,
+    .env_unset = &do_env_unset,
+    .apply_list = &do_apply_list
+};
+
+__attribute__((constructor))
+static void trunk_probe(void)
+{
+    (void)register_bootloader(BOOTLOADER_TRUNK, &trunk);
+}
+```
+
+在 `bootloader/uboot.c`中有使用示例。
