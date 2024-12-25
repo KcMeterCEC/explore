@@ -599,7 +599,6 @@ software =
 {
         version = "0.1.0";
         bootloader_state_markerer = false;
-       
 ```
 
 ## 更新 bootloader 的环境变量
@@ -645,8 +644,6 @@ bootenv: (
 `swupdate`可以进行版本号比较，默认格式为：`<major>.<minor>.<revision>.<build>`
 
 每个小段都是由数值组成的，其值为 0~65535，4 个 16 位组合成 64 位进行大小比较。
-
-
 
 在启动`swupdate`之前，应用软件需要更新`/etc/sw-versions`来保存各个软件包的版本，然后再来启动`swupdate`进行版本管理，文件内容格式为：
 
@@ -934,3 +931,128 @@ register_handler(my_image_type, my_handler, my_mask, data);
 - `data`：用于传递给处理函数的数据
 
 # API
+
+`swupdate`具有可被外部程序调用的 API，用于启动`swupdate`，发送镜像文件，获取状态等。
+
+`swupdate`使用的是 Unix Domain Socket，socket 路径按照以下顺序来决定：
+
+1. 编译时配置的`CONFIG_SOCKET_CTRL_PATH`
+
+2. 当环境变量`RUNTIME_DIRECTORY`设置了，则其位于`$RUNTIME_DIRECTORY/sockinstctrl`
+
+3. 当环境变量`TMPDIR`设置了，则其位于`$TMPDIR/sockinstctrl`
+
+4. `/tmp/sockinstctrl`
+
+## 客户端与服务端的通信逻辑
+
+同时，`swupdate`提供了客户端库，便于以直接调用函数的方式来完成通信。
+
+在文件`network_ipc.h`中定义了通信的帧结构：
+
+```cpp
+typedef struct {
+        int magic;
+        int type;
+        msgdata data;
+} ipc_message;
+```
+
+- `magic`：通信包的魔数
+
+- `type`：包类型，包含：`REQ_INSTALL, ACK, NACK, GET_STATUS, POST_UPDATE, SWUPDATE_SUBPROCESS, SET_AES_KEY`
+
+- `msgdata`：通信的数据数据
+
+客户端和`swupdate`通信的流程如下图：
+
+![](./pic/swupdate_progress.jpg)
+
+1. 客户端先发`REQ_INSTALL`，等待获取到`ACK`，然后就可以发送镜像文件了
+
+2. 客户端持续发送镜像文件直到发送完成，发送标记给`swupdate`
+
+3. 客户端从`swupdate`获取多次获取状态，来记录升级的进度
+
+## 客户端的 API 库说明
+
+### 启动升级
+
+与升级相关的 API 有以下几个：
+
+```cpp
+int swupdate_async_start(writedata wr_func, getstatus status_func,
+        terminated end_func, void *req, ssize_t size)
+typedef int (*writedata)(char **buf, int *size);
+typedef int (*getstatus)(ipc_message *msg);
+typedef int (*terminated)(RECOVERY_STATUS status);
+```
+
+- `swupdate_async_start`：创建了一个线程与`swupdate`进行通信
+  
+  - `wr_func`：当需要获取升级包时，此函数会被调用
+  
+  - `status_func`：当完成数据流传输时，有状态改变时该函数会被调用
+  
+  - `end_func`：当 `swupdate`停止后，该函数会被调用
+  
+  - `req`：是`swupdate_request`结构体，用于控制升级过程
+  
+  - `size`：即为结构体的大小
+
+```cpp
+struct swupdate_request {
+        unsigned int apiversion;
+        sourcetype source;
+        int dry_run;
+        size_t len;
+        char info[512];
+        char software_set[256];
+        char running_mode[256];
+};
+```
+
+- `source`：指定数据源的类型，包含`SOURCE_UNKNOWN, SOURCE_WEBSERVER, SOURCE_SURICATTA, SOURCE_DOWNLOADER, SOURCE_LOCAL`
+
+- `dry_run`：运行状态，包含`RUN_DEFAULT (set from command line), RUN_DRYRUN, RUN_INSTALL`
+
+- `info,len`：用于转发处理进程的接口
+
+- `software_set,running_mode`：选择设置状态
+
+`swupdate_request`结构体需要首先通过`swupdate_prepare_req()`来设置为默认值后再来进一步设置。
+
+具体的使用流程，可以参考`examples/client`文件夹。
+
+### 设置 AES 密钥
+
+AES 解密的密钥可以在命令行通过`-K`选项输入，也可以通过下面的函数输入：
+
+```cpp
+int swupdate_set_aes(char *key, char *ivt);
+```
+
+这里固定了是 AES-256 算法，所以`key`的长度是 64 字节的字符串，`ivt`是 32 字节的字符串。
+
+### 控制`swupdate`
+
+函数`ipc_send_cmd`用于给`swupdate`发送命令，这个函数是同步发送的：
+
+```cpp
+struct ipc_message {
+   sourcetype source; /* Who triggered the update */
+   int     cmd;       /* Optional encoded command */
+   int     timeout;     /* timeout in seconds if an aswer is expected */
+   unsigned int len;    /* Len of data valid in buf */
+   char    buf[2048];   /*
+                         * Buffer that each source can fill
+                         * with additional information
+                         */
+   }
+
+   int ipc_send_cmd(ipc_message *msg);
+```
+
+- `source`的值为`SWUPDATE_SUBPROCESS`
+
+- `cmd`的类型可以参考`network_ipc.h`
