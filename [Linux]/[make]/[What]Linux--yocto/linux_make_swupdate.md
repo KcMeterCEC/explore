@@ -7,7 +7,7 @@ categories:
 - make
 - swupdate
 date: 2024/12/19
-updated: 2024/12/20
+updated: 2024/12/26
 layout: true
 comments: true
 ---
@@ -172,6 +172,18 @@ bootloader 交替的启动切换最新的软件，`swupdate`则升级那个未�
 
 当当前应用程序没有正确清空 bootloader 的启动计数器时，bootloader 会主动切换回上一个版本的应用程序。
 
+bootloader 根据变量`ustate`的值为1，来确认目前有新的软件被安装，那么就需要通过计数器来测试该软件是否安装正确。当测试失败，bootloader 也可以修改`ustate`的值为 3，来通知应用程序升级是否成功。
+
+- 当`ustate=0`，则表示当前无新升级，bootloader 正常引导
+
+- 当`ustate=1`，表示有新软件被安装，需要测试
+  
+  - 测试失败，由 bootloader 将值设置为 3
+  
+  - 测试成功，由应用程序将值设置为 0
+
+![](./pic/swupdate_statemachine.jpg)
+
 ## double-copy with rescue system
 
 ![](./pic/swupdate_double_copy_rescue.jpg)
@@ -313,6 +325,12 @@ software =
 ```
 
 在实际升级时，到底应该是选择哪个分区，则是由应用程序来区分（比如查看当前程序是挂载在哪个分区），然后给`swupdate`发送消息。
+
+> 这个消息是要在 `swupdate`启动前就确认要升级哪个分区，然后通过`-e <selection,mode>`来告知`swupdate`。
+> 
+> 也可以在启动前创建一个连接文件`/dev/standby`指向需要被升级的分区。
+> 
+> 如果要在运行时来区分，就要在`sw-description`中编写嵌入式脚本来区分，Lua 脚本使用`getroot()`函数获取当前文件系统挂载的分区。
 
 ## 硬件兼容性
 
@@ -697,6 +715,12 @@ end
 
 上述的`image`则为传入的参数列表，该脚本设置了版本和安装属性然后返回。
 
+`swupdate`提供了一些函数便于调用，在脚本前需要写入：
+
+```lua
+require ('swupdate')
+```
+
 # 验证与签名
 
 ## 基本逻辑
@@ -945,6 +969,8 @@ register_handler(my_image_type, my_handler, my_mask, data);
 4. `/tmp/sockinstctrl`
 
 > swupdate 也编译了一个 `swupdate-client`工具，用户演示客户端如何与服务端进行通信。
+
+这也就意味着`swupdate`在系统启动后就已经启动服务了，其脚本`swupdate.sh`，用户启动该服务。该脚本还会遍历位于`/etc/swupdate/conf.d/`处的配置文件。
 
 ## 客户端与服务端的通信逻辑
 
