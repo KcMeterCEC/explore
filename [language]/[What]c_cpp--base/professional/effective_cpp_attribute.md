@@ -5,8 +5,8 @@ tags:
 categories:
 - cpp
 - professional
-date: 2022/9/28
-updated: 2022/10/2
+date: 2025/2/15
+updated: 2025/2/15
 layout: true
 comments: true
 ---
@@ -104,6 +104,10 @@ main.cpp:8:29: note: declared here
     8 |  [[nodiscard("Hello")]] int func(void) {
 ```
 
+这个属性主要是对一些重要的函数、类使用，便于提示调用者不要忽视返回值。
+
+> 如果对类使用，则调用类中的任何方法都会应用该属性。
+
 # [[maybe_unused]]
 
 当某些变量、参数、函数未被使用时，编译器会给出警告。此属性可以抑制该警告：
@@ -186,6 +190,29 @@ int main(int argc, char* argv[]) {
 
     return 0;
 };
-
-
 ```
+
+# [[assume]]
+
+`[[assume]]`是 c++ 23 增加的属性，告知编译器假定当前表达式条件在编译时判断，而不是在运行时再来判断，以优化代码性能。
+
+比如下面的代码：
+
+```cpp
+int divideBy32(int x)
+{
+    return x / 32;
+}
+```
+
+正常情况下编译器会产生可以处理正负两种情况的除法，如果确认`x`的值不会为负数，那么就可以加上`[[assume]]`:
+
+```cpp
+int divideBy32(int x)
+{
+    [[assume(x>=0)]];
+    return x / 32;
+}
+```
+
+这样子编译器就可以针对非负数除法做优化，比如上面的代码可以优化为`x>>5`，以单条指令就可以完成达到优化性能的目的。
