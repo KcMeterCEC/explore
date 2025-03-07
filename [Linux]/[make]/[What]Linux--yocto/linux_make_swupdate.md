@@ -76,6 +76,12 @@ make swupdate-menuconfig
 
 在输出路径`output/build/swupdate/tools`中有文件`swupdate-progress.c`可以作为很好的参考，用于与`swupdate`交互获取当前的状态。
 
+为了与 U-Boot 交互，则需要进行以下配置：
+
+- 在`Bootloader Interfaces`中使能 U-Boot，并设定文件`/etc/fw_env.config`以及`/etc/u-boot-initial-en`
+
+- 设定`U-Boot`中变量为`ustate`
+
 ## 使用
 
 `swupdate`的一般流程如下：
@@ -183,6 +189,10 @@ bootloader 根据变量`ustate`的值为1，来确认目前有新的软件被安
   - 测试成功，由应用程序将值设置为 0
 
 ![](./pic/swupdate_statemachine.jpg)
+
+在 bootloader 中，需要准备的变量有：
+
+1. 
 
 ## double-copy with rescue system
 
@@ -970,7 +980,7 @@ register_handler(my_image_type, my_handler, my_mask, data);
 
 > swupdate 也编译了一个 `swupdate-client`工具，用户演示客户端如何与服务端进行通信。
 
-这也就意味着`swupdate`在系统启动后就已经启动服务了，其脚本`swupdate.sh`，用户启动该服务。该脚本还会遍历位于`/etc/swupdate/conf.d/`处的配置文件。
+这也就意味着`swupdate`在系统启动后就已经启动服务了，其脚本`swupdate.sh`，用于启动该服务。该脚本还会遍历位于`/etc/swupdate/conf.d/`处的配置文件。
 
 ## 客户端与服务端的通信逻辑
 
