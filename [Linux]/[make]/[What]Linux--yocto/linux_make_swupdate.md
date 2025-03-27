@@ -192,9 +192,7 @@ bootloader 根据变量`ustate`的值为1，来确认目前有新的软件被安
 
 在 bootloader 中，需要准备的变量有：
 
-1. 
-
-## double-copy with rescue system
+1. ## double-copy with rescue system
 
 ![](./pic/swupdate_double_copy_rescue.jpg)
 
@@ -978,7 +976,7 @@ register_handler(my_image_type, my_handler, my_mask, data);
 
 4. `/tmp/sockinstctrl`
 
-> swupdate 也编译了一个 `swupdate-client`工具，用户演示客户端如何与服务端进行通信。
+> swupdate 也编译了一个 `swupdate-client`工具，用于演示客户端如何与服务端进行通信。
 
 这也就意味着`swupdate`在系统启动后就已经启动服务了，其脚本`swupdate.sh`，用于启动该服务。该脚本还会遍历位于`/etc/swupdate/conf.d/`处的配置文件。
 
