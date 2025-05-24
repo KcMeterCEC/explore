@@ -11,7 +11,7 @@ import os
 import shutil
 import filecmp
 
-blog_source = "/home/cec/github/new_blog/blog/source/_posts/";
+blog_source = "/home/cec/github/blog/source/_posts";
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 
 def get_real_name(file_path, pwd_path):
