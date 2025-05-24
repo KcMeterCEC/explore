@@ -8,7 +8,7 @@ categories:
 date: 2022/9/28
 updated: 2022/10/2
 layout: true
-comments: true
+comments: false
 ---
 
 从 c++11 开始，就具备了一些属性，其语法是 `[[attribute]]` 。
