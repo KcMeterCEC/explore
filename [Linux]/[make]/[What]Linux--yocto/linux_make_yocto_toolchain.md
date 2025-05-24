@@ -1,17 +1,15 @@
 ---
 title: 认识交叉编译器
 tags: 
-
 - yocto
-  categories: 
+categories: 
 - linux
 - make
 - yocto
-  date: 2024/1/17
-  updated: 2024/1/28
-  layout: true
-  comments: true
-
+date: 2024/1/17
+updated: 2024/1/28
+layout: true
+comments: true
 ---
 
 工具链的选择一般放在最开始，工具链选好以后最好就不要变动了。
