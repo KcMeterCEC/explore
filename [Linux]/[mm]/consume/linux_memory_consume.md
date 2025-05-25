@@ -116,36 +116,36 @@ mmap是一个指向 `vm_area_struct` 结构的链表，每一个节点(称为VMA
 
 - 在使用 gcc 编译代码时，使能其 `addresssanitizer` 选项。这种方式会在源代码中插入内存监控代码，进程运行速度影响不大。
   如下代码：
-  
-  ```c
-  #include <stdio.h>
-  #include <stdlib.h>
-  #include <string.h>
-  #include <sanitizer/lsan_interface.h>
-  #include <unistd.h>
-  
-  void main(void)
-  {
-    uint32_t *p1, i = 0;
-    while(1)
-      {
-        p1 = malloc(1024);
-        memset(p1, 0, 1024);
-        sleep(1);
-        //check memory leak by asan
-        if(++i > 3)
-          {
-            __lsan_do_leak_check();
-          }
-      }
-  }
-  ```
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sanitizer/lsan_interface.h>
+#include <unistd.h>
+
+void main(void)
+{
+  uint32_t *p1, i = 0;
+  while(1)
+    {
+      p1 = malloc(1024);
+      memset(p1, 0, 1024);
+      sleep(1);
+      //check memory leak by asan
+      if(++i > 3)
+        {
+          __lsan_do_leak_check();
+        }
+    }
+}
+```
 
 还需要加上编译选项:
 
 ```shell
-  gcc -g -fsanitize=address ./leak.c
-  ./a.out
+gcc -g -fsanitize=address ./leak.c
+./a.out
 ```
 
 # 观察内核的内存泄露
