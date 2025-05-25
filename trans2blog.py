@@ -11,7 +11,7 @@ import os
 import shutil
 import filecmp
 
-blog_source = "/home/cec/github/new_blog/blog/source/_posts/";
+blog_source = "/home/cec/github/blog/source/_posts/";
 html_str = "https://github.com/KcMeterCEC/explore/blob/master"
 
 def get_real_name(file_path, pwd_path):
@@ -49,6 +49,7 @@ def get_real_name(file_path, pwd_path):
                     temp_str = html_str + pwd_path.lstrip('.') + "/"
                     temp_str += pic_str
                     temp_str += "?raw=true"
+                    temp_str = temp_str.replace('[', '%5B').replace(']', '%5D')
                     new_str = "#+HTML:<img src=\"%s\" alt=\"%s\">" %(temp_str,pic_str)
                     if redir_pic == 2:
                         new_str = "![](%s)" %(temp_str)
