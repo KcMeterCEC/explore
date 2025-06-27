@@ -409,7 +409,7 @@ UUID=25fea792-68fb-4dcc-a793-c96933dd39a1 none            swap    sw            
 | default     | 默认:rw,suid,dev,exec,auto,nouser,async, 所以一般使用此参数即可 |
 
 - dump : 是否能被 dump 备份指定使用，一般设为 0
-- pass : 是否在开机是进行文件系统检查，为1代表需要检查 
+- pass : 是否在开机时进行文件系统检查，为1代表需要检查 
 
 ```shell
 当 fstab 文件写入有误导致开机失败，那么可以进入维护模式然后使用命令  "mount -n -o remount,rw /"

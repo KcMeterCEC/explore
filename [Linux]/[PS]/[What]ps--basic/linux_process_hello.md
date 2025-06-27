@@ -4,7 +4,7 @@ tags:
 - linux
 categories:
 - linux
-- memory
+- process
 - overview
 date: 2024/8/31
 updated: 2024/8/31
